@@ -1,0 +1,286 @@
+C51 COMPILER V9.03   UART                                                                  07/10/2013 23:53:53 PAGE 1   
+
+
+C51 COMPILER V9.03, COMPILATION OF MODULE UART
+OBJECT MODULE PLACED IN .\uart.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\src\uart.c BROWSE INCDIR(..\src;C:\Keil\C51\INC;..\src) DEBUG OBJECTEXTE
+                    -ND PRINT(.\uart.lst) OBJECT(.\uart.obj)
+
+line level    source
+
+   1          /*
+   2          * Description : Uart interface implement - 8051
+   3          *
+   4          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+   5          * All rights reserved.
+   6          *
+   7          * Author      : Peter Nguyen
+   8          *
+   9          * Purpose :
+  10          *                 To handle build-in uart related functions.
+  11          *
+  12          * File: uart.c
+  13          */
+  14          
+  15          //#include "stdafx.h"
+  16          #include <reg51.h>
+  17          #include <stdio.h>
+  18          
+  19          void ComInit();
+  20          char _getkey();
+  21          char _get1char();
+  22          char putchar(char);
+  23          
+  24          
+  25          void ComInit()
+  26          {
+  27   1              TMOD    = 0x21;     //Timer1: reload, timer0: 16bit counter
+  28   1      
+  29   1              //TH1   = 249;          //Reload values for 9600bps/12.5MHz clk
+  30   1              //TH1   = 251;    //Osc 4.6Mhz, br 4.8kbps
+  31   1              //TH1     = 0xE6;     //24MHZ / 4.8Kbps
+  32   1              //TH1     = 0xF3;     //24MHz 9.6Kbps 
+  33   1              //TH1     = 0xE5;   //25MHz @ 4.8Kbps
+  34   1              //TH1     = 0xF9;     //12.5MHz @ 9.6Kbps
+  35   1              //TH1     = 0xFA;     //11MHz @ 9.6Kbps
+  36   1              TH1     =  0xF2;    //25MHz @ 9.6Kbps
+  37   1              //TH1     = 0xD7;     //12.5MHz @ 1655bps (x12 = 19200)
+  38   1      
+  39   1              PCON    = 0x80;     //Set double baurate
+  40   1              IE0         = 0x0;          //Disable all interrupts
+  41   1              SCON    = 0x50;         //8bit mode, rx enable scon.4 = 1
+  42   1              TR1         = 1;                //Turn on timer1
+  43   1              TI      = 0;
+  44   1              RI      = 0;
+  45   1      }
+  46          
+  47          #if 0
+              char _getkey()
+              {
+                  char idata c;
+                  do
+                  {
+                      while (RI == 0);
+                      RI = 0;
+C51 COMPILER V9.03   UART                                                                  07/10/2013 23:53:53 PAGE 2   
+
+                      c = SBUF;
+                  } while (c == 0x11);    // Ignore 0x11 - XOn sync signal from Keil
+                  return c;
+              }
+              #endif
+  60          char putchar(char c)
+  61          {
+  62   1          if (c == '\n')  
+  63   1          {
+  64   2              TI = 0;
+  65   2              SBUF = '\r';        // output CR before LF
+  66   2              while (TI == 0);
+  67   2              TI = 0;
+  68   2          }
+  69   1          TI = 0;
+  70   1          SBUF = c;        // output CR before LF
+  71   1          while (TI == 0);
+  72   1          TI = 0;
+  73   1          return c;
+  74   1      }
+  75          
+  76          #if 0
+              //***************************************************************
+              //
+              //***************************************************************
+              char _get1char()
+              {
+                      char idata c;
+                      c = 0;
+                      while (RI==0);
+                      c = SBUF;
+                      RI = 0;
+                      return c;
+              }
+              #endif
+  90          
+  91          
+  92          /*
+  93          void CmdGet(u8 idata *CmdBufPnt)
+  94          {
+  95              volatile u8 idata c;
+  96              volatile u16 idata idx = 0;
+  97              while (1)
+  98              {
+  99                  c = _getkey();
+ 100          
+ 101                  switch (c)
+ 102                  {
+ 103                  case '\b':    // backspace
+ 104                      if (idx > 0)
+ 105                      {
+ 106                          printf("\b \b");
+ 107                          idx--;
+ 108                      }
+ 109                      break;
+ 110          
+ 111                  case 0x1B:    // ESC
+ 112                  case '`':
+ 113                      *CmdBufPnt = 0;
+ 114                      printf("\n");
+ 115                      return;
+ 116                      while (idx > 0)
+C51 COMPILER V9.03   UART                                                                  07/10/2013 23:53:53 PAGE 3   
+
+ 117                      {
+ 118                          printf("\b \b");
+ 119                          idx--;
+ 120                      }
+ 121                      break;
+ 122          
+ 123                  case '\r':    // enter
+ 124                  case '\n':
+ 125                      printf(" \n");
+ 126                                  
+ 127                      while (idx < 15)
+ 128                          *(CmdBufPnt+idx++) = 0;
+ 129                            return;
+ 130          
+ 131                  default:
+ 132                      if (idx > 13)
+ 133                      {
+ 134                          idx--;
+ 135                          putchar('\b');
+ 136                      }
+ 137                                  if (idx < 15)
+ 138                                  {
+ 139                          *(CmdBufPnt+idx) = c;
+ 140                                          putchar(*(CmdBufPnt+idx++));
+ 141                                  }
+ 142                                  break;
+ 143                  }
+ 144              }
+ 145          }
+ 146          */
+ 147          /*
+ 148          void CmdRead(u8 idata *CmdBufPt)
+ 149          {
+ 150              volatile u16 data reg_addr;
+ 151              volatile u16 data reg_data;
+ 152                  /////Testing 
+ 153                  for (reg_addr=0; reg_addr<16; reg_addr++)
+ 154                  {
+ 155                          printf("%c", *(CmdBufPt+reg_addr));
+ 156                  }
+ 157                  //////////////////////////////
+ 158          
+ 159              if (sscanf(CmdBufPt+1, "%x", &reg_addr) < 1)
+ 160                  return;
+ 161          
+ 162              reg_data = (u16)(*((u8 xdata *)reg_addr));
+ 163              printf("    Reg:  [%04X] --> %02X\n\n", reg_addr, reg_data);
+ 164          }
+ 165          */
+ 166          /*
+ 167          void CmdWrite(u8 idata *CmdBuf)
+ 168          {
+ 169              volatile u16 reg_addr;
+ 170              volatile u16 reg_data;
+ 171                  /////Testing 
+ 172                  for (reg_addr=0; reg_addr<16; reg_addr++)
+ 173                  {
+ 174                          printf("%c", CmdBuf[reg_addr]);
+ 175                  }
+ 176                  //////////////////////////////    
+ 177              if (sscanf(CmdBuf+1, "%x %x", &reg_addr, &reg_data) < 2)
+ 178                  return;
+C51 COMPILER V9.03   UART                                                                  07/10/2013 23:53:53 PAGE 4   
+
+ 179          
+ 180              reg_data &= 0x00FF;
+ 181          
+ 182              printf("    Reg:  %02X --> [%04X]\n\n", reg_data, reg_addr);
+ 183          
+ 184                   *((U8 xdata *)reg_addr) = (U8)reg_data;
+ 185          }
+ 186          */
+ 187          /*
+ 188          void CmdSPIWrite(u8 idata *CmdBufPt)
+ 189          {
+ 190              u16 spi_addr;
+ 191              u16 spi_data;
+ 192              
+ 193              if (sscanf(CmdBufPt+1, "%x %x", &spi_addr, &spi_data) < 2)
+ 194                  return;
+ 195          
+ 196              spi_addr &= 0x001F;         // 5-bit addr
+ 197              spi_data &= 0x03FF;         // 10-bit data
+ 198          
+ 199              reg_402 = spi_data;         // LSB [7:0]
+ 200              reg_403 = spi_data >> 8;    // MSB [9:8]
+ 201              reg_401 = spi_addr | 0x00;  // bit 7 = 0: write
+ 202              reg_404 = 0x55;             // dummy write to trigger SPI communication
+ 203          
+ 204              printf("    SPI:  %03X --> [%02X]\n\n", spi_data, spi_addr);
+ 205          }
+ 206          */
+ 207          /*
+ 208          void CmdReadCRam(u8 idata *CmdBufPt)
+ 209          {
+ 210             u16 reg_addr;
+ 211                  u8 reg_data;
+ 212             if (sscanf(CmdBufPt+1, "%x", &reg_addr) < 1)
+ 213                  return;
+ 214             reg_data  =  *((U8 code *)reg_addr); 
+ 215             printf("    CMem:  [%04X] --> %02X", reg_addr, (u16)(reg_data));
+ 216          }
+ 217          */
+ 218          /*
+ 219          void CmdWriteCRam(u8 idata *CmdBuf)
+ 220          {
+ 221             u16 reg_addr;
+ 222             u16 reg_data;
+ 223          
+ 224                  EnableWrCRam ();           
+ 225          
+ 226                  if (sscanf(CmdBuf+1, "%x %x", &reg_addr, &reg_data) < 2)
+ 227                  return;
+ 228          
+ 229                  printf("    CMem:  %02X --> [%04X]\n\n", reg_data, (u16)(reg_addr));
+ 230          
+ 231              *((U8 xdata *)reg_addr) = reg_data;
+ 232          #ifdef TEST_LEVEL1
+ 233                  printf ("@C/D RAM = %02X\n",(u16)*((u8 xdata *)reg_addr));
+ 234          #endif
+ 235                  DisableWrCRam ();
+ 236          #ifdef TEST_LEVEL1
+ 237                  printf ("@Code RAM = %02X\n",(u16)*((U8 code *)reg_addr)); 
+ 238                  printf ("@Data RAM = %02X\n",(u16)*((u8 xdata *)reg_addr));
+ 239          #endif 
+ 240          }
+C51 COMPILER V9.03   UART                                                                  07/10/2013 23:53:53 PAGE 5   
+
+ 241          */
+ 242          /*
+ 243          void CmdHelp()
+ 244          {
+ 245              printf
+ 246              (    
+ 247                      "\n"
+ 248                  "  S  download code from serial flash\n" 
+ 249                          "  U  download code from UART\n"
+ 250                  "  C  read 1 byte from CRAM (c aaaa)\n"
+ 251                          "\n"
+ 252              );
+ 253          }
+ 254          */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     44    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

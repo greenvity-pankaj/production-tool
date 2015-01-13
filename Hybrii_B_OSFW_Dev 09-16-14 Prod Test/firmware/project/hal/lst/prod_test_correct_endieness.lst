@@ -1,0 +1,219 @@
+C51 COMPILER V9.52.0.0   PROD_TEST_CORRECT_ENDIENESS                                       01/10/2015 21:25:28 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE PROD_TEST_CORRECT_ENDIENESS
+OBJECT MODULE PLACED IN .\obj\prod_test_correct_endieness.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE src\prod_test_correct_endieness.c LARGE OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0
+                    -X2100) INCDIR(..\..\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\s
+                    -rc\nma;..\..\hal;.\src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;.
+                    -.\..\hpgp\src\route;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\componen
+                    -ts\utilities\linklist\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\samp
+                    -leapp\inc;..\..\..\components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC
+                    -_SW_SYNC=1,inline,HPGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_
+                    -SPI_TX_CRC,HW_SPI_RX_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND 
+                    -PRINT(.\lst\prod_test_correct_endieness.lst) TABS(2) OBJECT(.\obj\prod_test_correct_endieness.obj)
+
+line level    source
+
+   1          #ifdef PROD_TEST
+   2          
+   3          #ifdef RTX51_TINY_OS
+   4          #include <rtx51tny.h>
+   5          #endif
+   6          #include <stdio.h>
+   7          #include <string.h>
+   8          #include <intrins.h>
+   9          #include "fm.h"
+  10          #include "papdef.h"
+  11          #include "hal_tst.h"
+  12          #include "hal_prod_tst.h"
+  13          #include "hal_spi.h"
+  14          
+  15          
+  16          
+  17          void correctEndieness_sPlcSimTxTestParams(sPlcSimTxTestParams *pTestParams){
+  18   1      
+  19   1        u16 len;
+  20   1        u32 numfrms, delay;
+  21   1      
+  22   1        len = pTestParams->frmLen;
+  23   1        numfrms = pTestParams->numFrames;
+  24   1        delay = pTestParams->delay;
+  25   1      
+  26   1        pTestParams->frmLen = le16_to_cpu(len);
+  27   1        pTestParams->numFrames = le32_to_cpu(numfrms);
+  28   1        pTestParams->delay = le32_to_cpu(delay);
+  29   1      
+  30   1      }
+  31          #if 0
+              void correctEndieness_shpgpHalStats(shpgpHalStats *stats){
+              
+                u32     TotalRxGoodFrmCnt;
+                  u32     TotalRxBytesCnt;
+                  u32     RxGoodDataCnt;
+                  u32     RxGoodBcnCnt;
+                  u32     RxGoodMgmtCnt;
+                  u32     RxGoodSoundCnt;
+                  u32     RxErrBcnCnt;
+                  u32     BcnRxIntCnt;
+                  u32     DuplicateRxCnt;
+              
+                  // Tx Statistics counters
+                  u32     TotalTxFrmCnt;
+                  u32     TotalTxBytesCnt;
+                  u32     TxDataCnt;
+C51 COMPILER V9.52.0.0   PROD_TEST_CORRECT_ENDIENESS                                       01/10/2015 21:25:28 PAGE 2   
+
+                  u32     TxBcnCnt;
+                  u32     TxMgmtCnt;
+                  u32     TxDataMgmtGoodCnt;
+                  u32     BcnSyncCnt;
+                  u32     BcnSentIntCnt;
+               
+                  // Tx Test Stat
+                  u32     CurTxTestFrmCnt;
+                  
+                  // Rx Test Stat - valid only for single tx-rx setup only 
+                  u32     TotalRxMissCnt;
+                  u32     CorruptFrmCnt;
+              
+                  u32     bpIntCnt;
+                  u32     lastSs1;
+                  u32     MissSyncCnt;
+              
+                  // rx Phy Active stuck workaround
+                  u32     prevBPTotalRxCnt;
+              
+                  u32     STAleadCCOCount;
+                  u32     STAlagCCOCount;
+                
+                  u16     macTxStuckCnt;
+                  u16     macRxStuckCnt;
+                  u16     phyStuckCnt;
+                  u16     mpiRxStuckCnt;
+                  u16     smTxStuckCnt;
+                  u16     smRxStuckCnt;
+              
+                  u32 PtoHswDropCnt;
+                  u32 HtoPswDropCnt;
+                  u32 GswDropCnt;
+              
+                //assign value
+                TotalRxGoodFrmCnt = stats->TotalRxGoodFrmCnt;
+                TotalRxBytesCnt = stats->TotalRxBytesCnt;
+                RxGoodDataCnt = stats->RxGoodDataCnt;
+                RxGoodBcnCnt = stats->RxGoodBcnCnt;
+                RxGoodMgmtCnt = stats->RxGoodMgmtCnt;
+                RxGoodSoundCnt = stats->RxGoodSoundCnt;
+                RxErrBcnCnt = stats->RxErrBcnCnt;
+                BcnRxIntCnt = stats->BcnRxIntCnt;
+                DuplicateRxCnt = stats->DuplicateRxCnt;
+              
+                // Tx Statistics counters
+                TotalTxFrmCnt = stats->TotalTxFrmCnt;
+                TotalTxBytesCnt = stats->TotalTxBytesCnt;
+                TxDataCnt = stats->TxDataCnt;
+                TxBcnCnt = stats->TxBcnCnt;
+                TxMgmtCnt = stats->TxMgmtCnt;
+                TxDataMgmtGoodCnt = stats->TxDataMgmtGoodCnt;
+                BcnSyncCnt = stats->BcnSyncCnt;
+                BcnSentIntCnt = stats->BcnSentIntCnt;
+              
+                // Tx Test Stat
+                CurTxTestFrmCnt = stats->CurTxTestFrmCnt;
+              
+                // Rx Test Stat - valid only for single tx-rx setup only 
+                TotalRxMissCnt = stats->TotalRxMissCnt;
+                CorruptFrmCnt = stats->CorruptFrmCnt;
+              
+C51 COMPILER V9.52.0.0   PROD_TEST_CORRECT_ENDIENESS                                       01/10/2015 21:25:28 PAGE 3   
+
+                bpIntCnt = stats->bpIntCnt;
+                lastSs1 = stats->lastSs1;
+                MissSyncCnt = stats->MissSyncCnt;
+              
+                // rx Phy Active stuck workaround
+                prevBPTotalRxCnt= stats->prevBPTotalRxCnt;
+              
+                STAleadCCOCount = stats->STAleadCCOCount;
+                STAlagCCOCount = stats->STAlagCCOCount;
+              
+                macTxStuckCnt = stats->macTxStuckCnt;
+                macRxStuckCnt= stats->macRxStuckCnt;
+                phyStuckCnt = stats->phyStuckCnt;
+                mpiRxStuckCnt = stats->mpiRxStuckCnt;
+                smTxStuckCnt = stats->smTxStuckCnt;
+                smRxStuckCnt = stats->smRxStuckCnt;
+              
+                PtoHswDropCnt = stats->PtoHswDropCnt;
+                HtoPswDropCnt = stats->HtoPswDropCnt;
+                GswDropCnt = stats->GswDropCnt;
+              
+                /* correct endieness */ 
+                stats->TotalRxGoodFrmCnt = cpu_to_le32(TotalRxGoodFrmCnt);
+                stats->TotalRxBytesCnt = cpu_to_le32(TotalRxBytesCnt);
+                stats->RxGoodDataCnt = cpu_to_le32(RxGoodDataCnt);
+                stats->RxGoodBcnCnt = cpu_to_le32(RxGoodBcnCnt);
+                stats->RxGoodMgmtCnt = cpu_to_le32(RxGoodMgmtCnt);
+                stats->RxGoodSoundCnt = cpu_to_le32(RxGoodSoundCnt);
+                stats->RxErrBcnCnt = cpu_to_le32(RxErrBcnCnt);
+                stats->BcnRxIntCnt = cpu_to_le32(BcnRxIntCnt);
+                stats->DuplicateRxCnt = cpu_to_le32(DuplicateRxCnt);
+              
+                // Tx Statistics counters
+                stats->TotalTxFrmCnt = cpu_to_le32(TotalTxFrmCnt);
+                stats->TotalTxBytesCnt = cpu_to_le32(TotalTxBytesCnt);
+                stats->TxDataCnt = cpu_to_le32(TxDataCnt);
+                stats->TxBcnCnt = cpu_to_le32(TxBcnCnt);
+                stats->TxMgmtCnt = cpu_to_le32(TxMgmtCnt);
+                stats->TxDataMgmtGoodCnt = cpu_to_le32(TxDataMgmtGoodCnt);
+                stats->BcnSyncCnt = cpu_to_le32(BcnSyncCnt);
+                stats->BcnSentIntCnt = cpu_to_le32(BcnSentIntCnt);
+              
+                // Tx Test Stat
+                stats->CurTxTestFrmCnt = cpu_to_le32(CurTxTestFrmCnt);
+              
+                // Rx Test Stat - valid only for single tx-rx setup only 
+                stats->TotalRxMissCnt = cpu_to_le32(TotalRxMissCnt);
+                stats->CorruptFrmCnt = cpu_to_le32(CorruptFrmCnt);
+              
+                stats->bpIntCnt = cpu_to_le32(bpIntCnt);
+                stats->lastSs1 = cpu_to_le32(lastSs1);
+                stats->MissSyncCnt = cpu_to_le32(MissSyncCnt);
+              
+                // rx Phy Active stuck workaround
+                stats->prevBPTotalRxCnt = cpu_to_le32(prevBPTotalRxCnt);
+              
+                stats->STAleadCCOCount = cpu_to_le32(STAleadCCOCount);
+                stats->STAlagCCOCount = cpu_to_le32(STAlagCCOCount);
+              
+                stats->macTxStuckCnt = cpu_to_le16(macTxStuckCnt);
+                stats->macRxStuckCnt = cpu_to_le16(macRxStuckCnt);
+                stats->phyStuckCnt = cpu_to_le16(phyStuckCnt);
+C51 COMPILER V9.52.0.0   PROD_TEST_CORRECT_ENDIENESS                                       01/10/2015 21:25:28 PAGE 4   
+
+                stats->mpiRxStuckCnt = cpu_to_le16(mpiRxStuckCnt);
+                stats->smTxStuckCnt = cpu_to_le16(smTxStuckCnt);
+                stats->smRxStuckCnt = cpu_to_le16(smRxStuckCnt);
+              
+                stats->PtoHswDropCnt = cpu_to_le32(PtoHswDropCnt);
+                stats->HtoPswDropCnt = cpu_to_le32(HtoPswDropCnt);
+                stats->GswDropCnt = cpu_to_le32(GswDropCnt);
+              }
+              
+              #endif
+ 182          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    309    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      13
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

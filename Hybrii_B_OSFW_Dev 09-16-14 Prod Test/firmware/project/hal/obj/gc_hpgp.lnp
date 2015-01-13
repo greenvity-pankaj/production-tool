@@ -1,0 +1,30 @@
+COMMON {".\obj\STARTUP.obj"},
+COMMON {".\obj\L51_PALM_BANK.obj"},
+COMMON {".\obj\CONF_TNY.obj"},
+COMMON {".\obj\clear_char.obj"},
+COMMON {".\obj\hal_common.obj"},
+COMMON {".\obj\hal_main.obj"},
+BANK0 {".\obj\fm.obj"},
+COMMON {".\obj\list.obj"},
+COMMON {".\obj\utils.obj"},
+COMMON {".\obj\ism.obj"},
+BANK0 {".\obj\hal_hpgpRx.obj"},
+BANK0 {".\obj\ehal_tst.obj"},
+BANK0 {".\obj\chal_tst.obj"},
+BANK0 {".\obj\ihal_ui.obj"},
+BANK0 {".\obj\ihal_tst.obj"},
+BANK1 {".\obj\hal_hpgp.obj"},
+BANK1 {".\obj\sys_common.obj"},
+BANK3 {".\obj\hal_hpgpTx.obj"},
+BANK3 {".\obj\datapath.obj"},
+BANK3 {".\obj\FrameTask.obj"},
+BANK3 {".\obj\prod_test_correct_endieness.obj"},
+BANK4 {".\obj\hhal_tst.obj"},
+BANK4 {".\obj\hal_eth.obj"},
+BANK4 {".\obj\hhal_led.obj"},
+BANK4 {".\obj\hal_spi.obj"},
+BANK4 {".\obj\hal_prod_tst.obj"} 
+TO ".\obj\gc_hpgp" BankArea(0xA000,0xFFFF) Rtx51Tiny 
+PRINT(".\lst\gc_hpgp.m51") RAMSIZE(256) 
+CODE( 0X2100-0X9FFF )
+XDATA( 0X2000-0XDFFF )

@@ -1,0 +1,157 @@
+C51 COMPILER V9.52.0.0   HPGP_MAC_INTF                                                     12/02/2014 14:35:42 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HPGP_MAC_INTF
+OBJECT MODULE PLACED IN .\obj\hpgp_mac_intf.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\src\sap\hpgp_mac_intf.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(
+                    -0X2100) INCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\h
+                    -al;..\..\src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\.
+                    -.\..\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilitie
+                    -s\event\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\samplea
+                    -pp\src;..\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_su
+                    -pport;..\..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,S
+                    -TA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HY
+                    -BRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RE
+                    -COVERY,PROD_TEST) DEBUG PRINT(.\lst\hpgp_mac_intf.lst) TABS(2) OBJECT(.\obj\hpgp_mac_intf.obj)
+
+line level    source
+
+   1          #include <stdio.h>
+   2          #include <string.h>
+   3          #ifdef RTX51_TINY_OS
+   4          #include <rtx51tny.h>
+   5          #endif
+   6          #include "papdef.h"
+   7          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  10          #include "event.h"
+  11          #include "hpgpdef.h"
+  12          //#include "H1msgs.h"
+  13          #include "hpgpevt.h"
+  14          #include "mac_intf_common.h"
+  15          #include "hpgp_mac_intf.h"
+  16          #include "hpgpapi.h"
+  17          #include "hal_eth.h"
+  18          #include "nma.h"
+  19          #include "fm.h"
+  20          #include "hal_spi.h"
+  21          #include "nma.h"
+  22          #include "hybrii_tasks.h"
+  23          
+  24          void NMA_RecvMgmtPacket(void* cookie,  sEvent *event);
+  25          
+  26          void hmac_intf_downlink_primitives_handler(hostHdr_t *pHostHdr, u16 packetlen)
+  27          {
+  28   1        sEvent *event;
+  29   1        sNma *nma = HOMEPLUG_GetNma();
+  30   1        u8 *pos;
+  31   1      
+  32   1      //  pos = (u8 *)pHostHdr + sizeof(hostHdr_t) + pHostHdr->rsvd + 2;  
+  33   1          packetlen -= sizeof(hostHdr_t);
+  34   1          pHostHdr->length = HTONHS(pHostHdr->length);
+  35   1          if((packetlen) < pHostHdr->length)
+  36   1          {
+  37   2              return;
+  38   2          }
+  39   1          
+  40   1        pos = (u8 *)pHostHdr + sizeof(hostHdr_t);    
+  41   1        
+  42   1        event = EVENT_Alloc( pHostHdr->length + CRC_SIZE, H1MSG_HEADER_SIZE);
+  43   1        if (event == NULL)
+  44   1        {
+  45   2          return;
+  46   2        }
+C51 COMPILER V9.52.0.0   HPGP_MAC_INTF                                                     12/02/2014 14:35:42 PAGE 2   
+
+  47   1      
+  48   1        switch(pHostHdr->type)
+  49   1        {
+  50   2          case(CONTROL_FRM_ID):
+  51   2          case(MGMT_FRM_ID):
+  52   2          {           
+  53   3            switch((u8)(*pos))
+  54   3            {   
+  55   4              case(APCM_SET_SECURITY_MODE_REQ):
+  56   4              case(APCM_GET_SECURITY_MODE_REQ):
+  57   4              case(APCM_SET_KEY_REQ):     
+  58   4              case(APCM_STA_RESTART_REQ):   
+  59   4              case(APCM_SET_NETWORKS_REQ):  
+  60   4              case(APCM_NET_EXIT_REQ):    
+  61   4              case(APCM_CCO_APPOINT_REQ):   
+  62   4              case(APCM_AUTHORIZE_REQ):
+  63   4                event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+  64   4              break;
+  65   4      
+  66   4              case(HOST_CMD_DATAPATH_REQ):  
+  67   4              case(HOST_CMD_SNIFFER_REQ):   
+  68   4              case(HOST_CMD_BRIDGE_REQ):    
+  69   4              case(HOST_CMD_DEVICE_MODE_REQ): 
+  70   4              case(HOST_CMD_HARDWARE_SPEC_REQ):
+  71   4              case(HOST_CMD_DEVICE_STATS_REQ):
+  72   4              case(HOST_CMD_PEERINFO_REQ):
+  73   4                      case(HOST_CMD_SW_RESET_REQ):
+  74   4                      case(HOST_CMD_FW_READY):    
+  75   4                      case(HOST_CMD_TX_POWER_MODE_REQ):
+  76   4                      case(HOST_CMD_COMMIT_REQ):
+  77   4              case(HOST_CMD_GET_VERSION_REQ):
+  78   4                      case(HOST_CMD_PSAVLN_REQ):
+  79   4                      case(HOST_CMD_PSSTA_REQ):
+  80   4                      case(HOST_CMD_GV_RESET_REQ):
+  81   4                      case(HOST_CMD_ERASE_FLASH_REQ):
+  82   4                event->eventHdr.eventClass = EVENT_CLASS_MGMT;
+  83   4              break;
+  84   4      
+  85   4              default:
+  86   4              {
+  87   5                printf("\n Invalid command id received from host");
+  88   5                EVENT_Free(event);
+  89   5                return;  // This is not handled cleanly. we might have to send a FAILURE status to Host     
+  90   5              }
+  91   4              break;
+  92   4            }
+  93   3          }
+  94   2          break;
+  95   2      
+  96   2          case(DATA_FRM_ID):
+  97   2          {
+  98   3            event->eventHdr.eventClass = EVENT_CLASS_DATA;  
+  99   3          }
+ 100   2          break;
+ 101   2              default:
+ 102   2              {
+ 103   3                  printf("\n Invalid pHostHdr->type\n");
+ 104   3              EVENT_Free(event);
+ 105   3              return;  // This is not handled cleanly. we might have to send a FAILURE status to Host
+ 106   3              }
+ 107   2        } 
+ 108   1        
+C51 COMPILER V9.52.0.0   HPGP_MAC_INTF                                                     12/02/2014 14:35:42 PAGE 3   
+
+ 109   1        event->eventHdr.type = *pos;
+ 110   1        event->buffDesc.datalen =  pHostHdr->length;
+ 111   1        memcpy(event->buffDesc.dataptr, pos,  pHostHdr->length);
+ 112   1        
+ 113   1        NMA_RecvMgmtPacket((void*)nma, event);
+ 114   1        ///os_set_ready(HPGP_TASK_ID_LINK);
+ 115   1        os_set_ready(HPGP_TASK_ID_CTRL);
+ 116   1        return;
+ 117   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    404    ----
+   CONSTANT SIZE    =     66    ----
+   XDATA SIZE       =   ----      14
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

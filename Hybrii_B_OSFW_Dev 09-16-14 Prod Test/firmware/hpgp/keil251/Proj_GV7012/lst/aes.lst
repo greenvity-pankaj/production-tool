@@ -1,0 +1,1157 @@
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE AES
+OBJECT MODULE PLACED IN .\obj\aes.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\src\crypto\aes.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100)
+                    - INCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..\.
+                    -.\src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\zi
+                    -gbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event
+                    -\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\src;
+                    -..\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support;.
+                    -.\..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC
+                    -,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,
+                    -Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,
+                    -PROD_TEST) DEBUG PRINT(.\lst\aes.lst) TABS(2) OBJECT(.\obj\aes.obj)
+
+line level    source
+
+   1          /*
+   2           ---------------------------------------------------------------------------
+   3           Copyright (c) 1998-2008, Brian Gladman, Worcester, UK. All rights reserved.
+   4          
+   5           LICENSE TERMS
+   6          
+   7           The redistribution and use of this software (with or without changes)
+   8           is allowed without the payment of fees or royalties provided that:
+   9          
+  10            1. source code distributions include the above copyright notice, this
+  11               list of conditions and the following disclaimer;
+  12          
+  13            2. binary distributions include the above copyright notice, this list
+  14               of conditions and the following disclaimer in their documentation;
+  15          
+  16            3. the name of the copyright holder is not used to endorse products
+  17               built using this software without specific written permission.
+  18          
+  19           DISCLAIMER
+  20          
+  21           This software is provided 'as is' with no explicit or implied warranties
+  22           in respect of its properties, including, but not limited to, correctness
+  23           and/or fitness for purpose.
+  24           ---------------------------------------------------------------------------
+  25           Issue 09/09/2006
+  26          
+  27           This is an AES implementation that uses only 8-bit byte operations on the
+  28           cipher state (there are options to use 32-bit types if available).
+  29          
+  30           The combination of mix columns and byte substitution used here is based on
+  31           that developed by Karl Malbrain. His contribution is acknowledged.
+  32           */
+  33          
+  34          /* define if you have a fast memcpy function on your system */
+  35          #ifdef AUTH_AES
+  36          #if 1
+  37          #  define HAVE_MEMCPY
+  38          #  include <string.h>
+  39          #  if defined( _MSC_VER )
+              #    include <intrin.h>
+              #    pragma intrinsic( memcpy )
+              #  endif
+  43          #endif
+  44          
+  45          #include <stdlib.h>
+  46          #include "fm.h"
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 2   
+
+  47          
+  48          /* define if you have fast 32-bit types on your system */
+  49          #if 0
+              #  define HAVE_UINT_32T
+              #endif
+  52          
+  53          /* define if you don't want any tables */
+  54          #if 1
+  55          #  define USE_TABLES
+  56          #endif
+  57          
+  58          /*  On Intel Core 2 duo VERSION_1 is faster */
+  59          
+  60          /* alternative versions (test for performance on your system) */
+  61          #if 1
+  62          #  define VERSION_1
+  63          #endif
+  64          
+  65          #include "aes.h"
+  66          #define EXIT_SUCCESS 0
+  67          #define EXIT_FAILURE 1
+  68          
+  69          #if defined( HAVE_UINT_32T )
+                typedef unsigned long uint_32t;
+              #endif
+  72          
+  73          /* functions for finite field multiplication in the AES Galois field    */
+  74          
+  75          #define WPOLY   0x011b
+  76          #define BPOLY     0x1b
+  77          #define DPOLY   0x008d
+  78          
+  79          #define f1(x)   (x)
+  80          #define f2(x)   ((x << 1) ^ (((x >> 7) & 1) * WPOLY))
+  81          #define f4(x)   ((x << 2) ^ (((x >> 6) & 1) * WPOLY) ^ (((x >> 6) & 2) * WPOLY))
+  82          #define f8(x)   ((x << 3) ^ (((x >> 5) & 1) * WPOLY) ^ (((x >> 5) & 2) * WPOLY) \
+  83                                    ^ (((x >> 5) & 4) * WPOLY))
+  84          #define d2(x)   (((x) >> 1) ^ ((x) & 1 ? DPOLY : 0))
+  85          
+  86          #define f3(x)   (f2(x) ^ x)
+  87          #define f9(x)   (f8(x) ^ x)
+  88          #define fb(x)   (f8(x) ^ f2(x) ^ x)
+  89          #define fd(x)   (f8(x) ^ f4(x) ^ x)
+  90          #define fe(x)   (f8(x) ^ f4(x) ^ f2(x))
+  91          
+  92          #if defined( USE_TABLES )
+  93          
+  94          #define sb_data(w) {    /* S Box data values */                            \
+  95              w(0x63), w(0x7c), w(0x77), w(0x7b), w(0xf2), w(0x6b), w(0x6f), w(0xc5),\
+  96              w(0x30), w(0x01), w(0x67), w(0x2b), w(0xfe), w(0xd7), w(0xab), w(0x76),\
+  97              w(0xca), w(0x82), w(0xc9), w(0x7d), w(0xfa), w(0x59), w(0x47), w(0xf0),\
+  98              w(0xad), w(0xd4), w(0xa2), w(0xaf), w(0x9c), w(0xa4), w(0x72), w(0xc0),\
+  99              w(0xb7), w(0xfd), w(0x93), w(0x26), w(0x36), w(0x3f), w(0xf7), w(0xcc),\
+ 100              w(0x34), w(0xa5), w(0xe5), w(0xf1), w(0x71), w(0xd8), w(0x31), w(0x15),\
+ 101              w(0x04), w(0xc7), w(0x23), w(0xc3), w(0x18), w(0x96), w(0x05), w(0x9a),\
+ 102              w(0x07), w(0x12), w(0x80), w(0xe2), w(0xeb), w(0x27), w(0xb2), w(0x75),\
+ 103              w(0x09), w(0x83), w(0x2c), w(0x1a), w(0x1b), w(0x6e), w(0x5a), w(0xa0),\
+ 104              w(0x52), w(0x3b), w(0xd6), w(0xb3), w(0x29), w(0xe3), w(0x2f), w(0x84),\
+ 105              w(0x53), w(0xd1), w(0x00), w(0xed), w(0x20), w(0xfc), w(0xb1), w(0x5b),\
+ 106              w(0x6a), w(0xcb), w(0xbe), w(0x39), w(0x4a), w(0x4c), w(0x58), w(0xcf),\
+ 107              w(0xd0), w(0xef), w(0xaa), w(0xfb), w(0x43), w(0x4d), w(0x33), w(0x85),\
+ 108              w(0x45), w(0xf9), w(0x02), w(0x7f), w(0x50), w(0x3c), w(0x9f), w(0xa8),\
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 3   
+
+ 109              w(0x51), w(0xa3), w(0x40), w(0x8f), w(0x92), w(0x9d), w(0x38), w(0xf5),\
+ 110              w(0xbc), w(0xb6), w(0xda), w(0x21), w(0x10), w(0xff), w(0xf3), w(0xd2),\
+ 111              w(0xcd), w(0x0c), w(0x13), w(0xec), w(0x5f), w(0x97), w(0x44), w(0x17),\
+ 112              w(0xc4), w(0xa7), w(0x7e), w(0x3d), w(0x64), w(0x5d), w(0x19), w(0x73),\
+ 113              w(0x60), w(0x81), w(0x4f), w(0xdc), w(0x22), w(0x2a), w(0x90), w(0x88),\
+ 114              w(0x46), w(0xee), w(0xb8), w(0x14), w(0xde), w(0x5e), w(0x0b), w(0xdb),\
+ 115              w(0xe0), w(0x32), w(0x3a), w(0x0a), w(0x49), w(0x06), w(0x24), w(0x5c),\
+ 116              w(0xc2), w(0xd3), w(0xac), w(0x62), w(0x91), w(0x95), w(0xe4), w(0x79),\
+ 117              w(0xe7), w(0xc8), w(0x37), w(0x6d), w(0x8d), w(0xd5), w(0x4e), w(0xa9),\
+ 118              w(0x6c), w(0x56), w(0xf4), w(0xea), w(0x65), w(0x7a), w(0xae), w(0x08),\
+ 119              w(0xba), w(0x78), w(0x25), w(0x2e), w(0x1c), w(0xa6), w(0xb4), w(0xc6),\
+ 120              w(0xe8), w(0xdd), w(0x74), w(0x1f), w(0x4b), w(0xbd), w(0x8b), w(0x8a),\
+ 121              w(0x70), w(0x3e), w(0xb5), w(0x66), w(0x48), w(0x03), w(0xf6), w(0x0e),\
+ 122              w(0x61), w(0x35), w(0x57), w(0xb9), w(0x86), w(0xc1), w(0x1d), w(0x9e),\
+ 123              w(0xe1), w(0xf8), w(0x98), w(0x11), w(0x69), w(0xd9), w(0x8e), w(0x94),\
+ 124              w(0x9b), w(0x1e), w(0x87), w(0xe9), w(0xce), w(0x55), w(0x28), w(0xdf),\
+ 125              w(0x8c), w(0xa1), w(0x89), w(0x0d), w(0xbf), w(0xe6), w(0x42), w(0x68),\
+ 126              w(0x41), w(0x99), w(0x2d), w(0x0f), w(0xb0), w(0x54), w(0xbb), w(0x16) }
+ 127          
+ 128          #define isb_data(w) {   /* inverse S Box data values */                    \
+ 129              w(0x52), w(0x09), w(0x6a), w(0xd5), w(0x30), w(0x36), w(0xa5), w(0x38),\
+ 130              w(0xbf), w(0x40), w(0xa3), w(0x9e), w(0x81), w(0xf3), w(0xd7), w(0xfb),\
+ 131              w(0x7c), w(0xe3), w(0x39), w(0x82), w(0x9b), w(0x2f), w(0xff), w(0x87),\
+ 132              w(0x34), w(0x8e), w(0x43), w(0x44), w(0xc4), w(0xde), w(0xe9), w(0xcb),\
+ 133              w(0x54), w(0x7b), w(0x94), w(0x32), w(0xa6), w(0xc2), w(0x23), w(0x3d),\
+ 134              w(0xee), w(0x4c), w(0x95), w(0x0b), w(0x42), w(0xfa), w(0xc3), w(0x4e),\
+ 135              w(0x08), w(0x2e), w(0xa1), w(0x66), w(0x28), w(0xd9), w(0x24), w(0xb2),\
+ 136              w(0x76), w(0x5b), w(0xa2), w(0x49), w(0x6d), w(0x8b), w(0xd1), w(0x25),\
+ 137              w(0x72), w(0xf8), w(0xf6), w(0x64), w(0x86), w(0x68), w(0x98), w(0x16),\
+ 138              w(0xd4), w(0xa4), w(0x5c), w(0xcc), w(0x5d), w(0x65), w(0xb6), w(0x92),\
+ 139              w(0x6c), w(0x70), w(0x48), w(0x50), w(0xfd), w(0xed), w(0xb9), w(0xda),\
+ 140              w(0x5e), w(0x15), w(0x46), w(0x57), w(0xa7), w(0x8d), w(0x9d), w(0x84),\
+ 141              w(0x90), w(0xd8), w(0xab), w(0x00), w(0x8c), w(0xbc), w(0xd3), w(0x0a),\
+ 142              w(0xf7), w(0xe4), w(0x58), w(0x05), w(0xb8), w(0xb3), w(0x45), w(0x06),\
+ 143              w(0xd0), w(0x2c), w(0x1e), w(0x8f), w(0xca), w(0x3f), w(0x0f), w(0x02),\
+ 144              w(0xc1), w(0xaf), w(0xbd), w(0x03), w(0x01), w(0x13), w(0x8a), w(0x6b),\
+ 145              w(0x3a), w(0x91), w(0x11), w(0x41), w(0x4f), w(0x67), w(0xdc), w(0xea),\
+ 146              w(0x97), w(0xf2), w(0xcf), w(0xce), w(0xf0), w(0xb4), w(0xe6), w(0x73),\
+ 147              w(0x96), w(0xac), w(0x74), w(0x22), w(0xe7), w(0xad), w(0x35), w(0x85),\
+ 148              w(0xe2), w(0xf9), w(0x37), w(0xe8), w(0x1c), w(0x75), w(0xdf), w(0x6e),\
+ 149              w(0x47), w(0xf1), w(0x1a), w(0x71), w(0x1d), w(0x29), w(0xc5), w(0x89),\
+ 150              w(0x6f), w(0xb7), w(0x62), w(0x0e), w(0xaa), w(0x18), w(0xbe), w(0x1b),\
+ 151              w(0xfc), w(0x56), w(0x3e), w(0x4b), w(0xc6), w(0xd2), w(0x79), w(0x20),\
+ 152              w(0x9a), w(0xdb), w(0xc0), w(0xfe), w(0x78), w(0xcd), w(0x5a), w(0xf4),\
+ 153              w(0x1f), w(0xdd), w(0xa8), w(0x33), w(0x88), w(0x07), w(0xc7), w(0x31),\
+ 154              w(0xb1), w(0x12), w(0x10), w(0x59), w(0x27), w(0x80), w(0xec), w(0x5f),\
+ 155              w(0x60), w(0x51), w(0x7f), w(0xa9), w(0x19), w(0xb5), w(0x4a), w(0x0d),\
+ 156              w(0x2d), w(0xe5), w(0x7a), w(0x9f), w(0x93), w(0xc9), w(0x9c), w(0xef),\
+ 157              w(0xa0), w(0xe0), w(0x3b), w(0x4d), w(0xae), w(0x2a), w(0xf5), w(0xb0),\
+ 158              w(0xc8), w(0xeb), w(0xbb), w(0x3c), w(0x83), w(0x53), w(0x99), w(0x61),\
+ 159              w(0x17), w(0x2b), w(0x04), w(0x7e), w(0xba), w(0x77), w(0xd6), w(0x26),\
+ 160              w(0xe1), w(0x69), w(0x14), w(0x63), w(0x55), w(0x21), w(0x0c), w(0x7d) }
+ 161          
+ 162          #define mm_data(w) {    /* basic data for forming finite field tables */   \
+ 163              w(0x00), w(0x01), w(0x02), w(0x03), w(0x04), w(0x05), w(0x06), w(0x07),\
+ 164              w(0x08), w(0x09), w(0x0a), w(0x0b), w(0x0c), w(0x0d), w(0x0e), w(0x0f),\
+ 165              w(0x10), w(0x11), w(0x12), w(0x13), w(0x14), w(0x15), w(0x16), w(0x17),\
+ 166              w(0x18), w(0x19), w(0x1a), w(0x1b), w(0x1c), w(0x1d), w(0x1e), w(0x1f),\
+ 167              w(0x20), w(0x21), w(0x22), w(0x23), w(0x24), w(0x25), w(0x26), w(0x27),\
+ 168              w(0x28), w(0x29), w(0x2a), w(0x2b), w(0x2c), w(0x2d), w(0x2e), w(0x2f),\
+ 169              w(0x30), w(0x31), w(0x32), w(0x33), w(0x34), w(0x35), w(0x36), w(0x37),\
+ 170              w(0x38), w(0x39), w(0x3a), w(0x3b), w(0x3c), w(0x3d), w(0x3e), w(0x3f),\
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 4   
+
+ 171              w(0x40), w(0x41), w(0x42), w(0x43), w(0x44), w(0x45), w(0x46), w(0x47),\
+ 172              w(0x48), w(0x49), w(0x4a), w(0x4b), w(0x4c), w(0x4d), w(0x4e), w(0x4f),\
+ 173              w(0x50), w(0x51), w(0x52), w(0x53), w(0x54), w(0x55), w(0x56), w(0x57),\
+ 174              w(0x58), w(0x59), w(0x5a), w(0x5b), w(0x5c), w(0x5d), w(0x5e), w(0x5f),\
+ 175              w(0x60), w(0x61), w(0x62), w(0x63), w(0x64), w(0x65), w(0x66), w(0x67),\
+ 176              w(0x68), w(0x69), w(0x6a), w(0x6b), w(0x6c), w(0x6d), w(0x6e), w(0x6f),\
+ 177              w(0x70), w(0x71), w(0x72), w(0x73), w(0x74), w(0x75), w(0x76), w(0x77),\
+ 178              w(0x78), w(0x79), w(0x7a), w(0x7b), w(0x7c), w(0x7d), w(0x7e), w(0x7f),\
+ 179              w(0x80), w(0x81), w(0x82), w(0x83), w(0x84), w(0x85), w(0x86), w(0x87),\
+ 180              w(0x88), w(0x89), w(0x8a), w(0x8b), w(0x8c), w(0x8d), w(0x8e), w(0x8f),\
+ 181              w(0x90), w(0x91), w(0x92), w(0x93), w(0x94), w(0x95), w(0x96), w(0x97),\
+ 182              w(0x98), w(0x99), w(0x9a), w(0x9b), w(0x9c), w(0x9d), w(0x9e), w(0x9f),\
+ 183              w(0xa0), w(0xa1), w(0xa2), w(0xa3), w(0xa4), w(0xa5), w(0xa6), w(0xa7),\
+ 184              w(0xa8), w(0xa9), w(0xaa), w(0xab), w(0xac), w(0xad), w(0xae), w(0xaf),\
+ 185              w(0xb0), w(0xb1), w(0xb2), w(0xb3), w(0xb4), w(0xb5), w(0xb6), w(0xb7),\
+ 186              w(0xb8), w(0xb9), w(0xba), w(0xbb), w(0xbc), w(0xbd), w(0xbe), w(0xbf),\
+ 187              w(0xc0), w(0xc1), w(0xc2), w(0xc3), w(0xc4), w(0xc5), w(0xc6), w(0xc7),\
+ 188              w(0xc8), w(0xc9), w(0xca), w(0xcb), w(0xcc), w(0xcd), w(0xce), w(0xcf),\
+ 189              w(0xd0), w(0xd1), w(0xd2), w(0xd3), w(0xd4), w(0xd5), w(0xd6), w(0xd7),\
+ 190              w(0xd8), w(0xd9), w(0xda), w(0xdb), w(0xdc), w(0xdd), w(0xde), w(0xdf),\
+ 191              w(0xe0), w(0xe1), w(0xe2), w(0xe3), w(0xe4), w(0xe5), w(0xe6), w(0xe7),\
+ 192              w(0xe8), w(0xe9), w(0xea), w(0xeb), w(0xec), w(0xed), w(0xee), w(0xef),\
+ 193              w(0xf0), w(0xf1), w(0xf2), w(0xf3), w(0xf4), w(0xf5), w(0xf6), w(0xf7),\
+ 194              w(0xf8), w(0xf9), w(0xfa), w(0xfb), w(0xfc), w(0xfd), w(0xfe), w(0xff) }
+ 195          
+ 196          static uint_8t XDATA sbox[256]  =  sb_data(f1);
+ 197          static uint_8t XDATA isbox[256] = isb_data(f1);
+ 198          
+ 199          static uint_8t XDATA gfm2_sbox[256] = sb_data(f2);
+ 200          static uint_8t XDATA gfm3_sbox[256] = sb_data(f3);
+ 201                                       
+ 202          static uint_8t XDATA gfmul_9[256] = mm_data(f9);
+ 203          static uint_8t XDATA gfmul_b[256] = mm_data(fb);
+ 204          static uint_8t XDATA gfmul_d[256] = mm_data(fd);
+ 205          static uint_8t XDATA gfmul_e[256] = mm_data(fe);
+ 206          
+ 207          #define s_box(x)     sbox[(x)]
+ 208          #define is_box(x)    isbox[(x)]
+ 209          #define gfm2_sb(x)   gfm2_sbox[(x)]
+ 210          #define gfm3_sb(x)   gfm3_sbox[(x)]
+ 211          #define gfm_9(x)     gfmul_9[(x)]
+ 212          #define gfm_b(x)     gfmul_b[(x)]
+ 213          #define gfm_d(x)     gfmul_d[(x)]
+ 214          #define gfm_e(x)     gfmul_e[(x)]
+ 215          
+ 216          #else
+              
+              /* this is the high bit of x right shifted by 1 */
+              /* position. Since the starting polynomial has  */
+              /* 9 bits (0x11b), this right shift keeps the   */
+              /* values of all top bits within a byte         */
+              
+              static uint_8t hibit(const uint_8t x)
+              {   uint_8t r = (uint_8t)((x >> 1) | (x >> 2));
+              
+                  r |= (r >> 2);
+                  r |= (r >> 4);
+                  return (r + 1) >> 1;
+              }
+              
+              /* return the inverse of the finite field element x */
+              
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 5   
+
+              static uint_8t gf_inv(const uint_8t x)
+              {   uint_8t p1 = x, p2 = BPOLY, n1 = hibit(x), n2 = 0x80, v1 = 1, v2 = 0;
+              
+                  if(x < 2) 
+                      return x;
+              
+                  for( ; ; )
+                  {
+                      if(n1)
+                          while(n2 >= n1)             /* divide polynomial p2 by p1    */
+                          {
+                              n2 /= n1;               /* shift smaller polynomial left */ 
+                              p2 ^= (p1 * n2) & 0xff; /* and remove from larger one    */
+                              v2 ^= (v1 * n2);        /* shift accumulated value and   */ 
+                              n2 = hibit(p2);         /* add into result               */
+                          }
+                      else
+                          return v1;
+              
+                      if(n2)                          /* repeat with values swapped    */ 
+                          while(n1 >= n2)
+                          {
+                              n1 /= n2; 
+                              p1 ^= p2 * n1; 
+                              v1 ^= v2 * n1; 
+                              n1 = hibit(p1);
+                          }
+                      else
+                          return v2;
+                  }
+              }
+              
+              /* The forward and inverse affine transformations used in the S-box */
+              uint_8t fwd_affine(const uint_8t x)
+              {   
+              #if defined( HAVE_UINT_32T )
+                  uint_32t w = x;
+                  w ^= (w << 1) ^ (w << 2) ^ (w << 3) ^ (w << 4);
+                  return 0x63 ^ ((w ^ (w >> 8)) & 0xff);
+              #else
+                  return 0x63 ^ x ^ (x << 1) ^ (x << 2) ^ (x << 3) ^ (x << 4) 
+                                  ^ (x >> 7) ^ (x >> 6) ^ (x >> 5) ^ (x >> 4);
+              #endif
+              }
+              
+              uint_8t inv_affine(const uint_8t x)
+              {
+              #if defined( HAVE_UINT_32T )
+                  uint_32t w = x;
+                  w = (w << 1) ^ (w << 3) ^ (w << 6);
+                  return 0x05 ^ ((w ^ (w >> 8)) & 0xff);
+              #else
+                  return 0x05 ^ (x << 1) ^ (x << 3) ^ (x << 6) 
+                              ^ (x >> 7) ^ (x >> 5) ^ (x >> 2);
+              #endif
+              }
+              
+              #define s_box(x)   fwd_affine(gf_inv(x))
+              #define is_box(x)  gf_inv(inv_affine(x))
+              #define gfm2_sb(x) f2(s_box(x))
+              #define gfm3_sb(x) f3(s_box(x))
+              #define gfm_9(x)   f9(x)
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 6   
+
+              #define gfm_b(x)   fb(x)
+              #define gfm_d(x)   fd(x)
+              #define gfm_e(x)   fe(x)
+              
+              #endif
+ 300          
+ 301          #if defined( HAVE_MEMCPY )
+ 302          #  define block_copy_nn(d, s, l)    memcpy(d, s, l)
+ 303          #  define block_copy(d, s)          memcpy(d, s, N_BLOCK)
+ 304          #else
+              #  define block_copy_nn(d, s, l)    copy_block_nn(d, s, l)
+              #  define block_copy(d, s)          copy_block(d, s)
+              
+              
+              
+              static void copy_block( void *d, const void *s )
+              {
+              #if defined( HAVE_UINT_32T )
+                  ((uint_32t*)d)[ 0] = ((uint_32t*)s)[ 0];
+                  ((uint_32t*)d)[ 1] = ((uint_32t*)s)[ 1];
+                  ((uint_32t*)d)[ 2] = ((uint_32t*)s)[ 2];
+                  ((uint_32t*)d)[ 3] = ((uint_32t*)s)[ 3];
+              #else
+                  ((uint_8t*)d)[ 0] = ((uint_8t*)s)[ 0];
+                  ((uint_8t*)d)[ 1] = ((uint_8t*)s)[ 1];
+                  ((uint_8t*)d)[ 2] = ((uint_8t*)s)[ 2];
+                  ((uint_8t*)d)[ 3] = ((uint_8t*)s)[ 3];
+                  ((uint_8t*)d)[ 4] = ((uint_8t*)s)[ 4];
+                  ((uint_8t*)d)[ 5] = ((uint_8t*)s)[ 5];
+                  ((uint_8t*)d)[ 6] = ((uint_8t*)s)[ 6];
+                  ((uint_8t*)d)[ 7] = ((uint_8t*)s)[ 7];
+                  ((uint_8t*)d)[ 8] = ((uint_8t*)s)[ 8];
+                  ((uint_8t*)d)[ 9] = ((uint_8t*)s)[ 9];
+                  ((uint_8t*)d)[10] = ((uint_8t*)s)[10];
+                  ((uint_8t*)d)[11] = ((uint_8t*)s)[11];
+                  ((uint_8t*)d)[12] = ((uint_8t*)s)[12];
+                  ((uint_8t*)d)[13] = ((uint_8t*)s)[13];
+                  ((uint_8t*)d)[14] = ((uint_8t*)s)[14];
+                  ((uint_8t*)d)[15] = ((uint_8t*)s)[15];
+              #endif
+              }
+              
+              static void copy_block_nn( void * d, const void *s, uint_8t nn )
+              {
+                  while( nn-- )
+                  {
+                      *((uint_8t*)d)++ = *((uint_8t*)s)++;
+                  }
+              }
+              
+              #endif
+ 346          
+ 347          
+ 348          static void xor_block( void *d, const void *s )
+ 349          {
+ 350   1      #if defined( HAVE_UINT_32T )
+                  ((uint_32t*)d)[ 0] ^= ((uint_32t*)s)[ 0];
+                  ((uint_32t*)d)[ 1] ^= ((uint_32t*)s)[ 1];
+                  ((uint_32t*)d)[ 2] ^= ((uint_32t*)s)[ 2];
+                  ((uint_32t*)d)[ 3] ^= ((uint_32t*)s)[ 3];
+              #else
+ 356   1          ((uint_8t*)d)[ 0] ^= ((uint_8t*)s)[ 0];
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 7   
+
+ 357   1          ((uint_8t*)d)[ 1] ^= ((uint_8t*)s)[ 1];
+ 358   1          ((uint_8t*)d)[ 2] ^= ((uint_8t*)s)[ 2];
+ 359   1          ((uint_8t*)d)[ 3] ^= ((uint_8t*)s)[ 3];
+ 360   1          ((uint_8t*)d)[ 4] ^= ((uint_8t*)s)[ 4];
+ 361   1          ((uint_8t*)d)[ 5] ^= ((uint_8t*)s)[ 5];
+ 362   1          ((uint_8t*)d)[ 6] ^= ((uint_8t*)s)[ 6];
+ 363   1          ((uint_8t*)d)[ 7] ^= ((uint_8t*)s)[ 7];
+ 364   1          ((uint_8t*)d)[ 8] ^= ((uint_8t*)s)[ 8];
+ 365   1          ((uint_8t*)d)[ 9] ^= ((uint_8t*)s)[ 9];
+ 366   1          ((uint_8t*)d)[10] ^= ((uint_8t*)s)[10];
+ 367   1          ((uint_8t*)d)[11] ^= ((uint_8t*)s)[11];
+ 368   1          ((uint_8t*)d)[12] ^= ((uint_8t*)s)[12];
+ 369   1          ((uint_8t*)d)[13] ^= ((uint_8t*)s)[13];
+ 370   1          ((uint_8t*)d)[14] ^= ((uint_8t*)s)[14];
+ 371   1          ((uint_8t*)d)[15] ^= ((uint_8t*)s)[15];
+ 372   1      #endif
+ 373   1      }
+ 374          
+ 375          static void copy_and_key( void *d, const void *s, const void *k )
+ 376          {
+ 377   1      #if defined( HAVE_UINT_32T )
+                  ((uint_32t*)d)[ 0] = ((uint_32t*)s)[ 0] ^ ((uint_32t*)k)[ 0];
+                  ((uint_32t*)d)[ 1] = ((uint_32t*)s)[ 1] ^ ((uint_32t*)k)[ 1];
+                  ((uint_32t*)d)[ 2] = ((uint_32t*)s)[ 2] ^ ((uint_32t*)k)[ 2];
+                  ((uint_32t*)d)[ 3] = ((uint_32t*)s)[ 3] ^ ((uint_32t*)k)[ 3];
+              #elif 1
+ 383   1          ((uint_8t*)d)[ 0] = ((uint_8t*)s)[ 0] ^ ((uint_8t*)k)[ 0];
+ 384   1          ((uint_8t*)d)[ 1] = ((uint_8t*)s)[ 1] ^ ((uint_8t*)k)[ 1];
+ 385   1          ((uint_8t*)d)[ 2] = ((uint_8t*)s)[ 2] ^ ((uint_8t*)k)[ 2];
+ 386   1          ((uint_8t*)d)[ 3] = ((uint_8t*)s)[ 3] ^ ((uint_8t*)k)[ 3];
+ 387   1          ((uint_8t*)d)[ 4] = ((uint_8t*)s)[ 4] ^ ((uint_8t*)k)[ 4];
+ 388   1          ((uint_8t*)d)[ 5] = ((uint_8t*)s)[ 5] ^ ((uint_8t*)k)[ 5];
+ 389   1          ((uint_8t*)d)[ 6] = ((uint_8t*)s)[ 6] ^ ((uint_8t*)k)[ 6];
+ 390   1          ((uint_8t*)d)[ 7] = ((uint_8t*)s)[ 7] ^ ((uint_8t*)k)[ 7];
+ 391   1          ((uint_8t*)d)[ 8] = ((uint_8t*)s)[ 8] ^ ((uint_8t*)k)[ 8];
+ 392   1          ((uint_8t*)d)[ 9] = ((uint_8t*)s)[ 9] ^ ((uint_8t*)k)[ 9];
+ 393   1          ((uint_8t*)d)[10] = ((uint_8t*)s)[10] ^ ((uint_8t*)k)[10];
+ 394   1          ((uint_8t*)d)[11] = ((uint_8t*)s)[11] ^ ((uint_8t*)k)[11];
+ 395   1          ((uint_8t*)d)[12] = ((uint_8t*)s)[12] ^ ((uint_8t*)k)[12];
+ 396   1          ((uint_8t*)d)[13] = ((uint_8t*)s)[13] ^ ((uint_8t*)k)[13];
+ 397   1          ((uint_8t*)d)[14] = ((uint_8t*)s)[14] ^ ((uint_8t*)k)[14];
+ 398   1          ((uint_8t*)d)[15] = ((uint_8t*)s)[15] ^ ((uint_8t*)k)[15];
+ 399   1      #else
+                  block_copy(d, s);
+                  xor_block(d, k);
+              #endif
+ 403   1      }
+ 404          
+ 405          static void add_round_key( uint_8t d[N_BLOCK], const uint_8t k[N_BLOCK] )
+ 406          {
+ 407   1          xor_block(d, k);
+ 408   1      }
+ 409          
+ 410          static void shift_sub_rows( uint_8t st[N_BLOCK] )
+ 411          {   uint_8t tt;
+ 412   1      
+ 413   1          st[ 0] = s_box(st[ 0]); st[ 4] = s_box(st[ 4]);
+ 414   1          st[ 8] = s_box(st[ 8]); st[12] = s_box(st[12]);
+ 415   1      
+ 416   1          tt = st[1]; st[ 1] = s_box(st[ 5]); st[ 5] = s_box(st[ 9]);
+ 417   1          st[ 9] = s_box(st[13]); st[13] = s_box( tt );
+ 418   1      
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 8   
+
+ 419   1          tt = st[2]; st[ 2] = s_box(st[10]); st[10] = s_box( tt );
+ 420   1          tt = st[6]; st[ 6] = s_box(st[14]); st[14] = s_box( tt );
+ 421   1      
+ 422   1          tt = st[15]; st[15] = s_box(st[11]); st[11] = s_box(st[ 7]);
+ 423   1          st[ 7] = s_box(st[ 3]); st[ 3] = s_box( tt );
+ 424   1      }
+ 425          
+ 426          static void inv_shift_sub_rows( uint_8t st[N_BLOCK] )
+ 427          {   uint_8t tt;
+ 428   1      
+ 429   1          st[ 0] = is_box(st[ 0]); st[ 4] = is_box(st[ 4]);
+ 430   1          st[ 8] = is_box(st[ 8]); st[12] = is_box(st[12]);
+ 431   1      
+ 432   1          tt = st[13]; st[13] = is_box(st[9]); st[ 9] = is_box(st[5]);
+ 433   1          st[ 5] = is_box(st[1]); st[ 1] = is_box( tt );
+ 434   1      
+ 435   1          tt = st[2]; st[ 2] = is_box(st[10]); st[10] = is_box( tt );
+ 436   1          tt = st[6]; st[ 6] = is_box(st[14]); st[14] = is_box( tt );
+ 437   1      
+ 438   1          tt = st[3]; st[ 3] = is_box(st[ 7]); st[ 7] = is_box(st[11]);
+ 439   1          st[11] = is_box(st[15]); st[15] = is_box( tt );
+ 440   1      }
+ 441          
+ 442          #if defined( VERSION_1 )
+ 443            static void mix_sub_columns( uint_8t dt[N_BLOCK] )
+ 444            { uint_8t st[N_BLOCK];
+ 445   1          block_copy(st, dt);
+ 446   1      #else
+                static void mix_sub_columns( uint_8t dt[N_BLOCK], uint_8t st[N_BLOCK] )
+                {
+              #endif
+ 450   1          dt[ 0] = gfm2_sb(st[0]) ^ gfm3_sb(st[5]) ^ s_box(st[10]) ^ s_box(st[15]);
+ 451   1          dt[ 1] = s_box(st[0]) ^ gfm2_sb(st[5]) ^ gfm3_sb(st[10]) ^ s_box(st[15]);
+ 452   1          dt[ 2] = s_box(st[0]) ^ s_box(st[5]) ^ gfm2_sb(st[10]) ^ gfm3_sb(st[15]);
+ 453   1          dt[ 3] = gfm3_sb(st[0]) ^ s_box(st[5]) ^ s_box(st[10]) ^ gfm2_sb(st[15]);
+ 454   1      
+ 455   1          dt[ 4] = gfm2_sb(st[4]) ^ gfm3_sb(st[9]) ^ s_box(st[14]) ^ s_box(st[3]);
+ 456   1          dt[ 5] = s_box(st[4]) ^ gfm2_sb(st[9]) ^ gfm3_sb(st[14]) ^ s_box(st[3]);
+ 457   1          dt[ 6] = s_box(st[4]) ^ s_box(st[9]) ^ gfm2_sb(st[14]) ^ gfm3_sb(st[3]);
+ 458   1          dt[ 7] = gfm3_sb(st[4]) ^ s_box(st[9]) ^ s_box(st[14]) ^ gfm2_sb(st[3]);
+ 459   1      
+ 460   1          dt[ 8] = gfm2_sb(st[8]) ^ gfm3_sb(st[13]) ^ s_box(st[2]) ^ s_box(st[7]);
+ 461   1          dt[ 9] = s_box(st[8]) ^ gfm2_sb(st[13]) ^ gfm3_sb(st[2]) ^ s_box(st[7]);
+ 462   1          dt[10] = s_box(st[8]) ^ s_box(st[13]) ^ gfm2_sb(st[2]) ^ gfm3_sb(st[7]);
+ 463   1          dt[11] = gfm3_sb(st[8]) ^ s_box(st[13]) ^ s_box(st[2]) ^ gfm2_sb(st[7]);
+ 464   1      
+ 465   1          dt[12] = gfm2_sb(st[12]) ^ gfm3_sb(st[1]) ^ s_box(st[6]) ^ s_box(st[11]);
+ 466   1          dt[13] = s_box(st[12]) ^ gfm2_sb(st[1]) ^ gfm3_sb(st[6]) ^ s_box(st[11]);
+ 467   1          dt[14] = s_box(st[12]) ^ s_box(st[1]) ^ gfm2_sb(st[6]) ^ gfm3_sb(st[11]);
+ 468   1          dt[15] = gfm3_sb(st[12]) ^ s_box(st[1]) ^ s_box(st[6]) ^ gfm2_sb(st[11]);
+ 469   1        }
+ 470          
+ 471          #if defined( VERSION_1 )
+ 472            static void inv_mix_sub_columns( uint_8t dt[N_BLOCK] )
+ 473            { uint_8t st[N_BLOCK];
+ 474   1          block_copy(st, dt);
+ 475   1      #else
+                static void inv_mix_sub_columns( uint_8t dt[N_BLOCK], uint_8t st[N_BLOCK] )
+                {
+              #endif
+ 479   1          dt[ 0] = is_box(gfm_e(st[ 0]) ^ gfm_b(st[ 1]) ^ gfm_d(st[ 2]) ^ gfm_9(st[ 3]));
+ 480   1          dt[ 5] = is_box(gfm_9(st[ 0]) ^ gfm_e(st[ 1]) ^ gfm_b(st[ 2]) ^ gfm_d(st[ 3]));
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 9   
+
+ 481   1          dt[10] = is_box(gfm_d(st[ 0]) ^ gfm_9(st[ 1]) ^ gfm_e(st[ 2]) ^ gfm_b(st[ 3]));
+ 482   1          dt[15] = is_box(gfm_b(st[ 0]) ^ gfm_d(st[ 1]) ^ gfm_9(st[ 2]) ^ gfm_e(st[ 3]));
+ 483   1      
+ 484   1          dt[ 4] = is_box(gfm_e(st[ 4]) ^ gfm_b(st[ 5]) ^ gfm_d(st[ 6]) ^ gfm_9(st[ 7]));
+ 485   1          dt[ 9] = is_box(gfm_9(st[ 4]) ^ gfm_e(st[ 5]) ^ gfm_b(st[ 6]) ^ gfm_d(st[ 7]));
+ 486   1          dt[14] = is_box(gfm_d(st[ 4]) ^ gfm_9(st[ 5]) ^ gfm_e(st[ 6]) ^ gfm_b(st[ 7]));
+ 487   1          dt[ 3] = is_box(gfm_b(st[ 4]) ^ gfm_d(st[ 5]) ^ gfm_9(st[ 6]) ^ gfm_e(st[ 7]));
+ 488   1      
+ 489   1          dt[ 8] = is_box(gfm_e(st[ 8]) ^ gfm_b(st[ 9]) ^ gfm_d(st[10]) ^ gfm_9(st[11]));
+ 490   1          dt[13] = is_box(gfm_9(st[ 8]) ^ gfm_e(st[ 9]) ^ gfm_b(st[10]) ^ gfm_d(st[11]));
+ 491   1          dt[ 2] = is_box(gfm_d(st[ 8]) ^ gfm_9(st[ 9]) ^ gfm_e(st[10]) ^ gfm_b(st[11]));
+ 492   1          dt[ 7] = is_box(gfm_b(st[ 8]) ^ gfm_d(st[ 9]) ^ gfm_9(st[10]) ^ gfm_e(st[11]));
+ 493   1      
+ 494   1          dt[12] = is_box(gfm_e(st[12]) ^ gfm_b(st[13]) ^ gfm_d(st[14]) ^ gfm_9(st[15]));
+ 495   1          dt[ 1] = is_box(gfm_9(st[12]) ^ gfm_e(st[13]) ^ gfm_b(st[14]) ^ gfm_d(st[15]));
+ 496   1          dt[ 6] = is_box(gfm_d(st[12]) ^ gfm_9(st[13]) ^ gfm_e(st[14]) ^ gfm_b(st[15]));
+ 497   1          dt[11] = is_box(gfm_b(st[12]) ^ gfm_d(st[13]) ^ gfm_9(st[14]) ^ gfm_e(st[15]));
+ 498   1        }
+ 499          
+ 500          #if defined( AES_ENC_PREKEYED ) || defined( AES_DEC_PREKEYED )
+ 501          
+ 502          /*  Set the cipher key for the pre-keyed version */
+ 503          
+ 504          return_type aes_set_key( const unsigned char key[], length_type keylen, aes_context ctx[1] )
+ 505          {
+ 506   1          uint_8t cc, rc, hi;
+ 507   1      
+ 508   1          switch( keylen )
+ 509   1          {
+ 510   2          case 16:
+ 511   2          case 128: 
+ 512   2              keylen = 16; 
+ 513   2              break;
+ 514   2          case 24:
+ 515   2          case 192: 
+ 516   2              keylen = 24; 
+ 517   2              break;
+ 518   2          case 32:
+ 519   2          case 256: 
+ 520   2              keylen = 32; 
+ 521   2              break;
+ 522   2          default: 
+ 523   2              ctx->rnd = 0; 
+ 524   2              return -1;
+ 525   2          }
+ 526   1          block_copy_nn(ctx->ksch, key, keylen);
+ 527   1          hi = (keylen + 28) << 2;
+ 528   1          ctx->rnd = (hi >> 4) - 1;
+ 529   1          for( cc = keylen, rc = 1; cc < hi; cc += 4 )
+ 530   1          {   uint_8t tt, t0, t1, t2, t3;
+ 531   2      
+ 532   2              t0 = ctx->ksch[cc - 4];
+ 533   2              t1 = ctx->ksch[cc - 3];
+ 534   2              t2 = ctx->ksch[cc - 2];
+ 535   2              t3 = ctx->ksch[cc - 1];
+ 536   2              if( cc % keylen == 0 )
+ 537   2              {
+ 538   3                  tt = t0;
+ 539   3                  t0 = s_box(t1) ^ rc;
+ 540   3                  t1 = s_box(t2);
+ 541   3                  t2 = s_box(t3);
+ 542   3                  t3 = s_box(tt);
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 10  
+
+ 543   3                  rc = f2(rc);
+ 544   3              }
+ 545   2              else if( keylen > 24 && cc % keylen == 16 )
+ 546   2              {
+ 547   3                  t0 = s_box(t0);
+ 548   3                  t1 = s_box(t1);
+ 549   3                  t2 = s_box(t2);
+ 550   3                  t3 = s_box(t3);
+ 551   3              }
+ 552   2              tt = cc - keylen;
+ 553   2              ctx->ksch[cc + 0] = ctx->ksch[tt + 0] ^ t0;
+ 554   2              ctx->ksch[cc + 1] = ctx->ksch[tt + 1] ^ t1;
+ 555   2              ctx->ksch[cc + 2] = ctx->ksch[tt + 2] ^ t2;
+ 556   2              ctx->ksch[cc + 3] = ctx->ksch[tt + 3] ^ t3;
+ 557   2          }
+ 558   1          return 0;
+ 559   1      }
+ 560          
+ 561          void AES_set_encrypt_key(const unsigned char *userKey,
+ 562                                   const int bits,
+ 563                                   AES_KEY *key)
+ 564          {
+ 565   1          aes_set_key( userKey, bits/8, key );
+ 566   1      }
+ 567          
+ 568          
+ 569          
+ 570          #endif
+ 571          
+ 572          
+ 573          
+ 574          
+ 575          #if defined( AES_ENC_PREKEYED )
+ 576          
+ 577          /*  Encrypt a single block of 16 bytes */
+ 578          
+ 579          return_type aes_encrypt( const unsigned char in[N_BLOCK], unsigned char  out[N_BLOCK], const aes_context c
+             -tx[1] )
+ 580          {
+ 581   1          if( ctx->rnd )
+ 582   1          {
+ 583   2              uint_8t s1[N_BLOCK], r, *sp;
+ 584   2              copy_and_key( s1, in, ctx->ksch );
+ 585   2      
+ 586   2              for( r = 1 ; r < ctx->rnd ; ++r )
+ 587   2      #if defined( VERSION_1 )
+ 588   2              {
+ 589   3            sp = (uint_8t *)SP;
+ 590   3                  mix_sub_columns( s1 );
+ 591   3            sp = (uint_8t *)SP;
+ 592   3                  add_round_key( s1, ctx->ksch + r * N_BLOCK);
+ 593   3              }
+ 594   2      #else
+                      {   uint_8t s2[N_BLOCK];
+                          mix_sub_columns( s2, s1 );
+              
+                          copy_and_key( s1, s2, ctx->ksch + r * N_BLOCK);
+                      }
+              #endif
+ 601   2              shift_sub_rows( s1 );
+ 602   2      
+ 603   2              copy_and_key( out, s1, ctx->ksch + r * N_BLOCK );
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 11  
+
+ 604   2          }
+ 605   1          else
+ 606   1              return -1;
+ 607   1          return 0;
+ 608   1      }
+ 609          
+ 610          /* CBC encrypt a number of blocks (input and return an IV) */
+ 611          
+ 612          /*
+ 613          return_type aes_cbc_encrypt( const unsigned char *in, unsigned char *out,
+ 614                                   int n_block, unsigned char iv[N_BLOCK], const aes_context ctx[1] )
+ 615          {
+ 616          
+ 617              while(n_block--)
+ 618              {
+ 619                  xor_block(iv, in);
+ 620                  if(aes_encrypt(iv, iv, ctx) != EXIT_SUCCESS)
+ 621                return EXIT_FAILURE;
+ 622                  memcpy(out, iv, N_BLOCK);
+ 623                  in += N_BLOCK;
+ 624                  out += N_BLOCK;
+ 625              }
+ 626              return EXIT_SUCCESS;
+ 627          }
+ 628          */
+ 629          
+ 630          #endif
+ 631          
+ 632          #if defined( AES_DEC_PREKEYED )
+ 633          
+ 634          /*  Decrypt a single block of 16 bytes */
+ 635          
+ 636          return_type aes_decrypt( const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const aes_context ct
+             -x[1] )
+ 637          {
+ 638   1          if( ctx->rnd )
+ 639   1          {
+ 640   2              uint_8t s1[N_BLOCK], r;
+ 641   2              copy_and_key( s1, in, ctx->ksch + ctx->rnd * N_BLOCK );
+ 642   2              inv_shift_sub_rows( s1 );
+ 643   2      
+ 644   2              for( r = ctx->rnd ; --r ; )
+ 645   2      #if defined( VERSION_1 )
+ 646   2              {
+ 647   3                  add_round_key( s1, ctx->ksch + r * N_BLOCK );
+ 648   3                  inv_mix_sub_columns( s1 );
+ 649   3              }
+ 650   2      #else
+                      {   uint_8t s2[N_BLOCK];
+                          copy_and_key( s2, s1, ctx->ksch + r * N_BLOCK );
+                          inv_mix_sub_columns( s1, s2 );
+                      }
+              #endif
+ 656   2              copy_and_key( out, s1, ctx->ksch );
+ 657   2          }
+ 658   1          else
+ 659   1              return -1;
+ 660   1          return 0;
+ 661   1      }
+ 662          
+ 663          /* CBC decrypt a number of blocks (input and return an IV) */
+ 664          
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 12  
+
+ 665          /*
+ 666          return_type aes_cbc_decrypt( const unsigned char *in, unsigned char *out,
+ 667                                   int n_block, unsigned char iv[N_BLOCK], const aes_context ctx[1] )
+ 668          {   
+ 669              while(n_block--)
+ 670              {   uint_8t tmp[N_BLOCK];
+ 671                  
+ 672                  memcpy(tmp, in, N_BLOCK);
+ 673                  if(aes_decrypt(in, out, ctx) != EXIT_SUCCESS)
+ 674                return EXIT_FAILURE;
+ 675                  xor_block(out, iv);
+ 676                  memcpy(iv, tmp, N_BLOCK);
+ 677                  in += N_BLOCK;
+ 678                  out += N_BLOCK;
+ 679              }
+ 680              return EXIT_SUCCESS;
+ 681          }
+ 682          */
+ 683          
+ 684          uint_8t AES_cbc_encrypt(const unsigned char *in, unsigned char *out,
+ 685                   const unsigned long length, const AES_KEY *ctx,
+ 686                   unsigned char *iv, const int enc)
+ 687          {
+ 688   1          int n_block = length/16;
+ 689   1        u8 temp[16];
+ 690   1          
+ 691   1          if(enc)
+ 692   1          {
+ 693   2          
+ 694   2          while(n_block--)
+ 695   2              {
+ 696   3                memcpy(temp, in, 16);
+ 697   3                  xor_block(iv, in);
+ 698   3            
+ 699   3                  if(aes_encrypt(iv, iv, ctx) != EXIT_SUCCESS)
+ 700   3                       return EXIT_FAILURE;
+ 701   3            memcpy(temp, iv, 16);
+ 702   3                  memcpy(out, temp/*iv*/, N_BLOCK);
+ 703   3                  in += N_BLOCK;
+ 704   3                  out += N_BLOCK;
+ 705   3              }
+ 706   2        
+ 707   2              return EXIT_SUCCESS;
+ 708   2          }
+ 709   1          else
+ 710   1          {
+ 711   2              while(n_block--)
+ 712   2              {   uint_8t tmp[N_BLOCK];
+ 713   3            memcpy(temp, in, 16);
+ 714   3                  memcpy(tmp, in, N_BLOCK);
+ 715   3                  if(aes_decrypt(in, out, ctx) != EXIT_SUCCESS)
+ 716   3                                  return EXIT_FAILURE;
+ 717   3                  xor_block(out, iv);
+ 718   3            memcpy(temp,out,16);
+ 719   3            memcpy(out, temp, 16);
+ 720   3                  memcpy(iv, tmp, N_BLOCK);
+ 721   3                  in += N_BLOCK;
+ 722   3                  out += N_BLOCK;
+ 723   3              }
+ 724   2              return EXIT_SUCCESS;
+ 725   2          }
+ 726   1      }
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 13  
+
+ 727          
+ 728          
+ 729          
+ 730          #endif
+ 731          
+ 732          #if defined( AES_ENC_128_OTFK )
+              
+              /*  The 'on the fly' encryption key update for for 128 bit keys */
+              
+              static void update_encrypt_key_128( uint_8t k[N_BLOCK], uint_8t *rc )
+              {   uint_8t cc;
+              
+                  k[0] ^= s_box(k[13]) ^ *rc;
+                  k[1] ^= s_box(k[14]);
+                  k[2] ^= s_box(k[15]);
+                  k[3] ^= s_box(k[12]);
+                  *rc = f2( *rc );
+              
+                  for(cc = 4; cc < 16; cc += 4 )
+                  {
+                      k[cc + 0] ^= k[cc - 4];
+                      k[cc + 1] ^= k[cc - 3];
+                      k[cc + 2] ^= k[cc - 2];
+                      k[cc + 3] ^= k[cc - 1];
+                  }
+              }
+              
+              /*  Encrypt a single block of 16 bytes with 'on the fly' 128 bit keying */
+              
+              void aes_encrypt_128( const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK],
+                                   const unsigned char key[N_BLOCK], unsigned char o_key[N_BLOCK] )
+              {   uint_8t s1[N_BLOCK], r, rc = 1;
+              
+                  if(o_key != key)
+                      block_copy( o_key, key );
+                  copy_and_key( s1, in, o_key );
+              
+                  for( r = 1 ; r < 10 ; ++r )
+              #if defined( VERSION_1 )
+                  {
+                      mix_sub_columns( s1 );
+                      update_encrypt_key_128( o_key, &rc );
+                      add_round_key( s1, o_key );
+                  }
+              #else
+                  {   uint_8t s2[N_BLOCK];
+                      mix_sub_columns( s2, s1 );
+                      update_encrypt_key_128( o_key, &rc );
+                      copy_and_key( s1, s2, o_key );
+                  }
+              #endif
+              
+                  shift_sub_rows( s1 );
+                  update_encrypt_key_128( o_key, &rc );
+                  copy_and_key( out, s1, o_key );
+              }
+              
+              #endif
+ 785          
+ 786          #if defined( AES_DEC_128_OTFK )
+              
+              /*  The 'on the fly' decryption key update for for 128 bit keys */
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 14  
+
+              
+              static void update_decrypt_key_128( uint_8t k[N_BLOCK], uint_8t *rc )
+              {   uint_8t cc;
+              
+                  for( cc = 12; cc > 0; cc -= 4 )
+                  {
+                      k[cc + 0] ^= k[cc - 4];
+                      k[cc + 1] ^= k[cc - 3];
+                      k[cc + 2] ^= k[cc - 2];
+                      k[cc + 3] ^= k[cc - 1];
+                  }
+                  *rc = d2(*rc);
+                  k[0] ^= s_box(k[13]) ^ *rc;
+                  k[1] ^= s_box(k[14]);
+                  k[2] ^= s_box(k[15]);
+                  k[3] ^= s_box(k[12]);
+              }
+              
+              /*  Decrypt a single block of 16 bytes with 'on the fly' 128 bit keying */
+              
+              void aes_decrypt_128( const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK],
+                                    const unsigned char key[N_BLOCK], unsigned char o_key[N_BLOCK] )
+              {
+                  uint_8t s1[N_BLOCK], r, rc = 0x6c;
+                  if(o_key != key)
+                      block_copy( o_key, key );
+              
+                  copy_and_key( s1, in, o_key );
+                  inv_shift_sub_rows( s1 );
+              
+                  for( r = 10 ; --r ; )
+              #if defined( VERSION_1 )
+                  {
+                      update_decrypt_key_128( o_key, &rc );
+                      add_round_key( s1, o_key );
+                      inv_mix_sub_columns( s1 );
+                  }
+              #else
+                  {   uint_8t s2[N_BLOCK];
+                      update_decrypt_key_128( o_key, &rc );
+                      copy_and_key( s2, s1, o_key );
+                      inv_mix_sub_columns( s1, s2 );
+                  }
+              #endif
+                  update_decrypt_key_128( o_key, &rc );
+                  copy_and_key( out, s1, o_key );
+              }
+              
+              #endif
+ 838          
+ 839          #if defined( AES_ENC_256_OTFK )
+              
+              /*  The 'on the fly' encryption key update for for 256 bit keys */
+              
+              static void update_encrypt_key_256( uint_8t k[2 * N_BLOCK], uint_8t *rc )
+              {   uint_8t cc;
+              
+                  k[0] ^= s_box(k[29]) ^ *rc;
+                  k[1] ^= s_box(k[30]);
+                  k[2] ^= s_box(k[31]);
+                  k[3] ^= s_box(k[28]);
+                  *rc = f2( *rc );
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 15  
+
+              
+                  for(cc = 4; cc < 16; cc += 4)
+                  {
+                      k[cc + 0] ^= k[cc - 4];
+                      k[cc + 1] ^= k[cc - 3];
+                      k[cc + 2] ^= k[cc - 2];
+                      k[cc + 3] ^= k[cc - 1];
+                  }
+              
+                  k[16] ^= s_box(k[12]);
+                  k[17] ^= s_box(k[13]);
+                  k[18] ^= s_box(k[14]);
+                  k[19] ^= s_box(k[15]);
+              
+                  for( cc = 20; cc < 32; cc += 4 )
+                  {
+                      k[cc + 0] ^= k[cc - 4];
+                      k[cc + 1] ^= k[cc - 3];
+                      k[cc + 2] ^= k[cc - 2];
+                      k[cc + 3] ^= k[cc - 1];
+                  }
+              }
+              
+              /*  Encrypt a single block of 16 bytes with 'on the fly' 256 bit keying */
+              
+              void aes_encrypt_256( const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK],
+                                    const unsigned char key[2 * N_BLOCK], unsigned char o_key[2 * N_BLOCK] )
+              {
+                  uint_8t s1[N_BLOCK], r, rc = 1;
+                  if(o_key != key)
+                  {
+                      block_copy( o_key, key );
+                      block_copy( o_key + 16, key + 16 );
+                  }
+                  copy_and_key( s1, in, o_key );
+              
+                  for( r = 1 ; r < 14 ; ++r )
+              #if defined( VERSION_1 )
+                  {
+                      mix_sub_columns(s1);
+                      if( r & 1 )
+                          add_round_key( s1, o_key + 16 );
+                      else
+                      {
+                          update_encrypt_key_256( o_key, &rc );
+                          add_round_key( s1, o_key );
+                      }
+                  }
+              #else
+                  {   uint_8t s2[N_BLOCK];
+                      mix_sub_columns( s2, s1 );
+                      if( r & 1 )
+                          copy_and_key( s1, s2, o_key + 16 );
+                      else
+                      {
+                          update_encrypt_key_256( o_key, &rc );
+                          copy_and_key( s1, s2, o_key );
+                      }
+                  }
+              #endif
+              
+                  shift_sub_rows( s1 );
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 16  
+
+                  update_encrypt_key_256( o_key, &rc );
+                  copy_and_key( out, s1, o_key );
+              }
+              
+              #endif
+ 918          
+ 919          #if defined( AES_DEC_256_OTFK )
+              
+              /*  The 'on the fly' encryption key update for for 256 bit keys */
+              
+              static void update_decrypt_key_256( uint_8t k[2 * N_BLOCK], uint_8t *rc )
+              {   uint_8t cc;
+              
+                  for(cc = 28; cc > 16; cc -= 4)
+                  {
+                      k[cc + 0] ^= k[cc - 4];
+                      k[cc + 1] ^= k[cc - 3];
+                      k[cc + 2] ^= k[cc - 2];
+                      k[cc + 3] ^= k[cc - 1];
+                  }
+              
+                  k[16] ^= s_box(k[12]);
+                  k[17] ^= s_box(k[13]);
+                  k[18] ^= s_box(k[14]);
+                  k[19] ^= s_box(k[15]);
+              
+                  for(cc = 12; cc > 0; cc -= 4)
+                  {
+                      k[cc + 0] ^= k[cc - 4];
+                      k[cc + 1] ^= k[cc - 3];
+                      k[cc + 2] ^= k[cc - 2];
+                      k[cc + 3] ^= k[cc - 1];
+                  }
+              
+                  *rc = d2(*rc);
+                  k[0] ^= s_box(k[29]) ^ *rc;
+                  k[1] ^= s_box(k[30]);
+                  k[2] ^= s_box(k[31]);
+                  k[3] ^= s_box(k[28]);
+              }
+              
+              /*  Decrypt a single block of 16 bytes with 'on the fly'
+                  256 bit keying
+              */
+              void aes_decrypt_256( const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK],
+                                    const unsigned char key[2 * N_BLOCK], unsigned char o_key[2 * N_BLOCK] )
+              {
+                  uint_8t s1[N_BLOCK], r, rc = 0x80;
+              
+                  if(o_key != key)
+                  {
+                      block_copy( o_key, key );
+                      block_copy( o_key + 16, key + 16 );
+                  }
+              
+                  copy_and_key( s1, in, o_key );
+                  inv_shift_sub_rows( s1 );
+              
+                  for( r = 14 ; --r ; )
+              #if defined( VERSION_1 )
+                  {
+                      if( ( r & 1 ) )
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 17  
+
+                      {
+                          update_decrypt_key_256( o_key, &rc );
+                          add_round_key( s1, o_key + 16 );
+                      }
+                      else
+                          add_round_key( s1, o_key );
+                      inv_mix_sub_columns( s1 );
+                  }
+              #else
+                  {   uint_8t s2[N_BLOCK];
+                      if( ( r & 1 ) )
+                      {
+                          update_decrypt_key_256( o_key, &rc );
+                          copy_and_key( s2, s1, o_key + 16 );
+                      }
+                      else
+                          copy_and_key( s2, s1, o_key );
+                      inv_mix_sub_columns( s1, s2 );
+                  }
+              #endif
+                  copy_and_key( out, s1, o_key );
+              }
+              
+              #endif
+ 999           int aes_test()
+1000          {
+1001   1        int i, length;
+1002   1        AES_KEY   key;
+1003   1         
+1004   1        unsigned char in[256];
+1005   1        unsigned char out[256];
+1006   1        
+1007   1        unsigned char userKey[16];
+1008   1        unsigned char iv[20] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0
+             -D, 0x0E, 0x0F};
+1009   1        unsigned char sa_iv[20] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 
+             -0x0D, 0x0E, 0x0F};
+1010   1      //  unsigned char temp[16] = {0x00  ,0x01  ,0x02  ,0x03  ,0x04  ,0x05  ,0x06  ,0x07  ,0x08  ,0x09  ,0x0a  ,
+             -0x0b  ,0x0c  ,0x0d  ,0x0e  ,0x0f};
+1011   1        //  unsigned char temp[16] = {0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09
+             -, 0xcf, 0x4f, 0x3c};
+1012   1          unsigned char temp[16] = {0xa4, 0x5e, 0x36, 0x87, 0x5a, 0x6f, 0x8c, 0xbe, 0x4e, 0x68, 0x24, 0x41, 0x3c, 
+             -0xa1, 0x9d, 0x0e};  
+1013   1      
+1014   1        unsigned char temp2[64]= "This is test ok!This is test ok!This is test ok!This is test ok!";
+1015   1      //   unsigned char temp2[16]= {0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96, 0xe9, 0x3d, 0x7e, 0x11, 0x7
+             -3, 0x93, 0x17, 0x2a};
+1016   1      
+1017   1      
+1018   1         for(i = 0; i < 0x10; i++)
+1019   1               iv[i] = i;
+1020   1      
+1021   1      
+1022   1      
+1023   1      
+1024   1      // Part 1 is for demonstrative purpose. The key and plaintext are given in the program itself.
+1025   1      //  Part 1: ********************************************************
+1026   1        
+1027   1        // The array temp stores the key.
+1028   1        // The array temp2 stores the plaintext.
+1029   1      
+1030   1        // Copy the Key and PlainText
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 18  
+
+1031   1        for(i=0;i<16;i++)
+1032   1        {
+1033   2          userKey[i]=temp[i];
+1034   2        }
+1035   1        length = sizeof(temp2);
+1036   1        for(i=0; i < length; i++)
+1037   1        {
+1038   2          in[i]=temp2[i];
+1039   2        }
+1040   1      //         *********************************************************
+1041   1      
+1042   1         AES_set_encrypt_key((unsigned char*)userKey, 128, &key);
+1043   1         AES_cbc_encrypt(in, (unsigned char*)out, length, 
+1044   1                  &key, (unsigned char*)iv,AES_ENCRYPT);
+1045   1      
+1046   1        // Output the encrypted text.
+1047   1      //  printf("\nText after encryption:\n");
+1048   1        for(i=0;i<64;i++)
+1049   1        {
+1050   2          FM_Printf(FM_ERROR,"%02x ",out[i]);
+1051   2        }
+1052   1        FM_Printf(FM_ERROR,"\n\n");
+1053   1          // The KeyExpansion routine must be called before encryption.
+1054   1      //  KeyExpansion(userKey, key);
+1055   1           for(i=0;i<16;i++)
+1056   1        {
+1057   2          userKey[i]=temp[i];
+1058   2        }
+1059   1      
+1060   1      //         *********************************************************
+1061   1      
+1062   1        AES_set_encrypt_key((unsigned char*)userKey, 128, &key);
+1063   1        AES_cbc_encrypt(out, (unsigned char*)in, length, 
+1064   1                  &key, (unsigned char*)sa_iv,AES_DECRYPT);
+1065   1      //  aes_dec(out, in, length,userKey, sa_iv);
+1066   1        in[length] = '\0';  
+1067   1          FM_Printf(FM_ERROR,"In: %s\n", in);
+1068   1          for(i=0;i<64;i++)
+1069   1        {
+1070   2      //    FM_Printf(FM_ERROR,"%02x ",in[i]);
+1071   2        }
+1072   1      //  getch();
+1073   1        FM_Printf(FM_ERROR,"\n\n");
+1074   1        return 0;
+1075   1      }
+1076          
+1077          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   4478    ----
+   CONSTANT SIZE    =    137    ----
+   XDATA SIZE       =   2048    1082
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+C51 COMPILER V9.52.0.0   AES                                                               12/02/2014 14:35:43 PAGE 19  
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

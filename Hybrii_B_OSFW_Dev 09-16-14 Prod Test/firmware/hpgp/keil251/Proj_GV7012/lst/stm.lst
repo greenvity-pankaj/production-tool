@@ -1,0 +1,935 @@
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE STM
+OBJECT MODULE PLACED IN .\obj\stm.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\..\common\stm.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) 
+                    -INCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..\..
+                    -\src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\zig
+                    -bee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\
+                    -inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\src;.
+                    -.\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support;..
+                    -\..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,
+                    -HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,H
+                    -ybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,P
+                    -ROD_TEST) DEBUG PRINT(.\lst\stm.lst) TABS(2) OBJECT(.\obj\stm.obj)
+
+line level    source
+
+   1          /** ==========================================================
+   2           *
+   3           * @file stm.c
+   4           * 
+   5           *  @brief Software Timer Manager
+   6           *
+   7           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ============================================================ */
+  11          
+  12          #ifdef RTX51_TINY_OS
+  13          #include <rtx51tny.h>
+  14          #include "hybrii_tasks.h"
+  15          #endif
+  16          #include <string.h>
+  17          #include "papdef.h"
+  18          #include "list.h"
+  19          #include "timer.h"
+  20          #include "stm.h"
+  21          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  24          #include "hal_common.h"
+  25          
+  26          #include "papdef.h"
+  27          #include "fm.h"
+  28          #ifdef P8051
+  29          #include <reg51.h>
+  30          #endif
+  31          
+  32          #ifndef CALLBACK
+  33           #ifdef HYBRII_HPGP
+  34           #include "hpgpapi.h"
+  35           #endif
+  36          #endif
+  37          
+  38          #include "frametask.h"
+  39          #ifdef UM
+  40          #include "mac_intf_common.h"
+  41          #endif
+  42          
+  43          /* TODO: convert duration from ms to the time tick
+  44           * based on the time tick frequency.
+  45           * At present, it is assumed that one time tick is 1 ms 
+  46           */
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 2   
+
+  47          #ifdef SIMU
+              #define STM_MS_TO_TICK(x)      (x)
+              #else
+  50          #ifdef B_ASICPLC
+  51          #define STM_MS_TO_TICK(x)      (x/10)
+  52          #else
+              #define STM_MS_TO_TICK(x)      (x/25)
+              #endif
+  55          #endif
+  56          //#ifdef B_ASICPLC
+  57          //#define STM_TIME_TICK_INIT    0//0xFFFFF000
+  58          //#else
+  59          //#define STM_TIME_TICK_INIT    0xFFFFF000  //0x00
+  60          //#endif
+  61          //#define STM_TIME_TICK_MAX     0xFFFFFFFF
+  62          
+  63          volatile sStm Stm;
+  64          void STM_StartHwTimer()
+  65          {
+  66   1      #ifdef P8051
+  67   1      #ifndef RTX51_TINY_OS
+                 /* Start 1 ms timer running Timer0 in Mode */
+                 TMOD = (TMOD & 0xF0) | 0x01;
+                 
+                 /* Load Timer register */
+                 TH0 = HYBRII_MSTIMER25MHZ_HI;
+                 TL0 = HYBRII_MSTIMER25MHZ_LO;
+                 
+                 /* Start Timer */
+                 TR0 = 1;
+                 /* Enable Timer0 Int */
+              #ifdef UART_HOST_INTF
+                 ET0 = 0; 
+              #else  
+                 ET0 = 1;    
+              #endif                
+              #endif
+  84   1      #endif
+  85   1      }
+  86          
+  87          
+  88          u32 STM_GetTick()
+  89          {
+  90   1          return Stm.timeTick;
+  91   1      }
+  92          
+  93          eStatus STM_Init(void)
+  94          {
+  95   1          u8 i;
+  96   1          eStatus status = STATUS_SUCCESS;
+  97   1          memset(&Stm, 0, sizeof(sStm));
+  98   1          Stm.timeTick = STM_TIME_TICK_INIT;
+  99   1      
+ 100   1          for (i = 0; i < STM_TIMER_MAX; i++)
+ 101   1          {
+ 102   2              Stm.timerCb[i].tid = i;
+ 103   2          }
+ 104   1      
+ 105   1          DLIST_Init(&(Stm.timerQueue));
+ 106   1      #ifdef SIMU
+              #if defined(WIN32) || defined(_WIN32)
+                  Stm.stmSem = CreateSemaphore( 
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 3   
+
+                      NULL,           // default security attributes
+                      SEM_COUNT,      // initial count
+                      SEM_COUNT,      // maximum count
+                      NULL);          // unnamed semaphore
+                  if(Stm.stmSem == NULL)
+              #else
+                  if(sem_init(&Stm.stmSem, 0, SEM_COUNT))
+              #endif
+                  {
+                      status = STATUS_FAILURE;
+                  }
+              #endif //end of SIMU
+ 121   1      #ifdef RTX51_TINY_OS
+ 122   1        //rajan  os_create_task(HYBRII_TASK_ID_STM);  
+ 123   1      #else
+              
+              #endif
+ 126   1          /* start the hardware timer */
+ 127   1          STM_StartHwTimer();
+ 128   1          return status;
+ 129   1      }
+ 130          
+ 131          /* Timer service request API */
+ 132          #ifdef CALLBACK
+              tTimerId STM_AllocTimer(void (*timerHdl)(u16 type, void *cookie), 
+                                      u16 type, void *cookie)
+              #else
+ 136          tTimerId STM_AllocTimer(u8 mid, u16 type, void *cookie)
+ 137          #endif
+ 138          {
+ 139   1          u8 i;
+ 140   1          for (i = 0; i < STM_TIMER_MAX; i++)
+ 141   1          {
+ 142   2              if(!Stm.timerCb[i].valid)
+ 143   2              {
+ 144   3      #ifdef CALLBACK
+                          Stm.timerCb[i].timerHandler = timerHdl;
+              #else
+ 147   3                  Stm.timerCb[i].mid = mid;
+ 148   3      #endif
+ 149   3                  Stm.timerCb[i].type = type;
+ 150   3                  Stm.timerCb[i].cookie = cookie;
+ 151   3                  Stm.timerCb[i].valid = 1;
+ 152   3      #if 0         
+              #ifdef P8051
+                          FM_Printf(FM_STM, "STM: alloc timer (tid = %bu)\n", i);
+              #else
+                          FM_Printf(FM_STM, "STM: alloc timer (tid = %d)\n", i);
+              #endif
+              #endif
+ 159   3                  return (i);
+ 160   3              }
+ 161   2          }
+ 162   1          return STM_TIMER_ID_NULL;
+ 163   1      }
+ 164          
+ 165          
+ 166          
+ 167          // Timer service Deregistration
+ 168          eStatus STM_FreeTimer(tTimerId tid)
+ 169          {
+ 170   1          // Sanity test for the input parameter
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 4   
+
+ 171   1          if ( (tid >= STM_TIMER_MAX) || (Stm.timerCb[tid].valid == 0) )
+ 172   1          {
+ 173   2              return STATUS_SUCCESS;
+ 174   2          }
+ 175   1          
+ 176   1          if ( Stm.timerCb[tid].active == 0 )
+ 177   1          {
+ 178   2              //remove the timer from timerQueue
+ 179   2              //NOTE: it has been removed from the timerQueue 
+ 180   2              //when it is stopped
+ 181   2      //        DLIST_Remove(&(Stm.timerCb[tid].link));
+ 182   2              Stm.timerCb[tid].valid = 0;
+ 183   2              Stm.timerCb[tid].active = 0;
+ 184   2              return STATUS_SUCCESS;
+ 185   2          }
+ 186   1          else
+ 187   1          {
+ 188   2              return STATUS_FAILURE;
+ 189   2          }
+ 190   1         
+ 191   1      }
+ 192          
+ 193          /*
+ 194           * place the timer into the active timer queue in the increasing order 
+ 195           * 
+ 196           */
+ 197          
+ 198          eStatus STM_StartTimer(tTimerId tid, tTime duration)
+ 199          {
+ 200   1          eStatus   status = STATUS_SUCCESS;
+ 201   1          sTimerCb *ptimer;
+ 202   1          sTimerCb *ntimer;
+ 203   1          sTimerCb *timer;
+ 204   1          tTime     currTimeTick;
+ 205   1          u8        currTimeSector;
+ 206   1          //sanity test on parameters
+ 207   1          if( (tid >= STM_TIMER_MAX )||(Stm.timerCb[tid].valid == 0))
+ 208   1          {
+ 209   2      #if 0     
+              #ifdef P8051
+                     FM_Printf(FM_WARN, "Could't find the timer (id %bu)\n", tid);
+              #else
+                     FM_Printf(FM_WARN, "Could't find the timer (id %d)\n", tid);
+              #endif
+              #endif
+ 216   2              return STATUS_FAILURE;
+ 217   2          }
+ 218   1      
+ 219   1          if(Stm.timerCb[tid].active)
+ 220   1          {
+ 221   2              //timer is already active
+ 222   2              return STATUS_SUCCESS;
+ 223   2          } 
+ 224   1      
+ 225   1          timer = &(Stm.timerCb[tid]);
+ 226   1      #if 0   
+              #ifdef P8051
+                  FM_Printf(FM_STM, "STM: start the timer (tid = %bu)\n", tid);
+              #else
+                  FM_Printf(FM_STM, "STM: start the timer (tid = %d)\n", tid);
+              #endif
+              #endif
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 5   
+
+ 233   1          //Disable the Timer 0 interrupt
+ 234   1      #ifdef P8051
+ 235   1      __CRIT_SECTION_BEGIN__
+ 236   1      #else
+              #ifdef SIMU
+                  SEM_WAIT(&Stm.stmSem);
+              #endif
+              #endif
+ 241   1          currTimeTick = Stm.timeTick;
+ 242   1          currTimeSector = (u8)Stm.timeSector;
+ 243   1          //convert duration from ms to the time tick 
+ 244   1          //based on the time tick frequency
+ 245   1          timer->time = currTimeTick + STM_MS_TO_TICK(duration);  
+ 246   1      #if 0   
+              #ifdef P8051
+                  FM_Printf(FM_STM, "STM: curr time sector %bu, curr time tick 0x%.8x\n", 
+                                    currTimeSector, currTimeTick);
+              #else
+                  FM_Printf(FM_STM, "STM: curr time sector %d, curr time tick 0x%.8x\n", 
+                                    currTimeSector, currTimeTick);
+              #endif
+              #endif
+ 255   1          if (timer->time < currTimeTick)
+ 256   1          {
+ 257   2              //overflow, thus this timer will expires in the next the time sector 
+ 258   2              //instead of the current time sector
+ 259   2              timer->timeSector = !currTimeSector;
+ 260   2          }
+ 261   1          else
+ 262   1          {
+ 263   2              //the timer will expire in the current time sector.
+ 264   2              timer->timeSector = currTimeSector;
+ 265   2          }
+ 266   1      #if 0   
+              #ifdef P8051
+                  FM_Printf(FM_STM, "STM: timer id %bu - duration %lu, time sector %bu, time tick 0x%.8x\n", 
+                                    tid, duration, timer->timeSector, timer->time);
+              #else
+                  FM_Printf(FM_STM, "STM: timer %d - duration %d, time sector %d, time tick 0x%.8x\n", 
+                                    tid, duration, timer->timeSector, timer->time);
+              #endif
+              #endif    
+ 275   1          //Place the timer STM.timerCb[tid] into STM.timerQueue 
+ 276   1          //in the increasing time order
+ 277   1          if(DLIST_IsEmpty(&(Stm.timerQueue)))
+ 278   1          {
+ 279   2              Stm.timerCb[tid].active = 1;
+ 280   2              DLIST_Push(&(Stm.timerQueue), &timer->link);
+ 281   2      #if 0     
+              #ifdef P8051
+                      FM_Printf(FM_STM, "STM: start timer (tid = %bu) successfully (1)\n", tid);
+              #else
+                      FM_Printf(FM_STM, "STM: start timer (tid = %d) successfully (1)\n", tid);
+              #endif
+              #endif      
+ 288   2              status = STATUS_SUCCESS;
+ 289   2              goto endCrit; 
+ 290   2          }
+ 291   1      
+ 292   1      
+ 293   1          //DLIST_For_Each_Entry(&(Stm.timerQueue), ptimer, link)
+ 294   1          DLIST_For_Each_Entry(&(Stm.timerQueue), ptimer, sTimerCb, link)
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 6   
+
+ 295   1          {
+ 296   2              if(ptimer->timeSector == currTimeSector) 
+ 297   2              {
+ 298   3                 if( (timer->timeSector == ptimer->timeSector) &&
+ 299   3                     (timer->time <= ptimer->time))
+ 300   3                  {
+ 301   4                      //add timer before ptimer
+ 302   4                      Stm.timerCb[tid].active = 1;
+ 303   4                      DLIST_Put(&ptimer->link, &timer->link);       
+ 304   4                      status = STATUS_SUCCESS;
+ 305   4      #if 0             
+              #ifdef P8051
+              FM_Printf(FM_STM, "STM: start timer (tid = %bu) successfully(2)\n", tid);
+              #else
+              FM_Printf(FM_STM, "STM: start timer (tid = %d) successfully(2)\n", tid);
+              #endif
+              #endif              
+ 312   4                      goto endCrit; 
+ 313   4                  }
+ 314   3                 
+ 315   3              } else if(ptimer->timeSector != currTimeSector)
+ 316   2              {
+ 317   3                    //reach the first timer in the next timer sector
+ 318   3                    //break the for loop
+ 319   3                    break;
+ 320   3              }
+ 321   2          }
+ 322   1      
+ 323   1          //at this point, we have the following cases:
+ 324   1          //(1) Reach the tail of time queue and the timer is in the current time 
+ 325   1          //    sector, thus greater than any timer in the queue
+ 326   1          //(2) Reach the tail of time queue and the timer is in the next time 
+ 327   1          //    sector
+ 328   1          //(3) Reach the first timer in the next time sector, and 
+ 329   1          //    the timer is the current time sector 
+ 330   1          //(4) Reach the first timer in the next time sector and 
+ 331   1          //    the timer is in the next time sector.
+ 332   1      
+ 333   1          //case (1) and (2): place the timer before the ptimer. 
+ 334   1          if(DLIST_IsHead(&(Stm.timerQueue), &ptimer->link))
+ 335   1          {
+ 336   2              Stm.timerCb[tid].active = 1;
+ 337   2              DLIST_Put(&Stm.timerQueue, &timer->link);       
+ 338   2              status = STATUS_SUCCESS;
+ 339   2      #if 0     
+              #ifdef P8051
+              FM_Printf(FM_STM, "STM: start timer (tid = %bu) successfully(3)\n", tid);
+              #else
+              FM_Printf(FM_STM, "STM: start timer (tid = %d) successfully(3)\n", tid);
+              #endif
+              #endif      
+ 346   2              goto endCrit; 
+ 347   2          }
+ 348   1          
+ 349   1          //case (3): place the timer before the ptimer
+ 350   1          if(ptimer->timeSector != timer->timeSector)
+ 351   1          { 
+ 352   2              Stm.timerCb[tid].active = 1;
+ 353   2              DLIST_Put(&ptimer->link, &timer->link);       
+ 354   2              status = STATUS_SUCCESS;
+ 355   2      #if 0     
+              #ifdef P8051
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 7   
+
+              FM_Printf(FM_STM, "STM: start timer (tid = %bu) successfully(4)\n", tid);
+              #else
+              FM_Printf(FM_STM, "STM: start timer (tid = %d) successfully(4)\n", tid);
+              #endif
+              #endif
+ 362   2              goto endCrit; 
+ 363   2          }
+ 364   1      
+ 365   1          //case (4): starting with ptimer, search until the end of time queue
+ 366   1          //DLIST_For_Each_Entry_Start(&(Stm.timerQueue), ptimer, ntimer, link)
+ 367   1          DLIST_For_Each_Entry_From(&(Stm.timerQueue), ptimer, ntimer, 
+ 368   1                                      sTimerCb, link)
+ 369   1          {
+ 370   2      #if 0     
+              #ifdef P8051
+              FM_Printf(FM_STM, "STM: from ntimer (tid: %bu time sector %bu, time tick 0x%.8x\n", 
+                                    ntimer->tid, (u8)ntimer->timeSector, ntimer->time);
+              #else
+              FM_Printf(FM_STM, "STM: from ntimer (tid: %d time sector %d, time tick 0x%.8x\n", 
+                                    ntimer->tid, ntimer->timeSector, ntimer->time);
+              #endif
+              #endif      
+ 379   2              if( (timer->timeSector == ntimer->timeSector) &&
+ 380   2                  (timer->time <= ntimer->time))
+ 381   2              {
+ 382   3                  Stm.timerCb[tid].active = 1;
+ 383   3                  DLIST_Put(&ntimer->link, &timer->link);       
+ 384   3                  status = STATUS_SUCCESS;
+ 385   3      #if 0         
+              #ifdef P8051
+              FM_Printf(FM_STM, "STM: start timer (tid = %bu) successfully(5)\n", tid);
+              #else
+              FM_Printf(FM_STM, "STM: start timer (tid = %d) successfully(5)\n", tid);
+              #endif
+              #endif          
+ 392   3                  goto endCrit; 
+ 393   3              }
+ 394   2      
+ 395   2          }
+ 396   1      
+ 397   1      //FM_Printf(FM_STM, "STM: ntimer (tid: %bu time sector %bu, time tick 0x%.8x.\n", 
+ 398   1      //                      ntimer->tid, (u8)ntimer->timeSector, ntimer->time);
+ 399   1      
+ 400   1          //reach the end of the next timer sector
+ 401   1          //thus put the end of queue
+ 402   1      //    if( timer->timeSector == ntimer->timeSector) 
+ 403   1          {
+ 404   2              Stm.timerCb[tid].active = 1;
+ 405   2              DLIST_Put(&(Stm.timerQueue), &timer->link);       
+ 406   2              status = STATUS_SUCCESS;
+ 407   2      #if 0     
+              #ifdef P8051
+              FM_Printf(FM_STM, "STM: start timer (tid = %bu) successfully(6)\n", tid);
+              #else
+              FM_Printf(FM_STM, "STM: start timer (tid = %d) successfully(6)\n", tid);
+              #endif
+              #endif      
+ 414   2              goto endCrit; 
+ 415   2          }
+ 416   1      //    else
+ 417   1      //    {
+ 418   1      //       FM_Printf(FM_ERROR, "STM: Could not start the timer (tid = %bu).\n", tid);
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 8   
+
+ 419   1      //       status = STATUS_FAILURE;
+ 420   1      //       goto endCrit; 
+ 421   1      //   }
+ 422   1          
+ 423   1      endCrit: 
+ 424   1      
+ 425   1      #ifdef TEST
+              STM_DisplayTimerQueue();
+              #endif
+ 428   1      #if 0
+              #endif
+ 430   1      
+ 431   1      //Enable the Timer 0 interrupt
+ 432   1      #ifdef P8051
+ 433   1      __CRIT_SECTION_END__
+ 434   1      #else
+              #ifdef SIMU
+                  SEM_POST(&Stm.stmSem);
+              #endif
+              #endif
+ 439   1          
+ 440   1          return status;
+ 441   1      }
+ 442          
+ 443          
+ 444          
+ 445          //stop a timer
+ 446          eStatus STM_StopTimer(tTimerId tid)
+ 447          {
+ 448   1          //Sanity check
+ 449   1          if( (tid >= STM_TIMER_MAX )||
+ 450   1              (Stm.timerCb[tid].valid == 0 ) ||
+ 451   1              (Stm.timerCb[tid].active == 0) )
+ 452   1          {
+ 453   2              return STATUS_SUCCESS;
+ 454   2          }
+ 455   1      
+ 456   1      //STM_DisplayTimerQueue();
+ 457   1      
+ 458   1      #ifdef P8051
+ 459   1      __CRIT_SECTION_BEGIN__
+ 460   1      #else
+              #ifdef SIMU
+                  SEM_WAIT(&Stm.stmSem);
+              #endif
+              #endif
+ 465   1          //Remove the timer Stm->TimerCb[tid] from TimerQueue.
+ 466   1          DLIST_Remove(&(Stm.timerCb[tid].link));
+ 467   1          Stm.timerCb[tid].active = 0;
+ 468   1      #ifdef P8051
+ 469   1      __CRIT_SECTION_END__
+ 470   1      #else
+              #ifdef SIMU
+                  SEM_POST(&Stm.stmSem);
+              #endif
+              #endif
+ 475   1      
+ 476   1      
+ 477   1      #if 0 
+              #ifdef P8051
+                  FM_Printf(FM_STM, "STM: stop the timer (tid = %bu)\n", tid);
+              #else
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 9   
+
+                  FM_Printf(FM_STM, "STM: stop the timer (tid = %d)\n", tid);
+              #endif
+              #endif
+ 484   1      //STM_DisplayTimerQueue();
+ 485   1      
+ 486   1          return STATUS_SUCCESS;
+ 487   1      }
+ 488          
+ 489          
+ 490          #ifndef CALLBACK
+ 491          void STM_ProcTimer(u8 mid, u16 type, void *cookie)
+ 492          {
+ 493   1          switch(mid)
+ 494   1          {
+ 495   2      #ifdef HYBRII_HPGP
+ 496   2      
+ 497   2      #ifdef UM
+ 498   2              case HP_LAYER_TYPE_CTRL:
+ 499   2              {
+ 500   3                  CTRLL_TimerHandler(type, cookie);
+ 501   3                  break;
+ 502   3              }
+ 503   2              case HP_LAYER_TYPE_LINK:
+ 504   2              {
+ 505   3                  LINKL_TimerHandler(type, cookie);
+ 506   3                  break;
+ 507   3              } 
+ 508   2      #endif    
+ 509   2      #ifdef NO_HOST
+                  case HP_LAYER_TYPE_APP:
+                  {
+                    hostTimerEvnt_t timerevent;
+                    timerevent.type = type;
+                    Host_SendIndication(HOST_EVENT_APP_TIMER,
+                              (u8*)&timerevent, sizeof(hostTimerEvnt_t));
+                    break;
+                  }   
+              #endif
+ 519   2      // Auto ping from keil periodically send ping req
+ 520   2      // TO send ping req periodically timeout of 1 sec needed
+ 521   2      // After timeout wakeup call for UI/htm task
+ 522   2      #ifdef AUTO_PING 
+                      case HP_LAYER_TYPE_HTM:
+                      {
+                          os_set_ready(HYBRII_TASK_ID_UI);
+                          break;
+                      }
+              #endif
+ 529   2              
+ 530   2      #endif
+ 531   2      #ifdef HYBRII_ZIGBEE
+                      case ZB_LAYER_TYPE_MAC:
+                      {
+                          zb_mac_timer_handler(type, cookie);
+                          break;
+                      }
+              #endif
+ 538   2              default:
+ 539   2              {
+ 540   3                  break;
+ 541   3              }
+ 542   2          }
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 10  
+
+ 543   1      
+ 544   1      }
+ 545          
+ 546          #endif
+ 547          
+ 548          void STM_Proc (void)
+ 549          {
+ 550   1          sTimerCb *ptimer;
+ 551   1          u8        currTimeSector; 
+ 552   1      
+ 553   1         
+ 554   1          currTimeSector = (u8)Stm.timeSector;
+ 555   1      
+ 556   1      
+ 557   1          //FM_Printf(FM_ERROR, "STM: time tick %d.\n",
+ 558   1          //          Stm.timeTick);
+ 559   1      
+ 560   1          /* 
+ 561   1           * Depending on the software timer resoultion(N), 
+ 562   1           * either invoke the timers every time tick (N=1, 
+ 563   1           * thus, the same as hardware timer)
+ 564   1           * or every N time ticks (N>1, thus lower than the hardware timer). 
+ 565   1           * At present, the software timer resolution is the same as 
+ 566   1           * the hardware timer
+ 567   1           */
+ 568   1      
+ 569   1          // Search through the software timer active queue
+ 570   1          //Remove those software timers that have the same flag as the timeFlag 
+ 571   1          //and have expired
+ 572   1          
+ 573   1          //if(Stm.timeTick%STM_TIMER_RESOLUTION == 0）
+ 574   1          //{
+ 575   1      
+ 576   1          do 
+ 577   1          {
+ 578   2              if (DLIST_IsEmpty(&Stm.timerQueue))
+ 579   2              {
+ 580   3                  break;
+ 581   3              }
+ 582   2      
+ 583   2              ptimer = DLIST_PeekHeadEntry(&(Stm.timerQueue), sTimerCb, link);
+ 584   2                  
+ 585   2              if(ptimer->timeSector == currTimeSector) 
+ 586   2              {
+ 587   3                  if (ptimer->time <= Stm.timeTick)
+ 588   3                  {
+ 589   4      #ifdef P8051
+ 590   4      __CRIT_SECTION_BEGIN__
+ 591   4      #else
+              #ifdef SIMU
+                              SEM_WAIT(&Stm.stmSem);
+              #endif
+              #endif
+ 596   4                      DLIST_Remove(&ptimer->link);       
+ 597   4                      ptimer->active = 0;
+ 598   4      #ifdef P8051
+ 599   4      __CRIT_SECTION_END__
+ 600   4      #else
+              #ifdef SIMU
+                              SEM_POST(&Stm.stmSem);
+              #endif
+              #endif
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 11  
+
+ 605   4      #ifdef P8051
+ 606   4      #if 0
+                              FM_Printf(FM_STM|FM_MINFO,
+                                        "STM: call a timer handler (tid: %bu, timeSector: %bu, "
+                                        "time tick: 0x%.8x, currTimeSector %bu, curr timeTick: 0x%.8x)\n", 
+                                        ptimer->tid, (u8)ptimer->timeSector,  ptimer->time, 
+                                        currTimeSector, Stm.timeTick);
+              #endif
+ 613   4      #else
+              #if 0
+                              FM_Printf(FM_STM|FM_MINFO, 
+                                        "STM: call a timer handler (tid: %d, timeSector: %d, "
+                                        "time tick: 0x%.8x, currTimeSector %d, curr timeTick: 0x%.8x)\n", 
+                                        ptimer->tid, ptimer->timeSector,  ptimer->time, 
+                                        currTimeSector, Stm.timeTick);
+              #endif
+              #endif
+ 622   4      #ifdef CALLBACK
+                              ptimer->timerHandler(ptimer->type, ptimer->cookie); 
+              #else
+ 625   4                      STM_ProcTimer(ptimer->mid, ptimer->type, ptimer->cookie);
+ 626   4      #endif
+ 627   4                  }
+ 628   3                  else
+ 629   3                  {
+ 630   4                      break;
+ 631   4                  }
+ 632   3                      
+ 633   3              } 
+ 634   2              else if (ptimer->timeSector == Stm.timeSector) 
+ 635   2              {
+ 636   3                  if (ptimer->time <= Stm.timeTick)
+ 637   3                  {
+ 638   4      #ifdef P8051
+ 639   4      __CRIT_SECTION_BEGIN__
+ 640   4      #else
+              #ifdef SIMU
+                              SEM_WAIT(&Stm.stmSem);
+              #endif
+              #endif
+ 645   4                      DLIST_Remove(&ptimer->link);       
+ 646   4                      ptimer->active = 0;
+ 647   4      #ifdef P8051
+ 648   4      __CRIT_SECTION_END__
+ 649   4      #else
+              #ifdef SIMU
+                              SEM_POST(&Stm.stmSem);
+              #endif
+              #endif
+ 654   4      #if 0             
+              #ifdef P8051
+                              FM_Printf(FM_STM|FM_MINFO,
+                                        "STM (2): call Timer handler (tid: %bu, timeSector: %bu, "
+                                        "time tick: 0x%.8x, currTimeSector %bu, curr timeTick: 0x%.8x)\n",
+                                        ptimer->tid, (u8)ptimer->timeSector, ptimer->time, \
+                                        currTimeSector, Stm.timeTick);
+              #else
+                              FM_Printf(FM_STM|FM_MINFO,
+                                        "STM (2): call Timer handler (tid: %d, timeSector: %d, "
+                                        "time tick: 0x%8x, currTimeSector %d, curr timeTick: 0x%.8x)\n",
+                                        ptimer->tid, ptimer->timeSector, ptimer->time, \
+                                        currTimeSector, Stm.timeTick);
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 12  
+
+              #endif
+              #endif
+ 669   4      
+ 670   4      #ifdef CALLBACK
+                              ptimer->timerHandler(ptimer->type, ptimer->cookie); 
+              #else
+ 673   4                      STM_ProcTimer(ptimer->mid, ptimer->type, ptimer->cookie);
+ 674   4      #endif
+ 675   4                  }
+ 676   3                  else
+ 677   3                  {
+ 678   4                      break;
+ 679   4                  }
+ 680   3              } 
+ 681   2              else
+ 682   2              {
+ 683   3                  break;
+ 684   3              }
+ 685   2          } while (1);
+ 686   1      
+ 687   1      }
+ 688          
+ 689          #ifdef RTX51_TINY_OS
+ 690          void STM_Task (void) //_task_ HYBRII_TASK_ID_STM
+ 691          {
+ 692   1         while (1) {
+ 693   2              STM_Proc();
+ 694   2              os_switch_task();
+ 695   2          }
+ 696   1      }
+ 697          #endif
+ 698          
+ 699          
+ 700          #ifdef TEST
+              
+              void STM_DisplayTimerQueue()
+              {
+                  sTimerCb *ptimer;
+                  FM_Printf(FM_STM, "Timer Queue:\n");
+                  DLIST_For_Each_Entry(&(Stm.timerQueue), ptimer, sTimerCb, link)
+                  {
+              #if 0     
+              #ifdef P8051
+                     FM_Printf(FM_STM, "Timer (tid: %bu), timeSector: %bu, time tick: 0x%.8x\n",
+                               ptimer->tid, (u8)ptimer->timeSector, ptimer->time);
+              #else
+                     FM_Printf(FM_STM, "Timer (tid: %d), timeSector: %d, time tick: 0x%.8x\n",
+                               ptimer->tid, ptimer->timeSector, ptimer->time);
+              #endif
+              #endif      
+                  }
+                         
+              }
+              #endif
+ 721          
+ 722          /** =========================================================
+ 723           *
+ 724           * Edit History
+ 725           *
+ 726           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/common/stm.c,v $
+ 727           *
+ 728           * $Log: stm.c,v $
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 13  
+
+ 729           * Revision 1.17  2014/07/22 10:03:52  kiran
+ 730           * 1) SDK Supports Power Save
+ 731           * 2) Uart_Driver.c cleanup
+ 732           * 3) SDK app memory pool optimization
+ 733           * 4) Prints from STM.c are commented
+ 734           * 5) Print messages are trimmed as common no memory left in common
+ 735           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+ 736           *
+ 737           * Revision 1.16  2014/06/11 13:17:46  kiran
+ 738           * UART as host interface and peripheral interface supported.
+ 739           *
+ 740           * Revision 1.15  2014/06/10 22:46:11  yiming
+ 741           * Merge Zigbee-PLC bridging code and System Configuration R/W to flash
+ 742           *
+ 743           * Revision 1.14  2014/05/28 10:58:58  prashant
+ 744           * SDK folder structure changes, Uart changes, removed htm (UI) task
+ 745           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+ 746           *
+ 747           * Revision 1.13  2014/05/12 08:35:00  prashant
+ 748           * timer fix
+ 749           *
+ 750           * Revision 1.12  2014/05/12 08:09:57  prashant
+ 751           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+ 752           *
+ 753           * Revision 1.11  2014/05/01 19:18:24  yiming
+ 754           * bring FPGA setting back
+ 755           *
+ 756           * Revision 1.10  2014/04/15 19:52:20  yiming
+ 757           * Merge new ASIC setting, Add throughput improvement code, add M_PER code
+ 758           *
+ 759           * Revision 1.9  2014/04/11 12:23:54  prashant
+ 760           * Under PLC_TEST macro Diagnostic Mode code added
+ 761           *
+ 762           * Revision 1.8  2014/04/09 08:18:10  ranjan
+ 763           * 1. Added host events for homeplug uppermac indication (Host_SendIndication)
+ 764           * 2. timer workaround  + other fixes
+ 765           *
+ 766           * Revision 1.7  2014/03/25 17:01:07  son
+ 767           * Hybrii B ASIC bring up
+ 768           *
+ 769           * Revision 1.6  2014/03/12 23:41:28  yiming
+ 770           * Merge Hybrii B ASIC code
+ 771           *
+ 772           * Revision 1.5  2014/03/10 05:58:10  ranjan
+ 773           * 1. added HomePlug BackupCCo feature. verified C&I test.(passed.) (bug 176)
+ 774           *
+ 775           * Revision 1.4  2014/02/27 10:42:47  prashant
+ 776           * Routing code added
+ 777           *
+ 778           * Revision 1.3  2014/01/22 19:34:23  son
+ 779           * Reenable calling to Zigbee timer handler
+ 780           *
+ 781           * Revision 1.2  2014/01/10 17:02:18  yiming
+ 782           * check in Rajan 1/8/2014 code release
+ 783           *
+ 784           * Revision 1.3  2014/01/08 10:53:53  ranjan
+ 785           * Changes for LM OS support.
+ 786           * New Datapath FrameTask
+ 787           * LM and UM  datapath, feature verified.
+ 788           *
+ 789           * known issues : performance numbers needs revisit
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 14  
+
+ 790           *
+ 791           * review : pending.
+ 792           *
+ 793           * Revision 1.2  2013/01/24 00:13:46  yiming
+ 794           * Use 01-23-2013 Hybrii-A code as first Hybrii-B code base
+ 795           *
+ 796           * Revision 1.17  2013/01/04 16:11:22  prashant
+ 797           * SPI to PLC bridgeing added, Queue added for SPI and Ethernet
+ 798           *
+ 799           * Revision 1.16  2012/11/27 20:49:25  son
+ 800           * Put back interrupt 1 on timer_handler as this cause issue with PLC upper mac project
+ 801           *
+ 802           * Revision 1.15  2012/11/26 18:02:10  son
+ 803           * Avoid timer 1 vector overlapping
+ 804           *
+ 805           * Revision 1.14  2012/11/22 09:44:02  prashant
+ 806           * Code change for auto ping test, sending tei map ind out, random mac addrr generation.
+ 807           *
+ 808           * Revision 1.13  2012/07/19 21:46:07  son
+ 809           * Prepared files for zigbee integration
+ 810           *
+ 811           * Revision 1.10  2012/06/29 02:41:08  kripa
+ 812           * Calling CHAL timer handler from timer ISR.
+ 813           * Committed on the Free edition of March Hare Software CVSNT Client.
+ 814           * Upgrade to CVS Suite for more features and support:
+ 815           * http://march-hare.com/cvsnt/
+ 816           *
+ 817           * Revision 1.9  2012/06/05 22:37:11  son
+ 818           * UART console does not get initialized due to task ID changed
+ 819           *
+ 820           * Revision 1.8  2012/06/05 07:25:58  yuanhua
+ 821           * (1) add a scan call to the MAC during the network discovery. (2) add a tiny task in ISM for interrupt p
+             -olling (3) modify the frame receiving integration. (4) modify the tiny task in STM.
+ 822           *
+ 823           * Revision 1.7  2012/06/04 23:27:59  son
+ 824           * Added STM_Task
+ 825           *
+ 826           * Revision 1.6  2012/05/19 05:05:15  yuanhua
+ 827           * optimized the timer handlers in CTRL and LINK layers.
+ 828           *
+ 829           * Revision 1.5  2012/05/17 05:05:58  yuanhua
+ 830           * (1) added the option for timer w/o callback (2) added task id and name.
+ 831           *
+ 832           * Revision 1.4  2012/04/13 06:15:10  yuanhua
+ 833           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+ 834           *
+ 835           * Revision 1.3  2012/03/11 17:02:24  yuanhua
+ 836           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+ 837           *
+ 838           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+ 839           * migrate the firmware code from the greenchip to the hybrii.
+ 840           *
+ 841           * Revision 1.6  2011/08/12 23:13:21  yuanhua
+ 842           * (1)Added Control Layer (2) Fixed bugs for user-selected CCo handover (3) Made changes to SNAM/CNAM and 
+             -SNSM/CNSM for CCo handover switch (from CCo to STA, from STA to CCo, and from STA to STA but with different CCo) and pos
+             -t CCo handover
+ 843           *
+ 844           * Revision 1.5  2011/08/02 16:06:00  yuanhua
+ 845           * (1) Fixed a bug in STM (2) Made STA discovery work according to the standard, including aging timer. (3
+             -) release the resource after the STA leave (4) STA will switch to the backup CCo if the CCo failure occurs (5) At this p
+             -oint, the CCo could work with multiple STAs correctly, including CCo association/leave, TEI renew, TEI map updating, dis
+C51 COMPILER V9.52.0.0   STM                                                               12/02/2014 14:35:33 PAGE 15  
+
+             -covery beacon scheduling, discovery STA list updating ang aging, CCo failure, etc.
+ 846           *
+ 847           * Revision 1.4  2011/07/30 02:43:35  yuanhua
+ 848           * (1) Split the beacon process into two parts: one requiring an immdiate response, the other tolerating t
+             -he delay (2) Changed the API btw the MUX and SHAL for packet reception (3) Fixed bugs in various modules. Now, multiple 
+             -STAs could successfully associate/leave the CCo
+ 849           *
+ 850           * Revision 1.3  2011/07/22 18:51:04  yuanhua
+ 851           * (1) added the hardware timer tick simulation (hts.h/hts.c) (2) Added semaphors for sync in simulation a
+             -nd defined macro for critical section (3) Fixed some bugs in list.h and CRM (4) Modified and fixed bugs in SHAL (5) Chan
+             -ged SNSM/CNSM and SNAM/CNAM for bug fix (6) Added debugging prints, and more.
+ 852           *
+ 853           * Revision 1.2  2011/06/24 14:33:18  yuanhua
+ 854           * (1) Changed event structure (2) Implemented SNSM, including the state machines in network discovery and
+             - connection states, becaon process, discover process, and handover detection (3) Integrated the HPGP and SHAL
+ 855           *
+ 856           *
+ 857           * ==========================================================*/
+ 858          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1191    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   2171      37
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

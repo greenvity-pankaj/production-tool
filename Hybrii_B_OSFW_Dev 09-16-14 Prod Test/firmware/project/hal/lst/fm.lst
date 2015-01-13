@@ -1,0 +1,112 @@
+C51 COMPILER V9.52.0.0   FM                                                                01/10/2015 21:25:25 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FM
+OBJECT MODULE PLACED IN .\obj\fm.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\common\fm.c LARGE OPTIMIZE(9,SPEED) BROWSE INTVECTOR(0X2100) INCDIR(.
+                    -.\..\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\src\nma;..\..\ha
+                    -l;.\src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;..\..\hpgp\src\r
+                    -oute;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\components\utilities\li
+                    -nklist\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\sampleapp\inc;..\..
+                    -\..\components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC_SW_SYNC=1,inli
+                    -ne,HPGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_SPI_TX_CRC,HW_S
+                    -PI_RX_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND PRINT(.\lst\fm.
+                    -lst) TABS(2) OBJECT(.\obj\fm.obj)
+
+line level    source
+
+   1          /** @file fm.c
+   2           * 
+   3           *  @brief Fault Management
+   4           *
+   5           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+   6           *  All Rights Reserved
+   7           *  
+   8           */
+   9          
+  10          
+  11          #include <stdio.h>
+  12          #include <stdarg.h>
+  13          #include "fm.h"
+  14          
+  15          u16 FmDebug = FM_MASK_DEBUG;
+  16          //static u16 FmDebug = /*FM_HINFO | FM_MINFO |*/ FM_MMSG /*| FM_USER*/;
+  17          
+  18          void FM_setdebug(u8 debug)
+  19          {
+  20   1          if(debug)
+  21   1          {
+  22   2              FmDebug = FM_MASK_DEBUG;
+  23   2          }
+  24   1          else
+  25   1          {
+  26   2              FmDebug = FM_MASK; 
+  27   2          }
+  28   1      
+  29   1      }
+  30          
+  31          void FM_Printf(u16 dbgLevel, char *fmt, ...)
+  32          {
+  33   1          va_list args;
+  34   1          IRQ_DISABLE_INTERRUPT();
+  35   1          va_start(args, fmt);
+  36   1      //    if( dbgLevel & FmDebug) 
+  37   1          if ((dbgLevel & FmDebug) == dbgLevel)
+  38   1          {
+  39   2              vprintf(fmt, args);
+  40   2          }
+  41   1          va_end(args);
+  42   1          IRQ_ENABLE_INTERRUPT();
+  43   1      }
+  44          
+  45          
+  46          void FM_HexDump(int dbgLevel, const char *title, const unsigned char *buf, int len)
+  47          {
+C51 COMPILER V9.52.0.0   FM                                                                01/10/2015 21:25:25 PAGE 2   
+
+  48   1          int i, j;
+  49   1          unsigned char *offset;
+  50   1      
+  51   1      //    if (!(dbgLevel & FmDebug))
+  52   1          if ((dbgLevel & FmDebug) != dbgLevel)
+  53   1              return;
+  54   1      
+  55   1          offset = (unsigned char *) buf;
+  56   1          IRQ_DISABLE_INTERRUPT();
+  57   1          printf("%s - hexdump(len=%lu):\n", title, (unsigned long) len);
+  58   1      
+  59   1          for (i = 0; i < len / 16; i++) {
+  60   2              for (j = 0; j < 16; j++)
+  61   2      #ifdef P8051
+  62   2                  printf("%02bx  ", offset[j]);
+  63   2      #else
+                          printf("%02x  ", offset[j]);
+              #endif
+  66   2              printf("\n");
+  67   2              offset += 16;
+  68   2          }
+  69   1          i = len % 16;
+  70   1          for (j = 0; j < i; j++)
+  71   1      #ifdef P8051
+  72   1              printf("%02bx  ", offset[j]);
+  73   1      #else
+                      printf("%02x  ", offset[j]);
+              #endif
+  76   1          printf("\n");
+  77   1          IRQ_ENABLE_INTERRUPT();
+  78   1      }
+  79          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    409    ----
+   CONSTANT SIZE    =     34    ----
+   XDATA SIZE       =      2      65
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

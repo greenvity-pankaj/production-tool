@@ -1,0 +1,1068 @@
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE GREEN
+OBJECT MODULE PLACED IN .\obj\green.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\src\green.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCD
+                    -IR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..\..\src
+                    -\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\zigbee;
+                    -..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;
+                    -..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\src;..\..
+                    -\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support;..\..\
+                    -..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP
+                    -_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,Hybri
+                    -i_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,PROD_
+                    -TEST) DEBUG PRINT(.\lst\green.lst) TABS(2) OBJECT(.\obj\green.obj)
+
+line level    source
+
+   1          /** ========================================================
+   2           *
+   3           *  @file green.c 
+   4           * 
+   5           *  @brief GREEN PHY Main Module
+   6           *
+   7           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ==========================================================*/
+  11          
+  12          #ifdef RTX51_TINY_OS
+  13          #include <rtx51tny.h>
+  14          #endif
+  15          #include <string.h>
+  16          #include <stdio.h>
+  17          #include <stdlib.h>
+  18          #include <intrins.h>
+  19          #include "fm.h"
+  20          #include "ism.h"
+  21          #include "timer.h"
+  22          #include "stm.h"
+  23          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  26          
+  27          #include "hpgpapi.h"
+  28          #include "sched.h"
+  29          #include "dmm.h"
+  30          
+  31          #if defined(SIMU) && !defined(HPGP_TEST)
+              #include "host.h"
+              #endif
+  34          
+  35          //#ifdef HPGP_DEBUG
+  36          #ifdef P8051
+  37          #include "uart.h"
+  38          #endif
+  39          //#endif  //HPGP_DEBUG
+  40          #include "green.h"
+  41          #include "hal_eth.h"
+  42          #include "hal_spi.h"
+  43          #include "frametask.h"
+  44          #include "nma.h"
+  45          #include "sys_common.h" 
+  46          #ifdef UART_HOST_INTF 
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 2   
+
+              #include "datapath.h"
+              #include "uart_driver.h"
+              #endif
+  50          
+  51          #if ((defined NO_HOST) || (defined UART_HOST_INTF)) 
+              #include "gv701x_aps.h"
+              #endif
+  54          
+  55          #ifdef NO_HOST
+              #include "gv701x_event.h"
+              #endif
+  58          
+  59          #include "hybrii_tasks.h"
+  60          #include "utils.h"
+  61          
+  62          #include "hal_common.h"
+  63          extern eStatus STM_Init(void);
+  64          #ifdef FREQ_DETECT
+  65          
+  66          extern u32 PLC_DC_LINE_CYCLE_FREQENCY;
+  67          extern void FREQDET_FreqDetectInit(void); 
+  68          
+  69          #endif 
+  70          extern void HTM_CmdRun(void);
+  71          extern void hal_spi_init (void);
+  72          extern void hal_spi_cleanup(void);
+  73          #ifdef HYBRII_ZIGBEE
+              extern void mac_init(void);
+              extern void mac_diag_init(void);
+              #endif
+  77          
+  78          extern sHpgpHalCB gHpgpHalCB;
+  79          u8 syncThres = 0;
+  80          
+  81          extern u8 ethTxDone;
+  82          extern u8 hostDetected;
+  83          extern u8 numHostCPs;
+  84          #define MEM_POOL_SIZE         1208 //3584//3072//4096//5376//6400//4096
+  85          #define MEM_SLAB_SEG_SIZE_0   32
+  86          #define MEM_SLAB_SEG_SIZE_1   64
+  87          #define MEM_SLAB_SEG_SIZE_2   128 
+  88          #define MEM_SLAB_SEG_SIZE_3   196 
+  89           #define MEM_SLAB_SEG_SIZE_4   256 
+  90           #define MEM_SLAB_SEG_SIZE_5   512 
+  91           #define MEM_SLAB_SEG_SIZE_6   1024//2048
+  92          
+  93          
+  94          u8 XDATA MemPool[MEM_POOL_SIZE];
+  95          
+  96          extern sysProfile_t gSysProfile;
+  97          extern u16 FmDebug;
+  98          static sSlabDesc SlabDesc[] =
+  99          {
+ 100              {6, MEM_SLAB_SEG_SIZE_0},
+ 101              {2, MEM_SLAB_SEG_SIZE_1},
+ 102              {2, MEM_SLAB_SEG_SIZE_2},
+ 103          //    {0, MEM_SLAB_SEG_SIZE_3},
+ 104              {2, MEM_SLAB_SEG_SIZE_4},
+ 105              //{0, MEM_SLAB_SEG_SIZE_5},    
+ 106             // {0, MEM_SLAB_SEG_SIZE_6},
+ 107          
+ 108          };
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 3   
+
+ 109          
+ 110          #define BCN_MEM_SLAB_SEG_SIZE_0   (BEACON_BUFF_LEN + 50)
+ 111          #define BCN_MEM_POOL_CNT          6
+ 112          #define BCN_MEM_POOL_SIZE         ((BCN_MEM_SLAB_SEG_SIZE_0 + sizeof(sSegDesc))* \
+ 113                             BCN_MEM_POOL_CNT )
+ 114          
+ 115          
+ 116          #define MGMT_MEM_SLAB_SEG_SIZE_0   (100)
+ 117          #define MGMT_MEM_SLAB_SEG_SIZE_1   (200)
+ 118          #define MGMT_MEM_SLAB_SEG_SIZE_2   (512)
+ 119          #define MGMT_MEM_SLAB_SEG_SIZE_3   (1024)
+ 120          
+ 121          
+ 122          #define MGMT_MEM_POOL_SIZE         (((MGMT_MEM_SLAB_SEG_SIZE_0 + sizeof(sSegDesc))* 40) + \
+ 123                              ((MGMT_MEM_SLAB_SEG_SIZE_1 + sizeof(sSegDesc))* 30) + \
+ 124                                 ((MGMT_MEM_SLAB_SEG_SIZE_2 + sizeof(sSegDesc))* 2 ) + \
+ 125                               ((MGMT_MEM_SLAB_SEG_SIZE_3 + sizeof(sSegDesc))* 1))
+ 126          
+ 127          u8 XDATA BcnMemPool[BCN_MEM_POOL_SIZE];
+ 128          u8 XDATA MgmtMemPool[MGMT_MEM_POOL_SIZE];
+ 129          
+ 130          
+ 131          static sSlabDesc BcnSlabDesc[] =
+ 132          {
+ 133              {BCN_MEM_POOL_CNT, BCN_MEM_SLAB_SEG_SIZE_0},
+ 134          
+ 135          };
+ 136          
+ 137          static sSlabDesc MgmtSlabDesc[] =
+ 138          {
+ 139              {40, MGMT_MEM_SLAB_SEG_SIZE_0},   
+ 140              {30, MGMT_MEM_SLAB_SEG_SIZE_1}, 
+ 141              {2, MGMT_MEM_SLAB_SEG_SIZE_2},
+ 142              {1, MGMT_MEM_SLAB_SEG_SIZE_3},
+ 143          
+ 144          };
+ 145          
+ 146          u8 hwSpecDone = FALSE;
+ 147          #ifdef LOG_FLASH
+              extern u16 *logLen;
+              extern u16 *blockId;
+              #endif
+ 151          #define MAX_HOST_WAIT 45
+ 152          #define MAX_INPUT_WAIT 90
+ 153          
+ 154          sHomePlugCb HomePlug;
+ 155          #ifdef HPGP_MAC_SAP 
+ 156          #ifdef LINK_STATUS
+              u8 linkStatus = TRUE;
+              #endif
+ 159          #endif
+ 160          extern void HTM_SetDefaultNid();
+ 161          extern void EHAL_DoRelEthTxCP();
+ 162          extern u8 opMode;
+ 163          extern eStatus CTRLL_StartNetDisc(sCtrlLayer *ctrlLayer);
+ 164          
+ 165          u16 hostDetectedCnt;
+ 166          
+ 167          extern void STM_Proc (void);
+ 168          extern eStatus NMA_Init(sNma *nma);
+ 169          extern void NMA_SendFwReady(void);
+ 170          extern void ConfigParams();
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 4   
+
+ 171          #ifdef HYBRII_SPI
+ 172          void hal_spi_cmd_len_rx_rdy ();
+ 173          #endif
+ 174          
+ 175          extern volatile sStm Stm;
+ 176          
+ 177          #ifdef UART_HOST_INTF
+              extern volatile uint8_t txEnable;// uart driver specific
+              extern uint8_t modemstatus;//uart driver spacific
+              extern union_uart_modemstat modemstatus_u;
+              extern union_uart_intctrl    *uart_intctrl;
+              
+              extern xdata volatile uint8_t txBuffer[128];
+              volatile uint8_t tlValue,thValue;
+              volatile uint16_t timerValue;// For Timer polling and timer reload //Kiran
+              volatile uint16_t timerDiff,timerCalc;
+              #define TIMER_RELOAD_VALUE 44702
+              #define TIMER_TICK10     20833
+              #endif
+ 190          
+ 191          #ifndef RTX51_TINY_OS
+              int main (void)
+              #else
+ 194          void green_main (void) _task_ HYBRII_TASK_ID_INIT
+ 195          #endif
+ 196          
+ 197          
+ 198          {
+ 199   1          
+ 200   1      #ifdef PLC_TEST 
+ 201   1          u8 lm, lmFlag = 0;
+ 202   1          u32 currTick; 
+ 203   1      #endif
+ 204   1          static u8 sendOnSpi = FALSE;
+ 205   1          memset(&HomePlug, 0, sizeof(sHomePlugCb));
+ 206   1          memset(&gHpgpHalCB, 0, sizeof(sHpgpHalCB));
+ 207   1      //#ifdef HPGP_DEBUG
+ 208   1          UART_Init();
+ 209   1      //#endif
+ 210   1      
+ 211   1          FM_Printf(FM_USER, "INITIALISING.\n");
+ 212   1        FM_Printf(FM_USER, "VERSION: %s\n",get_Version());
+ 213   1      #ifdef P8051
+ 214   1      //    init_mempool(&MemPool, sizeof(MemPool));
+ 215   1      #endif
+ 216   1      #ifdef UART_HOST_INTF
+                    TL0 = lo8(TIMER_RELOAD_VALUE);
+                    TH0 = hi8(TIMER_RELOAD_VALUE);
+                    ET0 = 0;
+                    TR0 = 1;
+              #endif
+ 222   1      #ifdef PLC_TEST
+ 223   1          currTick = STM_GetTick();
+ 224   1          FM_Printf(FM_USER,"Enter Diagnostic Mode(y/n) :: ");
+ 225   1          while((STM_GetTick() - currTick) < MAX_INPUT_WAIT)
+ 226   1          {
+ 227   2              lm = poll_key();
+ 228   2              if(lm == 'Y' || lm == 'y')
+ 229   2              {
+ 230   3                  putchar(lm);
+ 231   3                  opMode = LOWER_MAC;
+ 232   3                  eth_plc_bridge = 1;
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 5   
+
+ 233   3                  FM_Printf(FM_USER,"\nDiagnostic Mode Selected");
+ 234   3                  lmFlag = 1;
+ 235   3                  break;
+ 236   3              }
+ 237   2              else if(lm == 'N' || lm == 'n')
+ 238   2              {
+ 239   3                  putchar(lm);
+ 240   3            opMode = UPPER_MAC;
+ 241   3                  FM_Printf(FM_USER,"\nStation Mode Selected");
+ 242   3                  lmFlag = 1;
+ 243   3                  break;
+ 244   3              }
+ 245   2              
+ 246   2      #ifdef UART_HOST_INTF
+                  if(1 == TF0)
+                  {
+                    TF0 = 0;
+                    Stm.timeTick++;
+                    TR0 = 0;
+                    tlValue = TL0;
+                    thValue = TH0;
+              
+                    timerValue = (uint16_t)(thValue<<8) | tlValue;
+                    if(timerValue < TIMER_RELOAD_VALUE)
+                    {
+                      timerValue = TIMER_RELOAD_VALUE - timerValue;
+                      TL0 = lo8(timerValue);
+                      TH0 = hi8(timerValue);
+                    }// If value is equal or greater then don't reload as we are too late to process timer
+                    
+                    TR0 = 1;
+                  }
+              #endif
+ 266   2          }
+ 267   1          FM_Printf(FM_USER,"\n");
+ 268   1          if(lmFlag == 0)
+ 269   1          {
+ 270   2              FM_Printf(FM_USER,"\nTime Out:Station Mode Selected\n");
+ 271   2          }
+ 272   1          
+ 273   1      #endif
+ 274   1      //    gHpgpHalCB.lastdevMode = 2;
+ 275   1        FmDebug = FM_USER;
+ 276   1      
+ 277   1      #ifdef HYBRII_ZIGBEE
+                  mac_init();    
+                  mac_diag_init();
+              #endif
+ 281   1      #ifdef NOT_RANDOM
+                  syncThres = PLC_BCNTST_SYNCTHRES;
+              #else
+ 284   1        srand(ReadU32Reg(PLC_NTB_REG) + TL0);   
+ 285   1      
+ 286   1          syncThres = (u8)rand();
+ 287   1          if(syncThres < PLC_BCNTST_SYNCTHRES)
+ 288   1          {
+ 289   2              syncThres = PLC_BCNTST_SYNCTHRES;
+ 290   2          }
+ 291   1          else if(syncThres > 10) // 90 = 30 sec
+ 292   1          {
+ 293   2              syncThres = 10;
+ 294   2          }
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 6   
+
+ 295   1          
+ 296   1      #endif
+ 297   1      
+ 298   1          DMM_Init(FW_POOL_ID);
+ 299   1          DMM_InitMemPool(FW_POOL_ID, MemPool, sizeof(MemPool), 
+ 300   1                SlabDesc, sizeof(SlabDesc)/sizeof(SlabDesc[0]));
+ 301   1      
+ 302   1        DMM_Init(BCN_POOL_ID);
+ 303   1        DMM_InitMemPool(BCN_POOL_ID, BcnMemPool, sizeof(BcnMemPool),
+ 304   1                BcnSlabDesc, sizeof(BcnSlabDesc)/sizeof(BcnSlabDesc[0]));
+ 305   1      
+ 306   1        DMM_Init(MGMT_POOL_ID);
+ 307   1        DMM_InitMemPool(MGMT_POOL_ID, MgmtMemPool, sizeof(MgmtMemPool),
+ 308   1                MgmtSlabDesc, sizeof(MgmtSlabDesc)/sizeof(MgmtSlabDesc[0]));
+ 309   1        
+ 310   1          /* Initialize PAP */
+ 311   1          //PAP_Init();
+ 312   1      
+ 313   1        STM_Init();
+ 314   1        
+ 315   1      #if defined(SIMU) && !defined(HPGP_TEST)
+                  /* initialize host software */
+                Host_Init();
+              #endif
+ 319   1          HAL_Init(&HomePlug.haLayer);
+ 320   1      
+ 321   1      #ifdef B_ASICPLC
+ 322   1      
+ 323   1        if(isFlashProfileValid() == STATUS_SUCCESS)
+ 324   1        {
+ 325   2          flashRead_config((u8 *)&gSysProfile,FLASH_SYS_CONFIG_OFFSET,
+ 326   2                    sizeof(sysProfile_t));
+ 327   2          ConfigParams();
+ 328   2      
+ 329   2            //FM_HexDump(FM_USER, "MAC ADDR: ", gSysProfile.macAddress, MAC_ADDR_LEN);
+ 330   2        }
+ 331   1        else
+ 332   1        {
+ 333   2      
+ 334   2          u8 defaultMacAddress[6] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
+ 335   2          
+ 336   2          //sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+ 337   2          u8     nid[NID_LEN] = {0xb0, 0xf2, 0xe6, 0x95, 0x66, 0x6b, 0x03};
+ 338   2          // {0xB0, 0xF2, 0xE6, 0x95, 0x66, 0x6B, 0x83}; // Zyxel box NID = B0F2E695666B83
+ 339   2      
+ 340   2      
+ 341   2          u8     nmk[ENC_KEY_LEN] = {0x50, 0xD3, 0xE4, 0x93, 0x3F, 0x85, 0x5B, 0x70, 0x40,
+ 342   2                        0x78, 0x4D, 0xF8, 0x15, 0xAA, 0x8D, 0xB7};
+ 343   2      
+ 344   2      
+ 345   2          nid[NID_LEN-1] &= SECLV_MASK;       
+ 346   2          nid[NID_LEN-1] |= (SECLV_SC << SECLV_OFFSET); // By default SC
+ 347   2          
+ 348   2          //FM_Printf(FM_USER,"Invalid Flash Profile\n");
+ 349   2            
+ 350   2          //set a default NID, which should be set by the user later
+ 351   2          memcpy(gSysProfile.nid, nid, NID_LEN);
+ 352   2      
+ 353   2          memcpy(gSysProfile.nmk, nmk, ENC_KEY_LEN);
+ 354   2      
+ 355   2          //CTRLL_SetKey(ctrll, nmk, nid);
+ 356   2              
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 7   
+
+ 357   2          // memcpy(gSysProfile.defaultNMK, , ENC_KEY_LEN);// update
+ 358   2          memcpy(gSysProfile.systemName,"Greenvity HPGP", sizeof("Greenvity HPGP"));
+ 359   2        
+ 360   2          //gSysProfile.secLevel;
+ 361   2      
+ 362   2          //memcpy(gHpgpHalCB.nid, nid, NID_LEN);
+ 363   2          
+ 364   2          gSysProfile.lineMode = LINE_MODE_DC;
+ 365   2          //gHpgpHalCB.lineMode = LINE_MODE_DC;
+ 366   2      
+ 367   2          
+ 368   2      #ifdef AC_LINECYCLE_50HZ    
+                  //gHpgpHalCB.lineFreq = FREQUENCY_50HZ;
+                  gSysProfile.lineFreq = FREQUENCY_50HZ;
+              #else
+ 372   2          //gHpgpHalCB.lineFreq = FREQUENCY_60HZ;
+ 373   2          gSysProfile.lineFreq = FREQUENCY_50HZ;
+ 374   2      #endif
+ 375   2          //gSysProfile.plcLineFreq;
+ 376   2          gSysProfile.cap.fields.ccoCap = CCO_CAP_LEVEL0;
+ 377   2          gSysProfile.cap.fields.backupCcoCap = DEFAULT_BACKUP_CCO_CAP;
+ 378   2          
+ 379   2          gSysProfile.cap.fields.proxyNetCap = DEFAULT_PROXY_NET_CAP;
+ 380   2            
+ 381   2          gSysProfile.cap.fields.greenPhyCap = DEFAULT_GREENPHY_CAP;
+ 382   2          gSysProfile.cap.fields.HPAVVersion = DEFAULT_HPAV_VER;
+ 383   2          gSysProfile.cap.fields.powerSaveCap = DEFAULT_POWER_SAVE_CAP;
+ 384   2          gSysProfile.cap.fields.repeaterRouting = DEFAULT_REPEATER_ROUTING_SUPPORTED;
+ 385   2          gSysProfile.cap.fields.bridgeSupported =  DEFAULT_BRIDGE_SUPPORTED;
+ 386   2      
+ 387   2              gSysProfile.lastUserAppCCOState = 0x00;
+ 388   2          
+ 389   2          
+ 390   2          // SLIST_Init(&hal->txQueue);
+ 391   2           
+ 392   2          /* FIXME: the following is to hard code MAC address */
+ 393   2          srand(ReadU32Reg(PLC_NTB_REG));
+ 394   2          defaultMacAddress[5] = (u8)(rand() & 0xFF);   
+ 395   2      
+ 396   2          memcpy(&HomePlug.haLayer.macAddr, 
+ 397   2              &defaultMacAddress, MAC_ADDR_LEN);
+ 398   2      
+ 399   2          memcpy(&gSysProfile.macAddress,
+ 400   2            &defaultMacAddress, MAC_ADDR_LEN);
+ 401   2             
+ 402   2           
+ 403   2            FM_HexDump(FM_USER, "MAC ADDR:", &defaultMacAddress, MAC_ADDR_LEN);
+ 404   2          
+ 405   2          flashWrite_config((u8 *)&gSysProfile,FLASH_SYS_CONFIG_OFFSET,
+ 406   2                     sizeof(sysProfile_t));
+ 407   2      
+ 408   2          ConfigParams();
+ 409   2          
+ 410   2        } 
+ 411   1      #endif
+ 412   1          HPGPCTRL_Init(&HomePlug.hpgpCtrl);
+ 413   1      #ifdef FREQ_DETECT
+ 414   1          FREQDET_FreqSetting(gHpgpHalCB.lineFreq);
+ 415   1          FREQDET_FreqDetectInit();
+ 416   1      #endif
+ 417   1        
+ 418   1      #ifdef NMA
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 8   
+
+ 419   1          /* initialize HPGP network management agent */
+ 420   1          NMA_Init(&HomePlug.netMgmtAgt);
+ 421   1      #endif
+ 422   1        
+ 423   1      #ifdef SIMU
+                  /* initialize hpgp timer simulator */
+                  HTS_Init(&HomePlug.hts);
+              #endif
+ 427   1        
+ 428   1      #ifdef HPGP_HAL
+ 429   1          ISM_EnableInterrupts();
+ 430   1        
+ 431   1          ISM_EnableMacIrq(MAC_INT_IRQ_ALL);
+ 432   1        //    ISM_EnableMacIrq(MAC_INT_IRQ_PLC_BCN_TX);
+ 433   1      #ifndef RTX51_TINY_OS
+                  HAL_EnablePoll(&HomePlug.haLayer);
+              #endif
+ 436   1      #endif /* HPGP_HAL */
+ 437   1        
+ 438   1          
+ 439   1          /* main process */
+ 440   1      #ifdef HPGP_TEST
+ 441   1          HTM_Init(&HomePlug.htm);
+ 442   1      #endif
+ 443   1      #ifdef HYBRII_SPI
+ 444   1          hal_spi_init();
+ 445   1      #endif
+ 446   1      //    HTM_SetDefaultNid();
+ 447   1      #ifdef UART_HOST_INTF
+                   UART_Init16550();
+              #endif
+ 450   1      
+ 451   1          frame_task_init();
+ 452   1      #ifdef ROUTE
+                      ROUTE_routeInit();
+              #endif
+ 455   1      #ifdef NO_HOST
+                hostIntf = HOST_INTF_UART;
+                hostDetected = TRUE;
+              #else
+ 459   1          hostIntf = HOST_INTF_ETH;
+ 460   1      #endif
+ 461   1          if(opMode != LOWER_MAC)
+ 462   1          {
+ 463   2      
+ 464   2              NMA_SendFwReady();
+ 465   2          }
+ 466   1          hostDetectedCnt = 0;
+ 467   1      #ifdef LOG_FLASH
+                      *logLen = 0;
+                      *blockId = getLastPageId();
+              #endif
+ 471   1              os_set_ready(HYBRII_TASK_ID_FRAME);
+ 472   1          os_switch_task();
+ 473   1            
+ 474   1      #ifdef UART_HOST_INTF
+                TL0 = lo8(TIMER_RELOAD_VALUE);
+                TH0 = hi8(TIMER_RELOAD_VALUE);
+                TR0 = 1;
+                ET0 = 0;
+              #endif
+ 480   1      #ifdef RTX51_TINY_OS 
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 9   
+
+ 481   1      #ifdef LOG_FLASH
+                  logEvent(BOOT, 0, 0, NULL, 0);
+              #endif
+ 484   1      
+ 485   1          while (1)
+ 486   1      
+ 487   1        {
+ 488   2      #ifdef UART_HOST_INTF
+                  if(1 == TF0)
+                  {
+                    u8 val = 0;
+                    EA = 0;
+                    TF0 = 0;
+                    Stm.timeTick++;
+                    TR0 = 0;
+                    tlValue = TL0;
+                    thValue = TH0;
+              
+                    timerValue = (uint16_t)(thValue<<8) | tlValue;
+                    if(timerValue < TIMER_RELOAD_VALUE)
+                    {
+                      val = timerValue / TIMER_TICK10;
+                      //val = (u8)timerCalc;
+                      Stm.timeTick += val;
+                      timerCalc = timerValue % TIMER_TICK10;
+                      timerValue = TIMER_RELOAD_VALUE + timerCalc;
+                      TL0 = lo8(timerValue);
+                      TH0 = hi8(timerValue);
+                    }   
+                    else
+                    {
+                      val = 0;
+                      TL0 = lo8(TIMER_RELOAD_VALUE);
+                      TH0 = hi8(TIMER_RELOAD_VALUE);
+                    }   
+                    
+                    TR0 = 1;
+                    if(uartRxControl.uartRxFlag == 1) // in timer handler or in STM Proc()
+                    {
+                      uartRxControl.tick = uartRxControl.tick + ((val + 1)*10);
+                    }
+                    EA = 1;
+                  } 
+              #ifdef LG_UART_CONFIG   
+                  if(uartTxControl.txModeControl == UART_TX_LOW_EDGE)
+                  {
+                    modemstatus_u.modemstat = ReadU8Reg(UART_MODEMSTAT);//uart_modemstatus.modemstat;
+                    if(modemstatus_u.modemstat_field.DCTS || modemstatus_u.modemstat_field.CTS)
+                    {
+                      if(modemstatus_u.modemstat_field.DCTS && modemstatus_u.modemstat_field.CTS) // DCTS & CTS are set
+                      {   
+                        if(uartTxControl.txCount == 0)
+                        {
+                          // check if any frame is in queue
+                          //if available then unqueue copy in to local buffer and start interrupt 
+                          if(datapath_IsQueueEmpty(HOST_DATA_QUEUE) == FALSE)
+                          {
+                            xdata uint8_t *cellAddrTx;
+                            sSwFrmDesc* pHostTxFrmSwDesc = NULL;
+                            uint16_t i;
+                            if((pHostTxFrmSwDesc =
+                                datapath_getHeadDesc(HOST_DATA_QUEUE, 1)) != NULL)
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 10  
+
+                            {
+                              uartTxControl.pTxBuffer = txBuffer;
+                              uartTxControl.txCount = pHostTxFrmSwDesc->frmLen;
+                              uartTxControl.txDone = 0;
+                            if(HHAL_Req_Gnt_Read_CPU_QD_ISR() == STATUS_SUCCESS)
+                            {
+                              cellAddrTx = CHAL_GetAccessToCP(pHostTxFrmSwDesc->cpArr[0].cp);
+                              for(i=0;i<uartTxControl.txCount;i++)
+                              {
+                                *(uartTxControl.pTxBuffer+i) = *(cellAddrTx + i );
+                              }
+                              HHAL_Rel_Gnt_Read_CPU_QD_ISR();
+                              txEnable = 1;
+                              uart_intctrl->intctrl_field.EnTxEmptInt = 1; // Enables tx interrupt
+                            }
+                              CHAL_FreeFrameCp(pHostTxFrmSwDesc->cpArr, pHostTxFrmSwDesc->cpCount);   
+                              numHostCPs -= pHostTxFrmSwDesc->cpCount;
+                            }//Get head disc
+                          }
+                        }
+                        else //if(modemstatus_u.modemstat_field.DCTS && !modemstatus_u.modemstat_field.CTS)
+                        {
+                          txEnable = 1;
+                          uart_intctrl->intctrl_field.EnTxEmptInt = 1;// Enable TX Interrupt
+                        }
+                        modemstatus = ReadU8Reg(UART_MODEMSTAT);//uart_modemstatus.modemstat;
+                      }
+                      else if(modemstatus_u.modemstat_field.DCTS && !modemstatus_u.modemstat_field.CTS)// Only DCTS is set
+                      {
+                        uart_intctrl->intctrl_field.EnTxEmptInt = 0;// Disable TX Interrupt
+                        txEnable = 0;
+                        modemstatus = ReadU8Reg(UART_MODEMSTAT);//modemstatus = uart_modemstatus.modemstat;
+                      }
+                    }
+                  }
+              #endif
+              #endif
+ 580   2      #if 0
+                    if(hostDetected == FALSE)
+                      {
+                          if(hostDetectedCnt > 1000)
+                          {
+                              if(hostIntf == HOST_INTF_ETH)
+                              {
+                              
+                                  hostIntf = HOST_INTF_SPI;
+                                  if(opMode != LOWER_MAC)
+                                  {
+              #ifndef NO_HOST                    
+                                      NMA_SendFwReady();
+              #endif
+                                  }
+                                  hostDetectedCnt = 0;
+                                  
+                                  os_set_ready(HYBRII_TASK_ID_FRAME);
+                                  os_switch_task();
+                              }
+                              else
+                              {                    
+                                  hostIntf = HOST_INTF_NO;
+                                  //hostDetected = TRUE;
+                              }
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 11  
+
+                          }
+              
+                          hostDetectedCnt++;
+              
+                      }
+              #else
+ 611   2              if(hwSpecDone == FALSE) 
+ 612   2              {
+ 613   3                  if(hostDetectedCnt > 1000)
+ 614   3                  {
+ 615   4                      if((hostDetected == TRUE) && (hostIntf == HOST_INTF_ETH))
+ 616   4                      {
+ 617   5                      }
+ 618   4      #ifdef HYBRII_SPI
+ 619   4                      else if(sendOnSpi == FALSE)
+ 620   4                      {
+ 621   5                          hostIntf = HOST_INTF_SPI;
+ 622   5                          if(opMode != LOWER_MAC)
+ 623   5                          {
+ 624   6      #ifdef HYBRII_ETH                     
+ 625   6                             EHAL_DoRelEthTxCP();
+ 626   6      #endif                      
+ 627   6      #ifndef NO_HOST                    
+ 628   6                              NMA_SendFwReady();
+ 629   6      #endif
+ 630   6                              sendOnSpi = TRUE;
+ 631   6                          }
+ 632   5                      }
+ 633   4      #endif
+ 634   4                      else
+ 635   4                      {
+ 636   5                          hostIntf = HOST_INTF_NO;
+ 637   5      #ifdef HYBRII_SPI
+ 638   5                hal_spi_cmd_len_rx_rdy();
+ 639   5      #endif
+ 640   5                          hwSpecDone = TRUE;
+ 641   5                      }
+ 642   4                      hostDetectedCnt = 0;
+ 643   4                  }
+ 644   3                  hostDetectedCnt++;
+ 645   3              }
+ 646   2      #endif
+ 647   2      #ifdef UART_HOST_INTF       
+                  if(uartRxControl.rxExpectedCount == 0)
+                  {
+                    uartRxProc();
+                  }
+              #endif    
+ 653   2      
+ 654   2          STM_Proc();
+ 655   2      
+ 656   2              ISM_PollInt();
+ 657   2          HTM_CmdRun();
+ 658   2      
+ 659   2      #if 0 //def HYBRII_SPI
+                  if(spi_tx_flag == 1)
+                  {
+              
+                    if((STM_GetTick() - spi_tx_time) > MAX_SPI_TX_TIMEOUT)
+                    {
+                      hal_spi_cleanup();
+                      spi_tx_flag = 0;
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 12  
+
+                    }
+                  }
+              #endif  
+ 670   2              os_switch_task();
+ 671   2      
+ 672   2          STM_Proc();
+ 673   2      
+ 674   2              os_switch_task();
+ 675   2      
+ 676   2      
+ 677   2          }
+ 678   1      #else  
+                  SCHED_Proc();
+              #endif
+ 681   1      
+ 682   1          return;
+ 683   1      
+ 684   1      }
+ 685          
+ 686          
+ 687          
+ 688          sHpgpCtrl* HOMEPLUG_GetCtrlPlane()
+ 689          {
+ 690   1          return &HomePlug.hpgpCtrl;
+ 691   1      }
+ 692          
+ 693          sHaLayer* HOMEPLUG_GetHal()
+ 694          {
+ 695   1          return &HomePlug.haLayer;
+ 696   1      }
+ 697          
+ 698          sNma *HOMEPLUG_GetNma() 
+ 699          {
+ 700   1          return &HomePlug.netMgmtAgt;
+ 701   1      }
+ 702          
+ 703          
+ 704          
+ 705          
+ 706          /** =========================================================
+ 707           *
+ 708           * Edit History
+ 709           *
+ 710           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/green.c,v $
+ 711           *
+ 712           * $Log: green.c,v $
+ 713           * Revision 1.30  2014/09/05 09:28:18  ranjan
+ 714           * 1. uppermac cco-sta switching feature fix
+ 715           * 2. general stability fixes for many station associtions
+ 716           * 3. changed mgmt memory pool for many STA support
+ 717           *
+ 718           * Revision 1.29  2014/08/25 07:37:34  kiran
+ 719           * 1) RSSI & LQI support
+ 720           * 2) Fixed Sync related issues
+ 721           * 3) Fixed timer 0 timing drift for SDK
+ 722           * 4) MMSG & Error Logging in Flash
+ 723           *
+ 724           * Revision 1.28  2014/08/05 13:12:55  kiran
+ 725           * Fixed CP loss issue with UART Host & Peripheral interface
+ 726           *
+ 727           * Revision 1.27  2014/07/30 12:26:26  kiran
+ 728           * 1) Software Recovery for CCo
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 13  
+
+ 729           * 2) User appointed CCo support in SDK
+ 730           * 3) Association process performance fixes
+ 731           * 4) SSN related fixes
+ 732           *
+ 733           * Revision 1.26  2014/07/22 10:03:52  kiran
+ 734           * 1) SDK Supports Power Save
+ 735           * 2) Uart_Driver.c cleanup
+ 736           * 3) SDK app memory pool optimization
+ 737           * 4) Prints from STM.c are commented
+ 738           * 5) Print messages are trimmed as common no memory left in common
+ 739           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+ 740           *
+ 741           * Revision 1.25  2014/07/16 10:47:40  kiran
+ 742           * 1) Updated SDK
+ 743           * 2) Fixed Diag test in SDK
+ 744           * 3) Ethernet and SPI interfaces removed from SDK as common memory is less
+ 745           * 4) GPIO access API's added in SDK
+ 746           * 5) GV701x chip reset command supported
+ 747           * 6) Start network and Join network supported in SDK (Forced CCo and STA)
+ 748           * 7) Some bug fixed in SDK (CP free, p app command issue etc.)
+ 749           *
+ 750           * Revision 1.24  2014/07/10 11:42:45  prashant
+ 751           * power save commands added
+ 752           *
+ 753           * Revision 1.23  2014/07/05 09:16:27  prashant
+ 754           * 100 Devices support- only association tested, memory adjustments
+ 755           *
+ 756           * Revision 1.22  2014/07/01 09:49:57  kiran
+ 757           * memory (xdata) improvement
+ 758           *
+ 759           * Revision 1.21  2014/06/19 17:13:19  ranjan
+ 760           * -uppermac fixes for lvnet and reset command for cco and sta mode
+ 761           * -backup cco working
+ 762           *
+ 763           * Revision 1.20  2014/06/19 07:16:02  prashant
+ 764           * Region fix, frequency setting fix
+ 765           *
+ 766           * Revision 1.19  2014/06/17 09:24:58  kiran
+ 767           * interface selection issue fix, get version supported.
+ 768           *
+ 769           * Revision 1.18  2014/06/13 14:55:11  ranjan
+ 770           * -fixing memory issue due to previous checkin
+ 771           *
+ 772           * Revision 1.17  2014/06/12 13:15:43  ranjan
+ 773           * -separated bcn,mgmt,um event pools
+ 774           * -fixed datapath issue due to previous checkin
+ 775           * -work in progress. neighbour cco detection
+ 776           *
+ 777           * Revision 1.16  2014/06/11 13:17:47  kiran
+ 778           * UART as host interface and peripheral interface supported.
+ 779           *
+ 780           * Revision 1.15  2014/06/09 13:19:46  kiran
+ 781           * Zigbee MAC SAP supported
+ 782           *
+ 783           * Revision 1.14  2014/06/05 10:26:07  prashant
+ 784           * Host Interface selection isue fix, Ac sync issue fix
+ 785           *
+ 786           * Revision 1.13  2014/06/05 08:38:41  ranjan
+ 787           * -flash function enabled for uppermac
+ 788           * - commit command after any change would flash systemprofiles
+ 789           * - verfied upper mac
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 14  
+
+ 790           *
+ 791           * Revision 1.12  2014/05/28 10:58:59  prashant
+ 792           * SDK folder structure changes, Uart changes, removed htm (UI) task
+ 793           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+ 794           *
+ 795           * Revision 1.11  2014/05/16 08:52:30  kiran
+ 796           * - System Profile Flashing API's Added. Upper MAC functionality tested
+ 797           *
+ 798           * Revision 1.10  2014/05/15 19:29:55  varsha
+ 799           * FREQ_DETECT code is added
+ 800           *
+ 801           * Revision 1.9  2014/05/12 08:09:57  prashant
+ 802           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+ 803           *
+ 804           * Revision 1.8  2014/04/29 19:44:08  yiming
+ 805           * reduce compile flag
+ 806           *
+ 807           * Revision 1.7  2014/04/11 12:23:55  prashant
+ 808           * Under PLC_TEST macro Diagnostic Mode code added
+ 809           *
+ 810           * Revision 1.6  2014/02/27 10:42:47  prashant
+ 811           * Routing code added
+ 812           *
+ 813           * Revision 1.5  2014/02/19 10:22:40  ranjan
+ 814           * - common sync for hal_tst and upper mac project
+ 815           * - ism.c is MAC interrupt handler for hhal_tst and upper mac.
+ 816           *    chal_ext1isr function   is removed
+ 817           * - verified : lower mac sync, upper mac sync data traffic.
+ 818           *
+ 819           * Revision 1.4  2014/01/14 23:34:22  son
+ 820           * Zigbee PLC UMAC integration initial commit
+ 821           *
+ 822           * Revision 1.3  2014/01/13 08:33:16  ranjan
+ 823           * code cleanup
+ 824           *
+ 825           * Revision 1.2  2014/01/10 17:13:09  yiming
+ 826           * check in Rajan 1/8/2014 code release
+ 827           *
+ 828           * Revision 1.5  2014/01/08 10:53:54  ranjan
+ 829           * Changes for LM OS support.
+ 830           * New Datapath FrameTask
+ 831           * LM and UM  datapath, feature verified.
+ 832           *
+ 833           * known issues : performance numbers needs revisit
+ 834           *
+ 835           * review : pending.
+ 836           *
+ 837           * Revision 1.4  2013/09/04 14:49:33  yiming
+ 838           * New changes for Hybrii_A code merge
+ 839           *
+ 840           * Revision 1.40  2013/07/12 08:56:36  ranjan
+ 841           * -UKE Push Button Security Feature.
+ 842           * Verified : DirectEntry Security Works.Datapath Works.
+ 843           *                 command SetSecMode for UKE works.
+ 844           * Added against bug-160
+ 845           *
+ 846           * Revision 1.39  2013/06/05 15:42:40  ranjan
+ 847           * 1) Lower mac bridge can be used with SPI.
+ 848           * 2) auto assoc stability issue
+ 849           *
+ 850           * Revision 1.38  2013/05/23 10:09:30  prashant
+ 851           * Version command added, SPI polling waittime increased, sys_common file added
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 15  
+
+ 852           *
+ 853           * Revision 1.37  2013/05/20 10:15:31  prashant
+ 854           * poll_key bug fix and data path fix for UM
+ 855           *
+ 856           * Revision 1.36  2013/05/16 08:38:41  prashant
+ 857           * "p starttest" command merged in upper mac
+ 858           * Dignostic mode added in upper mac
+ 859           *
+ 860           * Revision 1.35  2013/04/19 12:56:34  prashant
+ 861           * Fix for sniffer, unresolved externs
+ 862           *
+ 863           * Revision 1.34  2013/04/17 13:00:59  ranjan
+ 864           * Added FW ready event, Removed hybrii header from datapath, Modified hybrii header
+ 865           *  formate
+ 866           *
+ 867           * Revision 1.33  2013/04/04 12:21:54  prashant
+ 868           * Detecting PLC link failure for HMC. added project for HMC and Renesas
+ 869           *
+ 870           * Revision 1.32  2013/03/22 12:21:48  prashant
+ 871           * default FM_MASK and FM_Printf modified for USER INFO
+ 872           *
+ 873           * Revision 1.31  2013/03/14 11:49:18  ranjan
+ 874           * 1.handled cases  for CCo toSTA switch and  viceversa
+ 875           * 2.UM uses bcntemplate
+ 876           *
+ 877           * Revision 1.30  2013/01/24 10:35:46  prashant
+ 878           * Fixing build issues in lower mac projects
+ 879           *
+ 880           * Revision 1.29  2013/01/22 12:41:38  prashant
+ 881           * Fixing build issues
+ 882           *
+ 883           * Revision 1.28  2013/01/16 12:30:55  prashant
+ 884           * Call to EHT_SendToHost added in main function
+ 885           *
+ 886           * Revision 1.27  2013/01/15 12:26:12  ranjan
+ 887           * a)fixed issues in swQ for plc->host intf datapath and
+ 888           *    swQ for host -> plc datapath
+ 889           *
+ 890           * Revision 1.26  2013/01/04 16:11:23  prashant
+ 891           * SPI to PLC bridgeing added, Queue added for SPI and Ethernet
+ 892           *
+ 893           * Revision 1.25  2012/11/19 07:46:23  ranjan
+ 894           * Changes for Network discovery modes
+ 895           *
+ 896           * Revision 1.24  2012/09/24 06:01:38  yuanhua
+ 897           * (1) Integrate the NMA and HAL in Rx path (2) add a Tx queue in HAL to have less stack size needed in tx
+             - path, and Tx in HAL is performed by polling now.
+ 898           *
+ 899           * Revision 1.23  2012/07/25 04:36:08  yuanhua
+ 900           * enable the DMM.
+ 901           *
+ 902           * Revision 1.22  2012/07/24 04:23:17  yuanhua
+ 903           * added DMM code for dynamic alloction with static memory to avoid memory fragmentation.
+ 904           *
+ 905           * Revision 1.21  2012/07/14 04:11:08  kripa
+ 906           * Moving CmdGet() call back to HTM task temporarily to avoid an unknown crash.
+ 907           * Committed on the Free edition of March Hare Software CVSNT Client.
+ 908           * Upgrade to CVS Suite for more features and support:
+ 909           * http://march-hare.com/cvsnt/
+ 910           *
+ 911           * Revision 1.20  2012/07/12 22:05:55  son
+ 912           * Moved ISM Polling to ISM Task.
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 16  
+
+ 913           * UI is now part of init task
+ 914           *
+ 915           * Revision 1.19  2012/06/15 00:30:50  son
+ 916           * Removed call to HTM
+ 917           *
+ 918           * Revision 1.18  2012/06/13 06:24:31  yuanhua
+ 919           * add code for tx bcn interrupt handler integration and data structures for region entry schedule. But th
+             -ey are not in execution yet.
+ 920           *
+ 921           * Revision 1.17  2012/06/11 18:01:11  son
+ 922           * Adding back HMT_Proc() call.
+ 923           * Committed on the Free edition of March Hare Software CVSNT Client.
+ 924           * Upgrade to CVS Suite for more features and support:
+ 925           * http://march-hare.com/cvsnt/
+ 926           *
+ 927           * Revision 1.16  2012/06/07 06:10:29  yuanhua
+ 928           * (1) free CPs if frame tx fails (2) add compiler flag HAL_INT_HDL to differentiate the interrupt and int
+             -errupt handler. (3) enable all interrupts during the system initialization.
+ 929           *
+ 930           * Revision 1.15  2012/06/06 17:39:33  son
+ 931           * Moved HTM_Proc call to HTM Task.
+ 932           * Committed on the Free edition of March Hare Software CVSNT Client.
+ 933           * Upgrade to CVS Suite for more features and support:
+ 934           * http://march-hare.com/cvsnt/
+ 935           *
+ 936           * Revision 1.14  2012/06/05 22:37:11  son
+ 937           * UART console does not get initialized due to task ID changed
+ 938           *
+ 939           * Revision 1.13  2012/06/05 07:25:59  yuanhua
+ 940           * (1) add a scan call to the MAC during the network discovery. (2) add a tiny task in ISM for interrupt p
+             -olling (3) modify the frame receiving integration. (4) modify the tiny task in STM.
+ 941           *
+ 942           * Revision 1.12  2012/06/04 23:35:24  son
+ 943           * Added RTX51 OS support
+ 944           *
+ 945           * Revision 1.11  2012/05/21 04:20:59  yuanhua
+ 946           * enable/disable MAC interrupts when STA/CCO starts.
+ 947           *
+ 948           * Revision 1.10  2012/05/12 19:41:24  yuanhua
+ 949           * added malloc memory pool.
+ 950           *
+ 951           * Revision 1.9  2012/05/12 04:11:46  yuanhua
+ 952           * (1) added list.h (2) changed the hal tx for the hw MAC implementation.
+ 953           *
+ 954           * Revision 1.8  2012/05/07 04:17:57  yuanhua
+ 955           * (1) updated hpgp Tx integration (2) added Rx poll option
+ 956           *
+ 957           * Revision 1.7  2012/04/20 01:39:33  yuanhua
+ 958           * integrated uart module and added compiler flag NMA.
+ 959           *
+ 960           * Revision 1.6  2012/04/15 20:35:09  yuanhua
+ 961           * integrated beacon RX changes in HAL and added HTM for on board test.
+ 962           *
+ 963           * Revision 1.5  2012/04/13 06:15:11  yuanhua
+ 964           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+ 965           *
+ 966           * Revision 1.4  2012/03/11 17:02:24  yuanhua
+ 967           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+ 968           *
+ 969           * Revision 1.3  2011/09/14 05:52:36  yuanhua
+ 970           * Made Keil C251 compilation.
+C51 COMPILER V9.52.0.0   GREEN                                                             12/02/2014 14:35:33 PAGE 17  
+
+ 971           *
+ 972           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+ 973           * migrate the firmware code from the greenchip to the hybrii.
+ 974           *
+ 975           * Revision 1.2  2011/07/22 18:51:04  yuanhua
+ 976           * (1) added the hardware timer tick simulation (hts.h/hts.c) (2) Added semaphors for sync in simulation a
+             -nd defined macro for critical section (3) Fixed some bugs in list.h and CRM (4) Modified and fixed bugs in SHAL (5) Chan
+             -ged SNSM/CNSM and SNAM/CNAM for bug fix (6) Added debugging prints, and more.
+ 977           *
+ 978           * Revision 1.1  2011/06/23 23:52:42  yuanhua
+ 979           * move green.h green.c hpgpapi.h hpgpdef.h hpgpconf.h to src directory
+ 980           *
+ 981           * Revision 1.1  2011/05/06 19:14:50  kripa
+ 982           * Adding nmp files to the new source tree.
+ 983           *
+ 984           * Revision 1.2  2011/04/23 17:06:54  kripa
+ 985           * Used relative path for inclusion of stm.h, to avoid conflict with stm.h system header in VC++.
+ 986           *
+ 987           * Revision 1.1  2011/04/08 21:40:59  yuanhua
+ 988           * Framework
+ 989           *
+ 990           *
+ 991           * =========================================================*/
+ 992          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    903    ----
+   CONSTANT SIZE    =    197    ----
+   XDATA SIZE       =  20508      35
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,1221 @@
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HAL
+OBJECT MODULE PLACED IN .\obj\hal.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\src\hal\hal.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) IN
+                    -CDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..\..\s
+                    -rc\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\zigbe
+                    -e;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\in
+                    -c;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\src;..\
+                    -..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support;..\.
+                    -.\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HP
+                    -GP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,Hyb
+                    -rii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,PRO
+                    -D_TEST) DEBUG PRINT(.\lst\hal.lst) TABS(2) OBJECT(.\obj\hal.obj)
+
+line level    source
+
+   1          /** =========================================================
+   2           *
+   3           *  @file hal.c
+   4           * 
+   5           *  @brief Hardware Abstract Layer
+   6           *
+   7           *  Copyright (C) 2010-2012, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ===========================================================*/
+  11          
+  12          #include <stdlib.h>
+  13          #include <string.h>
+  14          
+  15          
+  16          #ifdef RTX51_TINY_OS
+  17          #include <rtx51tny.h>
+  18          #endif
+  19          #include "papdef.h"
+  20          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  23          #include "event.h"
+  24          #include "ism.h"
+  25          #include "fm.h"
+  26          #include "hpgpevt.h"
+  27          #include "hal.h"
+  28          #include "nma.h"
+  29          
+  30          #ifdef HPGP_HAL
+  31          #include "hal_common.h"
+  32          #include "hal_hpgp.h"
+  33          #include "hal_eth.h"
+  34          #include "hal_tst.h"
+  35          
+  36          #else
+              #include "sdrv.h"
+              #endif
+  39          
+  40          #ifdef AUTH_AES
+  41          
+  42          #include "Linkl.h"
+  43          #include "hpgpapi.h"
+  44          #include "aes.h"
+  45          #include "dmm.h"
+  46          #endif
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 2   
+
+  47          #ifdef UM
+  48          #include "mac_intf_common.h"
+  49          #endif
+  50          #include "hybrii_tasks.h"
+  51          #include "sys_common.h"
+  52          
+  53          #ifndef CALLBACK
+  54          void MUXL_RecvMgmtPacket(void *cookie, sEvent *event) __REENTRANT__;
+  55          #endif
+  56          eStatus HAL_XmitMacFrame(sHaLayer *hal, sTxDesc *txInfo, sBuffDesc *buffDesc);
+  57          
+  58          
+  59          #ifdef HPGP_HAL
+  60          #ifndef HAL_INT
+  61          u8 HAL_RxPoll(void *cookie);
+  62          #endif
+  63          #endif
+  64          
+  65          #ifdef UKE
+              extern u8 genTek;
+              #endif
+  68          
+  69          void HAL_SetTei(sHaLayer *hal, u8 tei)
+  70          {
+  71   1      #ifdef HPGP_HAL
+  72   1          HHAL_SetTei(tei);
+  73   1      #else
+                  SHAL_SetTei(hal->shal, tei);
+              #endif
+  76   1      
+  77   1      }
+*** WARNING C280 IN LINE 69 OF ..\..\src\hal\hal.c: 'hal': unreferenced local variable
+  78          
+  79          #ifndef HPGP_HAL
+              void HAL_SetDevMode(sHaLayer *hal, u8 devMode)
+              {
+                  hal->devMode = devMode;
+              }
+              #endif
+  85          
+  86          
+  87          eStatus HAL_TransmitBeacon(sHaLayer *hal, sTxDesc *txdesc, 
+  88                                     sBuffDesc *buffDesc, u8 bpstoOffset)
+  89          {
+  90   1          sFrmCtrlBlk *fcb = NULL;
+  91   1          buffDesc->dataptr -= sizeof(sFrmCtrlBlk);
+  92   1          buffDesc->datalen += sizeof(sFrmCtrlBlk);
+  93   1          fcb = (sFrmCtrlBlk *)(buffDesc->dataptr);
+  94   1          fcb->access = hal->access; 
+  95   1          fcb->snid = txdesc->snid;
+  96   1      
+  97   1          /* Add other param of sFrmCtrlBlk */ // [Prashant]
+  98   1          fcb->bto[0] = PLC_PHY_TXLATENCY_FOR_TCC3;
+  99   1          fcb->bto[1] = PLC_PHY_TXLATENCY_FOR_TCC3;
+ 100   1          fcb->bto[2] = PLC_PHY_TXLATENCY_FOR_TCC3;
+ 101   1          fcb->bto[3] = PLC_PHY_TXLATENCY_FOR_TCC3;
+ 102   1      
+ 103   1      #if 1
+ 104   1          
+ 105   1      #ifdef HPGP_HAL
+ 106   1      
+ 107   1          if (txdesc->frameType == BEACON_TYPE_CENTRAL)
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 3   
+
+ 108   1          {
+ 109   2              HHAL_SetLMBcnBuf(buffDesc->dataptr, txdesc->frameType,
+ 110   2                           bpstoOffset);
+ 111   2          }
+ 112   1          else
+ 113   1          if (txdesc->frameType == BEACON_TYPE_DISCOVER)
+ 114   1          {
+ 115   2              
+ 116   2              HHAL_PlcBcnWrite(buffDesc->dataptr, txdesc->frameType, 
+ 117   2                                  bpstoOffset);
+ 118   2          }
+ 119   1      
+ 120   1        return 0;
+ 121   1      
+ 122   1      #endif
+ 123   1      
+ 124   1      #else
+              
+              
+              #ifdef HPGP_HAL
+                  return HHAL_PlcBcnWrite(buffDesc->dataptr, txdesc->frameType, 
+                                          bpstoOffset);
+              #else
+                  txdesc->frameType = FRAME_TYPE_BEACON;
+                  return SHAL_Xmit(hal->shal, txdesc, buffDesc, NULL);
+              #endif
+              
+              
+              #endif
+ 137   1      }
+ 138          
+ 139          
+ 140          void HAL_BcnRxIntHandler(void *cookie)
+ 141          {
+ 142   1          sHaLayer *hal = (sHaLayer *)cookie;
+ 143   1          sEvent   *event = NULL;
+ 144   1          /* create an event for the beacon */
+ 145   1      #ifdef UM
+ 146   1        if(eth_plc_sniffer == 1)
+ 147   1        {
+ 148   2          // Size for (Ethernet header  + Hybri header) added
+ 149   2          event = EVENT_BcnAlloc(BEACON_LEN + (sizeof(sEth2Hdr) + sizeof(hostHdr_t)), sizeof(sHpgpHdr));
+ 150   2        }
+ 151   1          else
+ 152   1      #endif
+ 153   1      
+ 154   1        {
+ 155   2            event = EVENT_BcnAlloc(BEACON_LEN, sizeof(sHpgpHdr));
+ 156   2        }
+ 157   1          if (event == NULL)
+ 158   1          {
+ 159   2              FM_Printf(FM_ERROR, "HAL: Fail to allcate an event.\n");
+ 160   2              return;
+ 161   2          }
+ 162   1      
+ 163   1          event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+ 164   1          event->eventHdr.type = EVENT_TYPE_CC_BCN_IND;
+ 165   1      
+ 166   1      #ifdef HPGP_HAL
+ 167   1          if (HHAL_BcnRxIntHandler(hal, event) == STATUS_SUCCESS)
+ 168   1      #else
+                  if (SHAL_BcnRxIntHandler(hal, event) == STATUS_SUCCESS)
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 4   
+
+              #endif
+ 171   1          {
+ 172   2             /* deliver the beacon to the upper layer */
+ 173   2      #ifdef CALLBACK
+                      hal->deliverMgmtPacket(hal->mgmtCookie, event);
+              #else
+ 176   2        //  EVENT_Free(event);
+ 177   2      
+ 178   2              MUXL_RecvMgmtPacket(hal->mgmtCookie, event);
+ 179   2      #endif
+ 180   2          }
+ 181   1          else
+ 182   1          {
+ 183   2              EVENT_Free(event);
+ 184   2          }
+ 185   1      }
+ 186          
+ 187          
+ 188          
+ 189          eStatus  HAL_Transmit(sHaLayer *hal, sEvent *event) 
+ 190          {
+ 191   1      #if 0
+                static u8 q = 0;
+                  /* post the event to the tx queue */
+              
+                if ( q == 1)
+                  return STATUS_SUCCESS;
+              
+                q = 1;
+              
+                #endif
+ 201   1          SLIST_Put(&hal->txQueue, &event->link);
+ 202   1      
+ 203   1        HAL_Proc(HOMEPLUG_GetHal());
+ 204   1      
+ 205   1      
+ 206   1        //FM_Printf(FM_USER,"q\n");
+ 207   1        os_set_ready(HYBRII_TASK_ID_FRAME);
+ 208   1          return STATUS_SUCCESS;
+ 209   1      }
+ 210          
+ 211          eStatus  HAL_ProcXmit(sHaLayer *hal, sEvent *event) 
+ 212          {
+ 213   1          sTxDesc    txInfo;
+ 214   1          sBuffDesc *buffDesc = NULL;
+ 215   1          sHpgpHdr  *hpgpHdr = NULL;
+ 216   1          eStatus    status = STATUS_SUCCESS;
+ 217   1      #ifdef HPGP_HAL
+ 218   1      //    u8         mft;
+ 219   1        //  u8         i;
+ 220   1      //    u8         numPbs;
+ 221   1          sEth2Hdr  *ethhdr = NULL;
+ 222   1          u8        *dataptr = NULL;
+ 223   1          u16        datalen = 0;
+ 224   1          u16        pbbSize = 0;
+ 225   1          u16        mfLen = 0;
+ 226   1      //    sBuffDesc  frmBuffDesc;
+ 227   1          sMfHdr    *mfHdr = NULL;
+ 228   1      #endif
+ 229   1      
+ 230   1          hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+ 231   1          txInfo.dtei = hpgpHdr->tei;
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 5   
+
+ 232   1          txInfo.snid = hpgpHdr->snid;
+ 233   1      
+ 234   1        txInfo.mcst = hpgpHdr->mcst;
+ 235   1        
+ 236   1      #ifdef HPGP_HAL
+ 237   1          txInfo.mnbc = hpgpHdr->mnbc; 
+ 238   1      #ifdef DEVELO
+                  txInfo.plid = HPGP_PLID2;
+              #else
+ 241   1          txInfo.plid = hpgpHdr->plid;
+ 242   1      #endif
+ 243   1      #endif
+ 244   1      
+ 245   1      
+ 246   1      //  FM_Printf(FM_USER,"px\n");
+ 247   1      
+ 248   1      #ifdef LOG_FLASH
+                  logEvent(MGMT_MSG,0,event->eventHdr.type,&txInfo.dtei,1);
+              #endif
+ 251   1      #ifdef AUTH_AES
+ 252   1          if(event->eventHdr.type == EVENT_TYPE_CM_ENCRY_PAYLOAD_IND)
+ 253   1          {    
+ 254   2              sCmEncryPayloadInd *ind;
+ 255   2              u8 *payload;
+ 256   2              u8  payloadLen;      
+ 257   2              sStaInfo    *staInfo;
+ 258   2              u8 XDATA  iv[20];
+ 259   2          AES_KEY   key;
+ 260   2              
+ 261   2              payloadLen = event->buffDesc.datalen - (sizeof(sMmHdr) + sizeof(sCmEncryPayloadInd));
+ 262   2               
+ 263   2              ind = (sCmEncryPayloadInd *)(event->buffDesc.dataptr + sizeof(sMmHdr));
+ 264   2         
+ 265   2              payload = (event->buffDesc.dataptr + sizeof(sMmHdr) + sizeof(sCmEncryPayloadInd));        
+ 266   2              
+ 267   2              staInfo =  LINKL_GetStaInfo(((sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK)));
+ 268   2              
+ 269   2              memcpy(iv, ind->iv, ENC_IV_LEN);
+ 270   2      
+ 271   2              /* PEKS could be DAK , NMK or TEK */
+ 272   2              
+ 273   2              if (ind->peks == PEKS_NMK)
+ 274   2              {
+ 275   3                AES_set_encrypt_key((unsigned char*)staInfo->nmk, 8*AES_BLOCK_SIZE, &key);
+ 276   3            AES_cbc_encrypt((unsigned char*)payload, (unsigned char*)payload, payloadLen,
+ 277   3                               &key, (unsigned char*)iv,AES_ENCRYPT);
+ 278   3              }
+ 279   2      #ifdef UKE    
+                      else // tek
+                      {             
+                          // Generate tek
+                          if(genTek == 1)
+                          {
+                              AKM_GenerateTek();
+                              genTek = 0;
+                          }
+                          AES_set_encrypt_key(AKM_GetTek(), 8*AES_BLOCK_SIZE, &key);
+                    AES_cbc_encrypt((unsigned char*)payload, (unsigned char*)payload,
+                                 payloadLen, &key, (unsigned char*)iv,AES_ENCRYPT);
+                      }
+              #endif    
+ 293   2        
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 6   
+
+ 294   2        }
+ 295   1      #ifdef UKE  
+                  else if(event->eventHdr.type == EVENT_TYPE_CM_GET_KEY_CNF)
+                  {
+                      if(genTek == 1)
+                      {
+                          AKM_GenerateTek();
+                          genTek = 0;
+                      }
+                  }
+              #endif
+ 305   1      
+ 306   1      #endif
+ 307   1      
+ 308   1          
+ 309   1          txInfo.eks  = HPGP_UNENCRYPTED_EKS;
+ 310   1      
+ 311   1          if (event->eventHdr.eventClass == EVENT_CLASS_MSG)
+ 312   1          {
+ 313   2              txInfo.frameType = FRAME_TYPE_MGMT;
+ 314   2          }
+ 315   1          else
+ 316   1          {
+ 317   2              txInfo.frameType = FRAME_TYPE_DATA;
+ 318   2          }
+ 319   1          buffDesc = &event->buffDesc;
+ 320   1      
+ 321   1      #ifdef HPGP_HAL
+ 322   1          /* TODO: determine the port based on the destination MAC address */
+ 323   1      
+ 324   1          txInfo.txPort = PORT_PLC;
+ 325   1      
+ 326   1          switch(txInfo.txPort)
+ 327   1          {
+ 328   2              case PORT_PLC:
+ 329   2              {
+ 330   3                  /* add the ethernet header */
+ 331   3                  buffDesc->dataptr -= sizeof(sEth2Hdr); 
+ 332   3                  buffDesc->datalen += sizeof(sEth2Hdr); 
+ 333   3      
+ 334   3      //    DB_Assert(buffDesc);
+ 335   3                  ethhdr = (sEth2Hdr *)(buffDesc->dataptr);
+ 336   3                  memcpy(ethhdr->srcaddr, hal->macAddr, MAC_ADDR_LEN);
+ 337   3                  ethhdr->ethtype = HTONS(ETH_TYPE_HPGP);// SWAP_FIX;
+ 338   3                  memcpy(ethhdr->dstaddr, hpgpHdr->macAddr, MAC_ADDR_LEN);
+ 339   3                  //FM_Printf(FM_MINFO, "Tx a mgmt msg: %d\n", buffDesc->datalen );
+ 340   3                  //FM_HexDump(FM_DATA|FM_MINFO, "Tx a mgmt msg:",
+ 341   3                  //           buffDesc->dataptr, buffDesc->datalen);
+ 342   3                  /* determine the ROBO mode based on the RSSI and/or FER */
+ 343   3                  /* However, due to a debug in the hardware at present, 
+ 344   3                   * ROBO mode is determined based on the MSDU length .*/
+ 345   3                  mfLen = buffDesc->datalen + HPGP_MF_HDR_LEN + HPGP_MF_ICV_LEN; 
+ 346   3      #if 0     
+                          if ( mfLen <= HPGP_136FEC_PBB_SIZE)
+                          {
+                              txInfo.roboMode = HPGP_ROBOMD_MINI;
+                              txInfo.numPbs = 1;
+                          }  
+                          else if ( mfLen <= HPGP_520FEC_PBB_SIZE)
+                          {
+                              txInfo.roboMode = HPGP_ROBOMD_STD;
+                              txInfo.numPbs = 1;
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 7   
+
+                          }
+                          else
+                          {
+                              txInfo.roboMode = HPGP_ROBOMD_HS;
+                              numPbs = mfLen/HPGP_520FEC_PBB_SIZE;
+                              numPbs += (mfLen == numPbs*HPGP_520FEC_PBB_SIZE ? 0: 1);
+                              txInfo.numPbs = numPbs;
+                             
+                          }
+              #endif
+ 366   3      
+ 367   3                  status = HAL_XmitMacFrame(hal, &txInfo, buffDesc);
+ 368   3      
+ 369   3      #if 0
+                          if (txInfo.frameType == FRAME_TYPE_MGMT)
+                          {
+                              buffDesc->dataptr -= HPGP_MF_OPT_LEN;
+                              /* add confounder here */
+                              dataptr = buffDesc->dataptr;
+                              for (i = 0; i < HPGP_MF_OPT_LEN; i++)
+                              {
+                                  dataptr[i] = rand() & 0xFF;
+                              }
+              
+                              buffDesc->datalen += HPGP_MF_OPT_LEN;
+                              mft = HPGP_MFT_MGMT;
+                          }
+                          else /* data */
+                          {
+                              mft = HPGP_MFT_MSDU_NO_ATS;
+                          }
+              
+                         /* add MAC frame header */
+                         buffDesc->dataptr -= sizeof(sMfHdr);
+                         mfHdr = (sMfHdr *) buffDesc->dataptr;     
+                         mfHdr->mft = mft;
+                         mfHdr->mflHi = (buffDesc->datalen >> 8); 
+                         mfHdr->mflLo = (buffDesc->datalen) & 0xFF; 
+                         buffDesc->datalen += sizeof(sMfHdr);
+              
+                          /* determine the ROBO mode based on the RSSI and/or FER */
+                          /* at present, use the standard ROBO for message reliability.*/
+                          txInfo.roboMode = HPGP_ROBOMD_STD;
+              
+                          /* then, determine the number of PBs needed for the tx frame */
+                          if (txInfo.roboMode == HPGP_ROBOMD_MINI)
+                              pbbSize = HPGP_136FEC_PBB_SIZE;
+                          else 
+                              pbbSize = HPGP_520FEC_PBB_SIZE;
+              
+                          numPbs = (buffDesc->datalen + HPGP_ICV_LEN) / pbbSize;
+                          numPbs += ((buffDesc->datalen + HPGP_ICV_LEN == numPbs*pbbSize) ? 0: 1);
+              
+                          if ( (txInfo.roboMode == HPGP_ROBOMD_MINI) ||
+                               (txInfo.roboMode == HPGP_ROBOMD_STD))
+                          {
+                              dataptr = buffDesc->dataptr;
+                              datalen = buffDesc->datalen;
+                              /* send one PB at a time */
+                              for (i=0; i< numPbs; i ++)
+                              {
+                                  frmBuffDesc.dataptr = dataptr;
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 8   
+
+                                  frmBuffDesc.datalen = MIN(datalen, pbbSize);
+                                  txInfo.numPbs = 1;
+                                  if (i == 0)
+                                      txInfo.mfStart = 1;
+                                  if (i == numPbs - 1)
+                                      txInfo.mfEnd = 1;
+                                  /* transmit the MAC frame */
+                                  status = HAL_XmitMacFrame(hal, &txInfo, &frmBuffDesc);
+                                  if (status == STATUS_SUCCESS)
+                                  {
+                                      dataptr += pbbSize;
+                                      datalen -= pbbSize;
+                                  }
+                                  else
+                                  {
+                                      break;
+                                  }
+                              }
+              
+                          }
+                          else 
+                          {
+                             /* HS ROBO */
+                             txInfo.roboMode = HPGP_ROBOMD_HS;
+                             txInfo.mfStart = 1;
+                             txInfo.mfEnd = 1;
+                             txInfo.numPbs = numPbs;
+                             status = HAL_XmitMacFrame(hal, &txInfo, buffDesc);
+                          }
+              #endif
+ 448   3                  break;
+ 449   3              }
+ 450   2              case PORT_ZIGBEE:
+ 451   2              case PORT_SPI:
+ 452   2              /* TODO: need to differentiate the mgmt and data */       
+ 453   2              default:
+ 454   2              {
+ 455   3              }
+ 456   2          }
+ 457   1      
+ 458   1      
+ 459   1        // status = HAL_XmitFrame(hal, &txInfo, buffdesc, hpgpHdr->macAddr);
+ 460   1      
+ 461   1      #else /* HPGP_HAL */
+                  status = SHAL_Xmit(hal->shal, &txInfo, buffDesc, hpgpHdr->macAddr);
+              #endif
+ 464   1          if ((status == STATUS_SUCCESS) && 
+ 465   1              (event->eventHdr.status == EVENT_STATUS_COMPLETE))
+ 466   1          {
+ 467   2              /* free the event as the transmission is successful */
+ 468   2              EVENT_Free(event);
+ 469   2          }
+ 470   1          return status;
+ 471   1      }
+ 472          
+ 473          
+ 474          #ifdef HPGP_HAL
+ 475          
+ 476          /* *****************************************************************
+ 477           * NAME :            HAL_ScanNet
+ 478           *
+ 479           * DESCRIPTION :     The function is to enable/disable scan in the MAC
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 9   
+
+ 480           *
+ 481           * INPUT PARAMETERS :
+ 482           *           enable: TRUE  - enable the scan; 
+ 483           *                   FALSE - disable the scan
+ 484           * OUTPUT PARAMETERS:
+ 485           *           None
+ 486           * RETURN : None
+ 487           * ***************************************************************** */
+ 488          
+ 489          void HAL_ScanNet(u8 enable)
+ 490          {
+ 491   1          if (enable == TRUE)
+ 492   1          {
+ 493   2              HHAL_SetSWStatReqScanFlag(REG_FLAG_SET);
+ 494   2          }
+ 495   1          else
+ 496   1          {
+ 497   2              HHAL_SetSWStatReqScanFlag(REG_FLAG_CLR);
+ 498   2          }
+ 499   1      }
+ 500          
+ 501          
+ 502          
+ 503          
+ 504          #if 0
+              /* *****************************************************************
+               * NAME :            HAL_FrameRxIntHandler
+               *
+               * DESCRIPTION :     The function is an interrupt handler for rx frame 
+               *                   executed in the interrupt context.
+               *
+               * INPUT PARAMETERS :
+               *           cookie: a pointer to the sHaLayer data structure
+               * OUTPUT PARAMETERS:
+               *           None
+               * RETURN : None
+               * ***************************************************************** */
+              
+              void HAL_FrameRxIntHandler(void *cookie)
+              {
+                  sHaLayer *hal = (sHaLayer *)cookie;
+                
+                  hal->taskBitMap |= HAL_TASK_FRM_RX;
+                  SCHED_Sched(&hal->task);
+              }
+              
+              #endif
+ 527          
+ 528           
+ 529          
+ 530          /* *****************************************************************
+ 531           * NAME :            HAL_ProcRx
+ 532           *
+ 533           * DESCRIPTION :     The function performs polling to recevive/forward  
+ 534           *                   frames from the LMAC hardware 
+ 535           *
+ 536           * INPUT PARAMETERS :
+ 537           *           hal: a pointer to the sHaLayer data structure
+ 538           * OUTPUT PARAMETERS:
+ 539           *           None
+ 540           * RETURN : None
+ 541           * ***************************************************************** */
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 10  
+
+ 542          
+ 543          #if 0
+              u8 HAL_RecvMacFrame(void *cookie)
+              {
+                  sEvent      *event = NULL;
+                  u8           frmsCnt;
+                  u8           descCnt;
+                  u8           tmp;
+                  sSwFrmDesc rxFrmSwDesc;
+                  sBuffDesc   *buffDesc = NULL;
+                  sEth2Hdr    *ethhdr = NULL;
+                  sHpgpHdr    *hpgpHdr = NULL; 
+                  sHaLayer    *hal = (sHaLayer *)cookie;
+              
+                  frmsCnt = CHAL_GetCPUTxQFrmCount(); 
+                  descCnt = CHAL_GetCPUTxQDescCount();
+                  while(frmsCnt--) 
+                  {
+                      if (CHAL_ProcRxFrameDesc(hal, &rxFrmSwDesc) == STATUS_SUCCESS)
+                      {
+                          switch(rxFrmSwDesc.rxPort)
+                          {
+                              case PORT_PLC:
+                              {
+                                  if (rxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_MGMT)
+                                  {
+                                      /* create an event for the mgmt message */
+                                      event = EVENT_Alloc(rxFrmSwDesc.frmLen, 
+                                                          sizeof(sHpgpHdr));
+                                      if (event == NULL)
+                                      {
+                                          FM_Printf(FM_ERROR, "HAL: Fail to allcate an event.\n");
+                                          CHAL_FreeFrameCp(rxFrmSwDesc.cpDesc, 
+                                                           rxFrmSwDesc.cpCnt);
+                                          /* may not be right */
+                                          continue;
+                                      }
+              
+                                      buffDesc = &event->buffDesc;
+              
+                                      if (CHAL_ReadFrame(hal, &rxFrmSwDesc, buffDesc) 
+                                          == STATUS_SUCCESS)
+                                      {
+                                          hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+                                          hpgpHdr->snid = hal->hhalCb->snid;
+                                          hpgpHdr->tei = rxFrmSwDesc.frmInfo.plc.stei;
+                                          event->eventHdr.eventClass = EVENT_CLASS_MSG;
+                                          /* process the MAC header */
+                                          ethhdr = (sEth2Hdr *)event->buffDesc.dataptr; 
+                                          hpgpHdr->macAddr = ethhdr->srcaddr;
+                                          /* chop off the ethernet header */
+                                          event->buffDesc.dataptr += sizeof(sEth2Hdr); 
+                                          event->buffDesc.datalen -= sizeof(sEth2Hdr); 
+                                          /* deliver the mgmt message to the upper layer */
+              #ifdef CALLBACK
+                                          hal->deliverMgmtPacket(hal->mgmtCookie, event);
+              #else
+                                          MUXL_RecvMgmtPacket(hal->mgmtCookie, event);
+              #endif
+                                      }
+                                      else
+                                      {
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 11  
+
+                                          EVENT_Free(event);
+                                      }
+                                  }
+                                  else if (rxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_MSDU)
+                                  {
+                                      /* deliver the data packet to the data plane */
+                                      hal->deliverDataPacket(hal->dataCookie, &rxFrmSwDesc);
+                                  }
+                                  else
+                                  {
+                                      /* unknown HPGP frame type */
+                                  }
+                                  break;
+                              }
+                              case PORT_ZIGBEE:
+                              case PORT_SPI:
+                                  /* TODO: need to differentiate the mgmt and data */       
+                              default:
+                              {
+                                  /* deliver the data packet to the data plane */
+                                  hal->deliverDataPacket(hal->dataCookie, &rxFrmSwDesc);
+                              }
+                          }
+                          hal->frmCnt++;
+                      }
+                      else
+                      {
+                          /* TODO */
+                      }
+                  }
+                  
+                  hal->taskBitMap &= ~HAL_TASK_FRM_RX;
+                  /* not be preempted */
+                  return FALSE;
+              }
+              
+              #endif
+ 641          
+ 642          
+ 643          #if 0
+              #ifndef HAL_INT
+              u8 HAL_RxPoll(void *cookie)
+              {
+                  sHaLayer *hal = (sHaLayer *)cookie;
+              
+                  /* check the bcn counter */
+                  while (HHAL_GetBcnCnt(hal))
+                  {
+                      HAL_BcnRxIntHandler(hal);
+                  }
+              
+                  HAL_RecvMacFrame(hal);
+              
+              #ifndef RTX51_TINY_OS
+                  SCHED_Sched(&hal->task);
+              #endif
+                  /* not be preempted */
+                  return FALSE;
+              }
+              #endif
+              
+              void HAL_EnablePoll(sHaLayer *hal)
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 12  
+
+              {
+                  SCHED_Sched(&hal->task);
+              }
+              
+              #endif /* HAL_INT */
+ 671          
+ 672          u8 HAL_Proc(void *cookie)
+ 673          {
+ 674   1          sEvent *event = NULL;
+ 675   1          sSlink *slink = NULL;
+ 676   1          u8      ret = 0;
+ 677   1          sHaLayer *hal = (sHaLayer *) cookie;
+ 678   1          if(!SLIST_IsEmpty(&hal->txQueue))
+ 679   1          {
+ 680   2              if(HHAL_IsPlcIdle() == STATUS_FAILURE)
+ 681   2              {
+ 682   3              
+ 683   3            //
+ 684   3            ///FM_Printf(FM_USER, "i. \n");
+ 685   3                  return 0;
+ 686   3            
+ 687   3              }
+ 688   2                  
+ 689   2      #ifdef P8051
+ 690   2      __CRIT_SECTION_BEGIN__
+ 691   2      #else
+                      SEM_WAIT(&hal->halSem);
+              #endif
+ 694   2              slink = SLIST_Pop(&hal->txQueue);
+ 695   2      #ifdef P8051
+ 696   2      __CRIT_SECTION_END__
+ 697   2      #else
+                      SEM_POST(&hal->halSem);
+              #endif
+ 700   2      
+ 701   2              event = SLIST_GetEntry(slink, sEvent, link);
+ 702   2          if (HAL_ProcXmit(hal, event) == STATUS_FAILURE)
+ 703   2              {
+ 704   3                  EVENT_Free(event);
+ 705   3              }
+ 706   2      
+ 707   2              return 1;
+ 708   2          }
+ 709   1          return 0;
+ 710   1      }
+ 711            
+ 712          static u8  grpMacAddr[MAC_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+ 713          
+ 714          
+ 715          eStatus HAL_XmitMacFrame(sHaLayer *hal, sTxDesc *txInfo, sBuffDesc *buffDesc)
+ 716          {
+ 717   1          u16          pbbSize = 0;
+ 718   1          sSwFrmDesc txFrmSwDesc;
+ 719   1      //    sEth2Hdr    *ethhdr = NULL;
+ 720   1          eStatus      status = STATUS_FAILURE;
+ 721   1          sHpgpHalCB  *hhalCb = hal->hhalCb;
+ 722   1           u16 retriesCnt = 0;
+ 723   1      //    u8           reTxMaxCnt = 5;
+ 724   1      
+ 725   1      
+ 726   1        memset(&txFrmSwDesc, 0x00, sizeof(sSwFrmDesc));
+ 727   1      
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 13  
+
+ 728   1          txFrmSwDesc.txPort = txInfo->txPort;
+ 729   1          txFrmSwDesc.frmLen = buffDesc->datalen;
+ 730   1      
+ 731   1        if (txInfo->frameType == FRAME_TYPE_MGMT)
+ 732   1          {
+ 733   2             txFrmSwDesc.frmType = HPGP_HW_FRMTYPE_MGMT;
+ 734   2          }
+ 735   1        else
+ 736   1        if (txInfo->frameType == FRAME_TYPE_DATA)
+ 737   1          {   
+ 738   2          txFrmSwDesc.frmType = HPGP_HW_FRMTYPE_MSDU;
+ 739   2          }
+ 740   1        else
+ 741   1        if (txInfo->frameType == FRAME_TYPE_BEACON)
+ 742   1        { 
+ 743   2          txFrmSwDesc.frmType = HPGP_HW_FRMTYPE_BEACON;
+ 744   2        }
+ 745   1        
+ 746   1          HHAL_PrepareTxFrame(hal, txInfo, &txFrmSwDesc);
+ 747   1      
+ 748   1          if (CHAL_GetCpforTxFrame(hal, &txFrmSwDesc) == STATUS_FAILURE)
+ 749   1          {
+ 750   2              return STATUS_FAILURE;
+ 751   2          }
+ 752   1      
+ 753   1          /* write the data into the frame */
+ 754   1          CHAL_WriteFrame(hal, &txFrmSwDesc, buffDesc);
+ 755   1      
+ 756   1          /* transmit the frame */
+ 757   1          retriesCnt=0;
+ 758   1      //  FM_Printf(FM_USER,"w\n");
+ 759   1         do
+ 760   1          {
+ 761   2            status = HHAL_PlcTxQWrite(hal, &txFrmSwDesc);
+ 762   2          // check for pending Tx and prossess it.
+ 763   2              if( status == STATUS_FAILURE)               
+ 764   2              {
+ 765   3                  
+ 766   3                  // TODO try for ETH_PLC_TX_RETRIES number of times, if not success then break
+ 767   3                  if(ETH_PLC_TX_RETRIES <= retriesCnt)
+ 768   3                  {
+ 769   4                      break;
+ 770   4                  }
+ 771   3                  retriesCnt++;
+ 772   3             }   
+ 773   2      
+ 774   2          }
+ 775   1          while(status == STATUS_FAILURE);
+ 776   1      
+ 777   1      
+ 778   1          if (status == STATUS_FAILURE)
+ 779   1        {
+ 780   2        //  FM_Printf(FM_ERROR, "PLC Mac Tx Write fail \n"); 
+ 781   2            CHAL_FreeFrameCp(txFrmSwDesc.cpArr, txFrmSwDesc.cpCount);
+ 782   2          }  
+ 783   1          /*do
+ 784   1          {
+ 785   1              status = HHAL_PlcTxQWrite(hal, &txFrmSwDesc);
+ 786   1              if (status == STATUS_SUCCESS || !reTxMaxCnt)
+ 787   1              {
+ 788   1                  break;
+ 789   1              }
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 14  
+
+ 790   1              //ISM_PollInt();
+ 791   1              reTxMaxCnt--;
+ 792   1          }while(reTxMaxCnt);
+ 793   1          */
+ 794   1          return status; 
+ 795   1      
+ 796   1      }
+ 797          
+ 798          #endif /* HPGP_HAL */
+ 799          
+ 800          void     HAL_RegisterXmitBcnCallback(
+ 801                      sHaLayer *hal,
+ 802                      void (*xmitBcnCallback)(void XDATA *cookie),
+ 803                      void *cookie )
+ 804          {
+ 805   1      #ifdef CALLBACK
+                  hal->xmitBcn = xmitBcnCallback;
+              #endif
+ 808   1          hal->txBcnCookie = cookie;
+ 809   1      
+ 810   1      }
+*** WARNING C280 IN LINE 802 OF ..\..\src\hal\hal.c: 'xmitBcnCallback': unreferenced local variable
+ 811          
+ 812          
+ 813          void HAL_RegisterProcBcnCallback(
+ 814              sHaLayer  *hal,
+ 815              void     (*bcnCallback)(void XDATA *bcnCookie, sEvent XDATA *event),
+ 816              void      *bcnCookie )
+ 817          {
+ 818   1      #ifdef CALLBACK
+                  hal->procBcn = bcnCallback;
+              #endif
+ 821   1          hal->bcnCookie = bcnCookie;
+ 822   1      }
+*** WARNING C280 IN LINE 815 OF ..\..\src\hal\hal.c: 'bcnCallback': unreferenced local variable
+ 823          
+ 824          
+ 825          void HAL_RegisterRxMgmtCallback(
+ 826              sHaLayer  *hal,
+ 827              void     (*mgmtCallback)(void XDATA *mgmtCookie, sEvent XDATA *event),
+ 828              void      *mgmtCookie )
+ 829          {
+ 830   1      #ifdef CALLBACK
+                  hal->deliverMgmtPacket = mgmtCallback;
+              #endif
+ 833   1          hal->mgmtCookie = mgmtCookie;
+ 834   1      }
+*** WARNING C280 IN LINE 827 OF ..\..\src\hal\hal.c: 'mgmtCallback': unreferenced local variable
+ 835          
+ 836          
+ 837          #ifdef HPGP_HAL
+ 838          void HAL_RegisterRxDataCallback(
+ 839              sHaLayer  *hal,
+ 840              void     (*dataCallback)(void XDATA *dataCookie, sSwFrmDesc XDATA *rxFrmSwDesc),
+ 841              void      *dataCookie )
+ 842          {
+ 843   1      #ifdef CALLBACK
+                  hal->deliverDataPacket = dataCallback;
+              #endif
+ 846   1          hal->dataCookie = dataCookie;
+ 847   1      }
+*** WARNING C280 IN LINE 840 OF ..\..\src\hal\hal.c: 'dataCallback': unreferenced local variable
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 15  
+
+ 848          #endif
+ 849          
+ 850          void HAL_RegisterRxNetMgmtCallback(
+ 851               sHaLayer *hal,
+ 852               void (*netMgmtCallback)(void XDATA *netMgmtCookie, sEvent XDATA *event),
+ 853               void *netMgmtCookie )
+ 854          {
+ 855   1      #ifdef CALLBACK
+                  hal->deliverNetMgmtPacket = netMgmtCallback;
+              #endif
+ 858   1          hal->netMgmtCookie = netMgmtCookie;
+ 859   1      }
+*** WARNING C280 IN LINE 852 OF ..\..\src\hal\hal.c: 'netMgmtCallback': unreferenced local variable
+ 860          
+ 861          
+ 862          eStatus HAL_Init(sHaLayer *hal)
+ 863          {
+ 864   1      #ifdef HPGP_HAL
+ 865   1          
+ 866   1          SLIST_Init(&hal->txQueue);
+ 867   1          /* common module */
+ 868   1          CHAL_InitHW();
+ 869   1          /* hpgp */
+ 870   1          HHAL_Init(hal, &hal->hhalCb);
+ 871   1      
+ 872   1          hal->hhalCb  = &gHpgpHalCB;
+ 873   1          /* register the frame rx interrupt handler with the ISM */
+ 874   1          ISM_RegisterIntHandler(MAC_INT_IRQ_CPU_TXQ_NONEMPTY, 
+ 875   1                                 CHAL_FrameRxIntHandler, hal);
+ 876   1      
+ 877   1          /* register the beacon tx interrupt handler with the ISM */
+ 878   1       //   ISM_RegisterIntHandler(MAC_INT_IRQ_PLC_BCN_TX, 
+ 879   1       //                          HHAL_BcnTxIntHandler, hal);
+ 880   1          /* register the beacon rx interrupt handler with the ISM */
+ 881   1          ISM_RegisterIntHandler(MAC_INT_IRQ_PLC_BCN_RX, 
+ 882   1                                 HAL_BcnRxIntHandler, hal);
+ 883   1       #ifdef HAL_INT
+              //   SCHED_InitTask(&hal->task, HPGP_TASK_ID_HAL, "HAL", 
+              //                   HPGP_TASK_PRI_HAL, HAL_RecvMacFrame, hal);
+              #else
+ 887   1      //    SCHED_InitTask(&hal->task, HPGP_TASK_ID_HAL, "HAL", 
+ 888   1      //                   HPGP_TASK_PRI_HAL, HAL_RxPoll, hal);
+ 889   1      #endif
+ 890   1      
+ 891   1          /* SPI */
+ 892   1      //    HHAL_AFEInit();
+ 893   1          //init_led_board();  
+ 894   1          /* ethernet */
+ 895   1      #ifdef HYBRII_ETH                   
+ 896   1          EHAL_Init();
+ 897   1      #endif
+ 898   1      
+ 899   1      
+ 900   1      
+ 901   1      
+ 902   1      
+ 903   1      #else
+                  SHAL_Init(hal, &hal->shal);
+              #endif /* HPGP_HAL */
+ 906   1      
+ 907   1          return  STATUS_SUCCESS;
+ 908   1      }
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 16  
+
+ 909          
+ 910          
+ 911          
+ 912          
+ 913          /** =========================================================
+ 914           *
+ 915           * Edit History
+ 916           *
+ 917           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/hal/hal.c,v $
+ 918           *
+ 919           * $Log: hal.c,v $
+ 920           * Revision 1.11  2014/09/05 09:28:18  ranjan
+ 921           * 1. uppermac cco-sta switching feature fix
+ 922           * 2. general stability fixes for many station associtions
+ 923           * 3. changed mgmt memory pool for many STA support
+ 924           *
+ 925           * Revision 1.10  2014/08/25 07:37:34  kiran
+ 926           * 1) RSSI & LQI support
+ 927           * 2) Fixed Sync related issues
+ 928           * 3) Fixed timer 0 timing drift for SDK
+ 929           * 4) MMSG & Error Logging in Flash
+ 930           *
+ 931           * Revision 1.9  2014/06/12 13:15:43  ranjan
+ 932           * -separated bcn,mgmt,um event pools
+ 933           * -fixed datapath issue due to previous checkin
+ 934           * -work in progress. neighbour cco detection
+ 935           *
+ 936           * Revision 1.8  2014/06/05 08:38:41  ranjan
+ 937           * -flash function enabled for uppermac
+ 938           * - commit command after any change would flash systemprofiles
+ 939           * - verfied upper mac
+ 940           *
+ 941           * Revision 1.7  2014/05/28 10:58:59  prashant
+ 942           * SDK folder structure changes, Uart changes, removed htm (UI) task
+ 943           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+ 944           *
+ 945           * Revision 1.6  2014/05/12 08:09:57  prashant
+ 946           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+ 947           *
+ 948           * Revision 1.5  2014/04/24 21:50:42  yiming
+ 949           * Working Code for Mitsumi
+ 950           *
+ 951           * Revision 1.4  2014/02/27 10:42:47  prashant
+ 952           * Routing code added
+ 953           *
+ 954           * Revision 1.3  2014/02/19 10:22:40  ranjan
+ 955           * - common sync for hal_tst and upper mac project
+ 956           * - ism.c is MAC interrupt handler for hhal_tst and upper mac.
+ 957           *    chal_ext1isr function   is removed
+ 958           * - verified : lower mac sync, upper mac sync data traffic.
+ 959           *
+ 960           * Revision 1.2  2014/01/10 17:15:32  yiming
+ 961           * check in Rajan 1/8/2014 code release
+ 962           *
+ 963           * Revision 1.5  2014/01/08 10:53:54  ranjan
+ 964           * Changes for LM OS support.
+ 965           * New Datapath FrameTask
+ 966           * LM and UM  datapath, feature verified.
+ 967           *
+ 968           * known issues : performance numbers needs revisit
+ 969           *
+ 970           * review : pending.
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 17  
+
+ 971           *
+ 972           * Revision 1.4  2013/09/04 14:50:45  yiming
+ 973           * New changes for Hybrii_A code merge
+ 974           *
+ 975           * Revision 1.41  2013/07/12 08:56:36  ranjan
+ 976           * -UKE Push Button Security Feature.
+ 977           * Verified : DirectEntry Security Works.Datapath Works.
+ 978           *                 command SetSecMode for UKE works.
+ 979           * Added against bug-160
+ 980           *
+ 981           * Revision 1.40  2013/03/22 12:21:48  prashant
+ 982           * default FM_MASK and FM_Printf modified for USER INFO
+ 983           *
+ 984           * Revision 1.39  2013/03/14 11:49:18  ranjan
+ 985           * 1.handled cases  for CCo toSTA switch and  viceversa
+ 986           * 2.UM uses bcntemplate
+ 987           *
+ 988           * Revision 1.38  2013/02/15 12:53:57  prashant
+ 989           * ASSOC.REQ changes for DEVELO
+ 990           *
+ 991           * Revision 1.37  2013/01/15 12:26:12  ranjan
+ 992           * a)fixed issues in swQ for plc->host intf datapath and
+ 993           *    swQ for host -> plc datapath
+ 994           *
+ 995           * Revision 1.36  2012/12/18 12:17:46  prashant
+ 996           * Stability checkin
+ 997           *
+ 998           * Revision 1.35  2012/12/14 11:06:57  ranjan
+ 999           * queue added for eth to plc datapath
+1000           * removed mgmt tx polling
+1001           *
+1002           * Revision 1.34  2012/11/22 09:44:02  prashant
+1003           * Code change for auto ping test, sending tei map ind out, random mac addrr generation.
+1004           *
+1005           * Revision 1.33  2012/11/19 07:46:23  ranjan
+1006           * Changes for Network discovery modes
+1007           *
+1008           * Revision 1.32  2012/11/06 05:05:26  ranjan
+1009           * -moved AES encryption to Hal Task
+1010           * - verified link establishment is very stable
+1011           *
+1012           * Revision 1.31  2012/10/25 11:38:48  prashant
+1013           * Sniffer code added for MAC_SAP, Added new commands in MAC_SAP for sniffer, bridge,
+1014           *  hardware settings and peer information.
+1015           *
+1016           * Revision 1.30  2012/10/11 06:21:00  ranjan
+1017           * ChangeLog:
+1018           * 1. Added HPGP_MAC_SAP to support linux host data and command path.
+1019           *     define HPGP_MAC_SAP, NMA needs to be added in project.
+1020           *
+1021           * 2. Added 'p ping' command in htm.c . Feature is under AUTO_PING macro.
+1022           *
+1023           * 3. Extended  'p key' command to include PPEK support.
+1024           *
+1025           * verified :
+1026           *   1. Datapath ping works overnite after association,auth
+1027           *   2. HAL TEST project is intact
+1028           *
+1029           * Revision 1.29  2012/09/24 06:01:38  yuanhua
+1030           * (1) Integrate the NMA and HAL in Rx path (2) add a Tx queue in HAL to have less stack size needed in tx
+             - path, and Tx in HAL is performed by polling now.
+1031           *
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 18  
+
+1032           * Revision 1.28  2012/07/27 02:53:10  kripa
+1033           * *** empty log message ***
+1034           *
+1035           * Revision 1.27  2012/07/25 04:34:50  kripa
+1036           * Modified Tx routine to match the common TxQWrite routine.
+1037           *
+1038           * Revision 1.26  2012/07/12 05:48:39  kripa
+1039           * Commenting out Mgmt Msg dump as this could interfere with bcn sync.
+1040           * Committed on the Free edition of March Hare Software CVSNT Client.
+1041           * Upgrade to CVS Suite for more features and support:
+1042           * http://march-hare.com/cvsnt/
+1043           *
+1044           * Revision 1.25  2012/07/03 05:18:37  yuanhua
+1045           * fixed an issue in HAL_XmitMacFrame(), which returns the status according to the status from HHAL_PlcTxQ
+             -Write() now.
+1046           *
+1047           * Revision 1.24  2012/06/22 04:33:49  yuanhua
+1048           * added a default MAC address for test.
+1049           *
+1050           * Revision 1.23  2012/06/20 17:50:17  kripa
+1051           * In Hal Rx routine, retrieved snid from rxSwDesc struct.
+1052           * Committed on the Free edition of March Hare Software CVSNT Client.
+1053           * Upgrade to CVS Suite for more features and support:
+1054           * http://march-hare.com/cvsnt/
+1055           *
+1056           * Revision 1.22  2012/06/13 16:12:47  son
+1057           * Initializing txInfo eks to unencrypted eks.
+1058           * Committed on the Free edition of March Hare Software CVSNT Client.
+1059           * Upgrade to CVS Suite for more features and support:
+1060           * http://march-hare.com/cvsnt/
+1061           *
+1062           * Revision 1.21  2012/06/13 06:24:31  yuanhua
+1063           * add code for tx bcn interrupt handler integration and data structures for region entry schedule. But th
+             -ey are not in execution yet.
+1064           *
+1065           * Revision 1.20  2012/06/11 06:29:01  yuanhua
+1066           * changed HAL_SetBpsto to HAL_SyncNet.
+1067           *
+1068           * Revision 1.19  2012/06/08 05:50:57  yuanhua
+1069           * added snid function.
+1070           *
+1071           * Revision 1.18  2012/06/07 06:10:29  yuanhua
+1072           * (1) free CPs if frame tx fails (2) add compiler flag HAL_INT_HDL to differentiate the interrupt and int
+             -errupt handler. (3) enable all interrupts during the system initialization.
+1073           *
+1074           * Revision 1.17  2012/06/05 07:25:59  yuanhua
+1075           * (1) add a scan call to the MAC during the network discovery. (2) add a tiny task in ISM for interrupt p
+             -olling (3) modify the frame receiving integration. (4) modify the tiny task in STM.
+1076           *
+1077           * Revision 1.16  2012/06/04 23:33:13  son
+1078           * Added RTX51 OS support
+1079           *
+1080           * Revision 1.15  2012/06/02 19:18:13  yuanhua
+1081           * fixed an issue in the scheduler. Now the higher priority task will render its cpu resource to the lower
+             - priority task if the higher priority task is in the polling mode.
+1082           *
+1083           * Revision 1.14  2012/05/20 23:26:21  yuanhua
+1084           * made the return value for HAL_RxPoll() to FALSE so that hal task would not be preempted.
+1085           *
+1086           * Revision 1.13  2012/05/19 22:22:16  yuanhua
+1087           * added bcn Tx/Rx non-callback option for the ISM.
+1088           *
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 19  
+
+1089           * Revision 1.12  2012/05/19 20:32:17  yuanhua
+1090           * added non-callback option for the protocol stack.
+1091           *
+1092           * Revision 1.11  2012/05/14 05:22:29  yuanhua
+1093           * support the SCHED without using callback functions.
+1094           *
+1095           * Revision 1.10  2012/05/12 04:11:46  yuanhua
+1096           * (1) added list.h (2) changed the hal tx for the hw MAC implementation.
+1097           *
+1098           * Revision 1.9  2012/05/07 04:17:57  yuanhua
+1099           * (1) updated hpgp Tx integration (2) added Rx poll option
+1100           *
+1101           * Revision 1.8  2012/04/30 04:05:57  yuanhua
+1102           * (1) integrated the HAL mgmt Tx. (2) various updates
+1103           *
+1104           * Revision 1.7  2012/04/25 13:53:40  yuanhua
+1105           * changed the HAL_Transmit prototype.
+1106           *
+1107           * Revision 1.6  2012/04/21 01:40:30  yuanhua
+1108           * Added Tx descriptor data structures for integration.
+1109           *
+1110           * Revision 1.5  2012/04/19 16:46:30  yuanhua
+1111           * fixed some C51 compiler errors for the integration.
+1112           *
+1113           * Revision 1.4  2012/04/17 23:09:50  yuanhua
+1114           * fixed compiler errors for the hpgp hal test due to the integration changes.
+1115           *
+1116           * Revision 1.3  2012/04/13 06:15:11  yuanhua
+1117           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+1118           *
+1119           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+1120           * migrate the firmware code from the greenchip to the hybrii.
+1121           *
+1122           * Revision 1.2  2011/07/22 18:51:04  yuanhua
+1123           * (1) added the hardware timer tick simulation (hts.h/hts.c) (2) Added semaphors for sync in simulation a
+             -nd defined macro for critical section (3) Fixed some bugs in list.h and CRM (4) Modified and fixed bugs in SHAL (5) Chan
+             -ged SNSM/CNSM and SNAM/CNAM for bug fix (6) Added debugging prints, and more.
+1124           *
+1125           * Revision 1.1  2011/05/06 19:09:17  kripa
+1126           * Adding hal layer files to new source tree.
+1127           *
+1128           * Revision 1.1  2011/04/08 21:43:07  yuanhua
+1129           * Framework
+1130           *
+1131           *
+1132           * =========================================================*/
+1133          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1918    ----
+   CONSTANT SIZE    =     32    ----
+   XDATA SIZE       =      6     471
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+C51 COMPILER V9.52.0.0   HAL                                                               12/02/2014 14:35:42 PAGE 20  
+
+
+C51 COMPILATION COMPLETE.  6 WARNING(S),  0 ERROR(S)

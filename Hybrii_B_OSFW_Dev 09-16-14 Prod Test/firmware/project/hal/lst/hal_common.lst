@@ -1,0 +1,2531 @@
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HAL_COMMON
+OBJECT MODULE PLACED IN .\obj\hal_common.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\hal\hal_common.c LARGE OPTIMIZE(9,SPEED) BROWSE INTVECTOR(0X2100) INC
+                    -DIR(..\..\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\src\nma;..\
+                    -..\hal;.\src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;..\..\hpgp\
+                    -src\route;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\components\utiliti
+                    -es\linklist\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\sampleapp\inc;
+                    -..\..\..\components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC_SW_SYNC=1
+                    -,inline,HPGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_SPI_TX_CRC
+                    -,HW_SPI_RX_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND PRINT(.\ls
+                    -t\hal_common.lst) TABS(2) OBJECT(.\obj\hal_common.obj)
+
+line level    source
+
+   1          /*
+   2          * $Id: hal_common.c,v 1.34 2014/08/25 07:37:34 kiran Exp $
+   3          *
+   4          * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hal/hal_common.c,v $
+   5          * 
+   6          * Description  : Common HAL module.
+   7          * 
+   8          * Copyright (c) 2010-2013 Greenvity Communications, Inc.
+   9          * All rights reserved.
+  10          *
+  11          * Purpose      :
+  12          *     Implements HAL APIs for accessing the common HW features like Pkt buffer.
+  13          *     Additionally implements Ext Int ISR and Timer ISRs.
+  14          *
+  15          */
+  16          #ifdef RTX51_TINY_OS
+  17          #include <rtx51tny.h>
+  18          #endif
+  19          #include <stdio.h>
+  20          #include <string.h>
+  21          #include "fm.h"
+  22          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  25          
+  26          #ifndef HPGP_HAL_TEST
+              #include "hpgpapi.h"
+              #endif
+  29          
+  30          #include "hpgpevt.h"
+  31          #include "hpgpdef.h"
+  32          #include "hal_common.h"
+  33          #include "hal.h"
+  34          #include "hal_hpgp.h"
+  35          
+  36          #include "hal_eth.h"
+  37          #ifdef HYBRII_SPI
+  38          #include "hal_spi.h"
+  39          #endif
+  40          
+  41          #include "hal_hpgp.h"
+  42          #include "frametask.h"
+  43          #include "datapath.h"
+  44          
+  45          #include "hal_hpgp_reset.h"
+  46          #include "hal_regs_def.h"
+  47          
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 2   
+
+  48          #include "ism.h"
+  49          #include "nma.h"
+  50          //#include "h1msgs.h"
+  51          #ifdef UM
+              #include "sys_config_data_utils.h"
+              #endif
+  54          extern u8 gsyncTimeout;
+  55          sysConfig_t sysConfig;
+  56          #ifdef FREQ_DETECT
+  57          
+  58          extern u32 PLC_MIN_AC_BPLEN; 
+  59          extern u32 PLC_MAX_AC_BPLEN;
+  60          extern u32 AC_MIN_THRESHOLD;
+  61          extern u32 PLC_DC_BP_LEN;
+  62          
+  63          #endif
+  64          #ifdef UM
+              #include "sys_config_data_utils.h"
+              #include "ctrll.h"
+              #endif
+  68          
+  69          
+  70          u8 gEthMacAddrDef[] = {0x00,0x11,0x22,0x33,0x44,0x55};
+  71          u8 gEthMacAddrBrdcast[] = {0xff,0xff,0xff,0xff,0xff,0xff};
+  72          u8  bcAddr[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  73          
+  74          //#define BPSTO_VALUE 0x1B
+  75          u32 gtimer2, gtimer1;
+  76          extern u8 gsendBcn;
+  77          extern u8 gPlcPendingHead;
+  78          extern u8 gPlcPendingTail;
+  79          #ifdef ETH_BRDG_DEBUG
+              extern u8 myDebugFlag;
+              extern u8 myDebugFlag1;
+              extern u32 TotalRxCpCnt;
+              extern u32 TotalRxFrameCnt;
+              #ifdef ETH_BRDG_DEBUG
+              extern u32 oldNumEthTxDoneInts;
+              #endif
+              #endif
+  88          #ifdef LOG_FLASH
+              extern u16 *blockId;
+              #endif
+  91          sHalCB     gHalCB;    // Common  HAL Control Blocl   
+  92          
+  93          // Flags for sniffer and eth_plc bridge
+  94          u8 eth_plc_bridge = 0;
+  95          u8 eth_plc_sniffer = 0;
+  96          
+  97          #ifdef HPGP_HAL_TEST
+  98          u8 opMode = LOWER_MAC;
+  99          #else
+              u8 opMode = UPPER_MAC;
+              #endif
+ 102          
+ 103          extern u8 spiflash_ReadByte(u32);
+ 104          extern void spiflash_wrsr_unlock(u8);
+ 105          extern void spiflash_WriteByte(u32, u8);
+ 106          
+ 107          u32 gCCO_NTB;
+ 108          #ifdef FREQ_DETECT
+ 109          extern void HHAL_SetPlcDevMode(ePlcDevMode plcDevMode);
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 3   
+
+ 110          extern void HHAL_SetACLine50HzFlag(eRegFlag acLin50Hz);
+ 111          #endif
+ 112          #ifdef DEBUG_DATAPATH
+              
+              u8 sigDbg = 0;
+              u8 pktDbg = 0;
+              
+              u8 ethQueueDebug = 0;
+              
+              
+              #endif
+ 121          
+ 122          
+ 123          // Interface flag
+ 124          u8 hostIntf = HOST_INTF_NO;
+ 125          //#ifdef UM
+ 126          u8 hostDetected = FALSE;
+ 127          //#endif
+ 128          /*******************************************************************
+ 129          * NAME :            CHAL_GetFreeCPCnt
+ 130          *
+ 131          * DESCRIPTION :     Get the number of free CPs available.
+ 132          *
+ 133          * INPUTS :
+ 134          *       PARAMETERS:
+ 135          *           None
+ 136          *
+ 137          * OUTPUTS :
+ 138          *       PARAMETERS:
+ 139          *           None
+ 140          *
+ 141          *       RETURN :
+ 142          *            Type:   u8
+ 143          *            Values: CP count.
+ 144          */
+ 145          u8 CHAL_GetFreeCPCnt() __REENTRANT__
+ 146          {
+ 147   1          uFreeCpCntReg  freeCpCnt;
+ 148   1           
+ 149   1          freeCpCnt.reg = ReadU32Reg(CPU_FREECPCOUNT_REG);
+ 150   1      
+ 151   1          return ((u8)freeCpCnt.s.cpCnt);
+ 152   1      }
+ 153          
+ 154          
+ 155          /**
+ 156           * NAME :            CHAL_AllocFrameCp
+ 157           *
+ 158           * DESCRIPTION :     
+ 159           *       Allocate an array of CPs as rquested.
+ 160           * INPUTS :
+ 161           *       PARAMETERS:
+ 162           *           u8 *cp    array of CPs for allocated CP index.
+ 163           *           u8 numCp  size of array
+ 164           *
+ 165           * OUTPUTS :
+ 166           *       PARAMETERS:
+ 167           *           None
+ 168           *
+ 169           *       RETURN 
+ 170           *           STATUS_SUCCESS if numCp CPs are allocated. 
+ 171           *           STATUS_FAILURE, otherwise.
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 4   
+
+ 172           */
+ 173          
+ 174          eStatus CHAL_AllocFrameCp(sCpSwDesc *cpDesc, u8 numCp)
+ 175          {
+ 176   1          u8 i;
+ 177   1          u8 numFreeCp = CHAL_GetFreeCPCnt();
+ 178   1        
+ 179   1          if (numFreeCp < numCp)
+ 180   1              return STATUS_FAILURE;
+ 181   1                
+ 182   1          for (i = 0; i < numCp; i++)
+ 183   1          {
+ 184   2              if (CHAL_RequestCP(&(cpDesc[i].cp)) == STATUS_FAILURE)
+ 185   2              {
+ 186   3                 // FM_Printf(FM_ERROR,"CHAL: error in CP request\n");
+ 187   3                  CHAL_FreeFrameCp(cpDesc, i-1);
+ 188   3                  return STATUS_FAILURE;
+ 189   3              }
+ 190   2          }
+ 191   1          return STATUS_SUCCESS;
+ 192   1      }
+ 193          
+ 194          
+ 195          
+ 196          
+ 197          /*******************************************************************
+ 198          * NAME :            CHAL_GetAccessToCP
+ 199          *
+ 200          * DESCRIPTION :     Selects the right HW bank corres. to a CP 
+ 201          *                   and returns the physical address.
+ 202          *
+ 203          * INPUTS :
+ 204          *       PARAMETERS:
+ 205          *           u8 cp    CP to be accessed.
+ 206          *
+ 207          * OUTPUTS :
+ 208          *       PARAMETERS:
+ 209          *           None
+ 210          *
+ 211          *       RETURN :
+ 212          *            Type:   u8 xdata* 
+ 213          *            Values: Cell (PktBuf) physical address.
+ 214          */
+ 215          u8 XDATA* CHAL_GetAccessToCP( u8 cp)
+ 216          {
+ 217   1          u8 XDATA *cellAddr;
+ 218   1          u8   bank;
+ 219   1          uPktBufBankSelReg pktBufBankSel;
+ 220   1      #ifdef UART_HOST_INTF 
+                u8 intFlag;
+              #endif
+ 223   1      
+ 224   1      #ifdef UART_HOST_INTF
+                intFlag = EA;
+                  EA = 0;
+              #endif
+ 228   1          bank     = (cp & 0x60) >>5;
+ 229   1      
+ 230   1          pktBufBankSel.reg = ReadU32Reg(CPU_PKTBUFBANKSEL_REG);
+ 231   1          pktBufBankSel.s.bank = bank;
+ 232   1          WriteU32Reg(CPU_PKTBUFBANKSEL_REG, pktBufBankSel.reg);
+ 233   1          cellAddr = (u8 XDATA *) ((u32)MAC_PKTBUF_BASEADDR+ (u32)( (((u32)cp) & 0x1F)<<7) );
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 5   
+
+ 234   1      #ifdef UART_HOST_INTF
+                EA = intFlag;
+              #endif
+ 237   1          return cellAddr;
+ 238   1      }
+ 239          
+ 240          /*******************************************************************
+ 241          * NAME :            CHAL_GetCPUsageCnt
+ 242          *
+ 243          * DESCRIPTION :     Get usage count corres. to a given CP. 
+ 244          *                   
+ 245          *
+ 246          * INPUTS :
+ 247          *       PARAMETERS:
+ 248          *           u8 cp    CP whose usage count is being queried.
+ 249          *
+ 250          * OUTPUTS :
+ 251          *       PARAMETERS:
+ 252          *           None
+ 253          *
+ 254          *       RETURN :
+ 255          *            Type:   u8  
+ 256          *            Values: Usage count for the CP ( Range = 0 to 15 )
+ 257          */
+ 258          u8 CHAL_GetCPUsageCnt(u8 cp)
+ 259          {
+ 260   1          uCpUsageCntIdxReg   cpUsageCntIdx;
+ 261   1          uCpUsageCntReg      cpUsageCnt;
+ 262   1           
+ 263   1          cpUsageCntIdx.reg = 0;
+ 264   1          cpUsageCntIdx.s.cpIdx = cp;
+ 265   1      
+ 266   1          WriteU32Reg(CPU_CPUSAGECNTIDX_REG, cpUsageCntIdx.reg);
+ 267   1          cpUsageCnt.reg = ReadU32Reg(CPU_CPUSAGECNT_REG);
+ 268   1      
+ 269   1          return (cpUsageCnt.s.usageCnt);
+ 270   1      }
+ 271          
+ 272          /*******************************************************************
+ 273          * NAME :            CHAL_IncrementCPUsageCnt
+ 274          *
+ 275          * DESCRIPTION :     Increase the usage count corres. to a given CP
+ 276          *                   by a given value. 
+ 277          *                   
+ 278          *
+ 279          * INPUTS :
+ 280          *       PARAMETERS:
+ 281          *           u8 cp      CP whose usage count is to be incremented.
+ 282          *           u8 cpCnt   Value to be added to current usage count.  
+ 283          *
+ 284          * OUTPUTS :
+ 285          *       PARAMETERS:
+ 286          *           None
+ 287          *
+ 288          *       RETURN :
+ 289          *            None
+ 290          */
+ 291          void CHAL_IncrementCPUsageCnt(u8 cp, u8 cpCnt)
+ 292          {
+ 293   1          uCpUsageCntIdxReg   cpUsageCntIdx;
+ 294   1          uCpUsageCntReg      cpUsageCnt;
+ 295   1           
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 6   
+
+ 296   1          cpUsageCntIdx.reg     = 0;
+ 297   1          cpUsageCnt.reg        = 0;
+ 298   1          cpUsageCntIdx.s.cpIdx = cp;
+ 299   1          cpUsageCnt.s.usageCnt    = cpCnt;
+ 300   1      
+ 301   1          WriteU32Reg(CPU_CPUSAGECNTIDX_REG, cpUsageCntIdx.reg);
+ 302   1          WriteU32Reg(CPU_CPUSAGECNT_REG, cpUsageCnt.reg);
+ 303   1      
+ 304   1          return;
+ 305   1      }
+ 306          
+ 307          #if 0
+              void CP_displayLocalBuf(u8 *buf)
+              {
+                u8 i;
+              
+                printf("\nContents of buf:\n");
+                for (i = 0; i < HYBRII_CELLBUF_SIZE; i++)
+                {
+                  printf("%bu ", buf[i]);
+                  if (i && !(i % 20))
+                    printf("\n");
+                }
+                printf("\n");
+              }
+              #endif
+ 322          
+ 323          #ifdef STEVE // CPInitDone bit is not defined in Hybrii B. Confirm with Steve
+              /*******************************************************************
+              * NAME :            CHAL_SetSwStatCPInitDoneFlag
+              *
+              * DESCRIPTION :     Set the CP Init done flag - to be done after releasing
+              *                   all 128 CPs just once, during initialization. 
+              *                   
+              *
+              * INPUTS :
+              *       PARAMETERS:
+              *           None 
+              *
+              * OUTPUTS :
+              *       PARAMETERS:
+              *           None
+              *
+              *       RETURN :
+              *            None
+              */
+              void CHAL_SetSwStatCPInitDoneFlag(eRegFlag regFlag)
+              {
+                  uCpuSwStatusReg cpuSwStatus;
+              
+                  cpuSwStatus.reg = ReadU32Reg(CPU_SWSTATUS_REG);
+                  cpuSwStatus.s.cpInitDone = regFlag;
+                  WriteU32Reg(CPU_SWSTATUS_REG,cpuSwStatus.reg); 
+              }
+              #endif
+ 351          
+ 352          
+ 353          u8 CHAL_GetCPUTxQDescCount()
+ 354          {
+ 355   1          uCpuTxQStatReg   cpuTxQStat;
+ 356   1          u8               txQDescCnt; 
+ 357   1      
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 7   
+
+ 358   1          cpuTxQStat.reg = ReadU32Reg(CPU_CPUTXSTATUS_REG);
+ 359   1          txQDescCnt   = (u8)cpuTxQStat.s.txQDescCntHi;
+ 360   1          txQDescCnt   = (txQDescCnt << CPUTXSTATUS_DESCCNTHI_POS)| cpuTxQStat.s.txQDescCntLo;
+ 361   1          return txQDescCnt;
+ 362   1      }
+ 363          
+ 364            
+ 365          u8 CHAL_GetCPUTxQFrmCount()
+ 366          {
+ 367   1          uCpuTxQStatReg   cpuTxQStat;
+ 368   1          u8               txQFrmCnt; 
+ 369   1      
+ 370   1          cpuTxQStat.reg = ReadU32Reg(CPU_CPUTXSTATUS_REG);
+ 371   1          txQFrmCnt   = (u8)cpuTxQStat.s.txQFrmCnt;
+ 372   1          return txQFrmCnt;
+ 373   1      }
+ 374          
+ 375          #if 0
+              void CHAL_InitSW()
+              {
+                  
+                  //in future read flash to see line mode and program accordingly
+              //    uPlcLineControlReg    plcLineCtrl; 
+                   uCSMARegionReg  pCSMARgn;
+              
+                  gHpgpHalCB.lineMode = LINE_MODE_DC;
+                  gHpgpHalCB.devMode   = DEV_MODE_CCO;
+                  gHpgpHalCB.curBcnPer = PLC_DC_BP_LEN;
+                  
+              /*#ifdef AC_LINECYCLE_50HZ
+                              HHAL_SetACLine50HzFlag(REG_FLAG_SET);
+              #else                   
+                              HHAL_SetACLine50HzFlag(REG_FLAG_CLR);
+              #endif */   //AC_LINECYCLE_50HZ  
+              
+                  pCSMARgn.s.csma_start_time_lo = 0; //start_time;
+                pCSMARgn.s.csma_start_time_hi = 0;
+                  pCSMARgn.s.csma_rxOnly = 0;
+                pCSMARgn.s.csma_hybrid = 1;
+              
+                  if(gHpgpHalCB.lineMode == LINE_MODE_DC)
+                  {
+                      pCSMARgn.s.csma_endtime_lo = 0xF43 & 0x00FF;  //f42 * 10.24 = 40ms
+                    pCSMARgn.s.csma_endtime_hi = ((0xF43  & 0xFF00) >> 8);
+                  }
+                  else if(gHpgpHalCB.lineMode == LINE_MODE_AC)
+                  {
+                      pCSMARgn.s.csma_endtime_lo = 0xCB6 & 0x00FF;
+                    pCSMARgn.s.csma_endtime_hi = ((0xCB6  & 0xFF00) >> 8);
+                  }
+                  
+                  
+                  WriteU32Reg(PLC_CSMAREGION0_REG, pCSMARgn.reg); 
+                         
+                  gHpgpHalCB.perSumCnt       = 0;
+                  gHpgpHalCB.bPerAvgInitDone = 0;
+              //    gHpgpHalCB.halStats.TxBcnCnt = 0;
+              //    gHpgpHalCB.halStats.TotalTxFrmCnt = 0;
+                     // put it in initsw routine (everything till end of func)
+                  // Initialize HPGP HAL Control Blok  
+                  gHpgpHalCB.diagModeEnb       = 0;
+                  gHpgpHalCB.bcnInitDone       = 0;
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 8   
+
+                  gHpgpHalCB.ppekValidReg      = 0;
+                  gHpgpHalCB.syncComplete      = 0;
+                  gHpgpHalCB.scanEnb           = 0;
+                  gHpgpHalCB.swSyncEnb         = 0;
+                  gHpgpHalCB.lastNtbB4         = 0;
+                  gHpgpHalCB.lastNtbAft        = 0;
+                  gHpgpHalCB.lastBpst          = 0;
+                  gHpgpHalCB.lastBcnRxTime     = 0;
+                  gHpgpHalCB.bcnPerSum         = 0;
+                  gHpgpHalCB.curBcnPer         = 0;
+                  gHpgpHalCB.perSumCnt         = 0;
+                  gHpgpHalCB.bPerAvgInitDone   = 0;
+                  gHpgpHalCB.bBcnNotSent       = 0; 
+                  gHpgpHalCB.BcnTxWaitTimeoutCnt = 0;
+                  gHpgpHalCB.nwSelected        = 0;
+                  gHpgpHalCB.bTxPending        = 0;
+                  gHpgpHalCB.BcnLateCnt = 0;
+                  gHpgpHalCB.halStats.STAlagCCOCount = 0;
+                  gHpgpHalCB.halStats.STAleadCCOCount = 0;
+              #ifndef HPGP_HAL_TEST 
+                  gHpgpHalCB.tei               = 0;
+              #endif  
+                  gHpgpHalCB.plcTx10FC.reg = HPGP_HP10FC_DEF;
+                  memcpy(gHpgpHalCB.nid, gDefNID, NID_LEN);
+              
+                  gHpgpHalCB.gPendingHead  = 0;
+                gHpgpHalCB.gPendingTail = 0;
+                memset(&gHpgpHalCB.gPending ,0x00, sizeof(gHpgpHalCB.gPending));
+              
+              
+                  //HHAL_SetSnid(0);
+                  //HHAL_SetDevMode(DEV_MODE_CCO, LINE_MODE_DC);
+                 
+                  
+              }
+              #endif //0
+ 456              
+ 457          /*******************************************************************
+ 458          * NAME :            CHAL_InitHW
+ 459          *
+ 460          * DESCRIPTION :     Init common resources like CPs, common HAL CB, 
+ 461          *                   Enable Timer Int, Ext Int, UART and timer. 
+ 462          *                   
+ 463          *
+ 464          * INPUTS :
+ 465          *       PARAMETERS:
+ 466          *           None  
+ 467          *
+ 468          * OUTPUTS :
+ 469          *       PARAMETERS:
+ 470          *           None
+ 471          *
+ 472          *       RETURN :
+ 473          *            None
+ 474          */
+ 475          void CHAL_InitHW()
+ 476          {
+ 477   1      #if defined (HPGP_HAL_TEST) || defined(UM)
+ 478   1      //    uInterruptReg       intMacEnable;
+ 479   1      #if INT_POLL
+ 480   1      #else     
+                  u8051InterruptReg   int8051Enable;
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 9   
+
+                  u8051InterruptReg   int8051Irq;
+              #endif
+ 484   1      #endif
+ 485   1      //    eRegFlag            regFlag;
+ 486   1          u8                  cpNum;
+ 487   1          //u8                  cpUsageCnt; 
+ 488   1      
+ 489   1          // 1. Init Cell pointers
+ 490   1          for (cpNum=0 ; cpNum<HYBRII_CPCOUNT_MAX ; cpNum++)
+ 491   1          {
+ 492   2               //for( cpUsageCnt=0 ; cpUsageCnt<HYBRII_CPUSAGECOUNT_MAX ; cpUsageCnt++)
+ 493   2               {
+ 494   3                  CHAL_DecrementReleaseCPCnt(cpNum);
+ 495   3               }
+ 496   2          }
+ 497   1      
+ 498   1      /* below is moved to the hal and ism */
+ 499   1      
+ 500   1      #if defined (HPGP_HAL_TEST) || defined(UM)
+ 501   1          // 5. Initialize HAL Control block
+ 502   1          memset(&gHalCB, 0, sizeof(gHalCB));
+ 503   1      
+ 504   1          // 3. Enable MAC Interrupts - routed through External Int 0
+ 505   1          //sw does polling so no need to do int enb
+ 506   1        /*intMacEnable.reg   = 0;
+ 507   1          //intMacEnable.reg |= CPU_INTERRUPT_ALLINTSMASK;
+ 508   1          intMacEnable.s.ethFreeCP      = 1;
+ 509   1          intMacEnable.s.hpgpBP         = 1;
+ 510   1          intMacEnable.s.plcBcn3Sent    = 1;
+ 511   1          intMacEnable.s.plcBcnRx       = 1;
+ 512   1          intMacEnable.s.cpuTxQNonEmpty = 1;
+ 513   1          //intMacEnable.s.hpgpBPSta      = 1;
+ 514   1          intMacEnable.s.plcMedStatInt  = 1;
+ 515   1          WriteU32Reg(CPU_INTENABLE_REG,intMacEnable.reg); */
+ 516   1      
+ 517   1          // 6. Program ClksPer2Us value
+ 518   1      
+ 519   1          // 7. Start 1 ms timer running
+ 520   1          // Timer0 in Mode
+ 521   1          TMOD = (TMOD & 0xF0) | 0x01;
+ 522   1          
+ 523   1          // Load Timer register
+ 524   1          TH0 = HYBRII_MSTIMER25MHZ_HI;
+ 525   1          TL0 = HYBRII_MSTIMER25MHZ_LO;
+ 526   1          
+ 527   1          // Start Timer
+ 528   1          TR0 = 1;
+ 529   1      
+ 530   1          // 4. Enable 8051 interrupts
+ 531   1          // Enable 8051 Timer2 Int & External Int     
+ 532   1          
+ 533   1      #ifdef UART_HOST_INTF 
+                  ET0 = 0;                    // Disable Timer0 Int
+              #else
+ 536   1      #ifdef _TIMER_INTERRUPT_
+ 537   1          ET0 = 1;                    // Enable Timer0 Int
+ 538   1      #endif
+ 539   1      #endif
+ 540   1          IT0 = 0;                    // Set the interrupts to Lowlevel-triggered 
+ 541   1          IT1 = 0;
+ 542   1          EA  = 1;                    // Overall Int Enable
+ 543   1      #if INT_POLL
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 10  
+
+ 544   1      #else
+              
+                  EX1 = 1;
+                  int8051Irq.reg = 0;
+                  int8051Irq.s.ext1 = 1;
+                  WriteU32Reg(INTIRQ_8051_REG,int8051Irq.reg);
+              
+                  int8051Enable.reg = 0;
+                  int8051Enable.s.ext1 = 1;
+                  int8051Enable.s.globalIntEna = 1;
+                  WriteU32Reg(INTENA_8051_REG,int8051Enable.reg);
+              #endif
+ 556   1      #endif /* HPGP_HAL_TEST */
+ 557   1      #ifdef UART_HOST_INTF 
+              {
+                u8051InterruptReg int8051Enable;
+                u8051InterruptReg int8051Irq;
+                IT0 = 0;                    // Set the interrupts to Lowlevel-triggered 
+                  IT1 = 0;
+                EX1 = 1;
+                EA  = 1;                    // Overall Int Enable
+                 int8051Irq.reg = 0;
+                 //int8051Irq.s.ext1 = 1;
+                 int8051Irq.s.uart0 = 1;
+                 WriteU32Reg(INTIRQ_8051_REG,int8051Irq.reg);
+              
+                 int8051Enable.reg = 0;
+                //int8051Enable.s.ext1 = 1;
+                 int8051Enable.s.uart0 = 1;
+                 int8051Enable.s.globalIntEna = 1;
+                 WriteU32Reg(INTENA_8051_REG,int8051Enable.reg);
+              }
+              
+              #endif
+ 578   1      
+ 579   1      }
+ 580          
+ 581          void hal_common_display_qc_error_stats (void)
+ 582          {
+ 583   1          printf("\nQ Controller Stat:");
+ 584   1          printf("\n  S/W Frame Count = %u, No 1st Desc = %bu, Too many desc = %bu, "
+ 585   1                 " No desc = %bu, qc_no_grant=%bu, cp_no_grant_free_cp=%d\n" 
+ 586   1                 " qc_no_grant_alloc_cp=%d, qc_no_grant_write_cp=%d, qc_no_grant_read_cp=%d\n", 
+ 587   1             (u16)gHalCB.frmsCnt, gHalCB.qc_no_1st_desc,
+ 588   1                 gHalCB.qc_too_many_desc, gHalCB.qc_no_desc, gHalCB.qc_no_grant, gHalCB.cp_no_grant_free_cp, 
+ 589   1             gHalCB.cp_no_grant_alloc_cp, gHalCB.cp_no_grant_write_cp, gHalCB.cp_no_grant_read_cp);
+ 590   1      }
+ 591          
+ 592          
+ 593          
+ 594          #ifdef HPGP_HAL_TEST
+ 595          void CHAL_CpuTxQNemptyIntHandler()
+ 596          #else
+              void CHAL_FrameRxIntHandler(void *cookie)
+              #endif
+ 599          {
+ 600   1      //    u8 frms_cnt;
+ 601   1          u8 desc_cnt;
+ 602   1          u8 rx_processing;
+ 603   1          u8 i; 
+ 604   1          u16 frmLen;
+ 605   1      #if !defined (HPGP_HAL_TEST)  && !defined(UM)    
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 11  
+
+                  u8  frmOffset;
+                  u8  snid;
+                  u16 ssn;
+                  eStatus status;
+              
+              #endif
+ 612   1      #ifdef HYBRII_B_FC
+              //    sPHYblockHeader  rxFrmPBHdr;
+              //    u32              rxFrmFC[4];  //store FC VF fileds
+              //    uPlcTxPktQDescVF0 rxFrmFCVF0;
+              //    uPlcTxPktQDescVF1 rxFrmFCVF1;
+              //    uPlcTxPktQDescVF2 rxFrmFCVF2;
+              //    uPlcTxPktQDescVF3 rxFrmFCVF3;
+              //  u32               rxFrmPBCS;
+              //  uPlcCpuRdCnt0Reg  rxFrmFcCnt;
+              //  uPlcCpuRdCnt1Reg  rxFrmPBCnt;
+              #endif
+ 623   1      
+ 624   1          sSwFrmDesc rxFrmSwDesc;
+ 625   1          uRxFrmHwDesc rxFrmHwDesc;
+ 626   1        uRxCpDesc    rxCpDesc;
+ 627   1      #ifndef HPGP_HAL_TEST
+                  volatile u8 XDATA *cellAddr;
+                  sHaLayer *hal= (sHaLayer *)cookie; 
+              //    sH1Hdr   *h1h = NULL;
+              #endif
+ 632   1      
+ 633   1      
+ 634   1      #ifdef ETH_BRDG_DEBUG
+                  if (myDebugFlag1)
+                      printf(" RX Int. Handler: recvd a frame\n");
+              #endif
+ 638   1            
+ 639   1        memset(&rxFrmSwDesc, 0x00, sizeof(sSwFrmDesc));
+ 640   1        memset(&rxFrmHwDesc, 0x00, sizeof(uRxFrmHwDesc));
+ 641   1        memset(&rxCpDesc, 0x00, sizeof(uRxCpDesc));
+ 642   1        
+ 643   1          //[YM] Add Hybrii_B FC and PBHdr process code here, before process Frame Payload
+ 644   1      #ifdef HYBRII_B_FC
+                  rxFrmFcCnt.reg = ReadU32Reg(PLC_FC_CP_CNT_REG);
+                  rxFrmPBCnt.reg = ReadU32Reg(PLC_PBH_PBCS_CNT_REG);
+                
+              #endif
+ 649   1      
+ 650   1      //    frms_cnt = CHAL_GetCPUTxQFrmCount();
+ 651   1      __CRIT_SECTION_BEGIN__ //kiran CP loss issue with interrupts
+ 652   1          desc_cnt = CHAL_GetCPUTxQDescCount();
+ 653   1      __CRIT_SECTION_END__ //kiran
+ 654   1      
+ 655   1          rx_processing = 0;
+ 656   1        
+ 657   1          while (desc_cnt) {
+ 658   2              u8                  last_desc_len;
+ 659   2              uRxPktQDesc1        rx_q_desc;
+ 660   2              uRxPktQCPDesc       q_desc_cp;
+ 661   2              sCommonRxFrmSwDesc  rx_frame_info;
+ 662   2      
+ 663   2      #ifdef ETH_BRDG_DEBUG
+                      if (myDebugFlag1)
+                          printf(" RX Int.  frms_cnt = %bu, gHalCB.frmsCnt=%bu, desc_cnt=%bu\n", frms_cnt, gHalCB.frmsCn
+             -t, desc_cnt);
+              #endif
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 12  
+
+ 667   2              // Request for right to read the CPU TX QD
+ 668   2              if (HHAL_Req_Gnt_Read_CPU_QD() == STATUS_FAILURE)
+ 669   2                  break;
+ 670   2      
+ 671   2              // Always expect a firstdescriptor here
+ 672   2              // else error cases
+ 673   2        
+ 674   2              memset(&rx_frame_info.hdrDesc, 0x00, sizeof(uRxPktQDesc1));
+ 675   2          memset(&rx_q_desc, 0x00, sizeof(uRxPktQDesc1));
+ 676   2          memset(&q_desc_cp, 0x00, sizeof(uRxPktQCPDesc));
+ 677   2          
+ 678   2       __CRIT_SECTION_BEGIN__ //kiran CP loss issue with interrupts 
+ 679   2              rx_q_desc.reg = ReadU32Reg(CPU_TXQDESC_REG);
+ 680   2              if (NO_DESCRIPTOR == rx_q_desc.reg) {
+ 681   3            //printf("\na\n");
+ 682   3                  gHalCB.qc_no_desc++;
+ 683   3             __CRIT_SECTION_END__ //kiran
+ 684   3                  break;
+ 685   3              }
+ 686   2       __CRIT_SECTION_END__ //kiran  
+ 687   2       
+ 688   2              if (rx_q_desc.s.bFirstDesc) {
+ 689   3                  u8              src_port;
+ 690   3                  bool            valid_frame; 
+ 691   3      #ifdef DUP_CP 
+                          u8        privCp;
+              #endif      
+ 694   3      
+ 695   3                  src_port = rx_q_desc.s.srcPort;
+ 696   3                  rx_frame_info.hdrDesc.reg = rx_q_desc.reg;
+ 697   3                  rx_frame_info.cpCount = 0;
+ 698   3                  valid_frame = TRUE;
+ 699   3                  rx_frame_info.rssiLqi.reg = ReadU32Reg(PLC_RSSILQI_REG);//kiran
+ 700   3      #ifdef HYBRII_B_FC  //[YM] Add Hybrii_B FC and PBHdr process code here, before process Frame Payload
+                                //if ((frms_cnt != rxFrmFcCnt.s.FcCntLo)||(frms_cnt != rxFrmPBCnt.s.PbhCnt_Lo))
+                                  //printf(" Receive frame count does not match with FC count or PB Hdr count\n");
+                            if ((rxFrmFcCnt.s.FcCntLo > 0)&&(rxFrmPBCnt.s.PbhCnt_Lo> 0) && (src_port == PORT_PLC))
+                            {
+                                  rxFrmPBHdr.pbh = ReadU32Reg(PLC_PHYBLOCK_REG);
+                      
+                                  //if ((rxFrmPBHdr.s.ssn_lo > 0)||(rxFrmPBHdr.s.ssn_hi > 0))
+                                      //printf("Rx PHY Block needs segement process, ssn_lo = %bu, ssn_hi = %bu\n", rxFr
+             -mPBHdr.s.ssn_lo, rxFrmPBHdr.s.ssn_hi);
+                                  
+                                  rxFrmPBCS = ReadU32Reg(PLC_PBCS_DATA_REG);  //No Use for Software
+                      
+                                  // [YM] temp code, just read FC header our from FC ram, no further process
+                                  rxFrmFCVF0.reg = ReadU32Reg(PLC_FC_DATA_REG);
+                                  rxFrmFCVF1.reg = ReadU32Reg(PLC_FC_DATA_REG);
+                                  rxFrmFCVF2.reg = ReadU32Reg(PLC_FC_DATA_REG);
+                                  rxFrmFCVF3.reg = ReadU32Reg(PLC_FC_DATA_REG);
+              
+                                  rx_frame_info.fc[0] = rxFrmFCVF0.reg;
+                                  rx_frame_info.fc[1] = rxFrmFCVF1.reg;
+                                  rx_frame_info.fc[2] = rxFrmFCVF2.reg;
+                                  rx_frame_info.fc[3] = rxFrmFCVF3.reg;
+                             //     printf("dt : %bx\n", rxFrmFCVF0.s.dt_av);
+                                  
+                            }
+                          
+              #endif
+ 727   3      __CRIT_SECTION_BEGIN__ //kiran CP loss issue with interrupts
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 13  
+
+ 728   3      
+ 729   3                  q_desc_cp.reg = ReadU32Reg(CPU_TXQDESC_REG);
+ 730   3      __CRIT_SECTION_END__ //kiran
+ 731   3      
+ 732   3                  if (NO_DESCRIPTOR == q_desc_cp.reg) {
+ 733   4              //printf("\nb\n");
+ 734   4                      gHalCB.qc_no_desc++;
+ 735   4                      valid_frame = FALSE;
+ 736   4                  } else {
+ 737   4                      // Store first CP desciptor and the associate CP
+ 738   4                      rx_frame_info.firstCpDesc.reg = q_desc_cp.reg;
+ 739   4                      rx_frame_info.cpArr[rx_frame_info.cpCount++] = 
+ 740   4                                  q_desc_cp.s.cp;
+ 741   4      #ifdef DUP_CP               
+                              privCp = q_desc_cp.s.cp;
+              #endif
+ 744   4                      // Read until the last descriptor
+ 745   4      __CRIT_SECTION_BEGIN__ //kiran CP loss issue with interrupts
+ 746   4                      while (q_desc_cp.s.lastDesc == 0) {
+ 747   5                          q_desc_cp.reg = ReadU32Reg(CPU_TXQDESC_REG);
+ 748   5                          if (NO_DESCRIPTOR == q_desc_cp.reg) {
+ 749   6                  //printf("\nc\n");
+ 750   6                              gHalCB.qc_no_desc++;
+ 751   6                              valid_frame = FALSE;
+ 752   6                              break;
+ 753   6                          }
+ 754   5                          if (rx_frame_info.cpCount < HYBRII_CPPERFRMCOUNT_MAX) {
+ 755   6                              // Extract Cell Pointer
+ 756   6                              rx_frame_info.cpArr[rx_frame_info.cpCount++] = 
+ 757   6                                  q_desc_cp.s.cp;
+ 758   6      #ifdef DUP_CP         
+                          
+                            {
+                              if(privCp != q_desc_cp.s.cp)
+                              {
+                                privCp = q_desc_cp.s.cp;
+                              }
+                              else
+                              {
+                                FM_Printf(FM_USER,"dup cp : %bu\n",q_desc_cp.s.cp);
+                                privCp = q_desc_cp.s.cp;
+                              }
+                            }
+              #endif              
+ 772   6                          } else {
+ 773   6                              // Error. Don't expect this many descriptor
+ 774   6                              CHAL_DecrementReleaseCPCnt(q_desc_cp.s.cp);
+ 775   6                              valid_frame = FALSE;
+ 776   6                              gHalCB.qc_too_many_desc++;
+ 777   6                          }
+ 778   5                      }
+ 779   4      __CRIT_SECTION_END__ //kiran
+ 780   4                  }
+ 781   3      
+ 782   3      #ifdef ETH_BRDG_DEBUG
+                    TotalRxCpCnt += rx_frame_info.cpCount;
+                      TotalRxFrameCnt++;
+              #endif
+ 786   3                  
+ 787   3                  // 1.1.5 Increment SW copy of FramesCount 
+ 788   3                  gHalCB.frmsCnt ++;
+ 789   3      __CRIT_SECTION_BEGIN__ //kiran CP loss issue with interrupts
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 14  
+
+ 790   3      
+ 791   3            desc_cnt = CHAL_GetCPUTxQDescCount();
+ 792   3      
+ 793   3                  HHAL_Rel_Gnt_Read_CPU_QD();     // Release CPQD Grant after finish reading a frame
+ 794   3      __CRIT_SECTION_END__ //kiran
+ 795   3      
+ 796   3                  if (valid_frame == FALSE) {
+ 797   4                      hal_common_free_frame(&rx_frame_info);
+ 798   4                  } else {
+ 799   4                      last_desc_len = q_desc_cp.s.descLenHi;
+ 800   4                      last_desc_len = (last_desc_len << PKTQDESCCP_DESCLENHI_POS) | 
+ 801   4                                      q_desc_cp.s.descLenLo;
+ 802   4                      rx_frame_info.lastDescLen = last_desc_len;
+ 803   4                      
+ 804   4                      rxFrmHwDesc.reg = rx_q_desc.reg;
+ 805   4                      frmLen = rxFrmHwDesc.gnl.frmLenHi;
+ 806   4                      frmLen = (frmLen << PKTQDESC1_FRMLENHI_POS) | rxFrmHwDesc.gnl.frmLenLo;
+ 807   4                      rxFrmSwDesc.frmLen = frmLen;
+ 808   4                      rxFrmSwDesc.frmType = rxFrmHwDesc.gnl.frmType;
+ 809   4                      rxFrmSwDesc.rxPort = rxFrmHwDesc.gnl.srcPort;
+ 810   4      
+ 811   4                      rxFrmSwDesc.lastDescLen = rx_frame_info.lastDescLen;
+ 812   4                      rxFrmSwDesc.cpCount = rx_frame_info.cpCount; 
+ 813   4      #ifdef DUP_CP
+                      privCp = 0xFF;
+              #endif        
+ 816   4                      for (i = 0; i < rxFrmSwDesc.cpCount; i++)
+ 817   4                      {
+ 818   5                          rxFrmSwDesc.cpArr[i].cp = rx_frame_info.cpArr[i];
+ 819   5      #ifdef DUP_CP
+                        { 
+                          if(privCp != rx_frame_info.cpArr[i])
+                          {
+                            privCp = rx_frame_info.cpArr[i];
+                          }
+                          else
+                          {
+                            FM_Printf(FM_ERROR,"dup cpx : %bu\n",rx_frame_info.cpArr[i]);
+                            privCp = rx_frame_info.cpArr[i];
+                          } 
+                        }
+              #endif          
+ 832   5                      }
+ 833   4      #ifndef HPGP_HAL_TEST
+                              /* find the destination Ethernet header */
+                              /* by reading the first CP */
+                             cellAddr = CHAL_GetAccessToCP(rxFrmSwDesc.cpArr[0].cp);
+              //FM_HexDump(FM_DATA|FM_MINFO, "rx buff:", hal->buf, HAL_BUF_LEN ); 
+              #endif
+ 839   4      #ifdef ETH_BRDG_DEBUG
+                             if (myDebugFlag1)
+                                  printf("RX Int.Handler: rxFrmSwDesc.cpCnt=%bu, TakenCPCnt=%bu\n",rxFrmSwDesc.cpCount,1
+             -28-CHAL_GetFreeCPCnt());
+                             if (myDebugFlag)
+                                  printf(" RX Int.Handler: src_port=%bu\n",src_port);
+              #endif
+ 845   4              rx_frame_info.hdrDesc.s.srcPort = src_port;
+ 846   4                      switch (src_port) {
+ 847   5      #ifdef HYBRII_ZIGBEE
+                              case PORT_ZIGBEE:
+              #ifdef NO_HOST          
+                        rx_frame_info.hdrDesc.s.dstPort = PORT_APP;         
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 15  
+
+              #else
+                        rx_frame_info.hdrDesc.s.dstPort = PORT_HOST;        
+              #endif
+                                  mac_hal_qc_frame_rx(&rx_frame_info);
+                                  break;
+              #endif
+ 857   5      #ifdef HYBRII_SPI
+ 858   5                      case PORT_SPI:
+ 859   5                rx_frame_info.hdrDesc.s.dstPort = PORT_PLC;         
+ 860   5      #ifndef HPGP_HAL_TEST    
+                                  hal_spi_frame_rx(hal, &rx_frame_info);   
+              #else
+ 863   5                          hal_spi_frame_rx(&rx_frame_info);   
+ 864   5      #endif
+ 865   5                          break;
+ 866   5      #endif
+ 867   5      #ifdef HYBRII_ETH
+ 868   5                      case PORT_ETH:
+ 869   5                rx_frame_info.hdrDesc.s.dstPort = PORT_PLC;         
+ 870   5      #ifdef HYBRII_ETH
+ 871   5                               //              FM_Printf(FM_ERROR, "e r\n");
+ 872   5      
+ 873   5      #ifndef HPGP_HAL_TEST                      
+                                  Host_RxHandler(hal, &rx_frame_info);
+              #else
+ 876   5                          Host_RxHandler(&rx_frame_info);
+ 877   5      #endif
+ 878   5      #endif
+ 879   5                          break;
+ 880   5      #endif
+ 881   5      #ifdef HYBRII_HPGP
+ 882   5                      case PORT_PLC:
+ 883   5      #ifdef NO_HOST          
+                        rx_frame_info.hdrDesc.s.dstPort = PORT_APP;         
+              #else
+ 886   5                rx_frame_info.hdrDesc.s.dstPort = PORT_HOST;        
+ 887   5      #endif
+ 888   5      #if defined (HPGP_HAL_TEST)  || defined(UM)
+ 889   5      
+ 890   5      
+ 891   5      #ifdef HPGP_HAL_TEST
+ 892   5                       //  FM_Printf(FM_ERROR, "p r\n");
+ 893   5                         HHAL_RxIntHandler(&rx_frame_info);
+ 894   5      
+ 895   5      #else
+                                 HHAL_RxIntHandler(&rx_frame_info, hal);
+              #endif // end of HPGP_HAL_TEST ifdef
+ 898   5      
+ 899   5      
+ 900   5      
+ 901   5      #else
+                                 rxCpDesc.reg = rx_frame_info.firstCpDesc.reg;
+                                 ssn    = rxCpDesc.plc.ssnHi;
+                                 ssn    = (ssn << PKTQDESC1_SSNHI_POS ) | rxCpDesc.plc.ssnLo;
+                                 rxFrmSwDesc.frmInfo.plc.ssn = ssn;
+                                 /* Extract SNID */
+                                 snid   = rxCpDesc.plc.snidHi;
+                                 snid   = (snid << PKTQDESC1_SNIDHI_POS ) | rxCpDesc.plc.snidLo;
+                                 rxFrmSwDesc.frmInfo.plc.snid    = snid;
+                         /* TODO: filter frames based on snid */
+                                  HHAL_ProcRxFrameDesc(hal, &rxFrmHwDesc,                                        
+                                                       &rxFrmSwDesc);
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 16  
+
+                                  
+                                  frmOffset = ((rxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_MGMT) ? 4 : 0);
+                                  
+              
+                                  /* receive mgmt packets now, 
+                                   * but let the bridge to switch data packets */
+                                  if (rxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_MGMT) 
+                                  {
+                                       status = HAL_RecvFrame(hal, &rxFrmSwDesc, NULL, NULL); 
+                                       if (status == STATUS_FAILURE)
+                                       {
+                                           CHAL_FreeFrameCp(rxFrmSwDesc.cpDesc, rxFrmSwDesc.cpCount);
+                                       }
+                                  }
+                        else
+                        {
+                                      FM_Printf(FM_ERROR,"HAL: Rx PLC data frame\n");
+                        }
+              #endif
+ 932   5                          break;
+ 933   5      #endif /* HYBRII_HPGP */
+ 934   5                      default:
+ 935   5                          {
+ 936   6                          hal_common_free_frame(&rx_frame_info);
+ 937   6                              gHpgpHalCB.halStats.GswDropCnt++;
+ 938   6                          }
+ 939   5                          break;
+ 940   5                      }
+ 941   4      
+ 942   4                     /* TODO: call bridge to switch the data packets */
+ 943   4                  }
+ 944   3              } else {
+ 945   3                  // Error case - don't see the 1st descriptor
+ 946   3                  // Free all CP's of the frame
+ 947   3                  gHalCB.qc_no_1st_desc++;
+ 948   3                  q_desc_cp.reg = rx_q_desc.reg;
+ 949   3                  do {
+ 950   4                      CHAL_DecrementReleaseCPCnt(q_desc_cp.s.cp);
+ 951   4      __CRIT_SECTION_BEGIN__ //kiran CP loss issue with interrupts        
+ 952   4                      q_desc_cp.reg = ReadU32Reg(CPU_TXQDESC_REG);
+ 953   4      __CRIT_SECTION_END__ //kiran
+ 954   4                      if (NO_DESCRIPTOR == q_desc_cp.reg) {
+ 955   5                //printf("\nd\n");
+ 956   5                          gHalCB.qc_no_desc++;
+ 957   5                          break;
+ 958   5                      }
+ 959   4                  } while (q_desc_cp.s.lastDesc == 0);
+ 960   3                  gHalCB.frmsCnt ++;
+ 961   3              }
+ 962   2              if (rx_processing++ > RX_PACKETS_PROCESSING_MAX) {
+ 963   3                  break;
+ 964   3              }
+ 965   2      
+ 966   2      #ifdef Hybrii_B_FC
+                      rxFrmFcCnt.reg = ReadU32Reg(PLC_FC_CP_CNT_REG);
+                      rxFrmPBCnt.reg = ReadU32Reg(PLC_PBH_PBCS_CNT_REG);
+              #endif    
+ 970   2      //        frms_cnt = CHAL_GetCPUTxQFrmCount();
+ 971   2      //        desc_cnt = CHAL_GetCPUTxQDescCount();
+ 972   2      #ifndef HYBRII_FPGA
+ 973   2      #ifdef  HYBRII_HPGP
+ 974   2      //        HHAL_ProcessPlcTxDone();
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 17  
+
+ 975   2      #endif
+ 976   2      
+ 977   2      #endif
+ 978   2      //    HHAL_Rel_Gnt_Read_CPU_QD();
+ 979   2      
+ 980   2      #ifdef RTX51_TINY_OS
+ 981   2          
+ 982   2        //  os_set_ready(HYBRII_TASK_ID_FRAME);
+ 983   2      
+ 984   2      //    os_switch_task();
+ 985   2      //    FM_Printf(FM_USER,"\nx..");
+ 986   2      #endif
+ 987   2      
+ 988   2          }
+ 989   1      
+ 990   1          // Make sure we release the CPU QD Grant
+ 991   1        HHAL_Rel_Gnt_Read_CPU_QD();
+ 992   1      }
+ 993                                                                                
+ 994          u32 get_TimerTick() 
+ 995          {
+ 996   1          return (gHalCB.timerIntCnt);
+ 997   1        
+ 998   1      
+ 999   1      }
+1000          #ifdef HPGP_HAL_TEST             
+1001          void CHAL_IncTimerIntCnt() using 2
+1002          {
+1003   1          gHalCB.timerIntCnt++;
+1004   1          //hhal_timerHandler();
+1005   1      }
+1006          #endif
+1007          #ifdef SW_RECOVERY 
+              void Monitor_Hang()
+              {  
+                
+                  u32 hangIntRegRead; // Remove it
+                  u32 reg_value;
+                  u8 csmaHang;
+                  u8 mpirxHang;
+                  u8 cpuQdHang;
+                  u8 txdmaHang;
+                  u8 plcSegmentHang;
+                  u8 plcAESHang;
+                  u8 mpitxHang;
+                  u8 plcSOFHang;
+                  u8 plcBcn3Hang;
+                  u8 plcBcn2Hang;
+                  u8 plcSoundHang;
+              
+              
+                  
+                  
+                  //    FM_Printf(FM_USER,"intr b4= %lx\n",hangIntRegRead);
+                  
+                  hangIntRegRead = hal_common_reg_32_read(PLC_SM_HANG_INT);
+                reg_value = hal_common_reg_32_read(PLC_SMSHADOW1_REG);
+                  //FM_Printf(FM_USER,"intr b41= %x\n",hangIntRegRead);
+                  //printf("\n intr b41= %lu\n",hangIntRegRead);
+                  csmaHang = (hangIntRegRead & (u32)PLC_CSMA_HANG);
+                  mpirxHang = (hangIntRegRead & (u32)PLC_MPIRX_HANG);
+                  cpuQdHang = (hangIntRegRead & (u32)PLC_CPUQD_HANG);
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 18  
+
+                  txdmaHang = (hangIntRegRead & PLC_TX_DMA_HANG);
+                  plcSegmentHang = (hangIntRegRead & PLC_SEGMENT_HANG);
+                  plcAESHang = (hangIntRegRead & PLC_AES_HANG);
+                  mpitxHang = (hangIntRegRead & PLC_MPITX_HANG);
+                  plcSOFHang = (hangIntRegRead & PLC_SOF_HANG);
+                  plcBcn3Hang = (hangIntRegRead & PLC_BCN3_HANG);
+                  plcBcn2Hang = (hangIntRegRead & PLC_BCN2_HANG);
+                  plcSoundHang = (hangIntRegRead & PLC_SOUND_HANG);
+                  
+                  // [YM] Only for CSMA hang - CCo UDP hang case
+                if (csmaHang)
+                {
+                   if ((reg_value & 0x07) == 7)
+                   {
+                              
+                     //printf("before: PLC_SM_HANG_INT 0xD10 = %lx\n", ReadU32Reg(PLC_SM_HANG_INT));
+                     
+                       WriteU32Reg(PLC_HYBRII_RESET, ctorl(0x10000));
+                     WriteU32Reg(PLC_HYBRII_RESET, 0x0);
+                     
+                     //printf("after: PLC_SM_HANG_INT 0xD10 = %lx\n", ReadU32Reg(PLC_SM_HANG_INT));
+                     set_plc_paramter(PLC_EIFS_SEL, PLC_EIFS_INIT_VALUE);
+                           gHpgpHalCB.halStats.macHangRecover2++;
+                     //printf("Reset CSMA State Machine - %bu\n", gHpgpHalCB.halStats.macHangRecover2);
+                   }
+                   //return;
+                }
+                else if(csmaHang || plcSOFHang || plcBcn2Hang || plcBcn3Hang || plcSoundHang || txdmaHang  || plcSegmentH
+             -ang  || mpitxHang || plcAESHang)
+                  {
+                       hangIntRegRead = hal_common_reg_32_read(PLC_SM_HANG_INT);
+                       //printf("\n intr b41= %lu\n",hangIntRegRead);
+                       plc_reset_tx();
+                   }
+                  //hangIntRegRead = hal_common_reg_32_read(PLC_SM_HANG_INT);
+                  if((mpirxHang > 0) || (cpuQdHang > 0))
+                  {
+                          plc_reset_mpirx_cpuqd();
+                          //printf("\n MPIRX/CPUQD_H\n");
+                  
+                          //FM_Printf(FM_USER,"MPIRX/CPUQD_H\n");
+                  
+                  } 
+                  /* if(plcAESHang)
+                  {
+                      plc_reset_aes();
+                      FM_Printf(FM_USER,"AES H\n");
+                  } */
+                  
+                  /*if(csmaHang || plcAESHang)
+                  {
+                      
+                      hangIntRegRead = hal_common_reg_32_read(PLC_SM_HANG_INT);
+                      printf("\n intr before= %lu\n",hangIntRegRead);
+                      plc_reset_rx();
+                       hangIntRegRead = hal_common_reg_32_read(PLC_SM_HANG_INT);
+                      printf("\n intr after2= %lu\n",hangIntRegRead);
+                  } */
+                  
+                  
+                  /*  hangIntRegRead = hal_common_reg_32_read(PLC_SM_HANG_INT);
+                  if(txdmaHang > 0)
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 19  
+
+                      {
+                          plc_reset_tx();//plc_reset_txdma();
+                          FM_Printf(FM_USER,"TX_H\n");
+                      }
+                                             || (hangIntRegRead & PLC_BCN3_HANG) 
+                                             || (hangIntRegRead & PLC_SOUND_HANG))              // if other flag is set 
+             -then reset whole PLC
+                    {
+                      plc_reset_tx();//plc_reset_warm();
+                      FM_Printf(FM_USER,"PLC_warm\n");
+                    }  */
+                  /* WriteU32Reg(PLC_CSMAREGION0_REG, ctorl(0x80CA0000));
+                  WriteU32Reg(PLC_CSMAREGION1_REG, ctorl(0x8D5A0000));
+                  WriteU32Reg(PLC_CSMAREGION2_REG, ctorl(0x8FFF0000));
+                  WriteU32Reg(PLC_CSMAREGION3_REG, ctorl(0x8FFF0000));
+                  WriteU32Reg(PLC_CSMAREGION4_REG, ctorl(0x8FFF0000));
+                  WriteU32Reg(PLC_CSMAREGION5_REG, ctorl(0x8FFF0000));*/
+                  //printf("\n intr after2= %lu\n",hangIntRegRead);
+                  
+                  
+              
+              }
+              #endif
+1120          
+1121          #ifdef HPGP_HAL_TEST
+1122          #ifdef _TIMER_INTERRUPT_
+1123          void timer_handler (void) using 2// interrupt 1
+1124          {
+1125   1      //    uInterruptReg intStatusRd;
+1126   1      //    uInterruptReg intStatusWr;
+1127   1      
+1128   1          // Reload Timer register
+1129   1       //   TH0 = HYBRII_MSTIMER25MHZ_HI;
+1130   1       //   TL0 = HYBRII_MSTIMER25MHZ_LO;
+1131   1      
+1132   1          
+1133   1          
+1134   1          // Increment timer count
+1135   1          CHAL_IncTimerIntCnt();
+1136   1          gtimer2++;
+1137   1          gtimer1++;
+1138   1          // Timer Interrupts
+1139   1        //  if((gHpgpHalCB.syncComplete) &&(gtimer2 > gsyncTimeout))
+1140   1      //    HHAL_BcnRxTimeoutIntHandler();
+1141   1      }
+1142          #endif
+1143          /*
+1144          #ifdef HPGP_HAL_TEST
+1145          extern  void CHAL_Tim1Isr(void) interrupt 3
+1146          {
+1147              //u32  intStatus;
+1148              uInterruptReg intStatus;
+1149          
+1150              // Read interrupt status.
+1151              intStatus.reg = ReadU32Reg(CPU_INTSTATUS_REG);
+1152          }
+1153          
+1154          void CHAL_Ext0Isr(void) interrupt 0
+1155          {
+1156              gHalCB.extIntCnt++;
+1157          }
+1158          
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 20  
+
+1159          #endif */
+1160          #if CPU_TXQ_POLL
+              
+              eStatus CHAL_PollAndRcvCPUTxQ()
+              {
+                  u8 frmsCnt;
+                  u8 descCnt;
+                  eStatus status;
+              
+                  status = STATUS_FAILURE;  
+                  frmsCnt = CHAL_GetCPUTxQFrmCount();
+              
+                  if(frmsCnt)
+                  {
+                      status = STATUS_SUCCESS;
+                      CHAL_CpuTxQNemptyIntHandler();
+                  }
+                  return status;    
+              }
+              
+              #endif
+1180          
+1181          u8 CHT_Poll() 
+1182          { 
+1183   1      #if INT_POLL
+1184   1      #ifdef RTX51_TINY_OS
+1185   1          os_switch_task();
+1186   1      #else
+                  ISM_PollInt();
+              #endif
+1189   1      #elif CPU_TXQ_POLL
+                  CHAL_PollAndRcvCPUTxQ();
+              #endif
+1192   1          return poll_key();
+1193   1      }
+1194          
+1195          #else /* HPGP_HAL_TEST */
+              
+              extern u8 HHAL_IsSnidMatched (sHaLayer *hal, uRxCpDesc *rxCpDesc);
+              
+              #if 0
+              eStatus CHAL_ProcRxFrameDesc(sHaLayer *hal, sSwFrmDesc *rxFrmSwDesc)
+              {
+              
+                  uRxFrmHwDesc     rxFrmHwDesc;
+                  uRxCpDesc        rxCpDesc;
+                  u16              frmLen;
+                  u8               firstDesc = 0;
+                  u8               lastDescLen;
+                  u8               descCnt;
+                  eStatus          ret = STATUS_SUCCESS;
+              #ifdef P8051
+                  u16  th0;
+                  u16  tl0;
+                  u16  timer;
+              #endif
+              
+                  /* Always expect a firstdescriptor here 
+                   * else error case
+                   */
+              
+                  /* 1. Read first descriptor and check SrcPort */
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 21  
+
+                  rxFrmHwDesc.reg = ReadU32Reg(CPU_TXQDESC_REG);
+              
+              #ifdef P8051
+                  th0 = TH0;
+                  tl0 = TL0;
+                  timer = ((th0 << 8)& 0xFF00) | tl0 ;
+                  //FM_Printf(FM_LINFO,"CHAL_CpuTxQIntHandler: time  = %u\n", timer);
+              #endif
+                  FM_Printf(FM_LINFO,"CHAL_CpuTxQIntHandler: HdrDesc  = 0x%08lX\n", rtocl(rxFrmHwDesc.reg));
+                  if(!rxFrmHwDesc.gnl.bLastDesc)
+                  {
+                      /* the Rx frame is ready */
+                      /* decode the common fields for all frame descriptor formats */
+                      rxFrmSwDesc->rxPort = rxFrmHwDesc.gnl.srcPort;
+                      frmLen = rxFrmHwDesc.gnl.frmLenHi;
+                      frmLen = (frmLen << PKTQDESC1_FRMLENHI_POS) | rxFrmHwDesc.gnl.frmLenLo;
+                      rxFrmSwDesc->frmLen = frmLen;
+                      rxFrmSwDesc->frmType = rxFrmHwDesc.gnl.frmType;
+              
+                      /* decode the fields based on frame descriptor format */
+                      switch(rxFrmSwDesc->rxPort)
+                      {
+                          case PORT_PLC:
+                          {
+                              /* HPGP */
+                              HHAL_ProcRxFrameDesc(hal, &rxFrmHwDesc, rxFrmSwDesc);
+                          }
+                          default:
+                          {
+                              /* do nothing at present */
+                          }
+                      }
+              
+                      /* number of descriptors for the frame */
+                      descCnt=CHAL_GetCPUTxQDescCount();
+                      rxFrmSwDesc->cpCnt = 0;
+                  
+                      /* regardless of any error, always read all CPs for the frame */
+                      /* read the first CP descriptor */
+                      rxCpDesc.reg  = ReadU32Reg(CPU_TXQDESC_REG);
+                      firstDesc = rxCpDesc.gnl.firstDesc;
+              
+                      FM_Printf(FM_LINFO,"CHAL_CpuTxQIntHandler: CPDesc[0]  = 0x%08lX\n", 
+                                rtocl(rxCpDesc.reg));
+              
+                      /* read CPs in the middle */
+                      while((!rxCpDesc.gnl.lastDesc) && 
+                            (rxFrmSwDesc->cpCnt < HYBRII_CPPERFRMCOUNT_MAX))
+                      {
+                          if (rxFrmSwDesc->rxPort == PORT_PLC)
+                          {
+                              /* check snid */
+                              if (HHAL_IsSnidMatched(hal, &rxCpDesc) == STATUS_SUCCESS) 
+                              {
+                                  ret = STATUS_FAILURE;
+                                  /* it is not for my network */
+                                  FM_Printf(FM_ERROR,"CHAL: SNID is not matched.\n");
+                              }
+                          } 
+              
+                          /* store Cell Pointer & increment count */
+                          rxFrmSwDesc->cpDesc[rxFrmSwDesc->cpCnt++].cp = rxCpDesc.gnl.cp;
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 22  
+
+              
+                          /* read next descriptor */
+                          rxCpDesc.reg  = ReadU32Reg(CPU_TXQDESC_REG);
+              
+                          FM_Printf(FM_LINFO,"CHAL_CpuTxQIntHandler: CPDesc[%b]  = 0x%08lX\n",
+                                    rxFrmSwDesc->cpCnt-1, rtocl(rxCpDesc.reg));
+                      }
+              
+                      /* store the last CP */
+                      if (rxCpDesc.gnl.lastDesc && 
+                          (rxFrmSwDesc->cpCnt < HYBRII_CPPERFRMCOUNT_MAX))
+                      {          
+                          if (HHAL_IsSnidMatched(hal, &rxCpDesc) == STATUS_SUCCESS) 
+                          {
+                              ret = STATUS_FAILURE;
+                              /* it is not for my network */
+                              FM_Printf(FM_ERROR,"CHAL: SNID is not matched.\n");
+                          }
+                          rxFrmSwDesc->cpDesc[rxFrmSwDesc->cpCnt++].cp = rxCpDesc.gnl.cp;
+                      } 
+                      else
+                      {
+                          FM_Printf(FM_ERROR,"CHAL: CP buffer size is too small.\n");
+                          ret = STATUS_FAILURE;
+                      }
+                      /* save the last desc len */
+                      lastDescLen = rxCpDesc.gnl.descLenHi;
+                      lastDescLen = (lastDescLen << PKTQDESCCP_DESCLENHI_POS)| 
+                                     rxCpDesc.gnl.descLenLo;
+                      rxFrmSwDesc->lastDescLen = lastDescLen;
+              
+                      /* check error cases */
+                      if ((rxFrmSwDesc->cpCnt != descCnt) ||  /* case 1 */
+                          !firstDesc ||                       /* case 2 */
+                          !rxFrmHwDesc.gnl.bFirstDesc ||      /* case 3 */
+                          (ret == STATUS_FAILURE))            /* case 4 */
+                      {
+                          /* case 1: Validate the CP number
+                           *     the cp number given in the frame descriptor is not 
+                           *     matched with the number of CPs recevied from the CP queue  
+                           * case 2: Validate the first CP
+                           *     the first CP descriptor in the CP queue is not
+                           *     the first CP descriptor of a frame
+                           * case 3: Validate the first/last CP flag
+                           *     the first descriptor flag is not set for the frame,
+                           *     but the last descriptor flag is set for the frame.
+                           * case 4: Validate the SNID
+                           *     SNID for the Rx frame is not matched with my network 
+                     *     or CP buffer is small
+                           */
+                          /* thus release all CPs */
+                          CHAL_FreeFrameCp(rxFrmSwDesc->cpDesc, rxFrmSwDesc->cpCnt);
+                          FM_Printf(FM_ERROR,"CHAL: the Rx frame is not completed.\n");
+                          ret = STATUS_FAILURE;
+                      }
+              
+                  }
+                  else 
+                  {
+                      /* the last descriptor flag is not set for the frame.
+                       * thus, the Rx frame is not ready yet and
+                       * wait until the next interrupt 
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 23  
+
+                       */
+                      ret = STATUS_FAILURE;
+                  } 
+                  return ret;
+              }
+              
+              eStatus CHAL_GetCpforTxFrame(sHaLayer *hal, sTxFrmSwDesc *txFrmSwDesc)
+              {
+                  u8 numCps = 0;
+                  
+                  /* determine the number of cps required based on the frame length */
+                  numCps = txFrmSwDesc->frmLen / HYBRII_CELLBUF_SIZE;
+                  numCps += ((txFrmSwDesc->frmLen == numCps*HYBRII_CELLBUF_SIZE) ? 0: 1);
+                  
+                  /* get the cell point resource for the tx frame */
+                  if ((numCps <= HYBRII_CPPERFRMCOUNT_MAX) &&
+                      (CHAL_AllocFrameCp(txFrmSwDesc->cpArr, numCps) == STATUS_SUCCESS))
+                  {
+                      txFrmSwDesc->cpCount = numCps; 
+                      return STATUS_SUCCESS;
+                  }
+               
+                  return STATUS_FAILURE;
+              }
+                   
+              eStatus CHAL_WriteFrame(sHaLayer *hal, 
+                                      sTxFrmSwDesc *txFrmSwDesc, 
+                                      sBuffDesc *buffdesc)
+              {
+                  s16 resLen = buffdesc->datalen;
+                  u8  numCps = txFrmSwDesc->cpCount;
+                  u16 cellLen = 0;
+                  u8  i = 0;
+                  u8  *dataptr = buffdesc->dataptr;
+                  volatile u8 XDATA *cellBlk = NULL;
+                  sCpSwDesc *cpDesc = NULL;
+              
+              
+                  while ((resLen > 0) && (i < numCps))
+                  {
+                      cpDesc = &txFrmSwDesc->cpArr[i];
+                      cellBlk = CHAL_GetAccessToCP(cpDesc->cp);
+                      cellLen = MIN(HYBRII_CELLBUF_SIZE, resLen);
+                      memcpy (cellBlk, dataptr, cellLen);
+                      cpDesc->offsetU32 = 0; 
+                      cpDesc->len = (u8)cellLen; 
+                      dataptr += cellLen;
+                      resLen -= cellLen;
+                      i++;
+                  }
+              
+                  if ((resLen > 0) && (i >= numCps))
+                  {
+                      FM_Printf(FM_ERROR, "CHAL: frame len and cp number mismatch.\n");
+                  }
+                  return STATUS_SUCCESS;
+              }
+              #endif // 0
+              #endif /* HPGP_HAL_TEST */
+1404          
+1405          eStatus CHAL_freeCP(u8 cp)
+1406          {
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 24  
+
+1407   1          uCpuCPReg cpuCPReg;
+1408   1        u8 i;
+1409   1          u8 intFlag;
+1410   1        intFlag = EA;
+1411   1      #ifdef UART_HOST_INTF
+                EA = 0;
+              #endif
+1414   1          cpuCPReg.reg = 0;
+1415   1          cpuCPReg.s.cp = cp;
+1416   1      
+1417   1          WriteU32Reg(CPU_WRITECP_REG, cpuCPReg.reg); 
+1418   1      
+1419   1        for (i = 0; i < ARBITOR_REQ_MAX_TIMES; i++)
+1420   1        {
+1421   2      //        CHAL_DelayTicks(10);  // give HW a chance to grant the freeing of a CP
+1422   2            cpuCPReg.reg = ReadU32Reg(CPU_WRITECP_REG);
+1423   2      
+1424   2            if(cpuCPReg.s.cpValid)
+1425   2            {
+1426   3      #ifdef ETH_BRDG_DEBUG
+                      if (myDebugFlag1)
+                      printf("CHAL_freeCP: cp %bu succeeded\n", cp);
+              #endif
+1430   3      #ifdef UART_HOST_INTF
+                      EA = intFlag;
+              #endif
+1433   3              return(STATUS_SUCCESS);
+1434   3            }
+1435   2        }
+1436   1      
+1437   1      #ifdef ETH_BRDG_DEBUG
+                  if (myDebugFlag1)
+                  printf("CHAL_freeCP: cp %bu failed\n", cp);
+              #endif
+1441   1      #ifdef UART_HOST_INTF
+                  EA = intFlag;
+              #endif
+1444   1          return(STATUS_FAILURE);
+1445   1      }
+1446          
+1447          /*******************************************************************
+1448          * NAME :            CHAL_GetCellPointer
+1449          *
+1450          * DESCRIPTION :     Returns a free Cell Pointer, that caller module 
+1451          *                   can use to fill data/command frame contents in.
+1452          *
+1453          * INPUTS :
+1454          *       PARAMETERS:
+1455          *           None
+1456          *
+1457          * OUTPUTS :
+1458          *       PARAMETERS:
+1459          *           u8* pCp        Pointer to which CP value 
+1460          *                         is to be copied.
+1461          *
+1462          *       RETURN :
+1463          *            Type:   eStatus
+1464          *            Values: STATUS_SUCCESS, if Free CP obtained.
+1465          *                    STATUS_FAILURE, otherwise.
+1466          */
+1467          eStatus CHAL_RequestCP(u8* pCp)
+1468          {
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 25  
+
+1469   1          uCpuCPReg cpuCPReg;
+1470   1        u8 i;
+1471   1        u8 intFlag;
+1472   1        intFlag = EA;
+1473   1      #ifdef UART_HOST_INTF
+                EA = 0;
+              #endif
+1476   1        // return if there's no free CP
+1477   1        if (CHAL_GetFreeCPCnt() == 0)
+1478   1        {
+1479   2          EA = intFlag;
+1480   2              return(STATUS_FAILURE);
+1481   2        }
+1482   1      
+1483   1        // Allocate a CP. If no more free CP, HW returns 0xFF
+1484   1        // If HW grants access to CP module, it will return a CP index
+1485   1        // and set the cpValid bit to 1, if it does not grant access
+1486   1        // to the CP module, the cpValid bit will be set to 0, in
+1487   1        // which case we'll need to poll for this bit until it's
+1488   1        // set to 1 or we time out.
+1489   1        for (i = 0; i < ARBITOR_REQ_MAX_TIMES; i++)
+1490   1        {
+1491   2            cpuCPReg.reg = ReadU32Reg(CPU_REQUESTCP_REG);
+1492   2      
+1493   2            if(cpuCPReg.s.cp == 0xFF)
+1494   2            {
+1495   3            // no more free CP
+1496   3            // set bit 31 to relinquish the grant request
+1497   3            // and then return error
+1498   3      #ifdef ETH_BRDG_DEBUG
+                      if (myDebugFlag1)
+                      printf("CHAL_ReqCP: no more free CP. Return err\n");
+              #endif
+1502   3            break;
+1503   3            }
+1504   2      
+1505   2          if(cpuCPReg.s.cpValid)
+1506   2            {
+1507   3            // alloc CP is valid
+1508   3                *pCp = (u8) cpuCPReg.s.cp;
+1509   3      #ifdef ETH_BRDG_DEBUG
+                      if (myDebugFlag1)
+                      printf("CHAL_ReqCP: alloc cp %bu success\n", cpuCPReg.s.cp);
+              #endif
+1513   3      #ifdef UART_HOST_INTF
+                    EA = intFlag;
+              #endif
+1516   3              return(STATUS_SUCCESS);
+1517   3            }
+1518   2      
+1519   2              CHAL_DelayTicks(10);  // give HW a chance to grant a CP
+1520   2        }
+1521   1      
+1522   1      #ifdef ETH_BRDG_DEBUG
+                  if (myDebugFlag1)
+                  printf("CHAL_RequestCP: alloc cp fail\n");
+              #endif
+1526   1      
+1527   1        // Cannot access to CP module. Write 1 to bit 31 to tell HW we're 
+1528   1        // relinquishing the CP alloc request
+1529   1          cpuCPReg.reg = 0;
+1530   1          cpuCPReg.s.cpValid = 1;
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 26  
+
+1531   1          WriteU32Reg(CPU_REQUESTCP_REG, cpuCPReg.reg);
+1532   1         
+1533   1        gHalCB.cp_no_grant_alloc_cp++;
+1534   1      #ifdef UART_HOST_INTF
+                EA = intFlag;
+              #endif
+1537   1          return(STATUS_FAILURE);
+1538   1      }
+1539          
+1540          
+1541          /*******************************************************************
+1542          * NAME :            CHAL_DecrementReleaseCPCnt
+1543          *
+1544          * DESCRIPTION :     Decrements the CP Usage count for a given CP, 
+1545          *                   following which HW will release CP if count has reached Zero.
+1546          *
+1547          * INPUTS :
+1548          *       PARAMETERS:
+1549          *           u8 cp    CP to be released/relinquished.
+1550          *
+1551          * OUTPUTS :
+1552          *       PARAMETERS:
+1553          *           None
+1554          *
+1555          *       RETURN :
+1556          *           None
+1557          */
+1558          void  CHAL_DecrementReleaseCPCnt(u8 cp) //reentrant
+1559          {
+1560   1        if (CHAL_freeCP(cp) == STATUS_FAILURE)
+1561   1          gHalCB.cp_no_grant_free_cp++; 
+1562   1      }
+1563          
+1564          
+1565          /**
+1566           * NAME :            CHAL_FreeFrameCp
+1567           *
+1568           * DESCRIPTION :     
+1569           *       Decrements the CP Usage count for an array of CPs, 
+1570           *       following which HW will release CP if count has reached Zero.
+1571           *
+1572           * INPUTS :
+1573           *       PARAMETERS:
+1574           *           u8 *cp    array of CPs to be released/relinquished.
+1575           *           u8 numCp  size of array
+1576           *
+1577           * OUTPUTS :
+1578           *       PARAMETERS:
+1579           *           None
+1580           *
+1581           *       RETURN 
+1582           *           None
+1583           */
+1584          
+1585          void CHAL_FreeFrameCp(sCpSwDesc *cpDesc, u8 numCp) __REENTRANT__
+1586          {
+1587   1          u8 i;
+1588   1        u8 intFlag;
+1589   1        intFlag = EA;
+1590   1      #ifdef UART_HOST_INTF
+                EA = 0;
+              #endif
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 27  
+
+1593   1      
+1594   1          for (i = 0; i < numCp; i++)
+1595   1          {
+1596   2          CHAL_DecrementReleaseCPCnt(cpDesc[i].cp);
+1597   2          }
+1598   1      #ifdef UART_HOST_INTF
+                EA = intFlag;
+              #endif
+1601   1      }
+1602          
+1603          
+1604          void hal_common_free_frame (sCommonRxFrmSwDesc *rx_frame_info_p)
+1605          {
+1606   1          u8 cp_idx;
+1607   1      
+1608   1          for (cp_idx = 0; cp_idx < rx_frame_info_p->cpCount; cp_idx++) {
+1609   2              CHAL_DecrementReleaseCPCnt(rx_frame_info_p->cpArr[cp_idx]);
+1610   2          }
+1611   1      }
+1612          
+1613          
+1614          
+1615          void hal_common_reg_8_bit_set (u16 addr, u8 dat8)
+1616          {
+1617   1          u8 value;
+1618   1      
+1619   1          value = ReadU8Reg(addr);
+1620   1          value |= dat8;
+1621   1          WriteU8Reg(addr, value);
+1622   1      }
+1623          
+1624          void hal_common_reg_8_bit_clear (u16 addr, u8 dat8)
+1625          {
+1626   1          u8 value;
+1627   1      
+1628   1          value = ReadU8Reg(addr);
+1629   1      
+1630   1          value &= ~dat8;
+1631   1          WriteU8Reg(addr, value);
+1632   1      }
+1633          
+1634          tinybool hal_common_reg_8_bit_test (u16 addr, u8 dat8)
+1635          {
+1636   1          u8 value;
+1637   1      
+1638   1          value = ReadU8Reg(addr);
+1639   1          if (value & dat8) {
+1640   2              return (true);
+1641   2          } else {
+1642   2              return (false);
+1643   2          }
+1644   1      }
+1645          
+1646          u16 hal_common_reg_16_read (u32 reg_addr)
+1647          {
+1648   1          volatile u16 xdata value_16;
+1649   1      
+1650   1          value_16 = ReadU16Reg(reg_addr);
+1651   1      
+1652   1          return (RTOCS(value_16));
+1653   1      }
+1654          
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 28  
+
+1655          void hal_common_reg_16_write (u32 addr, u16 dat16)
+1656          {
+1657   1          u16 xdata dat = dat16;
+1658   1      
+1659   1          dat = CTORS(dat16);
+1660   1          WriteU16Reg(addr, dat);
+1661   1      }
+1662          
+1663          u32 hal_common_reg_32_read (u32 reg_addr)
+1664          {
+1665   1          volatile u32 xdata value_32;
+1666   1          reg32 r32;
+1667   1          reg32 xdata rr32;
+1668   1      
+1669   1          value_32 = ReadU32Reg(reg_addr);
+1670   1          r32.w = value_32;
+1671   1          rr32.s.b1 = r32.s.b4;
+1672   1          rr32.s.b2 = r32.s.b3;
+1673   1          rr32.s.b3 = r32.s.b2;
+1674   1          rr32.s.b4 = r32.s.b1;
+1675   1          return rr32.w;
+1676   1      //    return (RTOCL(value_32));
+1677   1      }
+1678          
+1679          void hal_common_reg_32_write (u32 addr, u32 dat32)
+1680          {
+1681   1         // u32 xdata dat = dat32;
+1682   1          reg32 r32;
+1683   1          reg32 xdata rr32;
+1684   1      
+1685   1          //dat = CTORL(dat32);
+1686   1          r32.w = dat32;
+1687   1          rr32.s.b1 = r32.s.b4;
+1688   1          rr32.s.b2 = r32.s.b3;
+1689   1          rr32.s.b3 = r32.s.b2;
+1690   1          rr32.s.b4 = r32.s.b1;
+1691   1          WriteU32Reg(addr, rr32.w);
+1692   1          //WriteU32Reg(addr, dat);
+1693   1      }
+1694          
+1695          void hal_common_reg_bit_set (u32 addr, u32 dat32)
+1696          {
+1697   1          u32 value;
+1698   1      
+1699   1          value = hal_common_reg_32_read(addr);
+1700   1          value |= dat32;
+1701   1          hal_common_reg_32_write(addr, value);
+1702   1      }
+1703          
+1704          void hal_common_reg_bit_clear (u32 addr, u32 dat32)
+1705          {
+1706   1          u32 value;
+1707   1      
+1708   1          value = hal_common_reg_32_read(addr);
+1709   1      
+1710   1          value &= ~dat32;
+1711   1          hal_common_reg_32_write(addr, value);
+1712   1      }
+1713          
+1714          tinybool hal_common_reg_bit_test (u32 addr, u32 dat32)
+1715          {
+1716   1          u32 value;
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 29  
+
+1717   1      
+1718   1          value = hal_common_reg_32_read(addr);
+1719   1          if (value & dat32) {
+1720   2              return (true);
+1721   2          } else {
+1722   2              return (false);
+1723   2          }
+1724   1      }
+1725          
+1726          u32 hal_common_bit_field_reg_read (u32 addr, u32 mask, u16 pos)
+1727          {
+1728   1          u32 value;
+1729   1      
+1730   1          value = hal_common_reg_32_read(addr);
+1731   1          value &= mask;
+1732   1          value >>= pos;
+1733   1      
+1734   1          return (value);
+1735   1      }
+1736          
+1737          void hal_common_bit_field_reg_write (u32 addr, u32 mask, u16 pos, u32 value)
+1738          {
+1739   1          u32 current_value;
+1740   1      
+1741   1          current_value = hal_common_reg_32_read(addr);
+1742   1          current_value &= ~mask;
+1743   1          value <<= pos;
+1744   1          value &= mask;
+1745   1          value |= current_value;
+1746   1          hal_common_reg_32_write(addr, value);
+1747   1      }
+1748          
+1749          u32 hal_common_bit_field_get (u32 value, u32 field_mask, u8 field_pos)
+1750          {
+1751   1          // mask the field
+1752   1          value &= field_mask;
+1753   1      
+1754   1          // right shift the masked value
+1755   1          value >>= field_pos;
+1756   1      
+1757   1          return value;
+1758   1      }
+1759          
+1760          void hal_common_bit_field_set (u32 *value_p, u32 field_mask, u8 field_pos,
+1761                                         u32 field_val)
+1762          {
+1763   1          // left shift fieldVal var
+1764   1          field_val <<= field_pos;
+1765   1          // mask the shifted value
+1766   1          field_val &= field_mask;
+1767   1          // clear field in reg val
+1768   1          *value_p  &= ~field_mask;
+1769   1          // write field to reg val
+1770   1          *value_p  |= field_val;
+1771   1      }
+1772          
+1773          void CHAL_DelayTicks(u32 num12Clks) //reentrant
+1774          {
+1775   1      #ifdef P8051
+1776   1          u8 curTick;
+1777   1          do
+1778   1          {
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 30  
+
+1779   2              curTick = TL0;
+1780   2              while(curTick == TL0);
+1781   2          }while(num12Clks--);
+1782   1      #endif
+1783   1      }
+1784          
+1785          #ifdef MEM_PROTECTION
+              eStatus CP_Read_Arb(u8 cp, u8 offset, u32 *tmpBfr, u8 burst_size)
+              {
+                uCpu_Mem_Arb_Req cpuMemArbReg;
+                u8 i; 
+                u8 * tmp1Bfr = (u8 *) tmpBfr;
+              
+              #ifdef ETH_BRDG_DEBUG
+                if (myDebugFlag1)
+                  printf("CP_Read_Arb: cp=%bu, offset=%bu, tmpbfr[0]=%bu, burst_sz=%bu\n", cp, offset, tmp1Bfr[0], burst_s
+             -ize);
+              #endif
+                // request a CP read
+                cpuMemArbReg.reg = 0;
+                cpuMemArbReg.s.cp_rd_wr_offset = offset;
+                cpuMemArbReg.s.cp_rd_wr_cp_hi = (cp & 0x78) >> 3; // upper 4 bits go to cp_hi
+                cpuMemArbReg.s.cp_rd_wr_cp_lo = cp & 0x7; // lower 3 bits go to cp_lo
+                cpuMemArbReg.s.cp_rd_wr_req = 1;  // read request
+                cpuMemArbReg.s.cp_burst_size = burst_size;
+                  WriteU32Reg(CPU_MEM_ARB_REQ, cpuMemArbReg.reg);
+              
+                // Check read grant
+                for (i = 0; i < ARBITOR_REQ_MAX_TIMES; i++)
+                {
+                    cpuMemArbReg.reg = ReadU32Reg(CPU_MEM_ARB_REQ);
+              
+                    if(cpuMemArbReg.s.cp_rd_wr_grant)
+                    {
+              #ifdef ETH_BRDG_DEBUG
+                      if (myDebugFlag1)
+                      printf("Read_CP: grant\n");
+              #endif
+                    break;
+                    }
+                }
+              
+                if (i == ARBITOR_REQ_MAX_TIMES)
+                {
+              #ifdef ETH_BRDG_DEBUG
+                    if (myDebugFlag1)
+                    printf("Read_CP: no grant, offset=%bu, return\n", offset);
+              #endif
+                    gHalCB.cp_no_grant_read_cp++;
+                    return(STATUS_FAILURE);
+                }
+              
+                // read data
+                for (i = 0; i < burst_size; i++)
+                {
+                    tmpBfr[i] = ReadU32Reg(CPU_MEM_ARB_DATA);
+                }
+              
+                  return(STATUS_SUCCESS);
+              }
+                
+              eStatus CP_Write_Arb(u8 cp, u8 offset, u32 *tmpBfr, u8 burst_size)
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 31  
+
+              {
+                uCpu_Mem_Arb_Req cpuMemArbReg;
+                u8 i; 
+                u8 * tmp1Bfr = (u8 *) tmpBfr;
+              
+              #ifdef ETH_BRDG_DEBUG
+                if (myDebugFlag1)
+                  printf("CP_Write_Arb: cp=%bu, offset=%bu, tmpbfr[0]=%bu, burst_sz=%bu\n", cp, offset, tmp1Bfr[0], burst_
+             -size);
+              #endif
+                // request a CP write
+                cpuMemArbReg.reg = 0;
+                cpuMemArbReg.s.cp_rd_wr_offset = offset;
+                cpuMemArbReg.s.cp_rd_wr_cp_hi = (cp & 0x78) >> 3; // upper 4 bits go to cp_hi
+                cpuMemArbReg.s.cp_rd_wr_cp_lo = cp & 0x7; // lower 3 bits go to cp_lo
+                cpuMemArbReg.s.cp_rd_wr_req = 0;  // write request
+                cpuMemArbReg.s.cp_burst_size = burst_size;
+              #ifdef ETH_BRDG_DEBUG
+                if (myDebugFlag1)
+                  printf("CP_Write_Arb: cpuMemArbReg.reg=0x%lX, cp_rd_wr_offset=0x%bx,cp_rd_wr_cp_lo=0x%bx, cp_rd_wr_cp_hi
+             -=0x%bx\n", 
+                    cpuMemArbReg.reg, cpuMemArbReg.s.cp_rd_wr_offset, cpuMemArbReg.s.cp_rd_wr_cp_lo, cpuMemArbReg.s.cp_rd_w
+             -r_cp_hi);
+              #endif
+                  WriteU32Reg(CPU_MEM_ARB_REQ, cpuMemArbReg.reg);
+              
+                // write data
+                for (i = 0; i < burst_size; i++)
+                {
+                    WriteU32Reg(CPU_MEM_ARB_DATA, tmpBfr[i]);
+                }
+              
+                // Check write grant
+                for (i = 0; i < ARBITOR_REQ_MAX_TIMES; i++)
+                {
+                    cpuMemArbReg.reg = ReadU32Reg(CPU_MEM_ARB_REQ);
+              
+                    if(cpuMemArbReg.s.cp_rd_wr_grant)
+                    {
+              #ifdef ETH_BRDG_DEBUG
+                      if (myDebugFlag1)
+                      printf("Write_CP: succeeded, offset=0x%bx\n", offset);
+              #endif
+                      return(STATUS_SUCCESS);
+                    }
+                }
+              
+              #ifdef ETH_BRDG_DEBUG
+                  if (myDebugFlag1)
+                  printf("Write_CP: not granted, offset=0x%bx\n", offset);
+              #endif
+                  gHalCB.cp_no_grant_write_cp++;
+                  return(STATUS_FAILURE);
+              }
+                
+              eStatus HHAL_CP_Write_Arb(u8 cp, u8 offset, u8 *dataBfr, u8 bufLen)
+              {
+                u8 i, wr_cnt;
+                u8 burst_size = MAX_CP_BURST_SIZE;
+                u32 *tmpBfr = (u32 *)dataBfr;
+              
+                // skip the error checks for now to speed up the process
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 32  
+
+              #ifdef DO_CHECKING
+                if ((bufLen <= 0) || (bufLen <= (offset*BYTES_PER_DDWORD)) ||
+                  (bufLen > (HYBRII_CELLBUF_SIZE-(offset*BYTES_PER_DDWORD))))
+                {
+                    if (myDebugFlag1)
+                    printf("HHAL_CP_Write_Arb: Invalid bufLen: %bu, return\n", bufLen);
+                    return(STATUS_FAILURE);
+                }
+              
+                if ((offset < 0) || (offset >= (HYBRII_CELLBUF_SIZE/BYTES_PER_DDWORD)))
+                {
+                    if (myDebugFlag1)
+                    printf("HHAL_CP_Write_Arb: Invalid offset: %bu, return\n", offset);
+                    return(STATUS_FAILURE);
+                }
+              
+                if ((cp < 0) || (cp >= HYBRII_CPCOUNT_MAX))
+                {
+                    if (myDebugFlag1)
+                    printf("HHAL_CP_Write_Arb: Invalid cp: %bu, return\n", cp);
+                    return(STATUS_FAILURE);
+                }
+              #endif
+              
+                // This while loop writes as many burst_size times as possible.
+                // And when there's not enough data left for burst_size, it
+                // decrements burst_size and continues to write until
+                // the last write is less than 4 bytes (1 DWORD = 4 bytes)
+                while (bufLen)
+                {
+                  if (burst_size)
+                  {
+                    wr_cnt = bufLen / (burst_size*BYTES_PER_DDWORD);// each write = 1-4 DWORD = 4-16 bytes
+                    if (wr_cnt)
+                    {
+                      bufLen -= wr_cnt*burst_size*BYTES_PER_DDWORD;
+                    }
+                    else
+                    {
+                      burst_size--;
+                    }
+                  }
+                  else
+                  {
+                    // this is the last write whose len is 4 bytes (minimum len for a write is 4 bytes)
+                    wr_cnt = 1;
+                    bufLen = 0;
+                    burst_size = 1;
+                  }
+              
+                  for (i = 0; i < wr_cnt; i++)
+                  {
+              #ifdef ETH_BRDG_DEBUG
+                      if (myDebugFlag1)
+                      printf("before calling CP_Wr_Arb: i=%bu, wr_cnt=%bu, burst_size=%bu\n",i,wr_cnt, burst_size);
+              #endif 
+                    if (CP_Write_Arb(cp, offset, tmpBfr, burst_size) == STATUS_FAILURE)
+                    {
+                      return(STATUS_FAILURE);
+                    }
+                    offset += burst_size;
+                    tmpBfr += burst_size;
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 33  
+
+                  }
+                }
+              
+                return(STATUS_SUCCESS);
+              }
+                
+              eStatus HHAL_CP_Read_Arb(u8 cp, u8 offset, u8 *dataBfr, u8 bufLen)
+              {
+                u8 i, rd_cnt;
+                u8 burst_size = MAX_CP_BURST_SIZE;
+                u32 *tmpBfr = (u32 *)dataBfr;
+              
+                // skip the error checks for now to speed up the process
+              #ifdef DO_CHECKING
+                if ((bufLen <= 0) || (bufLen <= (offset*BYTES_PER_DDWORD)) ||
+                  (bufLen > (HYBRII_CELLBUF_SIZE-(offset*BYTES_PER_DDWORD))))
+                {
+                    if (myDebugFlag1)
+                    printf("HHAL_CP_Read_Arb: Invalid bufLen: %bu, return\n", bufLen);
+                    return(STATUS_FAILURE);
+                }
+              
+                if ((offset < 0) || (offset >= (HYBRII_CELLBUF_SIZE/BYTES_PER_DDWORD)))
+                {
+                    if (myDebugFlag1)
+                    printf("HHAL_CP_Read_Arb: Invalid offset: %bu, return\n", offset);
+                    return(STATUS_FAILURE);
+                }
+              
+                if ((cp < 0) || (cp >= HYBRII_CPCOUNT_MAX))
+                {
+                    if (myDebugFlag1)
+                    printf("HHAL_CP_Read_Arb: Invalid cp: %bu, return\n", cp);
+                    return(STATUS_FAILURE);
+                }
+              #endif
+              
+                // This while loop reads as many burst_size times as possible.
+                // And when there's not enough data left for burst_size, it
+                // decrements burst_size and continues to read until
+                // the last read is less than 4 bytes (1 DWORD = 4 bytes)
+                while (bufLen)
+                {
+                  if (burst_size)
+                  {
+                    rd_cnt = bufLen / (burst_size*BYTES_PER_DDWORD);// each write = 1-4 DWORD = 4-16 bytes
+                    if (rd_cnt)
+                    {
+                      bufLen -= rd_cnt*burst_size*BYTES_PER_DDWORD;
+                    }
+                    else
+                    {
+                      burst_size--;
+                    }
+                  }
+                  else
+                  {
+                    // this is the last read whose len is 4 bytes (minimum len for a read is 4 bytes)
+                    rd_cnt = 1;
+                    bufLen = 0;
+                    burst_size = 1;
+                  }
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 34  
+
+              
+                  for (i = 0; i < rd_cnt; i++)
+                  {
+                    if (CP_Read_Arb(cp, offset, tmpBfr, burst_size) == STATUS_FAILURE)
+                    {
+                      return(STATUS_FAILURE);
+                    }
+                    offset += burst_size;
+                    tmpBfr += burst_size;
+                  }
+                }
+              
+                return(STATUS_SUCCESS);
+              }
+              
+              eStatus HHAL_CP_Put_Copy(u8 cp, u8 *putBuf, u8 bufLen)
+              {
+                return(HHAL_CP_Write_Arb(cp, 0, putBuf, bufLen));
+              }
+              
+              eStatus HHAL_CP_Get_Copy(u8 cp, u8 *getBuf, u8 bufLen)
+              {
+                return(HHAL_CP_Read_Arb(cp, 0, getBuf, bufLen));
+              }
+              #endif // MEM_PROTECTION
+2048          
+2049          eStatus HHAL_Req_Gnt_Read_CPU_QD()
+2050          {
+2051   1          u16 i;
+2052   1      
+2053   1          uPlc_CpuQD_Wr_Arb_Req Wr_Arb_Req;
+2054   1      
+2055   1          // Set CPUQD_Write_Req
+2056   1          Wr_Arb_Req.reg = 0;
+2057   1          Wr_Arb_Req.s.cpuQDArbReq = 1;
+2058   1          WriteU32Reg(PLC_CPUQDWRITEARB_REG,Wr_Arb_Req.reg);
+2059   1          CHAL_DelayTicks(50);
+2060   1      
+2061   1          //Check if we get a grant
+2062   1          for (i = 0; i < ARBITOR_REQ_MAX_TIMES; i++)
+2063   1          {
+2064   2              Wr_Arb_Req.reg = ReadU32Reg(PLC_CPUQDWRITEARB_REG); 
+2065   2              if (Wr_Arb_Req.s.cpuQDArbGntStat)
+2066   2                  return(STATUS_SUCCESS);
+2067   2              CHAL_DelayTicks(10);
+2068   2          }
+2069   1          gHalCB.qc_no_grant++;
+2070   1          return(STATUS_FAILURE);
+2071   1      }
+2072          
+2073          void HHAL_Rel_Gnt_Read_CPU_QD()
+2074          {
+2075   1          uPlc_CpuQD_Wr_Arb_Req Wr_Arb_Req;
+2076   1      
+2077   1          // Clear CPUQD_Write_Req
+2078   1          Wr_Arb_Req.reg = 0;
+2079   1          WriteU32Reg(PLC_CPUQDWRITEARB_REG,Wr_Arb_Req.reg);
+2080   1      }
+2081          
+2082          #ifdef UM
+              
+              eStatus CHAL_GetCpforTxFrame(sHaLayer *hal, sSwFrmDesc *txFrmSwDesc)
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 35  
+
+              {
+                  u8 numCps = 0;
+                  
+                  /* determine the number of cps required based on the frame length */
+                  numCps = txFrmSwDesc->frmLen / HYBRII_CELLBUF_SIZE;
+                  numCps += ((txFrmSwDesc->frmLen == numCps*HYBRII_CELLBUF_SIZE) ? 0: 1);
+                  
+                  /* get the cell point resource for the tx frame */
+                  if ((numCps <= HYBRII_CPPERFRMCOUNT_MAX) &&
+                      (CHAL_AllocFrameCp(txFrmSwDesc->cpArr, numCps) == STATUS_SUCCESS))
+                  {
+                      txFrmSwDesc->cpCount = numCps; 
+                      return STATUS_SUCCESS;
+                  }
+               
+                  return STATUS_FAILURE;
+              }
+              
+              #endif
+2104          
+2105          void GV701x_GPIO_Config(uint8_t mode, uint32_t gpio)
+2106          {
+2107   1        uint32_t gpioReg;
+2108   1        
+2109   1        gpioReg = hal_common_reg_32_read(CPU_GPIO_REG);
+2110   1        if(mode == WRITE_ONLY)
+2111   1        {
+2112   2          gpioReg &= ~gpio; 
+2113   2        }
+2114   1        else
+2115   1        {
+2116   2          gpioReg |= gpio;
+2117   2        }
+2118   1        hal_common_reg_32_write(CPU_GPIO_REG,gpioReg);
+2119   1      }
+2120          
+2121          void GV701x_GPIO_Write(uint32_t gpio,uint8_t value)
+2122          {
+2123   1        uint32_t gpioReg;
+2124   1        
+2125   1        gpioReg = hal_common_reg_32_read(CPU_GPIO_REG); 
+2126   1        if(value)
+2127   1        {
+2128   2          gpioReg |= gpio;
+2129   2        }
+2130   1        else
+2131   1        {
+2132   2          gpioReg &= ~gpio;
+2133   2        }
+2134   1        hal_common_reg_32_write(CPU_GPIO_REG,gpioReg);
+2135   1      }
+2136          
+2137          u8 GV701x_GPIO_Read(uint32_t gpio)
+2138          {
+2139   1        uint32_t gpioReg;
+2140   1        
+2141   1        gpioReg = hal_common_reg_32_read(CPU_GPIO_REG);
+2142   1        if(gpioReg & gpio)
+2143   1        {
+2144   2          return true;
+2145   2        }
+2146   1        else
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 36  
+
+2147   1        { 
+2148   2          return false;
+2149   2        } 
+2150   1      
+2151   1      }
+2152          
+2153          #ifdef B_ASICPLC
+2154          #ifdef UM
+              
+              ///////////////////////////////////////////////// SPI Param Config Code //////////////////////////////////
+             -/////////////////
+              
+              //static xdata  u8 config_mem[GVTY_FLASH_CONFIG_DATA_MAX];
+              static xdata  u8 config_mem[GVTY_CONFIG_DATA_MAX];
+              
+              eStatus isFlashProfileValid()
+              {
+                u8 i,j;
+                EA = 0;
+                i = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR + FLASH_SIGN_OFFSET));
+                j = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR + FLASH_SIGN_OFFSET +  1));
+                //i = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR + FLASH_SIGN_OFFSET));
+                //j = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR + FLASH_SIGN_OFFSET +  1));
+                EA = 1;
+                if((i == 'G') && (j == 'V'))
+                {   
+                  return STATUS_SUCCESS;
+                }
+                else
+                {
+                  return STATUS_FAILURE;
+                }
+              }
+              eStatus flashRead_config( u8 xdata *dstMemAddr, u16 offset, u16 len)
+              {
+                xdata u8 *lmemAddr = dstMemAddr;
+                u16 count;
+                EA = 0;
+                
+                if(isFlashProfileValid() == STATUS_FAILURE)
+                {
+                  return STATUS_FAILURE;
+                }
+                
+              //  if((len !=0) && ((offset+len)<= (GVTY_FLASH_CONFIG_DATA_MAX - FLASH_SIGN_SIZE)))
+                  if((len !=0) && ((offset+len)<= (GVTY_CONFIG_DATA_MAX - FLASH_SIGN_SIZE)))
+                {
+                  for(count = offset;count < (offset + len);count++)
+                  {
+                    *lmemAddr = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR + count));
+                    lmemAddr++;
+                  }
+                  EA = 1;
+                  return STATUS_SUCCESS;
+                }
+                else
+                {
+                  EA = 1;
+                  return STATUS_FAILURE;
+                }
+              }
+              
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 37  
+
+              eStatus flashWrite_config( u8 xdata *srcMemAddr, u16 offset, u16 len)
+              {
+                
+                u16 count;
+                u16 tempOffset;
+                EA = 0;
+                if(len !=0)
+                {
+                  tempOffset = offset + len;
+                  //for(count = 0;count < GVTY_FLASH_CONFIG_DATA_MAX;count++)
+                  for(count = 0;count < GVTY_CONFIG_DATA_MAX;count++)
+                  {
+                    if( (count < offset) || (count >= (tempOffset)) )
+                    {
+                      config_mem[count] = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR + count));
+                    }
+                    else
+                    {
+                      config_mem[count] = *(srcMemAddr + (count - offset));
+                    }
+                  }
+                  config_mem[GVTY_CONFIG_DATA_MAX - FLASH_SIGN_SIZE] = 'G';
+                  config_mem[GVTY_CONFIG_DATA_MAX - FLASH_SIGN_SIZE + 1] = 'V';
+                  //config_mem[GVTY_FLASH_CONFIG_DATA_MAX - FLASH_SIGN_SIZE] = 'G';
+                  //config_mem[GVTY_FLASH_CONFIG_DATA_MAX - FLASH_SIGN_SIZE + 1] = 'V';   
+              
+                  spiflash_eraseConfigMem();
+                  spiflash_wrsr_unlock((u8)1);
+                  
+                  //for(count=0;count<GVTY_FLASH_CONFIG_DATA_MAX;count++)
+                  for(count=0;count<GVTY_CONFIG_DATA_MAX;count++)
+                  {
+                    spiflash_WriteByte(GVTY_CONFIG_DATA_ADDR + count,config_mem[count]);
+                  }
+                  spiflash_wrsr_unlock(0);
+                  
+                  EA = 1;
+                  return STATUS_SUCCESS;
+                }
+                else
+                {
+                  EA = 1;
+                  return STATUS_FAILURE;
+                }
+              }
+              
+              #ifdef LOG_FLASH
+              
+              void spiflash_eraseLogMem()
+              {
+                u16 i;
+                printf("\n --> Delete Log memory...\n");
+                for(i=273;i<512;i++)
+                {
+                  spiflash_eraseSector(i);
+                  spiflash_wrsr_unlock((u8)0);
+                  printf(".");
+                }
+                
+                printf("Erase done\n");
+              }
+              
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 38  
+
+              eStatus LogToFlash( u8 xdata *srcMemAddr, u16 bId, u16 len)
+              {
+                
+                u16 count;
+                u16 tempOffset;
+                EA = 0;
+                if(len !=0)
+                {
+                  tempOffset = len;
+                  
+                  //eraseBlock(bId);
+                  spiflash_wrsr_unlock((u8)1);
+                  
+                  for(count=0;count<len;count++)
+                  {
+                    spiflash_WriteByte((GVTY_LOG_DATA_ADDR + ((bId*GVTY_LOG_DATA_MAX)+count)),srcMemAddr[count]);
+                  }
+                  spiflash_wrsr_unlock(0);
+                  
+                  EA = 1;
+                  return STATUS_SUCCESS;
+                }
+                else
+                {
+                  EA = 1;
+                  return STATUS_FAILURE;
+                }
+              }
+              
+              xdata u8 lmemAddr[GVTY_LOG_DATA_MAX];
+              
+              eStatus dumpLog()
+              {
+                
+                static u16 count;
+                  static u16 bId;
+                
+                
+                if(*blockId == 0)
+                {
+                  return STATUS_FAILURE;
+                }
+              
+                  for(bId = 0; bId < *blockId; bId++)
+                  {
+                    for(count = 0;count < GVTY_CONFIG_DATA_MAX;count++)
+                    { 
+                      EA = 0;
+                      lmemAddr[count] = spiflash_ReadByte((u32)((GVTY_LOG_DATA_ADDR) + ((bId*GVTY_LOG_DATA_MAX)+count)));
+                    EA = 1;
+                    os_switch_task();
+                    }
+                      FM_HexDump(FM_USER,"Flash Mem Log",lmemAddr,GVTY_LOG_DATA_MAX);
+                  }
+                
+                return STATUS_SUCCESS;
+              }
+              
+              void dumpLogMem()
+              {
+                static u8 mem0,mem1,mem2,mem3;
+                static u16 bId;
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 39  
+
+                static u16 count;
+                static u16 tempAddr;
+                for(bId = 0;bId < 4384;bId++)// 
+                {
+                  tempAddr = bId*GVTY_LOG_DATA_MAX;
+                  mem0 = spiflash_ReadByte((u32)((GVTY_LOG_DATA_ADDR) + ((tempAddr))));
+                  mem1 = spiflash_ReadByte((u32)((GVTY_LOG_DATA_ADDR) + ((tempAddr)+1)));
+                  mem2 = spiflash_ReadByte((u32)((GVTY_LOG_DATA_ADDR) + ((tempAddr)+2)));
+                  mem3 = spiflash_ReadByte((u32)((GVTY_LOG_DATA_ADDR) + ((tempAddr)+3)));
+                  if((mem0 == 0xFF)&&(mem1 == 0xFF)&&(mem2 == 0xFF)&&(mem3 == 0xFF))
+                  {
+                    FM_Printf(FM_USER,"No additional Log Found\n");
+                    break;
+                  }
+                  else
+                  { 
+                    memset(lmemAddr,0x00,GVTY_LOG_DATA_MAX);
+                    for(count = 0;count < GVTY_LOG_DATA_MAX;count++)
+                      {
+                        EA = 0;
+                        lmemAddr[count] = spiflash_ReadByte((u32)((GVTY_LOG_DATA_ADDR) + ((tempAddr)+count)));
+                      EA = 1;
+                      os_switch_task();
+                      }
+                    FM_Printf(FM_USER,"Bank ID %u:\n",bId);
+                        FM_HexDump(FM_USER,"Flash Mem Log",lmemAddr,GVTY_LOG_DATA_MAX);
+                  }
+                }
+              
+              }
+              
+              u16 getLastPageId()
+              {
+                u8 mem0,mem1,mem2,mem3;
+                u16 bId;
+                u16 tempAddr;
+                for(bId = 0;bId < 3500;bId++)// 
+                {
+                  tempAddr = bId*GVTY_LOG_DATA_MAX;
+                  mem0 = spiflash_ReadByte((u32)((GVTY_LOG_DATA_ADDR) + ((tempAddr))));
+                  mem1 = spiflash_ReadByte((u32)((GVTY_LOG_DATA_ADDR) + ((tempAddr)+1)));
+                  mem2 = spiflash_ReadByte((u32)((GVTY_LOG_DATA_ADDR) + ((tempAddr)+2)));
+                  mem3 = spiflash_ReadByte((u32)((GVTY_LOG_DATA_ADDR) + ((tempAddr)+3)));
+                  if((mem0 == 0xFF)&&(mem1 == 0xFF)&&(mem2 == 0xFF)&&(mem3 == 0xFF))
+                  {
+                    return bId;
+                  }
+                  
+                }
+                  return 0xFFFF;
+              
+              }
+              #endif
+              #ifdef NO_HOST
+              eStatus appFlashWrite(u8 *srcMemAddr, u16 len)
+              {
+                if(FLASH_APP_MEM_SIZE >= len)
+                { 
+                  return flashWrite_config(srcMemAddr, FLASH_APP_CONFIG_OFFSET, len);
+                }
+                else
+                {
+C51 COMPILER V9.52.0.0   HAL_COMMON                                                        01/10/2015 21:25:24 PAGE 40  
+
+                  return STATUS_FAILURE;
+                }
+              }
+              
+              eStatus appFlashRead(u8 *dstMemAddr, u16 len)
+              {
+                if(FLASH_APP_MEM_SIZE >= len)
+                { 
+                  return flashRead_config(dstMemAddr, FLASH_APP_CONFIG_OFFSET, len);
+                }
+                else
+                {
+                  return STATUS_FAILURE;
+                }
+              }
+              
+              #endif //NO_HOST
+              #endif //UM
+2412          #endif // B_ASICPLC
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2888    ----
+   CONSTANT SIZE    =    216    ----
+   XDATA SIZE       =    472     351
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

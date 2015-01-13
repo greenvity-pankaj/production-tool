@@ -1,0 +1,486 @@
+C51 COMPILER V9.52.0.0   SYS_CONFIG_DATA_UTILS                                             12/02/2014 14:35:42 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE SYS_CONFIG_DATA_UTILS
+OBJECT MODULE PLACED IN .\obj\sys_config_data_utils.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\..\HybriiB_configuration_rw\src\sys_config_data_utils.c LARGE OMF2 OP
+                    -TIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\c
+                    -rypto;..\..\src\ctrl;..\..\src\hal;..\..\src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\te
+                    -st;..\..\..\project\hal\src;..\..\..\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc
+                    -;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utiliti
+                    -es\timer\inc;..\..\..\..\sampleapp\src;..\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\com
+                    -ponents\hpgp\inc;..\..\..\app_support;..\..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HY
+                    -BRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_S
+                    -AP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,
+                    -UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,PROD_TEST) DEBUG PRINT(.\lst\sys_config_data_utils.lst) TABS(2) OBJECT(.\obj\sys_
+                    -config_data_utils.obj)
+
+line level    source
+
+   1          /*
+   2          * Copyright (c) 2012-2013 Greenvity Communications, Inc.
+   3          * All rights reserved.
+   4          *
+   5          * Author      : Peter Nguyen
+   6          * Release Date: 06/12/2013
+   7          * Desciption : This file contains the utilities to program 
+   8          *              system configuration data into the sflash 
+   9          *              load system configuration to the sram.
+  10          *              The configuration data is an array of 
+  11          *              max 512 bytes of ASCII hex digits end by '$'
+  12          *
+  13          * File name: sys_config_data_utils.c
+  14          */
+  15          
+  16          #include <stdio.h>
+  17          #include <reg51.h>
+  18          #include <stdlib.h>
+  19          #include <ctype.h>
+  20          
+  21          typedef unsigned char U8, u8;
+  22          typedef unsigned long U32, u32;
+  23          typedef unsigned int  U16, u16;
+  24          typedef unsigned short int ui8, UI8;
+  25          
+  26          #define SPIFL_TXSTAT    0x0300
+  27          #define SPIFL_CFG       0x0304
+  28          #define SPIFL_MSBDATABIT_FIRST 0x0305
+  29          #define SPIFL_NOBYTE2TX 0x0306
+  30          #define SPIFL_TXCTRL    0x0308
+  31          #define SPIFL_WRDATA    0x030C
+  32          #define SPIFL_RDDATA  0x030C
+  33          #define SPIFL_WRDATA0   0x030F 
+  34          #define SPIFL_WRDATA1   0x030E 
+  35          #define SPIFL_WRDATA2   0x030D
+  36          #define SPIFL_WRDATA3   0x030C
+  37          #define SPIFL_WRDATA4   0x0307
+  38          
+  39          #define SPIFL_RD         0x03 
+  40          #define SPIFL_SECERASE   0x20000000 
+  41          #define SPIFL_BLKERASE   0x52000000
+  42          #define SPIFL_BLK64ERASE 0xD8000000
+  43          
+  44          #define SPIFL_BYTEPRGRM  0x02000000 
+  45          #define SPIFL_BYTEREAD   0x03000000
+C51 COMPILER V9.52.0.0   SYS_CONFIG_DATA_UTILS                                             12/02/2014 14:35:42 PAGE 2   
+
+  46          #define SPIFL_AAI        0xAF
+  47          #define SPIFL_RDSR       0x05
+  48          #define SPIFL_EWSR_B     0x50
+  49          #define SPIFL_EWSR       0x50000000
+  50          #define SPIFL_WRSR_B   0x01 
+  51          #define SPIFL_WRSR       0x00010000 
+  52          #define SPIFL_WREN_B     0x06
+  53          #define SPIFL_WREN       0x06000000
+  54          #define SPIFL_WRDI_B   0x04
+  55          #define SPIFL_WRDI       0x04000000
+  56          #define SPIFL_RDID       0x90
+  57          
+  58          #define GVTY_CONFIG_DATA_ADDR 0x00100000
+  59          #define GVTY_CONFIG_END_ADDR 0x001001FF
+  60          #define GVTY_CONFIG_DATA_SECTOR 256
+  61          #define GVTY_CONFIG_DRAM_ADDR 0xE000
+  62          #define GVTY_CONFIG_DATA_MAX 512
+  63          
+  64          #define SFLASH_PROTECT_ALL 0xBC   
+  65          #define SFLASH_PROTECT_NONE 0x0
+  66          
+  67          extern char _getkey();
+  68          extern char putchar(char);
+  69          
+  70          void spiflash_CheckFlashBusy();
+  71          void spiFlash_Cmd(u8, u32, u8, u8);
+  72          void spiflash_wren(u8);
+  73          void spiflash_eraseConfigMem();
+  74          void spiflash_eraseSector(u32);
+  75          void spiflash_wrsr_unlock(u8);
+  76          void test_spiflash(void);
+  77          void spiflash_WriteByte(u32, u8);
+  78          u8 spiflash_ReadByte(u32);
+  79          void Program_Config_Data();
+  80          void Load_Config_Data(u8, u8 *);
+  81          u8 Asc2Hex (u8 *);
+  82          //u8 Asc2Hex (u8 idata *);
+  83          u32 swUtil_SwapEndian(u32);
+  84          char _get1char();
+  85          
+  86          //***************************************************************
+  87          // void spiFlash_Cmd(u8 NumOfByteCmd, u32 CmdData) is to send a command to the spiflash
+  88          // An spiflash command may be from 1 to 4 bytes in length
+  89          // Input:
+  90          //    NumOfByteCmd: The length of command in number of bytes sent to sflash.
+  91          //    CmdData: Command data from 1 byte to 4 bytes
+  92          //    SpiWriteData: 5th byte to transmit to spi flash in case 5-byte command
+  93          //***************************************************************
+  94          void spiFlash_Cmd(u8 const NumOfByteCmd, u32 const CmdData, u8 const SpiWriteData, u8 const RdWr)
+  95          {
+  96   1        u8 c;
+  97   1        u32 temp;
+  98   1        temp = swUtil_SwapEndian(CmdData);
+  99   1        *(u32 xdata *)SPIFL_WRDATA = (u32)(temp);
+ 100   1        *(u8 xdata *)SPIFL_WRDATA4 = (u8)(SpiWriteData);
+ 101   1        *(u8 xdata *)SPIFL_NOBYTE2TX = NumOfByteCmd;
+ 102   1        if (RdWr){    
+ 103   2          *(u8 xdata *)SPIFL_TXCTRL    = 0x5; 
+ 104   2          c = *(u8 xdata *)SPIFL_TXSTAT;
+ 105   2          while (c!=0)
+ 106   2          {
+ 107   3            c = *(u8 xdata *)SPIFL_TXSTAT;
+C51 COMPILER V9.52.0.0   SYS_CONFIG_DATA_UTILS                                             12/02/2014 14:35:42 PAGE 3   
+
+ 108   3          }
+ 109   2          *(u8 xdata *)SPIFL_TXCTRL    = 0x3; 
+ 110   2        } else {
+ 111   2          *(u8 xdata *)SPIFL_TXCTRL    = 0x5; 
+ 112   2        }
+ 113   1        c = *(u8 xdata *)SPIFL_TXSTAT;
+ 114   1        while (c!=0)
+ 115   1        {
+ 116   2          c = *(u8 xdata *)SPIFL_TXSTAT;
+ 117   2        }
+ 118   1        *(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+ 119   1        return;
+ 120   1      }
+ 121          //***************************************************************
+ 122          // void spiflash_wren(u8 wren) to enable or disable sflash write enable
+ 123          // Input:
+ 124          //    wren = 1: Enable write mode
+ 125          //    wren = 0: Disable write mode
+ 126          //    the write enable mode will be disable automatically after every write command
+ 127          //***************************************************************
+ 128          
+ 129          void spiflash_wren(u8 const wren)
+ 130          {
+ 131   1        if (wren==1)
+ 132   1          spiFlash_Cmd(1,SPIFL_WREN_B,0,0);
+ 133   1        else
+ 134   1          spiFlash_Cmd(1,SPIFL_WRDI_B,0,0);
+ 135   1        return;
+ 136   1      }
+ 137          //***************************************************************
+ 138          // void spiflash_wrsr_unlock(u8 unlock) is to unlock or lock the spiflash
+ 139          // Input
+ 140          //    unlock = 1: is to unlock the chip
+ 141          //    unlock = 0: is to lock the chip
+ 142          //***************************************************************
+ 143          
+ 144          void spiflash_wrsr_unlock(u8 const unlock)
+ 145          { 
+ 146   1        spiflash_wren(1);
+ 147   1        if (unlock==1)
+ 148   1          spiFlash_Cmd(2,(u32)(SFLASH_PROTECT_NONE|(SPIFL_WRSR_B<<8)),0,0);
+ 149   1          spiFlash_Cmd(2,(u32)(SFLASH_PROTECT_ALL|(SPIFL_WRSR_B<<8)),0,0); 
+ 150   1        spiflash_CheckFlashBusy();
+ 151   1        return;
+ 152   1      }
+ 153          //***************************************************************
+ 154          //void spiflash_CheckFlashBusy(void)
+ 155          //Read status register untill bit busy == 0
+ 156          //***************************************************************
+ 157          void spiflash_CheckFlashBusy()
+ 158          {
+ 159   1        u8 c;
+ 160   1      check_st_reg:
+ 161   1        *(u8 xdata *)SPIFL_NOBYTE2TX = 1;
+ 162   1        *(u8 xdata *)SPIFL_WRDATA    = (u8)(SPIFL_RDSR);
+ 163   1        *(u8 xdata *)SPIFL_TXCTRL  = 0x5;
+ 164   1      check_Txdone1:
+ 165   1        c = *(u8 xdata *)SPIFL_TXSTAT;
+ 166   1        if (c!=0)
+ 167   1          goto check_Txdone1;
+ 168   1        *(u8 xdata *)SPIFL_TXCTRL  = 0x3;
+ 169   1      check_Rxdone:
+C51 COMPILER V9.52.0.0   SYS_CONFIG_DATA_UTILS                                             12/02/2014 14:35:42 PAGE 4   
+
+ 170   1        c = *(u8 xdata *)SPIFL_TXSTAT;
+ 171   1        if (c!=0)
+ 172   1          goto check_Rxdone;
+ 173   1        c = (*(u8 xdata *)SPIFL_RDDATA)&0x1;
+ 174   1      #ifdef  TEST_ON_BOARD
+                printf("\nBusy = %x",(u16)(0xFF&c));
+              #endif
+ 177   1        if (c==0x1)
+ 178   1          goto check_st_reg;
+ 179   1        *(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+ 180   1        return;
+ 181   1      }
+ 182          
+ 183          //***************************************************************
+ 184          //spiflash_64KBlkErase(u8 BlockID, u8 block64): a block of 64Kbytes
+ 185          //Input: 
+ 186          //  BlockID: The block ID of each 32 or 64K (0,1,2,3..)
+ 187          //   block64: 1 - erase block 64K, 0 - erase block 32K
+ 188          //***************************************************************
+ 189          
+ 190          void spiflash_EraseBlock(u32 BlockID, u8 block64)
+ 191          {
+ 192   1        spiflash_wrsr_unlock((u8)1);
+ 193   1        spiflash_wren((u8)1);
+ 194   1        if (block64==1)
+ 195   1          spiFlash_Cmd((u8)4,(u32)(SPIFL_BLK64ERASE | (BlockID<<16)), 0,0);
+ 196   1        else 
+ 197   1          spiFlash_Cmd((u8)4,(u32)(SPIFL_BLKERASE | (BlockID<<15)), 0,0);   
+ 198   1        spiflash_CheckFlashBusy();
+ 199   1        return;
+ 200   1      }
+ 201          //***************************************************************
+ 202          //spiflash_eraseConfigMem() erase 32k bytes of configuration data in the spi flash
+ 203          //Configuration data is located at address 0x00100000 - 0x0x001000FF; 
+ 204          //Sector 256, beyond 1Mbyte
+ 205          //***************************************************************
+ 206          
+ 207          void spiflash_eraseConfigMem()
+ 208          {
+ 209   1        printf("\n --> Delete configuration memory ...");
+ 210   1        spiflash_eraseSector(GVTY_CONFIG_DATA_SECTOR);
+ 211   1        spiflash_EraseBlock(32, 0);
+ 212   1        spiflash_EraseBlock(16, 1);
+ 213   1        spiflash_wrsr_unlock((u8)0);
+ 214   1        printf("\n");
+ 215   1        return;
+ 216   1      }
+ 217          
+ 218          //***************************************************************
+ 219          //void spiflash_WriteByte(u32 Addr, u8 IData)
+ 220          //***************************************************************
+ 221          
+ 222          void spiflash_WriteByte(u32 Addr, u8 IData)
+ 223          {
+ 224   1        spiflash_wren(1);
+ 225   1        spiFlash_Cmd(5, (SPIFL_BYTEPRGRM|Addr), IData,0);
+ 226   1        spiflash_CheckFlashBusy();
+ 227   1        return;
+ 228   1      }
+ 229          
+ 230          //***************************************************************
+ 231          //void spiflash_ReadByte(u32 Addr, u8 IData)
+C51 COMPILER V9.52.0.0   SYS_CONFIG_DATA_UTILS                                             12/02/2014 14:35:42 PAGE 5   
+
+ 232          //***************************************************************
+ 233          
+ 234          u8 spiflash_ReadByte(u32 Addr)
+ 235          {
+ 236   1        spiFlash_Cmd((u8)4,(u32)(SPIFL_BYTEREAD|Addr),0,1);
+ 237   1        return (*(u8 xdata *)SPIFL_RDDATA); 
+ 238   1      }
+ 239          //***************************************************************
+ 240          //void spiflash_eraseSector(u32 Addr)
+ 241          //To erase sectors of 4kbyte
+ 242          //***************************************************************
+ 243          void spiflash_eraseSector(u32 Sector)
+ 244          {
+ 245   1        spiflash_wrsr_unlock((u8)1);
+ 246   1        spiflash_wren((u8)1);
+ 247   1        spiFlash_Cmd((u8)4,(u32)(SPIFL_SECERASE | (Sector<<12)),0,0);
+ 248   1        spiflash_CheckFlashBusy();
+ 249   1        return;
+ 250   1      }
+ 251          //***************************************************************
+ 252          // Program_Config_Data() is to program configuration data into spi flash at the address
+ 253          // 0x00100000
+ 254          //***************************************************************
+ 255          void Program_Config_Data()
+ 256          {
+ 257   1        char  c;
+ 258   1        u32  ConfigAddr, i, n;
+ 259   1        u8  HexVal;
+ 260   1        u8  FirstChar = 0;
+ 261   1        u8  xdata dlCfData[GVTY_CONFIG_DATA_MAX];
+ 262   1        i = 0;
+ 263   1        printf("\n **** F PROGRAM CONFIGURATION DATA ****\n");  
+ 264   1        printf("\n --> Programming configuration data Y/N?: ");
+ 265   1        c = _get1char();
+ 266   1        TI = 0;
+ 267   1        SBUF = c;
+ 268   1        while (TI==0);
+ 269   1        if (c!='Y')
+ 270   1        {
+ 271   2          c = '1';
+ 272   2          goto AbortPrgConfigData;
+ 273   2        }
+ 274   1        printf("\n --> Erase current configuration data Y/N?: ");
+ 275   1        c = _get1char();
+ 276   1        TI = 0;
+ 277   1        SBUF = c;
+ 278   1        while (TI==0);
+ 279   1        if (c!='Y')
+ 280   1        {
+ 281   2          c = '1';
+ 282   2          goto AbortPrgConfigData;
+ 283   2        } 
+ 284   1        spiflash_eraseConfigMem();
+ 285   1        spiflash_wrsr_unlock((u8)1);
+ 286   1        printf("\n   **** Configuration data: max 508 bytes of ASCII Hex, ended by '$' ****"); 
+ 287   1        printf("\n --> Waiting for configuration data: ."); 
+ 288   1        ConfigAddr = GVTY_CONFIG_DATA_ADDR;
+ 289   1      Read_Config_data:
+ 290   1        c = _get1char();
+ 291   1        switch (c)
+ 292   1        { 
+ 293   2        case 27:
+C51 COMPILER V9.52.0.0   SYS_CONFIG_DATA_UTILS                                             12/02/2014 14:35:42 PAGE 6   
+
+ 294   2          goto AbortPrgConfigData;
+ 295   2          break;
+ 296   2        case '$':
+ 297   2          goto EndPrgConfigData;
+ 298   2          break;
+ 299   2        default:
+ 300   2          if (isxdigit(c))
+ 301   2          {
+ 302   3            if (FirstChar++==0)
+ 303   3            {
+ 304   4              HexVal = (u8)((Asc2Hex((u8*)&c))<<4);
+ 305   4            }
+ 306   3            else
+ 307   3            {
+ 308   4              HexVal |= Asc2Hex((u8*)&c);
+ 309   4              dlCfData[i] = HexVal;
+ 310   4              i++;
+ 311   4              FirstChar=0;
+ 312   4            }
+ 313   3          }
+ 314   2          break;
+ 315   2        } 
+ 316   1        if (i==(GVTY_CONFIG_DATA_MAX-4))
+ 317   1        {
+ 318   2          printf("\n Configuration data exceeds 508 bytes being truncated!\n");
+ 319   2          goto EndPrgConfigData;
+ 320   2        } else {
+ 321   2          goto Read_Config_data;
+ 322   2        }
+ 323   1      AbortPrgConfigData:
+ 324   1        printf ("\n\n --> Abort programming configuration data\n");
+ 325   1        goto CloseConfigProgramming;
+ 326   1      EndPrgConfigData:
+ 327   1        n = 0;
+ 328   1        if (i==0){
+ 329   2          printf("\n No configuration data available\n");
+ 330   2          goto CloseConfigProgramming;
+ 331   2        }
+ 332   1        while (n<i){
+ 333   2          if ((n&0x7)==0)
+ 334   2            printf(".");
+ 335   2          spiflash_WriteByte(ConfigAddr++,dlCfData[n]);
+ 336   2          n++;
+ 337   2        }
+ 338   1        printf ("\n\n --> Finish programming configuration data - %u bytes\n", (u16)(n&0xFFFF));
+ 339   1      CloseConfigProgramming:
+ 340   1        spiflash_WriteByte(ConfigAddr,'$');
+ 341   1        spiflash_WriteByte((ConfigAddr+1),'$');
+ 342   1        spiflash_WriteByte((ConfigAddr+2),'#');
+ 343   1        spiflash_WriteByte((ConfigAddr+3),'#');
+ 344   1        spiflash_wrsr_unlock(0);
+ 345   1        return;
+ 346   1      }
+ 347          //***************************************************************
+ 348          //Load_Config_Data();
+ 349          //Load configuration data into the data ram @ 0xE000
+ 350          //Input:
+ 351          //  LoadConfig = 1: Load configuration data to data ram
+ 352          //         = 0: Dump configuration data onto screen
+ 353          //***************************************************************
+ 354          void Load_Config_Data(u8 LoadConfig, u8  *eramConfigDatAdd)
+ 355          {
+C51 COMPILER V9.52.0.0   SYS_CONFIG_DATA_UTILS                                             12/02/2014 14:35:42 PAGE 7   
+
+ 356   1        u16 Temp, a;
+ 357   1        u8 c,d,f,g;
+ 358   1        if (LoadConfig==0)
+ 359   1          printf("\n --> Dump configuration data\n");
+ 360   1        else
+ 361   1          printf("\n --> Loading configuration data ");
+ 362   1        for (Temp=0;Temp<GVTY_CONFIG_DATA_MAX-4;Temp++)
+ 363   1        {
+ 364   2          c = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR+Temp));
+ 365   2          if (c=='$'){
+ 366   3            a = Temp;
+ 367   3            a++;
+ 368   3            d = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR+a++));
+ 369   3            f = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR+a++));
+ 370   3            g = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR+a));  
+ 371   3            if (d=='$' && f=='#' && g=='#'){
+ 372   4              *(u8 xdata *)((u16)(eramConfigDatAdd + Temp)) = '$';
+ 373   4              *(u8 xdata *)((u16)(eramConfigDatAdd + Temp + 1)) = '$';
+ 374   4              *(u8 xdata *)((u16)(eramConfigDatAdd + Temp + 2)) = '#';
+ 375   4              *(u8 xdata *)((u16)(eramConfigDatAdd + Temp + 3)) = '#';
+ 376   4              break;
+ 377   4            }       
+ 378   3          }
+ 379   2          if (LoadConfig==0)
+ 380   2          {     
+ 381   3            printf("\n Dump @0x%03X: 0x%bx",(u16)(Temp),(u8) (0xFF&c));
+ 382   3          }
+ 383   2          else
+ 384   2          {
+ 385   3            *((eramConfigDatAdd + Temp)) = c;
+ 386   3            //printf("\n RAM Save @0x%03X: 0x%bx",(u16)(eramConfigDatAdd + Temp), (u8 )(0xFF & *(u8 xdata *)((u16)(
+             -eramConfigDatAdd + Temp))));
+ 387   3            //if ((Temp&0x7) == 0){
+ 388   3            //  printf(".");
+ 389   3            //}
+ 390   3          }
+ 391   2        }
+ 392   1        printf("\n %u byte(s) of configuration data read ..........\n", Temp);
+ 393   1        
+ 394   1        return;
+ 395   1      }
+ 396          //***************************************************************
+ 397          //Asc2Hex(u8) 
+ 398          //           Input: an ascii hex digit
+ 399          //           ouput: the hex value of the input
+ 400          //***************************************************************
+ 401          u8 Asc2Hex (u8 *AscDigit)
+ 402          {
+ 403   1        u8 c;
+ 404   1        c = toupper(*AscDigit);
+ 405   1        if (c <= 57)
+ 406   1          c = c - 48;
+ 407   1        else
+ 408   1          c = c - 55;
+ 409   1        return c;
+ 410   1      }
+ 411          //***************************************************************
+ 412          // salutil_Big2LittleEndian(u32)
+ 413          // Sofware Abstraction Utility to convert a 32 bit big endian to 32 bit little endian or vs
+ 414          //***************************************************************
+ 415          u32 swUtil_SwapEndian(u32 var32)
+ 416          {
+C51 COMPILER V9.52.0.0   SYS_CONFIG_DATA_UTILS                                             12/02/2014 14:35:42 PAGE 8   
+
+ 417   1        return ((var32&0x000000FF)<<24 |
+ 418   1            (var32&0x0000FF00)<<8 |
+ 419   1            (var32&0x00FF0000)>>8 |
+ 420   1            (var32&0xFF000000)>>24);
+ 421   1      }
+ 422          //***************************************************************
+ 423          //char _get1char()
+ 424          //Get 1 char from the uart
+ 425          //***************************************************************
+ 426          char _get1char()
+ 427          {
+ 428   1        char  c;
+ 429   1        c = 0;
+ 430   1        while (RI==0);
+ 431   1        c = SBUF;
+ 432   1        RI = 0;
+ 433   1        return c;
+ 434   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1580    ----
+   CONSTANT SIZE    =    622    ----
+   XDATA SIZE       =   ----     569
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

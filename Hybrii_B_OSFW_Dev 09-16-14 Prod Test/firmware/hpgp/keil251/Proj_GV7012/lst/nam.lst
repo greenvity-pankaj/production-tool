@@ -1,0 +1,3781 @@
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE NAM
+OBJECT MODULE PLACED IN .\obj\nam.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\src\link\nam.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) I
+                    -NCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..\..\
+                    -src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\zigb
+                    -ee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\i
+                    -nc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\src;..
+                    -\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support;..\
+                    -..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,H
+                    -PGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,Hy
+                    -brii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,PR
+                    -OD_TEST) DEBUG PRINT(.\lst\nam.lst) TABS(2) OBJECT(.\obj\nam.obj)
+
+line level    source
+
+   1          /** ==========================================================
+   2           *
+   3           * @file cnam.c
+   4           * 
+   5           *  @brief Network Access Manager 
+   6           *
+   7           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * =========================================================*/
+  11          
+  12          
+  13          
+  14          #include <string.h>
+  15          #include "papdef.h"
+  16          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  19          #include "list.h"
+  20          #include "hpgpdef.h"
+  21          #include "hal.h"
+  22          #include "nma.h"
+  23          #include "linkl.h"
+  24          #include "nam.h"
+  25          #include "nsm.h"
+  26          #include "crm.h"
+  27          #include "timer.h"
+  28          #include "stm.h"
+  29          #include "hpgpevt.h"
+  30          #include "hpgpapi.h"
+  31          #include "fm.h"
+  32          #include "muxl.h"
+  33          #include "hal.h"
+  34          #include "frametask.h"
+  35          
+  36          #include "linkl.h"
+  37          
+  38          
+  39          #ifdef SIMU
+              #include "sdrv.h"
+              #endif
+  42          #ifdef UM
+  43          #include "mac_intf_common.h"
+  44          #endif
+  45          #include "hybrii_tasks.h"
+  46          #include "sys_common.h"
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 2   
+
+  47          
+  48          //#define HPGP_TIME_TEI_REUSE        300000  //5 minutes
+  49          //#define HPGP_TIME_TEI_REUSE        6000  //5 minutes
+  50          #define HPGP_TIME_TEI_REUSE       50  //5 minutes
+  51          
+  52          #define HPGP_TIME_USER_APPT_CCO    60000   //1 minute
+  53          #define HPGP_TIME_ASSOC            1000     //100 ms
+  54          #define HPGP_IDENTIFY_CAP_TIME               500
+  55          
+  56          //15 minutes: default lease time for STA associated but not authenticated
+  57          #define HPGP_TIME_TEI_LEASE_NOAUTH_MIN        1//0x0F 
+  58          //48 hours: default lease time for STA associated and authenticated
+  59          #define HPGP_TIME_TEI_LEASE_AUTH_MIN          0xB40 
+  60          
+  61          
+  62          #define HPGP_ASSOC_RESULT_SUCCESS         0   //resource found/allocated
+  63          #define HPGP_ASSOC_RESULT_TEMP_NO_RES     1   //resource temporarily exhausted
+  64          #define HPGP_ASSOC_RESULT_NO_RES          2   //resource permanently exhausted
+  65          #define HPGP_ASSOC_RESULT_UNKNOWN         3   //due to other reason
+  66          
+  67          
+  68          #define HPGP_TEI_MAP_MODE_NEW             0   // new STA
+  69          #define HPGP_TEI_MAP_MODE_ADD             1   // add STA
+  70          #define HPGP_TEI_MAP_MODE_DELETE          2   // add STA
+  71          
+  72          #define HPGP_TEI_MAP_STATUS_ASSOC         0x0
+  73          #define HPGP_TEI_MAP_STATUS_AUTH          0x1
+  74          #define HPGP_TEI_MAP_STATUS_DISASSOC      0x2
+  75          #define HPGP_TEI_MAP_STATUS_INVALID       0xFF
+  76          
+  77          
+  78          #define HPGP_CCO_APPT_REQ_APPT_HO      0x00   //Appoint CCo and handover
+  79          #define HPGP_CCO_APPT_REQ_UNAPPT       0x01   //unappoint
+  80          #define HPGP_CCO_APPT_REQ_UNAPPT_HO    0x01   //unappoint CCo and handover
+  81          
+  82          //CCO APPOINT CNF RESULT
+  83          #define HPGP_CCO_APPT_CNF_ACCEPT       0x00   //accept
+  84          #define HPGP_CCO_APPT_CNF_REJECT       0x01   //reject
+  85          #define HPGP_CCO_APPT_CNF_UNKNOWN_STA  0x02   //unknown user-appointed STA
+  86          #define HPGP_CCO_APPT_CNF_APPT_CCO     0x03   //CCO is user appointed already
+  87          #define HPGP_CCO_APPT_CNF_CCO_UNAPPT   0x04   //CCo is unappointed  
+  88          #define HPGP_CCO_APPT_CNF_CCO_NOT_APPT 0x05   //CCo is not user-appointed 
+  89          #define HPGP_CCO_APPT_CNF_OTHERS       0x06   //unknown user-appointed STA
+  90          #define HPGP_CCO_APPT_CNF_UNAPPT_HO    0x07   //CCo is unappointed and handover
+  91          #define HPGP_CCO_APPT_CNF_UNKNOWN_STA2 0x08   //unknown user-appointed STA and
+  92                                                        //continue as a user-appointed CCo
+  93          
+  94          #define HPGP_CCO_BACKUP_REQ_APPOINT    0
+  95          #define HPGP_CCO_BACKUP_REQ_RELEASE    1
+  96          #ifdef LOG_FLASH
+              extern u16 scbFreeReason;
+              #endif
+  99          /* --------------------------
+ 100           * CCO network access manager
+ 101           * -------------------------- */
+ 102          
+ 103          
+ 104          
+ 105          typedef struct backupCCoParam
+ 106          {
+ 107              u8    dstTei;         //destination STA
+ 108              u8   *dstMacAddr;     //adestination STA
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 3   
+
+ 109              u8    action;
+ 110          } sBackupCCoParam;
+ 111          
+ 112          
+ 113          typedef struct assocCnfParam
+ 114          {
+ 115              u8    result;
+ 116              u8    staTei;
+ 117              u16   teiLeaseTime;
+ 118              u8    dstTei;         //destination STA
+ 119              u8   *dstMacAddr;     //adestination STA
+ 120          } sAssocCnfParam;
+ 121          
+ 122          typedef struct leaveIndParam
+ 123          {
+ 124              u8    reason;
+ 125              u8    dstTei;         //destination STA
+ 126              u8   *dstMacAddr;     //destination STA
+ 127          } sLeaveIndParam;
+ 128          
+ 129          
+ 130          typedef struct leaveCnfParam
+ 131          {
+ 132              u8    dstTei;         //destination STA
+ 133              u8   *dstMacAddr;     //destination STA
+ 134          } sLeaveCnfParam;
+ 135          
+ 136          
+ 137          typedef struct teiMapIndParam
+ 138          {
+ 139              u8    mode;   
+ 140              u8    staTei;         //add or delete STA
+ 141              u8   *staMacAddr;     //add or delete STA
+ 142              u8    staStatus;      //add or delete STA
+ 143              u8    dstTei;         //destination STA
+ 144              u8   *dstMacAddr;     //destination STA
+ 145          } sTeiMapIndParam;
+ 146          
+ 147          typedef struct ccoApptCnfParam
+ 148          {
+ 149              u8    result;
+ 150              u8    dstTei;         //destination STA
+ 151              u8   *dstMacAddr;     //destination STA
+ 152          } sCcoApptCnfParam;
+ 153          
+ 154          typedef union mgmtMsgParamRef
+ 155          {
+ 156              sAssocCnfParam  *assocCnf;
+ 157              sLeaveIndParam  *leaveInd;  
+ 158              sLeaveCnfParam  *leaveCnf;  
+ 159              sTeiMapIndParam *teiMapInd;
+ 160              sCcoApptCnfParam *ccoApptCnf;
+ 161            sBackupCCoParam  *ccoBackupReq;
+ 162          } uMgmtMsgParamRef;
+ 163          
+ 164          extern void LINKL_TimerHandler(u16 type, void *cookie);
+ 165          #ifdef ROUTE
+              extern void ROUTE_preparteAndSendUnreachable(sScb *scb);
+              extern eStatus ROUTE_sendRouteInfoReq(sScb *scb);
+              extern void ROUTE_initLrtEntry(sScb *scb);
+              #endif
+ 170          extern eStatus IDENTIFY_sendFrm(u16 mmType, sEvent *reqEvent, sScb *scb);
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 4   
+
+ 171          extern eStatus IDENTIFY_procFrm(u16 mmType, sEvent *reqEvent);
+ 172          extern eStatus NMA_SendCcoApptCnf(sNma *nma, u8 result);
+ 173          
+ 174          #ifdef CCO_FUNC
+ 175          
+ 176          //#define FM_Printf(x,y,z)   
+ 177          
+ 178          eStatus CNAM_SendMgmtMsg(sCnam *cnam, u16 mmType, void *msgParam)
+ 179          {
+ 180   1          eStatus           status = STATUS_FAILURE;
+ 181   1          sEvent            *newEvent = NULL;
+ 182   1          sHpgpHdr          *hpgpHdr = NULL;
+ 183   1          sCcAssocCnf       *assocCnf = NULL;
+ 184   1          sCcLeaveInd       *leaveInd = NULL;
+ 185   1          sTeiMap           *teiMap = NULL;
+ 186   1          sCcTeiMapInd      *teiMapInd = NULL;
+ 187   1          sCcCcoApptCnf     *ccoApptCnf = NULL;
+ 188   1        sCcBackupReq      *ccoBackUpReq = NULL;
+ 189   1          uMgmtMsgParamRef   mgmtMsgParam;
+ 190   1          sScb              *scbIter = NULL;
+ 191   1          u8                *dataptr = NULL;
+ 192   1          u16                freeLen = 0;
+ 193   1          u8                 numSta = 0;
+ 194   1          u16                eventSize = 0;
+ 195   1      //    sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 196   1          sLinkLayer        *linkl = cnam->linkl;
+ 197   1          sStaInfo          *staInfo = LINKL_GetStaInfo(linkl);
+ 198   1          
+ 199   1      
+ 200   1      
+ 201   1          switch(mmType)
+ 202   1          {
+ 203   2              case EVENT_TYPE_CC_ASSOC_CNF:
+ 204   2              {
+ 205   3      #ifdef LOG_FLASH
+                          u8 buff[2];
+              #endif
+ 208   3                  eventSize = MAX(HPGP_DATA_PAYLOAD_MIN, sizeof(sCcAssocCnf)); 
+ 209   3                  newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+ 210   3                  if(newEvent == NULL)
+ 211   3                  {
+ 212   4                      //FM_Printf(FM_ERROR, "Cannot allocate an event.\n");
+ 213   4                      return STATUS_FAILURE;
+ 214   4                  }
+ 215   3                  mgmtMsgParam.assocCnf = (sAssocCnfParam *)msgParam;
+ 216   3                  newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 217   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_ASSOC_CNF;
+ 218   3      
+ 219   3                  hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 220   3                  hpgpHdr->tei =  mgmtMsgParam.assocCnf->dstTei; //TODO
+ 221   3                  hpgpHdr->macAddr =  mgmtMsgParam.assocCnf->dstMacAddr;
+ 222   3                  hpgpHdr->snid = staInfo->snid;
+ 223   3            
+ 224   3            hpgpHdr->eks = HPGP_EKS_NONE;
+ 225   3      
+ 226   3                  assocCnf = (sCcAssocCnf *)(newEvent->buffDesc.dataptr); 
+ 227   3      
+ 228   3                  assocCnf->result = mgmtMsgParam.assocCnf->result; 
+ 229   3                  assocCnf->staTei = mgmtMsgParam.assocCnf->staTei; 
+ 230   3                  memcpy(assocCnf->nid, staInfo->nid, NID_LEN);
+ 231   3                  assocCnf->snid = staInfo->snid;
+ 232   3                  assocCnf->leaseTime = mgmtMsgParam.assocCnf->teiLeaseTime;  
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 5   
+
+ 233   3      
+ 234   3                  newEvent->buffDesc.datalen += eventSize;
+ 235   3      #ifdef LOG_FLASH
+                          buff[0] = assocCnf->result;            
+                          buff[1] = assocCnf->staTei;
+                          
+                          logEvent(MGMT_MSG, 0, EVENT_TYPE_CC_ASSOC_CNF, buff, 2);
+              #endif
+ 241   3                  FM_Printf(FM_MMSG, "CNAM:>>>CC_ASSOC.CNF(tei:%bu)\n",
+ 242   3                                      hpgpHdr->tei);
+ 243   3                  break;
+ 244   3              }
+ 245   2              case EVENT_TYPE_CC_LEAVE_CNF:
+ 246   2              {
+ 247   3                  newEvent = EVENT_MgmtAlloc(HPGP_DATA_PAYLOAD_MIN, 
+ 248   3                                         EVENT_HPGP_MSG_HEADROOM);
+ 249   3                  if(newEvent == NULL)
+ 250   3                  {
+ 251   4      //                FM_Printf(FM_ERROR, "Cannot allocate an event.\n");
+ 252   4                      return STATUS_FAILURE;
+ 253   4                  }
+ 254   3                  mgmtMsgParam.leaveCnf = (sLeaveCnfParam *)msgParam;  
+ 255   3                  newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 256   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_LEAVE_CNF;
+ 257   3      
+ 258   3                  hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 259   3                  hpgpHdr->tei = mgmtMsgParam.leaveCnf->dstTei; //TODO
+ 260   3                  hpgpHdr->macAddr = mgmtMsgParam.leaveCnf->dstMacAddr;
+ 261   3                  hpgpHdr->snid = staInfo->snid;
+ 262   3      
+ 263   3            hpgpHdr->eks = staInfo->nekEks;
+ 264   3                  
+ 265   3          
+ 266   3                  newEvent->buffDesc.datalen += HPGP_DATA_PAYLOAD_MIN;
+ 267   3      #ifdef LOG_FLASH
+                          logEvent(MGMT_MSG, 0, EVENT_TYPE_CC_LEAVE_CNF, &hpgpHdr->tei, 1);
+              #endif
+ 270   3      #ifdef P8051
+ 271   3                  FM_Printf(FM_MMSG, "CNAM:>>>CC_LEAVE.CNF(tei:%bu)\n",
+ 272   3                                      hpgpHdr->tei);
+ 273   3      #else
+                          FM_Printf(FM_MMSG, "CNAM:>>>CC_LEAVE.CNF(tei:%d)\n",
+                                              hpgpHdr->tei);
+              #endif
+ 277   3                  break;
+ 278   3              }
+ 279   2              case EVENT_TYPE_CC_LEAVE_IND:
+ 280   2              {
+ 281   3                  eventSize = MAX(HPGP_DATA_PAYLOAD_MIN, sizeof(sCcLeaveInd)); 
+ 282   3                  newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+ 283   3                  if(newEvent == NULL)
+ 284   3                  {
+ 285   4      //                FM_Printf(FM_ERROR, "Cannot allocate an event.\n");
+ 286   4                      return STATUS_FAILURE;
+ 287   4                  }
+ 288   3      
+ 289   3                  mgmtMsgParam.leaveInd = (sLeaveIndParam *)msgParam;  
+ 290   3                  newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 291   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_LEAVE_IND;
+ 292   3      
+ 293   3                  hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 294   3                  hpgpHdr->tei = mgmtMsgParam.leaveInd->dstTei; //TODO
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 6   
+
+ 295   3                  hpgpHdr->macAddr = mgmtMsgParam.leaveInd->dstMacAddr;
+ 296   3                  hpgpHdr->snid = staInfo->snid;
+ 297   3      
+ 298   3            hpgpHdr->eks = staInfo->nekEks;
+ 299   3                  
+ 300   3                  leaveInd = (sCcLeaveInd *)(newEvent->buffDesc.dataptr); 
+ 301   3                  memcpy(leaveInd->nid, staInfo->nid, NID_LEN);
+ 302   3                  leaveInd->reason = mgmtMsgParam.leaveInd->reason;
+ 303   3      
+ 304   3                  newEvent->buffDesc.datalen += eventSize;
+ 305   3      #ifdef LOG_FLASH
+                          logEvent(MGMT_MSG, 0, EVENT_TYPE_CC_LEAVE_IND, &hpgpHdr->tei, 1);
+              #endif
+ 308   3      #ifdef P8051
+ 309   3                  FM_Printf(FM_MMSG, "CNAM:>>>CC_LEAVE.IND(tei:%bu)\n",
+ 310   3                                      hpgpHdr->tei);
+ 311   3      #else
+                          FM_Printf(FM_MMSG, "CNAM:>>>CC_LEAVE.IND(tei:%d)\n",
+                                              hpgpHdr->tei);
+              #endif
+ 315   3                  break;
+ 316   3              }
+ 317   2              case EVENT_TYPE_CC_SET_TEI_MAP_IND:
+ 318   2              {
+ 319   3                  mgmtMsgParam.teiMapInd = (sTeiMapIndParam *)msgParam;  
+ 320   3      
+ 321   3                  if( mgmtMsgParam.teiMapInd->mode == HPGP_TEI_MAP_MODE_NEW)
+ 322   3                  {
+ 323   4                      //send the SET_TEI_MAP.IND to the new STA
+ 324   4                      numSta = CRM_GetScbNum(cnam->crm);
+ 325   4                  }
+ 326   3                  else
+ 327   3                  {
+ 328   4                      numSta = 1;
+ 329   4                  }
+ 330   3      
+ 331   3                  eventSize = MAX(HPGP_DATA_PAYLOAD_MIN, (2+(u16)(sizeof(sTeiMap)*numSta))); 
+ 332   3                  newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+ 333   3                  if(newEvent == NULL)
+ 334   3                  {
+ 335   4      //                FM_Printf(FM_ERROR, "Cannot allocate an event.\n");
+ 336   4                      return STATUS_FAILURE;
+ 337   4                  }
+ 338   3      
+ 339   3                  newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 340   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_SET_TEI_MAP_IND;
+ 341   3      
+ 342   3                  hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 343   3                  hpgpHdr->tei =  mgmtMsgParam.teiMapInd->dstTei;
+ 344   3                  hpgpHdr->macAddr =  mgmtMsgParam.teiMapInd->dstMacAddr;
+ 345   3                  hpgpHdr->snid = staInfo->snid;
+ 346   3            hpgpHdr->eks = HPGP_EKS_NONE;
+ 347   3            hpgpHdr->mcst = 1;
+ 348   3                  
+ 349   3      
+ 350   3                  //build the message
+ 351   3                  dataptr = newEvent->buffDesc.dataptr;
+ 352   3                  teiMapInd = (sCcTeiMapInd *) dataptr;
+ 353   3                  teiMapInd->mode = mgmtMsgParam.teiMapInd->mode;
+ 354   3                  teiMapInd->numSta = numSta; 
+ 355   3                  newEvent->buffDesc.datalen += 2;
+ 356   3                  dataptr += 2;
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 7   
+
+ 357   3      
+ 358   3                  freeLen = eventSize - 2;//newEvent->buffDesc.bufflen - 2 - 
+ 359   3                            //(newEvent->buffDesc.dataptr - newEvent->buffDesc.buff);
+ 360   3      
+ 361   3                  if( mgmtMsgParam.teiMapInd->mode == HPGP_TEI_MAP_MODE_NEW)
+ 362   3                  {
+ 363   4                      //send the SET_TEI_MAP.IND to the new STA
+ 364   4                      while( (freeLen >= sizeof(sTeiMap)) && numSta)
+ 365   4                      {
+ 366   5                          teiMap = (sTeiMap *) dataptr;
+ 367   5                          scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+ 368   5                          if(scbIter == NULL)
+ 369   5                          {
+ 370   6      //                        FM_Printf(FM_ERROR, "CNAM: imcompatible in CRM.\n");
+ 371   6                              EVENT_Free(newEvent);
+ 372   6                              return STATUS_FAILURE;
+ 373   6                          }
+ 374   5      
+ 375   5                          teiMap->tei = scbIter->tei; 
+ 376   5                          memcpy(teiMap->macAddr, scbIter->macAddr, MAC_ADDR_LEN); 
+ 377   5                          teiMap->status = scbIter->staStatus.fields.authStatus; 
+ 378   5                          dataptr += sizeof(sTeiMap);
+ 379   5                          newEvent->buffDesc.datalen += sizeof(sTeiMap);
+ 380   5                          freeLen -= sizeof(sTeiMap);
+ 381   5      
+ 382   5                          numSta--;
+ 383   5                      }
+ 384   4                      if((freeLen > 0)&&numSta)
+ 385   4                      {
+ 386   5      //                    FM_Printf(FM_ERROR, "CNAM: imcompatible with numSta.\n");
+ 387   5                          EVENT_Free(newEvent);
+ 388   5                          return STATUS_FAILURE;
+ 389   5                      }
+ 390   4                  }
+ 391   3                  else
+ 392   3                  {
+ 393   4      
+ 394   4                      teiMapInd->teiMap.tei = mgmtMsgParam.teiMapInd->staTei; 
+ 395   4                      memcpy(teiMapInd->teiMap.macAddr, mgmtMsgParam.teiMapInd->staMacAddr, MAC_ADDR_LEN); 
+ 396   4                      teiMapInd->teiMap.status = mgmtMsgParam.teiMapInd->staStatus; 
+ 397   4                      newEvent->buffDesc.datalen += sizeof(sTeiMap); 
+ 398   4                  }
+ 399   3      
+ 400   3                  newEvent->buffDesc.datalen = MAX(HPGP_DATA_PAYLOAD_MIN, newEvent->buffDesc.datalen);
+ 401   3          #ifdef P8051
+ 402   3                  FM_Printf(FM_MMSG, "CNAM:>>>SET_TEI_MAP.IND(tei:%bu)\n",
+ 403   3          #else
+                          FM_Printf(FM_MMSG, "CNAM:>>>SET_TEI_MAP.IND(tei:%d)\n",
+                  #endif
+ 406   3                                      hpgpHdr->tei);
+ 407   3                  break;
+ 408   3              }
+ 409   2              case EVENT_TYPE_CC_CCO_APPOINT_CNF:
+ 410   2              {
+ 411   3                  eventSize = MAX(HPGP_DATA_PAYLOAD_MIN, sizeof(sCcCcoApptCnf)); 
+ 412   3                  newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+ 413   3                  if(newEvent == NULL)
+ 414   3                  {
+ 415   4                      FM_Printf(FM_ERROR, "EAllocErr\n");
+ 416   4                      return STATUS_FAILURE;
+ 417   4                  }
+ 418   3                  mgmtMsgParam.ccoApptCnf = (sCcoApptCnfParam *)msgParam;
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 8   
+
+ 419   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_CCO_APPOINT_CNF;
+ 420   3                  newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 421   3      
+ 422   3                  hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 423   3                  hpgpHdr->tei =  mgmtMsgParam.ccoApptCnf->dstTei; //TODO
+ 424   3                  hpgpHdr->macAddr =  mgmtMsgParam.ccoApptCnf->dstMacAddr;
+ 425   3                  hpgpHdr->snid = staInfo->snid;
+ 426   3            hpgpHdr->eks = staInfo->nekEks;
+ 427   3      
+ 428   3                  ccoApptCnf = (sCcCcoApptCnf *)(newEvent->buffDesc.dataptr); 
+ 429   3                  ccoApptCnf->result = mgmtMsgParam.ccoApptCnf->result;
+ 430   3                  newEvent->buffDesc.datalen += eventSize;
+ 431   3                  FM_Printf(FM_MMSG, "CNAM:>>>CCO_APPOINT.CNF(tei:%bu)\n",
+ 432   3                                      hpgpHdr->tei);
+ 433   3                  break;
+ 434   3              }
+ 435   2              case EVENT_TYPE_CC_BACKUP_APPOINT_REQ:
+ 436   2              {
+ 437   3                  eventSize = MAX(HPGP_DATA_PAYLOAD_MIN, sizeof(ccoBackUpReq)); 
+ 438   3                  newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+ 439   3                  if(newEvent == NULL)
+ 440   3                  {
+ 441   4                      FM_Printf(FM_ERROR, "EAllocErr\n");
+ 442   4                      return STATUS_FAILURE;
+ 443   4                  }
+ 444   3                  mgmtMsgParam.ccoBackupReq = (sBackupCCoParam*)msgParam;
+ 445   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_BACKUP_APPOINT_REQ;
+ 446   3                  newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 447   3      
+ 448   3                  hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 449   3                  hpgpHdr->tei =  mgmtMsgParam.ccoBackupReq->dstTei; //TODO
+ 450   3                  hpgpHdr->macAddr =  mgmtMsgParam.ccoBackupReq->dstMacAddr;
+ 451   3                  hpgpHdr->snid = staInfo->snid;
+ 452   3      
+ 453   3            hpgpHdr->eks = staInfo->nekEks;
+ 454   3      
+ 455   3                  ccoBackUpReq = (sCcBackupReq*)(newEvent->buffDesc.dataptr); 
+ 456   3                  ccoBackUpReq->action = mgmtMsgParam.ccoBackupReq->action;
+ 457   3                  newEvent->buffDesc.datalen += eventSize;
+ 458   3                  FM_Printf(FM_MMSG, "CNAM:>>>BACKUP_APPOINT_REQ:(tei:%bu)\n",
+ 459   3                                      hpgpHdr->tei);
+ 460   3                  break;
+ 461   3              }
+ 462   2              default:
+ 463   2              {
+ 464   3              }
+ 465   2          }
+ 466   1      
+ 467   1          EVENT_Assert(newEvent);
+ 468   1      
+ 469   1          //transmit the mgmt msg
+ 470   1          status =  MUXL_TransmitMgmtMsg(HPGPCTRL_GetLayer(HP_LAYER_TYPE_MUX), newEvent);
+ 471   1          //the event will be freed by MUXL if the TX is successful
+ 472   1          if(status == STATUS_FAILURE)
+ 473   1          {
+ 474   2              EVENT_Free(newEvent);
+ 475   2          }
+ 476   1          
+ 477   1          return status;
+ 478   1      }
+ 479          
+ 480          extern u8 bcAddr[];
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 9   
+
+ 481          
+ 482          #if 1
+ 483          
+ 484          eStatus CNAM_SendTeiMapInd(sCnam *cnam, sScb *scb, u8 operation)
+ 485          {
+ 486   1          sScb              *scbIter = NULL;
+ 487   1          sTeiMapIndParam    teiMapIndParam;
+ 488   1          u8                 txInd = 1;
+ 489   1        sScb *minRssiScb = NULL;
+ 490   1        u8 minRssi = 200;
+ 491   1      
+ 492   1        scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+ 493   1          while(scbIter)
+ 494   1        {
+ 495   2      
+ 496   2          if (scbIter != cnam->staInfo->staScb)
+ 497   2          {
+ 498   3      
+ 499   3            if (scbIter->rssiLqi.s.rssi < minRssi)
+ 500   3            {
+ 501   4              minRssiScb = scbIter;
+ 502   4              
+ 503   4            //  FM_Printf(FM_ERROR,"mrssi %bu \n", minRssi);
+ 504   4        
+ 505   4              minRssi = scbIter->rssiLqi.s.rssi;
+ 506   4            }
+ 507   3      
+ 508   3          }
+ 509   2          scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+ 510   2        
+ 511   2        }
+ 512   1      
+ 513   1      //  FM_Printf(FM_ERROR,"mrssi %bu \n", minRssi);
+ 514   1          scbIter = minRssiScb;
+ 515   1        
+ 516   1          if(scbIter)
+ 517   1          {
+ 518   2              if(1)//scbIter->tei != cnam->staInfo->ccoScb->tei)
+ 519   2              {
+ 520   3                  txInd = 1;
+ 521   3      //        teiMapIndParam.scb = scbIter;    //destination sta
+ 522   3                  teiMapIndParam.dstTei = scbIter->tei;         //destination STA
+ 523   3                  teiMapIndParam.dstMacAddr = bcAddr; //destination STA
+ 524   3                  teiMapIndParam.staTei = scb->tei;
+ 525   3                  teiMapIndParam.staMacAddr = scb->macAddr;
+ 526   3                  teiMapIndParam.staStatus = scb->staStatus.fields.authStatus;
+ 527   3                  if (operation ==  HPGP_TEI_MAP_MODE_ADD)
+ 528   3                  { 
+ 529   4                      if(1)//scbIter->tei == scb->tei)
+ 530   4                      {
+ 531   5                          teiMapIndParam.mode = HPGP_TEI_MAP_MODE_NEW; 
+ 532   5                      }
+ 533   4                      else
+ 534   4                      {
+ 535   5                          teiMapIndParam.mode = HPGP_TEI_MAP_MODE_ADD; 
+ 536   5                      }
+ 537   4                  }
+ 538   3                  else
+ 539   3                  {
+ 540   4                      if(scbIter->tei != scb->tei)
+ 541   4                      {
+ 542   5                          teiMapIndParam.mode = HPGP_TEI_MAP_MODE_DELETE; 
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 10  
+
+ 543   5                          teiMapIndParam.staStatus = HPGP_TEI_MAP_STATUS_DISASSOC;
+ 544   5                      }
+ 545   4                      else
+ 546   4                      {
+ 547   5                          txInd = 0;
+ 548   5                      }
+ 549   4                  }
+ 550   3      
+ 551   3                  if(txInd)
+ 552   3                  {
+ 553   4                      CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_SET_TEI_MAP_IND, 
+ 554   4                                       &teiMapIndParam);
+ 555   4                  }
+ 556   3              }
+ 557   2      
+ 558   2          //    scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+ 559   2          } //end of while
+ 560   1          return STATUS_SUCCESS;
+ 561   1      
+ 562   1      }
+ 563          
+ 564          
+ 565          
+ 566          
+ 567          #else
+              
+              eStatus CNAM_SendTeiMapInd(sCnam *cnam, sScb *scb, u8 operation)
+              {
+                  sScb              *scbIter = NULL;
+                  sTeiMapIndParam    teiMapIndParam;
+                  u8                 txInd = 1;
+                
+                  scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+                  while(scbIter)
+                  {
+                      if(scbIter->tei != cnam->staInfo->ccoScb->tei)
+                      {
+                          txInd = 1;
+              //        teiMapIndParam.scb = scbIter;    //destination sta
+                          teiMapIndParam.dstTei = scbIter->tei;         //destination STA
+                          teiMapIndParam.dstMacAddr = scbIter->macAddr; //destination STA
+                          teiMapIndParam.staTei = scb->tei;
+                          teiMapIndParam.staMacAddr = scb->macAddr;
+                          teiMapIndParam.staStatus = scb->staStatus.fields.authStatus;
+                          if (operation ==  HPGP_TEI_MAP_MODE_ADD)
+                          { 
+                              if(scbIter->tei == scb->tei)
+                              {
+                                  teiMapIndParam.mode = HPGP_TEI_MAP_MODE_NEW; 
+                              }
+                              else
+                              {
+                                  teiMapIndParam.mode = HPGP_TEI_MAP_MODE_ADD; 
+                              }
+                          }
+                          else
+                          {
+                              if(scbIter->tei != scb->tei)
+                              {
+                                  teiMapIndParam.mode = HPGP_TEI_MAP_MODE_DELETE; 
+                                  teiMapIndParam.staStatus = HPGP_TEI_MAP_STATUS_DISASSOC;
+                              }
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 11  
+
+                              else
+                              {
+                                  txInd = 0;
+                              }
+                          }
+              
+                          if(txInd)
+                          {
+                              CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_SET_TEI_MAP_IND, 
+                                               &teiMapIndParam);
+                          }
+                      }
+              
+                      scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+                  } //end of while
+                  return STATUS_SUCCESS;
+              
+              }
+              
+              
+              #endif
+ 626          
+ 627          void CNAM_ProcEvent(sCnam *cnam, sEvent *event)
+ 628          {
+ 629   1          sEvent            *newEvent = NULL;
+ 630   1          sHpgpHdr          *hpgpHdr = NULL;
+ 631   1          sHpgpHdr          *newHpgpHdr = NULL;
+ 632   1          sCcAssocReq       *assocReq = NULL;
+ 633   1          sCcCcoApptReq     *ccoApptReq = NULL;
+ 634   1          sCcoHoReqEvent    *ccoHoReqEvent = NULL;
+ 635   1          sCcoHoRspEvent    *ccoHoRspEvent = NULL;
+ 636   1        sCcBackupCnf      *ccoBackUpCnf = NULL;
+ 637   1          sScb              *scb = NULL;
+ 638   1          sScb              *scbIter = NULL;
+ 639   1          sAssocCnfParam     assocCnfParam;
+ 640   1          sLeaveIndParam     leaveIndParam;
+ 641   1          sLeaveCnfParam     leaveCnfParam;
+ 642   1          sCcoApptCnfParam   ccoApptCnfParam;
+ 643   1          sLinkLayer        *linkl = NULL;
+ 644   1          sStaInfo          *staInfo = NULL;
+ 645   1          u8                 txCcoApptCnf;
+ 646   1          sCnsm             *cnsm = NULL;
+ 647   1          u16                numSta = 0;
+ 648   1          static u8         scbFoundFlag = 0;
+ 649   1      
+ 650   1      //    linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 651   1          linkl = cnam->linkl;
+ 652   1          staInfo = LINKL_GetStaInfo(linkl);
+ 653   1         
+ 654   1      
+ 655   1          if(cnam->state == CNAM_STATE_INIT)
+ 656   1          {
+ 657   2      #ifdef NAM_PRINT  
+                      FM_Printf(FM_WARN, "CNAM yet not ready\n");
+              #endif    
+ 660   2              return;
+ 661   2          }
+ 662   1      
+ 663   1          hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+ 664   1          if( event->eventHdr.eventClass == EVENT_CLASS_MSG) 
+ 665   1          {
+ 666   2              switch(event->eventHdr.type)
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 12  
+
+ 667   2              {
+ 668   3                  case EVENT_TYPE_CC_ASSOC_REQ:
+ 669   3                  {
+ 670   4                      FM_Printf(FM_MMSG, "CNAM:<<<CC_ASSOC.REQ(tei:%bu)\n",
+ 671   4                                hpgpHdr->tei);
+ 672   4                      //process this event at any time regardless of STA state 
+ 673   4                      assocCnfParam.staTei = 0;
+ 674   4                      assocCnfParam.dstTei = 0;
+ 675   4                      assocCnfParam.dstMacAddr = hpgpHdr->macAddr;
+ 676   4                      assocReq = (sCcAssocReq *)event->buffDesc.dataptr; 
+ 677   4      #ifdef LOG_FLASH
+                              logEvent(MGMT_MSG, 0, EVENT_TYPE_CC_ASSOC_REQ, hpgpHdr->macAddr, MAC_ADDR_LEN);
+              #endif
+ 680   4                      if(assocReq->reqType == 0)
+ 681   4                      {
+ 682   5                          scb = CRM_FindScbMacAddr(hpgpHdr->macAddr);
+ 683   5                          if(scb == NULL) 
+ 684   5                          {
+ 685   6                              //this is a new request
+ 686   6                              scb = CRM_AllocScb(cnam->crm);
+ 687   6                              scbFoundFlag = 0;
+ 688   6      #ifdef POWERSAVE
+                                      if(scb)
+                                      {                            
+                            PSM_resetScbPs(scb);  // set SCB's PS data to init state 
+                          }
+              #endif
+ 694   6      #ifdef ROUTE
+                                      if(scb)
+                                      {                            
+                                          ROUTE_initLrtEntry(scb);
+                                          scb->lrtEntry.nTei = scb->tei;
+                                          scb->lrtEntry.rnh = 0;
+                                      }
+              #endif
+ 702   6                          }
+ 703   5                          else
+ 704   5                          {
+ 705   6                              scbFoundFlag = 1;
+ 706   6                          }
+ 707   5                          if(scb)
+ 708   5                          {
+ 709   6      //                        scb->uMaxSSN = 0;
+ 710   6                              scb->uMinSSN = 0;
+ 711   6                              scb->uWrapAround = 0;
+ 712   6                              if(scbFoundFlag == 0)
+ 713   6                              {
+ 714   7                                  //allocate a tei lease timer for the STA
+ 715   7      #ifdef CALLBACK
+                                          scb->teiTimer = STM_AllocTimer(LINKL_TimerHandler, 
+                                                              EVENT_TYPE_TIMER_TEI_IND, scb);
+              #else
+ 719   7                                  scb->teiTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK, 
+ 720   7                                                      EVENT_TYPE_TIMER_TEI_IND, scb);
+ 721   7      #endif
+ 722   7                              }
+ 723   6                              if(scb->teiTimer != STM_TIMER_INVALID_ID)
+ 724   6                              {
+ 725   7                                  scb->staCap.fields.ccoCap = assocReq->ccoCap;
+ 726   7                                  scb->staCap.fields.proxyNetCap = assocReq->proxyNetCap;
+ 727   7                                  memcpy(scb->macAddr, hpgpHdr->macAddr, 
+ 728   7                                         MAC_ADDR_LEN);
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 13  
+
+ 729   7                                  assocCnfParam.result = HPGP_ASSOC_RESULT_SUCCESS;
+ 730   7                                  assocCnfParam.teiLeaseTime = cnam->teiLeaseTime;
+ 731   7                                  assocCnfParam.staTei = scb->tei;
+ 732   7                                  assocCnfParam.dstTei = 0xFF;
+ 733   7                                  if(scbFoundFlag == 0)
+ 734   7                                  {
+ 735   8      #ifdef SIMU                            
+                                              //call SHAL to add tei to the port MAP by macaddr?
+                                              //add requester tei to the Port Map in SHAL
+                                             SHAL_AddTeiToPortMap(HOMEPLUG_GetHal()->shal,
+                                              scb->macAddr, scb->tei);
+              #endif
+ 741   8         
+ 742   8                               }
+ 743   7                               
+ 744   7      #if 0
+              #ifdef P8051
+                  FM_Printf(FM_HINFO,"CNAM: STA MAC Address: %bx:%bx:%bx:%bx:%bx:%bx\n",
+              #else
+                 FM_Printf(FM_HINFO,"CNAM: STA MAC Address: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
+              #endif
+                                      scb->macAddr[0], scb->macAddr[1],
+                                      scb->macAddr[2], scb->macAddr[3],
+                                      scb->macAddr[4], scb->macAddr[5]);
+              #endif
+ 754   7                               
+ 755   7                              linkl->akm.peerTei = scb->tei;
+ 756   7                              linkl->akm.peerMacAddr = scb->macAddr;
+ 757   7      
+ 758   7                              }
+ 759   6                              else
+ 760   6                              {
+ 761   7                                  assocCnfParam.result = HPGP_ASSOC_RESULT_TEMP_NO_RES;
+ 762   7                                  STM_FreeTimer(scb->teiTimer);
+ 763   7                                  scb->teiTimer = STM_TIMER_INVALID_ID;
+ 764   7      #ifdef LOG_FLASH
+                                          scbFreeReason = ASSOC_NO_RESOURCE;
+              #endif
+ 767   7                                  CRM_FreeScb(cnam->crm, scb);
+ 768   7                                  scb = NULL;
+ 769   7                              }
+ 770   6                          }
+ 771   5                          else
+ 772   5                          {
+ 773   6                              // scb = NULL;
+ 774   6                              assocCnfParam.result = HPGP_ASSOC_RESULT_TEMP_NO_RES;
+ 775   6                          }
+ 776   5      
+ 777   5                          if ( CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_ASSOC_CNF, 
+ 778   5                                                &assocCnfParam) == STATUS_SUCCESS)
+ 779   5                          {
+ 780   6                              //start the lease timer
+ 781   6                              if(scb)
+ 782   6                              {
+ 783   7                                  //TODO: we need to check the lease timer
+ 784   7                                  //so that it does not exceed our timer limit
+ 785   7      
+ 786   7                    STM_StopTimer(scb->teiTimer);
+ 787   7                                  STM_StartTimer(scb->teiTimer, 
+ 788   7                                                 cnam->teiLeaseTime*60000);
+ 789   7      #ifdef P8051
+ 790   7                    FM_Printf(FM_HINFO, "CNAM:lease(tei:%bu,time:0x%lx)\n",
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 14  
+
+ 791   7      #else
+                            FM_Printf(FM_HINFO, "CNAM:lease(tei:%d,time:0x%08x)\n",
+              #endif
+ 794   7                           scb->tei, assocCnfParam.teiLeaseTime*60000);
+ 795   7      //FM_Printf(FM_HINFO, "CNAM: accNotif %bu\n",cnam->accNotification);   
+ 796   7                                  if(cnam->accNotification)
+ 797   7                                  {
+ 798   8      #ifdef UKE              
+                                              {
+                                                  if ((scbFoundFlag == 0) &&
+                                                       (!memcmp(&cnam->ukePeer, &scb->macAddr, MAC_ADDR_LEN)))
+                                                  {
+              
+                                                      //send the event to the SNAM to renew the TEI
+                                                      newEvent = EVENT_Alloc(MAC_ADDR_LEN, 
+                                                                         EVENT_HPGP_CTRL_HEADROOM);
+                                                      if(newEvent == NULL)
+                                                      {
+                                                          FM_Printf(FM_ERROR, 
+                                                                  "EAllocErr\n");
+                                                          break;
+                                                      }
+                                                      
+                                                      newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                                                      newEvent->eventHdr.type = EVENT_TYPE_ASSOC_IND;
+                                                  
+                                                      
+                                                      hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+                                                      hpgpHdr->scb = (sScb*)scb;
+              
+                                                      memcpy(newEvent->buffDesc.dataptr,
+                                                             cnam->ukePeer, MAC_ADDR_LEN);
+                                          
+                                                      newEvent->buffDesc.datalen = MAC_ADDR_LEN;
+              
+                                                      SLIST_Put(&linkl->intEventQueue, &newEvent->link);
+              
+                                                     // LINKL_SendEvent(linkl, newEvent);
+              
+                                                 }
+                                              }
+              #endif                
+ 833   8                                      newEvent = EVENT_Alloc(EVENT_DEFAULT_SIZE, 0);
+ 834   8                                      if(newEvent)
+ 835   8                                      {
+ 836   9                                          newEvent->eventHdr.eventClass = 
+ 837   9                                              EVENT_CLASS_CTRL;
+ 838   9                                          newEvent->eventHdr.type = EVENT_TYPE_NET_ACC_IND;
+ 839   9                                          //eeliver the event to the upper layer
+ 840   9      #ifdef CALLBACK
+                                                  linkl->deliverEvent(linkl->eventcookie, newEvent);
+              #else
+ 843   9                                          CTRLL_ReceiveEvent(linkl->eventcookie, newEvent);
+ 844   9      #endif
+ 845   9                                          cnam->accNotification = 0;
+ 846   9                                      }
+ 847   8                                      else
+ 848   8                                      {
+ 849   9                                          FM_Printf(FM_ERROR, "EAllocErr\n");
+ 850   9                                      }
+ 851   8                                  }
+ 852   7                    scb->namState = STA_NAM_STATE_CONN;
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 15  
+
+ 853   7                                  scb->homState = STA_HOM_STATE_IDLE;
+ 854   7      
+ 855   7                    {
+ 856   8      
+ 857   8                      hostEvent_peerAssocInd assocInd;
+ 858   8      
+ 859   8                      memcpy(&assocInd.macAddress, (u8*)&scb->macAddr, MAC_ADDR_LEN);
+ 860   8                      assocInd.tei = scb->tei;
+ 861   8      
+ 862   8                      Host_SendIndication(HOST_EVENT_TYPE_PEER_ASSOC_IND,
+ 863   8                                (u8*)&assocInd, sizeof(assocInd));
+ 864   8      
+ 865   8                    }
+ 866   7      
+ 867   7                    if(scbFoundFlag == 1)
+ 868   7                    {
+ 869   8                      if (linkl->ccoNam.backupCCoCfg.scb == scb)
+ 870   8                        linkl->ccoNam.backupCCoCfg.scb = NULL;  
+ 871   8                    }
+ 872   7      
+ 873   7      #if 0               
+                                          //if(scbFoundFlag == 0) // send tei map ind on every assoc req(if it is not re
+             -new), if device reset
+                                          {
+                                              //update the TEI map
+                                              CNAM_SendTeiMapInd(cnam, 
+                                                              scb, 
+                                                              HPGP_TEI_MAP_MODE_ADD);
+                      
+                                          }
+              #endif
+ 883   7                                 
+ 884   7                              }
+ 885   6                          }
+ 886   5                          else if(scbFoundFlag == 0)                            
+ 887   5                          {
+ 888   6                              //release resource
+ 889   6                              if(scb)
+ 890   6                              {
+ 891   7                                  STM_FreeTimer(scb->teiTimer);
+ 892   7                                  STM_FreeTimer(scb->staTimer);
+ 893   7                                  scb->teiTimer = STM_TIMER_INVALID_ID;
+ 894   7                                  scb->staTimer = STM_TIMER_INVALID_ID;                            
+ 895   7      #ifdef LOG_FLASH
+                                          scbFreeReason = ASSOC_CNF_FAILED;
+              #endif              
+ 898   7                                  CRM_FreeScb(cnam->crm, scb);
+ 899   7                                  scb = NULL;
+ 900   7                              }
+ 901   6                              
+ 902   6                          }
+ 903   5                      }
+ 904   4                      else  //renew
+ 905   4                      {
+ 906   5                          //search through the CRM to get the scb
+ 907   5                          //scb = CRM_GetScb(cnam->crm, event->eventHdr.stei);
+ 908   5                          scb = (sScb *)(hpgpHdr->scb);
+ 909   5                          if(scb)
+ 910   5                          {
+ 911   6                              //save MAC address for TEI renew too 
+ 912   6                              //in case of CCo handover
+ 913   6                              scb->staCap.fields.ccoCap = assocReq->ccoCap;
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 16  
+
+ 914   6                              scb->staCap.fields.proxyNetCap = assocReq->proxyNetCap;
+ 915   6                              memcpy(scb->macAddr, hpgpHdr->macAddr, 
+ 916   6                                     MAC_ADDR_LEN);
+ 917   6                              assocCnfParam.staTei = scb->tei;
+ 918   6                              assocCnfParam.result = HPGP_ASSOC_RESULT_SUCCESS;
+ 919   6                        
+ 920   6                              // check if the sta is auth
+ 921   6                              if(scb->staStatus.fields.authStatus)
+ 922   6                              {
+ 923   7                                  assocCnfParam.teiLeaseTime = cnam->teiLeaseTimeAuth;
+ 924   7                              }
+ 925   6                              else //unauth
+ 926   6                              {
+ 927   7                                  assocCnfParam.teiLeaseTime = cnam->teiLeaseTime;
+ 928   7                              }
+ 929   6                              assocCnfParam.dstTei = scb->tei;
+ 930   6                              assocCnfParam.dstMacAddr = scb->macAddr;
+ 931   6                              //restart the TEI release timer
+ 932   6                              STM_StopTimer(scb->teiTimer);
+ 933   6                              STM_StartTimer(scb->teiTimer, 
+ 934   6                                             assocCnfParam.teiLeaseTime*60000);
+ 935   6      #ifdef P8051
+ 936   6      FM_Printf(FM_HINFO, "CNAM:lease(0x%lx)\n",
+ 937   6      #else
+              FM_Printf(FM_HINFO, "CNAM:lease(0x%.8x)\n",
+              #endif
+ 940   6                           assocCnfParam.teiLeaseTime*60000);
+ 941   6                          
+ 942   6                          }
+ 943   5                          else
+ 944   5                          {
+ 945   6                              assocCnfParam.dstTei = hpgpHdr->tei;
+ 946   6                              assocCnfParam.dstMacAddr = hpgpHdr->macAddr;
+ 947   6                              assocCnfParam.result = HPGP_ASSOC_RESULT_UNKNOWN;
+ 948   6                          }
+ 949   5      
+ 950   5                          CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_ASSOC_CNF, 
+ 951   5                                                 &assocCnfParam);
+ 952   5                CNAM_SendTeiMapInd(cnam, 
+ 953   5                            scb, 
+ 954   5                          HPGP_TEI_MAP_MODE_ADD);     
+ 955   5      
+ 956   5                
+ 957   5                
+ 958   5                      }
+ 959   4                      break;
+ 960   4                  }
+ 961   3      
+ 962   3            case EVENT_TYPE_CC_BACKUP_APPOINT_CNF:
+ 963   3            {
+ 964   4              scb = (sScb *)(hpgpHdr->scb);
+ 965   4              if(scb)
+ 966   4              {
+ 967   5                
+ 968   5                
+ 969   5                FM_Printf(FM_MMSG, "CNAM:<<<BACKUP_APPOINT_CNF(tei:%bu)\n",
+ 970   5                      scb->tei);
+ 971   5      
+ 972   5                if (scb->namState == STA_NAM_STATE_CONN)
+ 973   5      
+ 974   5                {
+ 975   6                  ccoBackUpCnf = (sCcBackupCnf*)event->buffDesc.dataptr;
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 17  
+
+ 976   6      
+ 977   6                  if (!ccoBackUpCnf->result) 
+ 978   6                  {  //Success
+ 979   7                    scb->staCap.fields.backupCcoStatus = 1;
+ 980   7                     
+ 981   7                    cnam->backupCCoCfg.result = 0;
+ 982   7      
+ 983   7                    break;
+ 984   7          
+ 985   7                  }
+ 986   6      
+ 987   6                }
+ 988   5              
+ 989   5                cnam->backupCCoCfg.scb = NULL;
+ 990   5      
+ 991   5                cnam->backupCCoCfg.result = 1;  
+ 992   5                  
+ 993   5                CNAM_SelectBackupCCo(cnam, scb);
+ 994   5                
+ 995   5              }
+ 996   4      
+ 997   4              break;
+ 998   4            }
+ 999   3          
+1000   3                  case EVENT_TYPE_CC_CCO_APPOINT_REQ: // user appointed CCO
+1001   3                  {
+1002   4                      scb = (sScb *)(hpgpHdr->scb);
+1003   4                      if(scb && (scb->namState == STA_NAM_STATE_CONN))
+1004   4                      {
+1005   5                      FM_Printf(FM_MMSG, "CNAM:<<<CCO_APPOINT.REQ(tei:%bu)\n",
+1006   5                                          scb->tei);
+1007   5                          //process the event only in STA_STATE_IDLE
+1008   5                          ccoApptReq = (sCcCcoApptReq *)event->buffDesc.dataptr; 
+1009   5      
+1010   5                          txCcoApptCnf  = 0;
+1011   5                          if(ccoApptReq->reqType == HPGP_CCO_APPT_REQ_APPT_HO)
+1012   5                          {
+1013   6                              //(1) am I an user appointed CCO already?
+1014   6      //                      if(ccoInfo->appointedCco)
+1015   6                              if(staInfo->ccoScb->staStatus.fields.apptCcoStatus)
+1016   6                              {
+1017   7                                  //already a user appointed CCo
+1018   7                                  ccoApptCnfParam.result = 
+1019   7                                      HPGP_CCO_APPT_CNF_APPT_CCO;      
+1020   7                                  //send a negaive CC_CCO_APPOINT_CNF response
+1021   7                                  txCcoApptCnf = 1;
+1022   7                              }
+1023   6                              else
+1024   6                              {
+1025   7      
+1026   7                                  //(2) check if the appointed STA is associated 
+1027   7                                  scbIter = NULL;
+1028   7                                  scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1029   7                                  while(scbIter)
+1030   7                                  {
+1031   8                                      if(memcmp(ccoApptReq->macAddr, 
+1032   8                                             scbIter->macAddr, MAC_ADDR_LEN) == 0)
+1033   8                                      {
+1034   9                                          break;
+1035   9                                      }
+1036   8                                      scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1037   8                                  }
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 18  
+
+1038   7                                  if(scbIter == NULL)
+1039   7                                  {
+1040   8                                      //unknown user-appointed STA
+1041   8                                      ccoApptCnfParam.result = 
+1042   8                                          HPGP_CCO_APPT_CNF_UNKNOWN_STA;      
+1043   8                                      //send a negaive CC_CCO_APPOINT_CNF response
+1044   8                                      txCcoApptCnf = 1;
+1045   8                                  }
+1046   7                                  else
+1047   7                                  {
+1048   8                                      //CCo is appointed and perform handover
+1049   8      //                                ccoInfo->ccoScb->staStatus.fields.apptCcoStatus = 1;
+1050   8      //                                ccoInfo->appointedCco = 1;
+1051   8                                      //success, send a CC_HANDOVER.REQ
+1052   8                                     txCcoApptCnf  = 0;
+1053   8                                  }
+1054   7                              }
+1055   6                          }
+1056   5                          else if(ccoApptReq->reqType == HPGP_CCO_APPT_REQ_UNAPPT)
+1057   5                          {
+1058   6                              //if(ccoInfo->appointedCco)
+1059   6                              if(staInfo->ccoScb->staStatus.fields.apptCcoStatus)
+1060   6                              { 
+1061   7                                  //ccoInfo->appointedCco = 0;
+1062   7                                  staInfo->ccoScb->staStatus.fields.apptCcoStatus = 0;
+1063   7                                  //CCo is unappointed
+1064   7                                  ccoApptCnfParam.result = 
+1065   7                                          HPGP_CCO_APPT_CNF_CCO_UNAPPT;      
+1066   7                              }
+1067   6                              else
+1068   6                              {
+1069   7                                  //CCo is not a user appointed Cco
+1070   7                                  ccoApptCnfParam.result = 
+1071   7                                          HPGP_CCO_APPT_CNF_CCO_NOT_APPT;      
+1072   7                              }
+1073   6                              txCcoApptCnf = 1;
+1074   6                          }
+1075   5                          else if(ccoApptReq->reqType == 
+1076   5                                      HPGP_CCO_APPT_REQ_UNAPPT_HO)
+1077   5                          {
+1078   6                              //check if the appointed STA is associated 
+1079   6                              scbIter = NULL;
+1080   6                              scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1081   6                              while(scbIter)
+1082   6                              {
+1083   7                                  if(memcmp(ccoApptReq->macAddr, 
+1084   7                                         scbIter->macAddr, MAC_ADDR_LEN) == 0)
+1085   7                                  {
+1086   8                                      break;
+1087   8                                  }
+1088   7                                  scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1089   7                              }
+1090   6                              if(scbIter == NULL)
+1091   6                              {
+1092   7                                  //unknown user-appointed STA
+1093   7                                  ccoApptCnfParam.result = 
+1094   7                                      HPGP_CCO_APPT_CNF_UNKNOWN_STA2;      
+1095   7                                  //send a negaive CC_CCO_APPOINT_CNF response
+1096   7                                  txCcoApptCnf = 1;
+1097   7                              }
+1098   6                              else
+1099   6                              {
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 19  
+
+1100   7                                  //ccoInfo->appointedCco = 0;
+1101   7                                  staInfo->ccoScb->staStatus.fields.apptCcoStatus = 0;
+1102   7                                  //success, send a CC_HANDOVER.REQ
+1103   7                                  txCcoApptCnf = 0;
+1104   7                              }
+1105   6                          }
+1106   5                          else
+1107   5                          {
+1108   6                              FM_Printf(FM_ERROR, "CNAM:unknown req\n");
+1109   6                          }
+1110   5      
+1111   5                          if(txCcoApptCnf)
+1112   5                          {
+1113   6                              ccoApptCnfParam.dstTei = hpgpHdr->tei;
+1114   6                              ccoApptCnfParam.dstMacAddr = hpgpHdr->macAddr;
+1115   6                              CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_CCO_APPOINT_CNF, 
+1116   6                                               &ccoApptCnfParam);
+1117   6                          }
+1118   5                          else
+1119   5                          {
+1120   6                              //initiate the CCO handover
+1121   6                              newEvent = EVENT_Alloc(sizeof(sCcoHoReqEvent), 
+1122   6                                                     EVENT_HPGP_CTRL_HEADROOM);
+1123   6                              if(newEvent == NULL)
+1124   6                              {
+1125   7                                  FM_Printf(FM_ERROR, "EAllocErr\n");
+1126   7                                  break ;
+1127   7                              }
+1128   6      
+1129   6      
+1130   6                              cnam->ccoApptOrigScb = scb;
+1131   6                          
+1132   6      //                    scbIter->hoTrigger = HO_TRIGGER_TYPE_USER;
+1133   6                              newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1134   6                              newEvent->eventHdr.type = EVENT_TYPE_CCO_HO_REQ;
+1135   6      
+1136   6                              newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+1137   6      
+1138   6                              newHpgpHdr->scb = scbIter;
+1139   6                              ccoHoReqEvent = (sCcoHoReqEvent *)(newEvent->buffDesc.dataptr); 
+1140   6                              ccoHoReqEvent->reason = HPGP_HO_REASON_CCO_APPT;
+1141   6                              newEvent->buffDesc.datalen +=sizeof(sCcoHoReqEvent);
+1142   6                              EVENT_Assert(newEvent);
+1143   6                              //LINKL_SendEvent(linkl, newEvent);
+1144   6                              SLIST_Put(&linkl->intEventQueue, &newEvent->link);
+1145   6                              scbIter->namState = STA_NAM_STATE_WAITFOR_CCO_HO_RSP;
+1146   6                          }
+1147   5                      }
+1148   4                      break;
+1149   4                  }
+1150   3                  case EVENT_TYPE_CC_LEAVE_REQ:
+1151   3                  {
+1152   4                      //process the event only in STA_STATE_IDLE
+1153   4                      //search through the CRM to get the scb
+1154   4                      //scb = CRM_GetScb(cnam->crm, event->eventHdr.stei);
+1155   4                      hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+1156   4                      scb = (sScb *)(hpgpHdr->scb);
+1157   4              
+1158   4              FM_Printf(FM_MMSG, "CNAM:<<<LEAVE.REQ(tei:%bu)\n",
+1159   4                                          scb->tei);
+1160   4      #ifdef LOG_FLASH
+                              logEvent(MGMT_MSG, 0, EVENT_TYPE_CC_LEAVE_REQ, &scb->tei, 1);
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 20  
+
+              #endif
+1163   4                      if(scb && (scb->namState == STA_NAM_STATE_CONN))
+1164   4                      {
+1165   5                          leaveCnfParam.dstTei = scb->tei;
+1166   5                          leaveCnfParam.dstMacAddr = scb->macAddr;
+1167   5                          //stop the TEI release timer
+1168   5                          STM_StopTimer(scb->teiTimer);
+1169   5            
+1170   5                          //start the TEI reuser timer
+1171   5                          STM_StartTimer(scb->teiTimer, 
+1172   5                                         HPGP_TIME_TEI_REUSE);
+1173   5                          scb->namState = STA_NAM_STATE_RELEASE;
+1174   5                
+1175   5                          CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_LEAVE_CNF, 
+1176   5                                                 &leaveCnfParam);
+1177   5                          //update the TEI map
+1178   5                          CNAM_SendTeiMapInd(cnam, scb, HPGP_TEI_MAP_MODE_DELETE);
+1179   5      
+1180   5                { 
+1181   6                  hostEvent_peerLeave_t pLeave;
+1182   6                
+1183   6                  memcpy(pLeave.macAddress, scb->macAddr, MAC_ADDR_LEN);
+1184   6                  pLeave.tei = scb->tei;
+1185   6                  pLeave.reason = HOST_EVENT_PEER_LEAVE_REASON_PEER_LEAVING;
+1186   6                
+1187   6                
+1188   6                  Host_SendIndication(HOST_EVENT_PEER_STA_LEAVE, (u8*)&pLeave,
+1189   6                            sizeof(hostEvent_peerLeave_t));
+1190   6                
+1191   6                }
+1192   5      
+1193   5      #ifdef ROUTE
+                                  ROUTE_preparteAndSendUnreachable(scb);                    
+              #endif
+1196   5      
+1197   5                          //Remove MAC addr from scb list
+1198   5                          //hal hpgp tx uses mac address so we cannot nullify here
+1199   5      //                    memset(&scb->macAddr, 0, MAC_ADDR_LEN);
+1200   5      
+1201   5      #ifdef SIMU
+                                  //NOTE: if the CC_LEAVE_REQ is retransmitted
+                                  //it would not processed
+                                  SHAL_DeletePortMap(HOMEPLUG_GetHal()->shal,
+                                                     scb->tei);
+              #else
+1207   5                          //call the HAL to remove TEI 
+1208   5      #endif
+1209   5                      }
+1210   4                      else
+1211   4                      {
+1212   5      #ifdef NAM_PRINT        
+                                  FM_Printf(FM_ERROR, "CNAM:no scb for leaving STA\n");
+              #endif          
+1215   5                      }
+1216   4      #ifdef POWERSAVE
+                      PSM_resetScbPs(scb);  // set SCB's PS data to init state 
+              #endif
+1219   4                      break;
+1220   4                  }
+1221   3                  case EVENT_TYPE_CM_STA_IDENTIFY_REQ:                    
+1222   3                  {
+1223   4                      IDENTIFY_procFrm(EVENT_TYPE_CM_STA_IDENTIFY_REQ, event);
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 21  
+
+1224   4                      break;
+1225   4                  }
+1226   3                  case EVENT_TYPE_CM_STA_IDENTIFY_CNF:                    
+1227   3                  {
+1228   4                      IDENTIFY_procFrm(EVENT_TYPE_CM_STA_IDENTIFY_CNF, event);
+1229   4                      break;
+1230   4                  }
+1231   3                  case EVENT_TYPE_CM_STA_IDENTIFY_IND:                    
+1232   3                  {
+1233   4                      IDENTIFY_procFrm(EVENT_TYPE_CM_STA_IDENTIFY_IND, event);
+1234   4                      break;
+1235   4                  }
+1236   3                  
+1237   3                  default:
+1238   3                  {
+1239   4                  }
+1240   3              }
+1241   2          }
+1242   1          else // control message
+1243   1          {
+1244   2              switch(event->eventHdr.type)
+1245   2              {
+1246   3      
+1247   3            case EVENT_TYPE_CNAM_STOP_REQ:
+1248   3            {   
+1249   4              sLeaveIndParam leaveIndParam;
+1250   4      #ifdef NAM_PRINT
+                      FM_Printf(FM_USER,"EVENT_TYPE_CNAM_STOP_REQ\n");
+              #endif        
+1253   4              scbIter = CRM_GetNextScb(cnam->crm, NULL);
+1254   4            
+1255   4              if (LINKL_QueryAnySta(linkl))
+1256   4              {
+1257   5                  // Nothing to do
+1258   5                  
+1259   5                cnam->state = CNAM_STATE_SHUTTINGDOWN;
+1260   5              }
+1261   4              else
+1262   4              {
+1263   5                sEvent *newEvent;
+1264   5                  newEvent = EVENT_Alloc(EVENT_DEFAULT_SIZE, 0);
+1265   5                  if(newEvent)
+1266   5                  {       
+1267   6                      newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1268   6      
+1269   6                  cnam->state = CNAM_STATE_INIT;
+1270   6                  newEvent->eventHdr.type = EVENT_TYPE_NET_EXIT_IND;
+1271   6      
+1272   6                      CTRLL_ReceiveEvent(linkl->eventcookie, newEvent);   
+1273   6                      
+1274   6                  }
+1275   5                  else
+1276   5                  {
+1277   6                      FM_Printf(FM_ERROR, "CNAM:EallocErr\n");
+1278   6                  }
+1279   5      #if 0 //this happens in linkl_poststopcco
+              
+                        if(staInfo->ccoScb != NULL)
+                        {
+                          CRM_FreeScb(&linkl->ccoRm, staInfo->ccoScb);
+                        }
+              
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 22  
+
+              #endif
+1287   5                  break;
+1288   5              }
+1289   4                                  
+1290   4              while(scbIter)
+1291   4              {
+1292   5                if(scbIter->tei != staInfo->tei)
+1293   5                {
+1294   6                  
+1295   6                            leaveIndParam.reason = HPGP_LEAVE_IND_REASON_CCO_DOWN;
+1296   6                            leaveIndParam.dstTei = scbIter->tei;
+1297   6                            leaveIndParam.dstMacAddr = scbIter->macAddr;
+1298   6                            STM_StopTimer(scbIter->teiTimer);
+1299   6      
+1300   6                            //start the TEI reuser timer
+1301   6                            STM_StartTimer(scbIter->teiTimer, 
+1302   6                                           50);
+1303   6                            scbIter->namState = STA_NAM_STATE_RELEASE;
+1304   6      
+1305   6                            //send the CC_LEAVE.IND
+1306   6                            CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_LEAVE_IND, 
+1307   6                                                   &leaveIndParam);
+1308   6              
+1309   6                }
+1310   5              
+1311   5                scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1312   5              } //end of while
+1313   4              
+1314   4      
+1315   4              break;
+1316   4              
+1317   4            }
+1318   3      
+1319   3              
+1320   3              case EVENT_TYPE_TIMER_TEI_IND:
+1321   3            case EVENT_TYPE_STA_AGEOUT:
+1322   3                  {
+1323   4                      //process the event at any time 
+1324   4                      //tei lease timer
+1325   4                      hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+1326   4                      scb = (sScb *)(hpgpHdr->scb);
+1327   4      #ifdef POWERSAVE 
+                      if (scb->psState == PSM_PS_STATE_ON)
+                      {
+              //          printf("CNAM_ProcEvent: event type %d with PS on (tei: %bu). Don't send LEAVE.IND\n",
+              //                      event->eventHdr.type, scb->tei);
+                        break;
+                      }
+              #endif
+1335   4                      //release the resource
+1336   4                      if(scb->namState == STA_NAM_STATE_CONN)
+1337   4                      {
+1338   5                          leaveIndParam.reason = HPGP_LEAVE_IND_REASON_TEI_EXP;
+1339   5                          leaveIndParam.dstTei = scb->tei;
+1340   5                          leaveIndParam.dstMacAddr = scb->macAddr;
+1341   5                          STM_StopTimer(scb->teiTimer);
+1342   5      
+1343   5                          //start the TEI reuser timer
+1344   5                          STM_StartTimer(scb->teiTimer, 
+1345   5                                         HPGP_TIME_TEI_REUSE);
+1346   5                          scb->namState = STA_NAM_STATE_RELEASE;
+1347   5      
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 23  
+
+1348   5                
+1349   5                { 
+1350   6                  hostEvent_peerLeave_t pLeave;
+1351   6                
+1352   6                  memcpy(pLeave.macAddress, scb->macAddr, MAC_ADDR_LEN);
+1353   6                  pLeave.tei = scb->tei;
+1354   6                  pLeave.reason = HOST_EVENT_PEER_LEAVE_REASON_TEI_TIMEOUT;
+1355   6                
+1356   6                
+1357   6                  Host_SendIndication(HOST_EVENT_PEER_STA_LEAVE, (u8*)&pLeave,
+1358   6                            sizeof(hostEvent_peerLeave_t));
+1359   6                
+1360   6                }
+1361   5      
+1362   5                          //send the CC_LEAVE.IND
+1363   5                          CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_LEAVE_IND, 
+1364   5                                                 &leaveIndParam);
+1365   5                          //update the TEI map
+1366   5                          CNAM_SendTeiMapInd(cnam, scb, HPGP_TEI_MAP_MODE_DELETE);
+1367   5                          
+1368   5      #ifdef ROUTE
+                                   ROUTE_preparteAndSendUnreachable(scb);                    
+              #endif
+1371   5      
+1372   5                CNAM_BackupCCoAgeOut(cnam, scb);
+1373   5                          //Remove MAC addr from scb list
+1374   5                          memset(&scb->macAddr, 0, MAC_ADDR_LEN);
+1375   5      
+1376   5      #ifdef SIMU
+                                  //NOTE: if the CC_LEAVE_REQ is retransmitted
+                                  //it may not be processed
+                                  SHAL_DeletePortMap(HOMEPLUG_GetHal()->shal,
+                                                     scb->tei);
+              #else
+1382   5                          //call the HAL to remove TEI
+1383   5      #endif
+1384   5                      }
+1385   4                      else if( scb->namState == STA_NAM_STATE_RELEASE)
+1386   4                      { 
+1387   5      #ifdef NAM_PRINT        
+              #ifdef P8051
+                                  FM_Printf(FM_MINFO, 
+                                            "CNAM:free the scb for leaving STA(tei: %bu)\n",
+                                            scb->tei);
+              #else
+                                  FM_Printf(FM_MINFO, 
+                                            "CNAM:free the scb for leaving STA(tei: %d)\n",
+                                            scb->tei);
+              #endif
+              #endif
+1398   5                CNAM_BackupCCoAgeOut(cnam, scb);
+1399   5      
+1400   5                          // STA_NAM_STATE_RELEASE:
+1401   5                          STM_FreeTimer(scb->teiTimer);
+1402   5                          STM_FreeTimer(scb->staTimer);
+1403   5                          scb->teiTimer = STM_TIMER_INVALID_ID;
+1404   5                          scb->staTimer = STM_TIMER_INVALID_ID;
+1405   5                         
+1406   5                          cnsm = LINKL_GetCnsm(linkl);
+1407   5                          CNSM_UpdateDiscBcnSched(cnsm, scb);
+1408   5                          
+1409   5      #ifdef LOG_FLASH
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 24  
+
+                                  scbFreeReason = STA_AGEOUT;
+              #endif
+1412   5                          CRM_FreeScb(cnam->crm, scb);
+1413   5                          
+1414   5                          // If last STA leave network Become unassoc
+1415   5      
+1416   5                          if (LINKL_QueryAnySta(linkl))
+1417   5                          {
+1418   6                              // Nothing to do
+1419   6                          }
+1420   5                          else
+1421   5                          {
+1422   6                              newEvent = EVENT_Alloc(EVENT_DEFAULT_SIZE, 0);
+1423   6                              if(newEvent)
+1424   6                              {
+1425   7                                  newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1426   7      
+1427   7                    if (cnam->state == CNAM_STATE_SHUTTINGDOWN)
+1428   7                    {
+1429   8                      cnam->state = CNAM_STATE_INIT;
+1430   8                      newEvent->eventHdr.type = EVENT_TYPE_NET_EXIT_IND;
+1431   8      
+1432   8                    }
+1433   7                    else
+1434   7                    {
+1435   8                      newEvent->eventHdr.type = EVENT_TYPE_NO_STA_IND;
+1436   8                    }
+1437   7                            
+1438   7      
+1439   7                    CTRLL_ReceiveEvent(linkl->eventcookie, newEvent);
+1440   7                    
+1441   7                              }
+1442   6                              else
+1443   6                              {
+1444   7                                  FM_Printf(FM_ERROR, "CNAM_ProcEvent: EAllocErr\n");
+1445   7                              }
+1446   6                          }
+1447   5                           
+1448   5                      }
+1449   4                      else
+1450   4                      {
+1451   5                          FM_Printf(FM_ERROR, "CNAM:unexpected TEI release timer out\n");
+1452   5                      }
+1453   4                      break;
+1454   4                  }
+1455   3                  case EVENT_TYPE_CCO_SELECT_IND: 
+1456   3                  {
+1457   4                      hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+1458   4                      scb = (sScb *)(hpgpHdr->scb);
+1459   4                      if(scb && (scb->namState == STA_NAM_STATE_CONN))
+1460   4                      {
+1461   5      #ifdef NAM_PRINT        
+              FM_Printf(FM_ERROR, "CNAM:Initiate a HO\n");
+              #endif           
+1464   5                      //initiate the CCO handover
+1465   5                          newEvent = EVENT_Alloc(sizeof(sCcoHoReqEvent), 
+1466   5                                                 EVENT_HPGP_CTRL_HEADROOM);
+1467   5                          if(newEvent == NULL)
+1468   5                          {
+1469   6                              FM_Printf(FM_ERROR, "EAllocErr\n");
+1470   6                              break ;
+1471   6                          }
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 25  
+
+1472   5      //                    scb->hoTrigger = HO_TRIGGER_TYPE_AUTO;
+1473   5                          newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1474   5                          newEvent->eventHdr.type = EVENT_TYPE_CCO_HO_REQ;
+1475   5                          newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+1476   5      
+1477   5                          newHpgpHdr->scb = scb;
+1478   5                          ccoHoReqEvent = (sCcoHoReqEvent *)(newEvent->buffDesc.dataptr); 
+1479   5                          ccoHoReqEvent->reason = HPGP_HO_REASON_CCO_SLCT;
+1480   5                          newEvent->buffDesc.datalen +=sizeof(sCcoHoReqEvent);
+1481   5                          EVENT_Assert(newEvent);
+1482   5                          //LINKL_SendEvent(linkl, newEvent);
+1483   5                          SLIST_Put(&linkl->intEventQueue, &newEvent->link);
+1484   5                          scb->namState = STA_NAM_STATE_WAITFOR_CCO_HO_RSP;
+1485   5                      }
+1486   4                      else
+1487   4                      {
+1488   5                          FM_Printf(FM_WARN, "CNAM:Initiate a HO fail\n");
+1489   5                      }
+1490   4                      break;
+1491   4                  }
+1492   3                  case EVENT_TYPE_CCO_HO_RSP: 
+1493   3                  {
+1494   4                      //process the event only in STA_STATE_IDLE
+1495   4                      hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+1496   4                      scb = (sScb *)(hpgpHdr->scb);
+1497   4                      if(scb && (scb->namState == STA_NAM_STATE_WAITFOR_CCO_HO_RSP))
+1498   4                      {
+1499   5                          if(cnam->ccoApptOrigScb)
+1500   5                          {
+1501   6                              ccoApptCnfParam.dstTei = cnam->ccoApptOrigScb->tei;
+1502   6                              ccoApptCnfParam.dstMacAddr = 
+1503   6                                  cnam->ccoApptOrigScb->macAddr;
+1504   6                              ccoHoRspEvent = (sCcoHoRspEvent *)(event->buffDesc.dataptr); 
+1505   6                              if( ccoHoRspEvent->reason == HPGP_HO_REASON_CCO_APPT)
+1506   6                              {
+1507   7                                  if(ccoHoRspEvent->result == TRUE)
+1508   7                                  {
+1509   8                                      ccoApptCnfParam.result = 
+1510   8                                          HPGP_CCO_APPT_CNF_ACCEPT;
+1511   8                                  }
+1512   7                                  else
+1513   7                                  {
+1514   8                                      ccoApptCnfParam.result = 
+1515   8                                          HPGP_CCO_APPT_CNF_REJECT;
+1516   8                                  }
+1517   7                              }
+1518   6                              else if( ccoHoRspEvent->reason == HPGP_HO_REASON_CCO_SLCT)
+1519   6                              {
+1520   7                                  if(ccoHoRspEvent->result == TRUE)
+1521   7                                  {
+1522   8                                      //CCo is un-appointed and perform handover
+1523   8                                      ccoApptCnfParam.result = 
+1524   8                                          HPGP_CCO_APPT_CNF_UNAPPT_HO;
+1525   8                                  }
+1526   7                                  else
+1527   7                                  {
+1528   8                                      //not defined in the standard
+1529   8                                      ccoApptCnfParam.result = 
+1530   8                                          HPGP_CCO_APPT_CNF_REJECT;
+1531   8                                  }
+1532   7                              }
+1533   6      
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 26  
+
+1534   6                              CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_CCO_APPOINT_CNF, 
+1535   6                                               &ccoApptCnfParam);
+1536   6                              cnam->ccoApptOrigScb = NULL;
+1537   6                          }
+1538   5                          //else it is triggered by the auto CCo selection
+1539   5                      }
+1540   4                      break;
+1541   4                  }
+1542   3                  default:
+1543   3                  {
+1544   4                      break;
+1545   4                  }
+1546   3              }
+1547   2          }
+1548   1      }
+1549          
+1550          void CNAM_BackupCCoAgeOut(sCnam *cnam, sScb *scb)
+1551          {
+1552   1      
+1553   1        if (cnam->backupCCoCfg.scb  == scb)
+1554   1        {
+1555   2          scb->staCap.fields.backupCcoStatus = 0;
+1556   2          scb->staCap.fields.backupCcoCap = 0;
+1557   2          cnam->backupCCoCfg.scb = NULL;
+1558   2          
+1559   2          CNAM_SelectBackupCCo(cnam, scb);
+1560   2        }
+1561   1              
+1562   1      
+1563   1      }
+1564          
+1565          eStatus CNAM_SelectBackupCCo(sCnam *cnam, sScb *scbIter)
+1566          {
+1567   1        sBackupCCoParam    ccoBackupReq;
+1568   1      
+1569   1        
+1570   1        scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1571   1      
+1572   1      
+1573   1        while(scbIter)
+1574   1        {
+1575   2      
+1576   2          if((scbIter->tei != cnam->staInfo->ccoScb->tei) &&
+1577   2               (scbIter->staCap.fields.backupCcoCap))
+1578   2          {
+1579   3      
+1580   3            ccoBackupReq.dstTei = scbIter->tei;
+1581   3            ccoBackupReq.dstMacAddr = scbIter->macAddr;
+1582   3            ccoBackupReq.action = HPGP_CCO_BACKUP_REQ_APPOINT;
+1583   3      
+1584   3            cnam->backupCCoCfg.scb = scbIter;
+1585   3            
+1586   3            CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_BACKUP_APPOINT_REQ,
+1587   3                     &ccoBackupReq);
+1588   3      
+1589   3            return STATUS_SUCCESS;
+1590   3            
+1591   3      
+1592   3          }
+1593   2      
+1594   2          scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1595   2        } //end of while
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 27  
+
+1596   1      
+1597   1        return STATUS_FAILURE;
+1598   1      
+1599   1        
+1600   1      }
+1601          
+1602          eStatus CNAM_ReleaseBackupCCo()
+1603          {
+1604   1        sBackupCCoParam    ccoBackupReq;
+1605   1        sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1606   1        sCnam *cnam = &linkl->ccoNam;
+1607   1        sScb *scbIter = NULL;
+1608   1        
+1609   1        scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1610   1      
+1611   1        while(scbIter)
+1612   1        {
+1613   2          if((scbIter->tei != cnam->staInfo->ccoScb->tei) &&
+1614   2               (scbIter->staCap.fields.backupCcoStatus))
+1615   2          {
+1616   3      
+1617   3              ccoBackupReq.dstTei = scbIter->tei;
+1618   3              ccoBackupReq.dstMacAddr = scbIter->macAddr;
+1619   3              ccoBackupReq.action = HPGP_CCO_BACKUP_REQ_RELEASE;
+1620   3      
+1621   3              cnam->backupCCoCfg.scb = NULL;
+1622   3              
+1623   3              CNAM_SendMgmtMsg(cnam, EVENT_TYPE_CC_BACKUP_APPOINT_REQ,
+1624   3                       &ccoBackupReq);
+1625   3      
+1626   3              return STATUS_SUCCESS;
+1627   3              
+1628   3            
+1629   3          }
+1630   2      
+1631   2          scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1632   2        } //end of while
+1633   1      
+1634   1        return STATUS_FAILURE;
+1635   1      
+1636   1        
+1637   1      }
+1638          
+1639          
+1640          
+1641          void CNAM_EnableAssocNotification(sCnam *cnam, u8 *macAddr)
+1642          {
+1643   1      
+1644   1          sLinkLayer        *linkl = NULL;
+1645   1          sStaInfo          *staInfo = NULL;
+1646   1      
+1647   1      
+1648   1      
+1649   1          cnam->accNotification = 1;
+1650   1      
+1651   1      
+1652   1      #ifdef UKE    
+                  linkl = cnam->linkl;
+                  staInfo = LINKL_GetStaInfo(linkl);
+              
+              
+                  memcpy((u8*)&cnam->ukePeer, macAddr, MAC_ADDR_LEN);
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 28  
+
+              #endif
+1659   1      
+1660   1          
+1661   1      }
+*** WARNING C280 IN LINE 1641 OF ..\..\src\link\nam.c: 'macAddr': unreferenced local variable
+1662          
+1663          void CNAM_Stop(sCnam *cnam)
+1664          {
+1665   1        sEvent *newEvent;
+1666   1        
+1667   1        newEvent = EVENT_Alloc(MAC_ADDR_LEN, 
+1668   1                     EVENT_HPGP_CTRL_HEADROOM);
+1669   1        if(newEvent == NULL)
+1670   1        {
+1671   2          FM_Printf(FM_ERROR, 
+1672   2              "CNAM:EallocErr\n");
+1673   2          return;
+1674   2        }
+1675   1        
+1676   1        newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1677   1        newEvent->eventHdr.type = EVENT_TYPE_CNAM_STOP_REQ;
+1678   1        
+1679   1        newEvent->buffDesc.datalen = 0;
+1680   1        SLIST_Put(&cnam->linkl->eventQueue, &newEvent->link);
+1681   1      
+1682   1      }
+1683          
+1684          
+1685          void  CNAM_Start(sCnam *cnam, u8 ccoType)
+1686          {
+1687   1          sScb *scbIter = NULL;
+1688   1      
+1689   1      
+1690   1          //if(ccoType == LINKL_CCO_TYPE_HO)
+1691   1          //{
+1692   1          //}
+1693   1          if (ccoType == LINKL_CCO_TYPE_UNASSOC)
+1694   1          {
+1695   2              cnam->accNotification = 1;
+1696   2          }
+1697   1          else
+1698   1          {
+1699   2              cnam->accNotification = 0;
+1700   2              //start the tei timer for each STA due to handover
+1701   2              //Note: if tei timer starts already (e.g. in when CCo is associated), 
+1702   2              //it would not take an affect
+1703   2              scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1704   2              while(scbIter)
+1705   2              {
+1706   3                  if(scbIter->tei != cnam->staInfo->ccoScb->tei)
+1707   3                  {
+1708   4                      STM_StartTimer(scbIter->teiTimer, cnam->teiLeaseTime*60000);
+1709   4                  }
+1710   3              
+1711   3                  scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+1712   3              }
+1713   2          }
+1714   1          cnam->state = CNAM_STATE_READY;
+1715   1      }
+1716          
+1717          
+1718          eStatus CNAM_Init(sCnam *cnam, sLinkLayer *linkl)
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 29  
+
+1719          {
+1720   1      
+1721   1          cnam->linkl = linkl;
+1722   1          cnam->staInfo = LINKL_GetStaInfo(linkl);
+1723   1          cnam->crm = LINKL_GetCrm(linkl);
+1724   1      
+1725   1          cnam->state = CNAM_STATE_INIT;
+1726   1          cnam->accNotification = 0;
+1727   1          cnam->teiLeaseTime = HPGP_TIME_TEI_LEASE_NOAUTH_MIN;   //15 minutes
+1728   1          cnam->teiLeaseTimeAuth = HPGP_TIME_TEI_LEASE_AUTH_MIN; //48 hours
+1729   1      
+1730   1        cnam->backupCCoCfg.scb = NULL;
+1731   1      //    cnam->ccoInfo = LINKL_GetCcoInfo(linkLayer);
+1732   1      
+1733   1      
+1734   1          return STATUS_SUCCESS;
+1735   1      }
+1736          
+1737          #endif /* CCO_FUNC */
+1738          
+1739          /* --------------------------
+1740           * STA network access manager
+1741           * -------------------------- */
+1742          
+1743          #ifdef STA_FUNC
+1744          
+1745          
+1746          #ifdef UKE
+              void SNAM_EnableAssocNtf(sSnam *snam, u8 *macAddr)
+              {
+                  sLinkLayer    *linkl = snam->linkl;
+                  sStaInfo      *staInfo = LINKL_GetStaInfo(linkl);
+              
+                  snam->ukePeerNotification = 1;
+                  
+                  memcpy(&snam->ukePeer, macAddr, MAC_ADDR_LEN);
+              
+              }
+              #endif
+1758          eStatus SNAM_SendMgmtMsg(sSnam *snam, u16 mmType)
+1759          {
+1760   1          eStatus        status = STATUS_FAILURE;
+1761   1          sEvent        *newEvent = NULL;
+1762   1          sHpgpHdr      *newHpgpHdr = NULL;
+1763   1          sCcAssocReq   *assocReq = NULL;
+1764   1          sCcLeaveReq   *leaveReq = NULL;
+1765   1          sCcCcoApptReq *ccoApptReq = NULL;
+1766   1        sCcBackupCnf  *ccoBackupCnf = NULL;
+1767   1          u16            eventSize = 0;
+1768   1      //    sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1769   1          sLinkLayer    *linkl = snam->linkl;
+1770   1          sStaInfo      *staInfo = LINKL_GetStaInfo(linkl);
+1771   1      
+1772   1          //build the CC_ASSOC.REQ
+1773   1          eventSize = MAX(HPGP_DATA_PAYLOAD_MIN, sizeof(sMgmtMsg));
+1774   1          newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+1775   1          if(newEvent == NULL)
+1776   1          {
+1777   2              FM_Printf(FM_ERROR, "EAllocErr\n");
+1778   2              return STATUS_FAILURE;
+1779   2          }
+1780   1      
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 30  
+
+1781   1          newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+1782   1          switch(mmType)
+1783   1          {
+1784   2            case EVENT_TYPE_CC_BACKUP_APPOINT_CNF:
+1785   2            
+1786   2            newEvent->eventHdr.type = EVENT_TYPE_CC_BACKUP_APPOINT_CNF;
+1787   2            
+1788   2                  newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+1789   2                  newHpgpHdr->tei = staInfo->ccoScb->tei;
+1790   2                  newHpgpHdr->macAddr = staInfo->ccoScb->macAddr;
+1791   2                  newHpgpHdr->snid = staInfo->snid;
+1792   2      
+1793   2            newHpgpHdr->eks = staInfo->nekEks;
+1794   2               
+1795   2                  ccoBackupCnf = (sCcBackupCnf *)(newEvent->buffDesc.dataptr); 
+1796   2                  ccoBackupCnf->result = snam->backupCCoCfg.result; //usre request
+1797   2                  newEvent->buffDesc.datalen += HPGP_DATA_PAYLOAD_MIN;
+1798   2      #ifdef P8051
+1799   2                  FM_Printf(FM_MMSG, "SNAM:>>>BACKUP_APPOINT_CNF(tei:%bu)\n",
+1800   2                                     newHpgpHdr->tei);
+1801   2      #else
+                          FM_Printf(FM_MMSG, "SNAM:>>>BACKUP_APPOINT_CNF(tei:%d)\n",
+                                             newHpgpHdr->tei);
+              #endif
+1805   2                
+1806   2            break;
+1807   2            
+1808   2              case EVENT_TYPE_CC_ASSOC_REQ:
+1809   2              {
+1810   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_ASSOC_REQ;
+1811   3                  if(staInfo->ccoScb == NULL)
+1812   3                  {
+1813   4                          FM_Printf(FM_ERROR, "SNAM:ccoScb NULL\n");
+1814   4                break;
+1815   4                  }
+1816   3      
+1817   3                  newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+1818   3      #ifdef DEVELO
+                          newHpgpHdr->tei = 0xFF;
+              #else
+1821   3                  newHpgpHdr->tei = staInfo->ccoScb->tei;
+1822   3      #endif
+1823   3                  newHpgpHdr->macAddr = staInfo->ccoScb->macAddr;
+1824   3                  newHpgpHdr->snid = staInfo->snid;
+1825   3      
+1826   3                  if (snam->teiRenew)
+1827   3                  {
+1828   4                      newHpgpHdr->eks = staInfo->nekEks;
+1829   4                  }
+1830   3                  else
+1831   3                  {
+1832   4                      newHpgpHdr->eks = HPGP_EKS_NONE;
+1833   4                  }
+1834   3       
+1835   3                  assocReq = (sCcAssocReq *)(newEvent->buffDesc.dataptr); 
+1836   3                  assocReq->reqType = snam->teiRenew; //new request    
+1837   3                  memcpy(assocReq->nid, staInfo->nid, NID_LEN);
+1838   3                  assocReq->ccoCap = staInfo->staCap.fields.ccoCap;
+1839   3                  assocReq->proxyNetCap = 0;
+1840   3                  newEvent->buffDesc.datalen +=MAX(HPGP_DATA_PAYLOAD_MIN, sizeof(sCcAssocReq));            
+1841   3      #ifdef LOG_FLASH
+                          logEvent(MGMT_MSG, 0, EVENT_TYPE_CC_ASSOC_REQ, NULL, 0);
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 31  
+
+              #endif
+1844   3                  FM_Printf(FM_MMSG, "SNAM:>>>CC_ASSOC.REQ(tei:%bu)\n",
+1845   3                                     newHpgpHdr->tei);
+1846   3                  break;
+1847   3              }
+1848   2              case EVENT_TYPE_CC_LEAVE_REQ:
+1849   2              {
+1850   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_LEAVE_REQ;
+1851   3      
+1852   3                  newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+1853   3                  newHpgpHdr->tei = staInfo->ccoScb->tei;
+1854   3                  newHpgpHdr->macAddr = staInfo->ccoScb->macAddr;
+1855   3                  newHpgpHdr->snid = staInfo->snid;
+1856   3                  if (staInfo->staStatus.fields.authStatus)
+1857   3                  {
+1858   4                      newHpgpHdr->eks = staInfo->nekEks;
+1859   4                  }
+1860   3                  else
+1861   3                  {
+1862   4                      newHpgpHdr->eks = HPGP_EKS_NONE;
+1863   4                  }
+1864   3      
+1865   3                  leaveReq = (sCcLeaveReq *)(newEvent->buffDesc.dataptr); 
+1866   3                  leaveReq->reason = snam->leaveReq.reason; //usre request
+1867   3                  newEvent->buffDesc.datalen += HPGP_DATA_PAYLOAD_MIN;
+1868   3      #ifdef LOG_FLASH
+                          logEvent(MGMT_MSG, 0, EVENT_TYPE_CC_LEAVE_REQ, &newHpgpHdr->tei, 1);
+              #endif
+1871   3      #ifdef P8051
+1872   3                  FM_Printf(FM_MMSG, "SNAM:>>>CC_LEAVE.REQ(tei:%bu)\n",
+1873   3                                     newHpgpHdr->tei);
+1874   3      #else
+                          FM_Printf(FM_MMSG, "SNAM:>>>CC_LEAVE.REQ(tei:%d)\n",
+                                             newHpgpHdr->tei);
+              #endif
+1878   3                  break;
+1879   3              }
+1880   2              case EVENT_TYPE_CC_CCO_APPOINT_REQ:
+1881   2              {
+1882   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_CCO_APPOINT_REQ;
+1883   3      
+1884   3                  newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+1885   3                  newHpgpHdr->tei = staInfo->ccoScb->tei;
+1886   3                  newHpgpHdr->macAddr = staInfo->ccoScb->macAddr;
+1887   3                  newHpgpHdr->snid = staInfo->snid;
+1888   3            newHpgpHdr->eks = staInfo->nekEks;
+1889   3      
+1890   3      
+1891   3                  ccoApptReq = (sCcCcoApptReq *)(newEvent->buffDesc.dataptr); 
+1892   3                  memcpy(ccoApptReq, &snam->ccoApptReq, sizeof(sCcCcoApptReq));
+1893   3                  newEvent->buffDesc.datalen +=MAX(HPGP_DATA_PAYLOAD_MIN, sizeof(sCcCcoApptReq));
+1894   3      #ifdef P8051
+1895   3                  FM_Printf(FM_MMSG, "SNAM:>>>CCO_APPOINT.REQ(tei:%bu)\n",
+1896   3                                     newHpgpHdr->tei);
+1897   3      #else
+                          FM_Printf(FM_MMSG, "SNAM:>>>CCO_APPOINT.REQ(tei:%d)\n",
+                                             newHpgpHdr->tei);
+              #endif
+1901   3                  break;
+1902   3              }
+1903   2              default:
+1904   2              {
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 32  
+
+1905   3              }
+1906   2          }
+1907   1          EVENT_Assert(newEvent);
+1908   1          //transmit the mgmt msg
+1909   1          status = MUXL_TransmitMgmtMsg(HPGPCTRL_GetLayer(HP_LAYER_TYPE_MUX), newEvent);
+1910   1          //the event is freed by MUXL if the TX is successful
+1911   1          if(status == STATUS_FAILURE)
+1912   1          {
+1913   2              EVENT_Free(newEvent);
+1914   2          }
+1915   1      
+1916   1          return status;
+1917   1      }
+1918          
+1919          
+1920          eStatus SNAM_DeliverEvent(sSnam *snam, u16 eventType, uEventBody *eventBody)
+1921          {
+1922   1          sEvent       *newEvent = NULL;
+1923   1      //    sLinkLayer   *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1924   1          sLinkLayer   *linkl = snam->linkl;
+1925   1      
+1926   1          newEvent = EVENT_Alloc(sizeof(uEventBody), 0);
+1927   1          if(newEvent == NULL)
+1928   1          {
+1929   2              FM_Printf(FM_ERROR, "SNAM:EAllocErr\n");
+1930   2              return STATUS_FAILURE;
+1931   2          }
+1932   1          newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1933   1          newEvent->eventHdr.type = eventType;
+1934   1       
+1935   1          switch(eventType)
+1936   1          {
+1937   2              case EVENT_TYPE_NET_LEAVE_IND:
+1938   2              {
+1939   3                  *(newEvent->buffDesc.dataptr) = eventBody->netLeaveInd.reason;
+1940   3                  break;
+1941   3              }
+1942   2              case EVENT_TYPE_NET_ACC_RSP:
+1943   2              {
+1944   3                  *(newEvent->buffDesc.dataptr) = eventBody->netAccRsp.result;
+1945   3                  break;
+1946   3              }
+1947   2              default:
+1948   2              {
+1949   3                 //event with null event body:
+1950   3                 //EVENT_TYPE_NET_LEAVE_RSP
+1951   3              }
+1952   2          }
+1953   1      
+1954   1          //deliver the event to the upper layer
+1955   1      #ifdef CALLBACK
+                  linkl->deliverEvent(linkl->eventcookie, newEvent);
+              #else
+1958   1          CTRLL_ReceiveEvent(linkl->eventcookie, newEvent);
+1959   1      #endif
+1960   1          
+1961   1          return STATUS_SUCCESS;
+1962   1      }
+1963          
+1964          
+1965          //Process CC_SET_TEI_MAP.IND: update tei map table
+1966          void SNAM_ProcTeiMapInd(sSnam *snam,  sCcTeiMapInd *teiMapInd)
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 33  
+
+1967          {
+1968   1          sTeiMap       *teiMap = NULL;
+1969   1          u8             numSta;
+1970   1      //    sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1971   1          sLinkLayer    *linkl = snam->linkl;
+1972   1          sCrm          *crm = LINKL_GetCrm(linkl);
+1973   1        sStaInfo   *staInfo  = LINKL_GetStaInfo(linkl);
+1974   1          sScb          *scb = NULL;
+1975   1      
+1976   1          switch (teiMapInd->mode)
+1977   1          {
+1978   2              case HPGP_TEI_MAP_MODE_NEW: 
+1979   2              {
+1980   3                  //update entire tei map table
+1981   3                  numSta = teiMapInd->numSta;  
+1982   3                  teiMap = &teiMapInd->teiMap;
+1983   3                  while(numSta)
+1984   3                  {
+1985   4                      scb = CRM_AddScb(crm, teiMap->tei);
+1986   4                      if(scb)
+1987   4                      {
+1988   5                          memcpy(scb->macAddr, teiMap->macAddr, MAC_ADDR_LEN);
+1989   5                          scb->staStatus.fields.authStatus = teiMap->status;
+1990   5      
+1991   5                scb->namState = STA_NAM_STATE_CONN;
+1992   5                          teiMap++;
+1993   5                          numSta--;
+1994   5      #ifdef ROUTE
+                                  if(scb != staInfo->staScb)
+                                  {                        
+                                      ROUTE_initLrtEntry(scb);                                                
+                                  }
+                                  
+              #endif
+2001   5                          if(scb != staInfo->staScb)
+2002   5                          {
+2003   6      #ifdef STA_ID
+              
+                                      scb->identityCapUpdated = FALSE;
+                                      scb->identityCapUpdatedRetry = 3;
+                                      
+                                      STM_StartTimer(snam->identifyCapTimer,HPGP_IDENTIFY_CAP_TIME);
+              #else
+2010   6                              scb->identityCapUpdated = TRUE;
+2011   6                              scb->identityCapUpdatedRetry = 0;
+2012   6      #endif
+2013   6                          }
+2014   5      //                    scb->uMaxSSN = 0;
+2015   5                          scb->uMinSSN = 0;
+2016   5                          scb->uWrapAround = 0;
+2017   5      
+2018   5      
+2019   5                if(scb->teiTimer == STM_TIMER_ID_NULL)
+2020   5                {
+2021   6                  scb->teiTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK, 
+2022   6                    EVENT_TYPE_TIMER_TEI_IND, scb);
+2023   6                }
+2024   5      
+2025   5      
+2026   5                      }
+2027   4                      else
+2028   4                      {
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 34  
+
+2029   5                          FM_Printf(FM_ERROR, "SNAM:can't add scb\n");
+2030   5                          break;
+2031   5                      }
+2032   4                  }
+2033   3                  break;
+2034   3              }
+2035   2              case HPGP_TEI_MAP_MODE_ADD:
+2036   2              {
+2037   3                  teiMap = &teiMapInd->teiMap;
+2038   3                  scb = CRM_AddScb(crm, teiMap->tei);
+2039   3                  if(scb)
+2040   3                  {
+2041   4                      sHpgpHdr *hpgpHdr;
+2042   4      
+2043   4                      memcpy(scb->macAddr, teiMap->macAddr, MAC_ADDR_LEN);
+2044   4                      scb->staStatus.fields.authStatus = teiMap->status;
+2045   4                      
+2046   4      #ifdef ROUTE
+                              ROUTE_initLrtEntry(scb);                
+                              
+              #endif
+2050   4      //                scb->uMaxSSN = 0;
+2051   4                      scb->uMinSSN = 0;
+2052   4                      scb->uWrapAround = 0;
+2053   4                      
+2054   4      
+2055   4              scb->namState = STA_NAM_STATE_CONN;
+2056   4      #ifdef STA_ID
+                              scb->identityCapUpdated = FALSE;
+                              scb->identityCapUpdatedRetry = 3;
+                                
+                              STM_StartTimer(snam->identifyCapTimer,HPGP_IDENTIFY_CAP_TIME);
+              #else
+2062   4                      scb->identityCapUpdated = TRUE;
+2063   4                      scb->identityCapUpdatedRetry = 0;
+2064   4      #endif
+2065   4      
+2066   4      #ifdef UKE 
+                              if ((snam->ukePeerNotification) &&
+                                   (!memcmp(&snam->ukePeer, &teiMap->macAddr, MAC_ADDR_LEN )))
+                              {
+              
+                                  {
+                                          sEvent *newEvent;
+                                          
+                                          //send the event to the SNAM to renew the TEI
+                                          newEvent = EVENT_Alloc(MAC_ADDR_LEN, 
+                                                                 EVENT_HPGP_CTRL_HEADROOM);
+                                          if(newEvent == NULL)
+                                          {
+                                              FM_Printf(FM_ERROR, "SNAM:EAllocErr\n");
+                                              break;
+                                          }
+                                          newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                                          newEvent->eventHdr.type = EVENT_TYPE_ASSOC_IND;
+                                          hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+                                          hpgpHdr->scb = (sScb*)scb;
+              
+                                          //send the event to the SNAM
+                                          //LINKL_SendEvent(linkl, newEvent);
+                                          memcpy(newEvent->buffDesc.dataptr,snam->ukePeer, MAC_ADDR_LEN);
+                                          newEvent->buffDesc.datalen = MAC_ADDR_LEN;
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 35  
+
+              
+                                          snam->ukePeerNotification = 0;
+                                          
+                                          //SLIST_Put(&linkl->intEventQueue, &newEvent->link);
+                                          LINKL_SendEvent(linkl, newEvent);
+                                          
+                              
+                                      }
+                              }
+              #endif        
+2101   4      
+2102   4              if(scb->teiTimer == STM_TIMER_ID_NULL)
+2103   4              {
+2104   5                scb->teiTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK, 
+2105   5                            EVENT_TYPE_TIMER_TEI_IND, scb);
+2106   5              }
+2107   4      
+2108   4                  }
+2109   3                  else
+2110   3                  {
+2111   4                      FM_Printf(FM_ERROR, "SNAM:can't add scb\n");
+2112   4                  }
+2113   3                  break;
+2114   3              }
+2115   2              case HPGP_TEI_MAP_MODE_DELETE: 
+2116   2              {
+2117   3      
+2118   3                  //remove it from the TEI MAP
+2119   3                  teiMap = &teiMapInd->teiMap;
+2120   3                  scb = CRM_GetScb(crm, teiMap->tei);
+2121   3                  if(scb)
+2122   3                  {
+2123   4      //                scb->uMaxSSN = 0;
+2124   4                      scb->uMinSSN = 0;
+2125   4                      scb->uWrapAround = 0;
+2126   4                  
+2127   4      #ifdef ROUTE
+                          ROUTE_preparteAndSendUnreachable(scb);            
+              #endif  // ROUTE
+2130   4      #ifdef LOG_FLASH
+                          scbFreeReason = TEI_MAP_DELETE;
+              #endif      
+2133   4                  CRM_FreeScb(crm, scb);
+2134   4      
+2135   4            { 
+2136   5              hostEvent_peerLeave_t pLeave;
+2137   5      
+2138   5              memcpy(pLeave.macAddress, scb->macAddr, MAC_ADDR_LEN);
+2139   5              pLeave.tei = scb->tei;
+2140   5              pLeave.reason = 0;
+2141   5      
+2142   5                
+2143   5      
+2144   5              Host_SendIndication(HOST_EVENT_PEER_STA_LEAVE, (u8*)&pLeave,
+2145   5                          sizeof(hostEvent_peerLeave_t));
+2146   5      
+2147   5            }
+2148   4      #ifdef NAM_PRINT
+              #ifdef P8051
+              FM_Printf(FM_ERROR, "SNAM:rm SCB(tei: %bu) TEI map\n", teiMap->tei);
+              #else
+              FM_Printf(FM_ERROR, "SNAM:rm SCB(tei: %d) TEI map\n", teiMap->tei);
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 36  
+
+              #endif
+              #endif
+2155   4                  //TODO: shall we remove it from the discovered sta list right now?
+2156   4                  //Or let it age out later 
+2157   4                  }
+2158   3                  break;
+2159   3              }
+2160   2              default:
+2161   2              {
+2162   3              }
+2163   2          }
+2164   1      
+2165   1      }
+*** WARNING C280 IN LINE 2041 OF ..\..\src\link\nam.c: 'hpgpHdr': unreferenced local variable
+2166          
+2167          void SNAM_ProcEvent(sSnam *snam, sEvent *event)
+2168          {
+2169   1          u8             staType;
+2170   1          u8             txCcoApptRsp;
+2171   1          sCcAssocCnf   *assocCnf = NULL;
+2172   1          sCcLeaveInd   *leaveInd = NULL;
+2173   1          sCcTeiMapInd  *teiMapInd = NULL;
+2174   1          sCcCcoApptReq *ccoApptReq = NULL;
+2175   1          sCcCcoApptCnf *ccoApptCnf = NULL;
+2176   1        sCcBackupReq  *ccoBackupReq;
+2177   1          sEvent        *newEvent = NULL;
+2178   1          sHpgpHdr      *hpgpHdr = NULL;
+2179   1          uEventBody    eventBody;
+2180   1          u16           eventType;
+2181   1          sScb          *scb = NULL;
+2182   1      //    sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+2183   1          sLinkLayer    *linkl = snam->linkl;
+2184   1          sStaInfo      *staInfo = LINKL_GetStaInfo(linkl);
+2185   1          sCrm          *crm = LINKL_GetCrm(linkl);
+2186   1          sNma          *nma = HOMEPLUG_GetNma();
+2187   1      //    sSnsm         *snsm = LINKL_GetSnsm(linkl);
+2188   1          hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+2189   1      
+2190   1          switch(snam->state)
+2191   1          {
+2192   2              case SNAM_STATE_INIT:
+2193   2              {
+2194   3                  if( (event->eventHdr.eventClass == EVENT_CLASS_CTRL)&& 
+2195   3                      (event->eventHdr.type == EVENT_TYPE_SNAM_START) )
+2196   3                  {
+2197   4                      staType = *(event->buffDesc.dataptr);
+2198   4       #ifdef NAM_PRINT                 
+              FM_Printf(FM_ERROR, "SNAM:Start(staType: %bu)\n", staType);
+              #endif
+2201   4                      if(staType == LINKL_STA_TYPE_ASSOC)
+2202   4                      {
+2203   5      #ifdef NAM_PRINT        
+              FM_Printf(FM_ERROR, "SNAM:Start as ASSOC STA\n");
+              #endif
+2206   5                          //handover, role from the CCo to the STA 
+2207   5                          snam->state = SNAM_STATE_CONN;
+2208   5                      }
+2209   4                      else 
+2210   4                      {
+2211   5                          //for net disc and unassociated STA,
+2212   5                          //transit to the ready state 
+2213   5                          //as the upper layer may issue net access request 
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 37  
+
+2214   5                          //when it finds the CCo
+2215   5                          snam->state = SNAM_STATE_READY;
+2216   5                      }
+2217   4                      //if(staType == LINKL_STA_TYPE_UNASSOC)
+2218   4                  }
+2219   3                  break;
+2220   3              }
+2221   2              case SNAM_STATE_READY:
+2222   2              {
+2223   3                  if( event->eventHdr.eventClass == EVENT_CLASS_CTRL)
+2224   3                  {
+2225   4                      switch(event->eventHdr.type)
+2226   4                      {
+2227   5                          case EVENT_TYPE_NET_ACC_REQ: 
+2228   5                          {
+2229   6      //                if(staInfo->staScb == NULL)
+2230   6      //                {
+2231   6                              snam->teiRenew = 0;
+2232   6      //                }
+2233   6      //                else
+2234   6      //                {
+2235   6                          //in case of CCo handover changing the CCo to STA 
+2236   6      //                    snam->teiRenew = 1;
+2237   6      //                }
+2238   6                              SNAM_SendMgmtMsg(snam, EVENT_TYPE_CC_ASSOC_REQ);
+2239   6      
+2240   6                              /* regardless of tx success, do the retransmission */
+2241   6                              STM_StartTimer(snam->accTimer, HPGP_TIME_ASSOC);
+2242   6                              snam->txRetryCnt++; 
+2243   6                              snam->state = SNAM_STATE_WAITFOR_CC_ASSOC_RSP;
+2244   6                              
+2245   6                        
+2246   6      
+2247   6                              break;
+2248   6                          }
+2249   5                          case EVENT_TYPE_SNAM_STOP: 
+2250   5                          {
+2251   6                              LINKL_StopSta(linkl);
+2252   6                              snam->state = SNAM_STATE_INIT;
+2253   6                              break;
+2254   6                          }
+2255   5                          default:
+2256   5                          {
+2257   6                          }
+2258   5                      }
+2259   4                  }
+2260   3                  break;
+2261   3              }
+2262   2              case SNAM_STATE_CONN:
+2263   2              {
+2264   3                  if( event->eventHdr.eventClass == EVENT_CLASS_MSG) 
+2265   3                  {
+2266   4                      switch(event->eventHdr.type)
+2267   4                      {
+2268   5      
+2269   5                case EVENT_TYPE_CC_BACKUP_APPOINT_REQ:
+2270   5                {
+2271   6      #ifndef LG_WAR
+2272   6                  FM_Printf(FM_MMSG, "SNAM:<<<BACKUP_APPOINT_REQ:(tei:%bu)\n", 
+2273   6                                                          hpgpHdr->tei);
+2274   6      
+2275   6                  ccoBackupReq = (sCcBackupReq*)event->buffDesc.dataptr;
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 38  
+
+2276   6      
+2277   6                  if (ccoBackupReq->action == HPGP_CCO_BACKUP_REQ_APPOINT)
+2278   6                  {
+2279   7      
+2280   7                    if (staInfo->staCap.fields.backupCcoCap)
+2281   7                    {
+2282   8                      snam->backupCCoCfg.result = 0;
+2283   8                      staInfo->staCap.fields.backupCcoStatus = 1;
+2284   8      
+2285   8      
+2286   8                      Host_SendIndication(HOST_EVENT_SELECTED_BACKUP_CCO, NULL, 0);
+2287   8      
+2288   8                    }
+2289   7                    else
+2290   7                    {               
+2291   8                      snam->backupCCoCfg.result = 1;                
+2292   8                    }
+2293   7      
+2294   7                  }
+2295   6                  else
+2296   6                  if (ccoBackupReq->action == HPGP_CCO_BACKUP_REQ_RELEASE)
+2297   6                  {
+2298   7      
+2299   7                    if (staInfo->staCap.fields.backupCcoStatus)
+2300   7                    {
+2301   8                      snam->backupCCoCfg.result = 0;
+2302   8                      staInfo->staCap.fields.backupCcoStatus = 0;
+2303   8      
+2304   8                    }
+2305   7                    else
+2306   7                    {               
+2307   8                      snam->backupCCoCfg.result = 1;                
+2308   8                    }
+2309   7      
+2310   7                  }
+2311   6      
+2312   6                  SNAM_SendMgmtMsg(snam, EVENT_TYPE_CC_BACKUP_APPOINT_CNF);
+2313   6      #endif
+2314   6      
+2315   6                  break;
+2316   6                                      
+2317   6      
+2318   6      
+2319   6                }
+2320   5                
+2321   5                          case EVENT_TYPE_CC_LEAVE_IND:
+2322   5                          {                      
+2323   6                          
+2324   6                      
+2325   6                              FM_Printf(FM_MMSG, "SNAM:<<<CC_LEAVE_IND(tei:%bu)\n", 
+2326   6                                                          hpgpHdr->tei);
+2327   6      #ifdef LOG_FLASH
+                                      logEvent(MGMT_MSG, 0, EVENT_TYPE_CC_LEAVE_IND, &hpgpHdr->tei, 1);
+              #endif
+2330   6                              
+2331   6                              STM_StopTimer(snam->teiTimer);
+2332   6                              //SNSM_LeaveConn(&linkl->staNsm);
+2333   6                              SNSM_Stop(&linkl->staNsm);
+2334   6      
+2335   6                  AKM_Stop(&linkl->akm);
+2336   6      
+2337   6                              //CRM_FreeScb(crm, staInfo->staScb);
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 39  
+
+2338   6                              //remove the TEI MAP
+2339   6                              CRM_Init(crm);
+2340   6                              staInfo->staScb = NULL;
+2341   6                              staInfo->ccoScb = NULL;
+2342   6      
+2343   6                              
+2344   6                              //set the MAC routing table to stop the data path
+2345   6                            
+2346   6                              //stop the SHOM
+2347   6      
+2348   6                              leaveInd = (sCcLeaveInd *)(event->buffDesc.dataptr); 
+2349   6                              eventBody.netLeaveInd.reason = leaveInd->reason;
+2350   6                              
+2351   6                    CHAL_DelayTicks(300000); // give time to cco to STOP beaconing
+2352   6           
+2353   6                              SNAM_DeliverEvent(snam, EVENT_TYPE_NET_LEAVE_IND,
+2354   6                                                &eventBody);
+2355   6                              
+2356   6                              //stay the state    
+2357   6                              snam->state = SNAM_STATE_READY;
+2358   6                              break;
+2359   6                          }
+2360   5                          case EVENT_TYPE_CC_SET_TEI_MAP_IND:
+2361   5                          {
+2362   6      #ifdef P8051
+2363   6                      FM_Printf(FM_MMSG, "SNAM:<<<SET_TEI_MAP.IND(tei:%bu)\n",
+2364   6                                                  hpgpHdr->tei);
+2365   6      #else
+                              FM_Printf(FM_MMSG, "SNAM:<<<SET_TEI_MAP.IND(tei:%d)\n",
+                                                          hpgpHdr->tei);
+              #endif
+2369   6                              teiMapInd = (sCcTeiMapInd *)event->buffDesc.dataptr; 
+2370   6                              SNAM_ProcTeiMapInd(snam, teiMapInd);
+2371   6                              break;
+2372   6                          }
+2373   5                          case EVENT_TYPE_CC_CCO_APPOINT_CNF:
+2374   5                          {
+2375   6      #ifdef P8051
+2376   6                       FM_Printf(FM_MMSG, "SNAM:<<<CCO_APPOINT.CNF(tei:%bu)\n",
+2377   6                                                  hpgpHdr->tei);
+2378   6      #else
+                               FM_Printf(FM_MMSG, "SNAM:<<<CCO_APPOINT.CNF(tei:%d)\n",
+                                                          hpgpHdr->tei);
+              #endif
+2382   6      
+2383   6                              snam->apptTxRetryCnt = 0; 
+2384   6                              STM_StopTimer(snam->apptTimer); 
+2385   6                              STM_FreeTimer(snam->apptTimer); 
+2386   6                              
+2387   6                              ccoApptCnf = (sCcCcoApptCnf *)(event->buffDesc.dataptr);
+2388   6      #ifdef NMA
+2389   6                              /* respond to the NMA */
+2390   6                              NMA_SendCcoApptCnf(nma, ccoApptCnf->result);
+2391   6      #endif
+2392   6      /*
+2393   6                              eventBody.ccoApptRsp.result = ccoApptCnf->result;
+2394   6                              SNAM_DeliverEvent(snam, EVENT_TYPE_CCO_APPOINT_RSP,
+2395   6                                                &eventBody);
+2396   6      */ 
+2397   6      
+2398   6                              break;
+2399   6                          }
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 40  
+
+2400   5                          case EVENT_TYPE_CM_STA_IDENTIFY_REQ:                    
+2401   5                          {
+2402   6                              IDENTIFY_procFrm(EVENT_TYPE_CM_STA_IDENTIFY_REQ, event);
+2403   6                              break;
+2404   6                          }
+2405   5                          case EVENT_TYPE_CM_STA_IDENTIFY_CNF:                    
+2406   5                          {
+2407   6                              IDENTIFY_procFrm(EVENT_TYPE_CM_STA_IDENTIFY_CNF, event);
+2408   6                              break;
+2409   6                          }
+2410   5                          case EVENT_TYPE_CM_STA_IDENTIFY_RSP:                    
+2411   5                          {
+2412   6                              IDENTIFY_procFrm(EVENT_TYPE_CM_STA_IDENTIFY_RSP, event);
+2413   6                              break;
+2414   6                          }
+2415   5                          default:
+2416   5                          {
+2417   6                              FM_Printf(FM_HINFO, "SNAM:%bu\n",event->eventHdr.type);
+2418   6                          }
+2419   5                      }
+2420   4                  }
+2421   3                  else if( event->eventHdr.eventClass == EVENT_CLASS_CTRL) 
+2422   3                  {
+2423   4                      switch(event->eventHdr.type)
+2424   4                      {
+2425   5                          case EVENT_TYPE_CCO_APPOINT_REQ: // user appointed CCO
+2426   5                          {
+2427   6                              snam->apptTxRetryCnt = 0; 
+2428   6      #ifdef CALLBACK
+                                      snam->apptTimer = STM_AllocTimer(LINKL_TimerHandler,
+                                                            EVENT_TYPE_TIMER_APPT_IND, linkl);
+              #else
+2432   6                              snam->apptTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK,
+2433   6                                                    EVENT_TYPE_TIMER_APPT_IND, linkl);
+2434   6      #endif
+2435   6      
+2436   6                              txCcoApptRsp = 0;
+2437   6                              if(snam->apptTimer != STM_TIMER_INVALID_ID)
+2438   6                              {
+2439   7                                  
+2440   7                                  ccoApptReq = (sCcCcoApptReq *)(event->buffDesc.dataptr); 
+2441   7                                  memcpy(&snam->ccoApptReq, ccoApptReq, 
+2442   7                                         sizeof(sCcCcoApptReq));
+2443   7      
+2444   7                                  if(SNAM_SendMgmtMsg(snam, 
+2445   7                                                      EVENT_TYPE_CC_CCO_APPOINT_REQ)
+2446   7                                      == STATUS_SUCCESS)
+2447   7                                  {
+2448   8                                      STM_StartTimer(snam->apptTimer, 
+2449   8                                                     HPGP_TIME_USER_APPT_CCO);
+2450   8                                      snam->apptTxRetryCnt++; 
+2451   8                                      //snam->state = SNAM_STATE_WAITFOR_CC_CCO_APPOINT_CNF;
+2452   8                                      //stay in the same state as it takes a time for rsp?
+2453   8                                  }
+2454   7                                  else
+2455   7                                  {
+2456   8                                      txCcoApptRsp = 1;
+2457   8                                      STM_StopTimer(snam->apptTimer); 
+2458   8                                      STM_FreeTimer(snam->apptTimer); 
+2459   8                                  }
+2460   7                              }
+2461   6                              else
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 41  
+
+2462   6                              {
+2463   7                                  txCcoApptRsp = 1;
+2464   7                              }
+2465   6                              if(txCcoApptRsp)
+2466   6                              {
+2467   7                                  //TODO: the result could be various due to
+2468   7                                  //different request type. 
+2469   7                                  //Here we simply use one and fix it later
+2470   7                                  eventBody.ccoApptRsp.result = 
+2471   7                                      HPGP_CCO_APPT_CNF_REJECT;
+2472   7                                  SNAM_DeliverEvent(snam, EVENT_TYPE_CCO_APPOINT_RSP,
+2473   7                                                    &eventBody);
+2474   7                              }
+2475   6      
+2476   6                              break;
+2477   6                          }
+2478   5      /*
+2479   5                          case EVENT_TYPE_CCO_HO_IND: //switch to the new CCO: renew 
+2480   5                          {
+2481   5                              //wait for the central beacon coming first
+2482   5                              SNSM_EnableCcoDetection(snsm);
+2483   5                              break; 
+2484   5                          }
+2485   5      */
+2486   5                          case EVENT_TYPE_TIMER_TEI_IND: //tei lease expires: renew 
+2487   5                          case EVENT_TYPE_CCO_DISC_IND:  //handover to new CCO: renew
+2488   5                          {
+2489   6      #ifdef NAM_PRINT          
+              FM_Printf(FM_ERROR, "SNAM:Renew the TEI\n");
+              #endif
+2492   6                              snam->teiRenew = 1;
+2493   6                              if(SNAM_SendMgmtMsg(snam, EVENT_TYPE_CC_ASSOC_REQ)
+2494   6                                      == STATUS_SUCCESS)
+2495   6                              {
+2496   7                                  STM_StartTimer(snam->accTimer, HPGP_TIME_ASSOC);
+2497   7                                  snam->txRetryCnt++; 
+2498   7                                  snam->state = SNAM_STATE_WAITFOR_CC_ASSOC_RSP;
+2499   7                              }
+2500   6                              break;
+2501   6                          }
+2502   5                          case EVENT_TYPE_NET_LEAVE_REQ:
+2503   5                          {
+2504   6      #ifdef POWERSAVE
+                                  scb = (sScb *)(hpgpHdr->scb);
+                          if (scb->psState != PSM_PS_STATE_OFF)
+                          {
+                            // send PS_EXIT.REQ
+                            PSM_set_sta_PS(FALSE, 0xF);
+                            PSM_resetScbPs(scb);  // set SCB's PS data to init state 
+                          }
+              #endif
+2513   6                              snam->leaveReq.reason = HPGP_LEAVE_REQ_REASON_USER_REQ;
+2514   6      #ifndef MULTIDEV
+2515   6                              if(SNAM_SendMgmtMsg(snam, EVENT_TYPE_CC_LEAVE_REQ) 
+2516   6                                      == STATUS_SUCCESS)
+2517   6      #endif                
+2518   6                              {
+2519   7      #ifndef MULTIDEV
+2520   7                                  STM_StartTimer(snam->accTimer, HPGP_TIME_ASSOC);
+2521   7                                  snam->txRetryCnt++; 
+2522   7                                  snam->state = SNAM_STATE_WAITFOR_CC_LEAVE_RSP;
+2523   7      #else
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 42  
+
+                                     snam->state = SNAM_STATE_READY;
+                                          {
+                                              STM_StopTimer(snam->teiTimer);
+                                              SHOM_Stop(&linkl->staHom);
+                                              SNAM_DeliverEvent(snam, EVENT_TYPE_NET_LEAVE_RSP, NULL);
+                                              snam->stopDataPath = 0;
+                                          }
+              #endif
+2532   7                              }
+2533   6                              break;
+2534   6                          }
+2535   5                          case EVENT_TYPE_TIMER_APPT_IND:
+2536   5                          {
+2537   6                              if( snam->apptTxRetryCnt <= HPGP_TX_RETRY_MAX)
+2538   6                              { 
+2539   7                                  //resend the message
+2540   7                                  SNAM_SendMgmtMsg( snam, 
+2541   7                                                    EVENT_TYPE_CC_CCO_APPOINT_REQ);
+2542   7      
+2543   7                                  STM_StartTimer(snam->apptTimer, 
+2544   7                                                 HPGP_TIME_USER_APPT_CCO);
+2545   7                                  snam->apptTxRetryCnt++; 
+2546   7                                  //stay in the same CONN state
+2547   7                              }
+2548   6                              else
+2549   6                              {
+2550   7                                  //retry exhausted
+2551   7                                  snam->apptTxRetryCnt = 0; //reset
+2552   7                                  STM_FreeTimer(snam->apptTimer); 
+2553   7                                  //stay in the same CONN state
+2554   7                              }
+2555   6                              break;
+2556   6                          }
+2557   5                          case EVENT_TYPE_SNAM_STOP: 
+2558   5                          {
+2559   6                              //stop the SNAM Tei lease timer
+2560   6                              LINKL_StopSta(linkl);
+2561   6                              STM_StopTimer(snam->teiTimer);
+2562   6                              snam->state = SNAM_STATE_INIT;
+2563   6                              break; 
+2564   6                          }
+2565   5                          case EVENT_TYPE_AUTH_CPLT:
+2566   5                          {   
+2567   6      #ifdef STA_ID
+                                        IDENTIFY_sendFrm(EVENT_TYPE_CM_STA_IDENTIFY_IND, NULL, staInfo->ccoScb);
+              #endif
+2570   6      #ifdef ROUTE
+                                        if(staInfo->identifyCaps.routingCap == TRUE)
+                                        {
+                                            ROUTE_startUpdateTimer();
+                                        }
+              #endif
+2576   6                                break;
+2577   6                          }
+2578   5                          case EVENT_TYPE_IDENTIFY_CAP_TIMEOUT:
+2579   5                {
+2580   6                              scb = CRM_GetNextScb(&linkl->ccoRm, scb);
+2581   6                              while(scb)
+2582   6                              {
+2583   7                                  if(scb->identityCapUpdated == FALSE)
+2584   7                                  {
+2585   8                                      if( scb->identityCapUpdatedRetry)
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 43  
+
+2586   8                                      {
+2587   9                                          IDENTIFY_sendFrm(EVENT_TYPE_CM_STA_IDENTIFY_REQ, NULL, scb);
+2588   9                                          scb->identityCapUpdatedRetry--;
+2589   9                                      }
+2590   8                                      else
+2591   8                                      {
+2592   9                                          scb->identityCapUpdated = TRUE;
+2593   9                                      }
+2594   8                                      break;
+2595   8                                  }
+2596   7                                  scb = CRM_GetNextScb(&linkl->ccoRm, scb);
+2597   7                              }
+2598   6                              if(scb != NULL)
+2599   6                              {
+2600   7                                  STM_StartTimer(snam->identifyCapTimer,HPGP_IDENTIFY_CAP_TIME);
+2601   7                              }
+2602   6                              break;
+2603   6                }
+2604   5                          default:
+2605   5                          {
+2606   6                          }
+2607   5                      }
+2608   4                  }
+2609   3                  break;
+2610   3              }
+2611   2              case SNAM_STATE_WAITFOR_CC_ASSOC_RSP:
+2612   2              {
+2613   3                  if( event->eventHdr.eventClass == EVENT_CLASS_MSG) 
+2614   3                  {
+2615   4                      switch(event->eventHdr.type)
+2616   4                      {
+2617   5                          case EVENT_TYPE_CC_ASSOC_CNF:
+2618   5                          {
+2619   6      #ifdef LOG_FLASH
+                                      u8 buff[2];
+              #endif
+2622   6                      FM_Printf(FM_MMSG, "SNAM:<<<CC_ASSOC.CNF(tei:%bu)\n", 
+2623   6                                                  hpgpHdr->tei);
+2624   6                              //process the CC_ASSOC.CNF
+2625   6                              assocCnf = (sCcAssocCnf *)event->buffDesc.dataptr; 
+2626   6      #ifdef LOG_FLASH
+                                      buff[0] = assocCnf->result;
+                                      buff[1] = assocCnf->staTei;
+                                      logEvent(MGMT_MSG, 0, EVENT_TYPE_CC_ASSOC_CNF, buff, 2);
+              #endif
+2631   6                              if(assocCnf->result == 0)
+2632   6                              {
+2633   7                                  //success
+2634   7                                  //This is the first time that we know 
+2635   7                                  //CCo MAC address unless we send a query to the CCo
+2636   7                                  //So, save it
+2637   7      #ifdef NAM_PRINT              
+              #ifdef P8051
+                  FM_Printf(FM_HINFO,"cco MAC Addr:%bx:%bx:%bx:%bx:%bx:%bx\n",
+              #else
+                  FM_Printf(FM_HINFO,"cco MAC Addr:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
+              #endif
+              
+                            staInfo->ccoScb->macAddr[0], staInfo->ccoScb->macAddr[1],
+                            staInfo->ccoScb->macAddr[2], staInfo->ccoScb->macAddr[3],
+                            staInfo->ccoScb->macAddr[4], staInfo->ccoScb->macAddr[5]);
+              #ifdef P8051
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 44  
+
+                  FM_Printf(FM_HINFO,"event MAC Addr:%bx:%bx:%bx:%bx:%bx:%bx\n",
+              #else
+                  FM_Printf(FM_HINFO,"event MAC Addr:%.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
+              #endif
+                            hpgpHdr->macAddr[0], hpgpHdr->macAddr[1],
+                            hpgpHdr->macAddr[2], hpgpHdr->macAddr[3],
+                            hpgpHdr->macAddr[4], hpgpHdr->macAddr[5]);
+              #endif
+2656   7      
+2657   7                                  memcpy( staInfo->ccoScb->macAddr, 
+2658   7                                          hpgpHdr->macAddr, MAC_ADDR_LEN);
+2659   7      
+2660   7                                  snam->txRetryCnt = 0; //reset
+2661   7                                  STM_StopTimer(snam->accTimer);
+2662   7                                  staInfo->tei = assocCnf->staTei;
+2663   7                                  staInfo->snid = assocCnf->snid;
+2664   7                    scb = CRM_AddScb(crm, assocCnf->staTei);
+2665   7                                  if(scb)
+2666   7                                  {
+2667   8                                      //it is done for renew too in case of CCo HO
+2668   8                                      memcpy(scb->macAddr, staInfo->macAddr,
+2669   8                                             MAC_ADDR_LEN);
+2670   8                                      scb->staStatus.byte = staInfo->staStatus.byte;
+2671   8                                      scb->staCap.byte = staInfo->staCap.byte;
+2672   8      #ifdef POWERSAVE
+                                            if(!snam->teiRenew) 
+                              {
+                                // first time doing the Assoc.Req, init all variables
+                                PSM_resetScbPs(scb);  // set SCB's PS data to init state 
+                              }
+              #endif
+2679   8      
+2680   8                                      staInfo->staScb = scb;  
+2681   8                                      scb->identityCapUpdated = TRUE;
+2682   8                                      scb->identityCapUpdatedRetry = 3;
+2683   8      
+2684   8                                      HAL_SetTei(HOMEPLUG_GetHal(), scb->tei);
+2685   8                                  }
+2686   7                                  else
+2687   7                                  {
+2688   8                                      FM_Printf(FM_ERROR, "SNAM:Assoc failed\n");
+2689   8                                      break;  //should not happen
+2690   8                                  }
+2691   7      
+2692   7                                  snam->state = SNAM_STATE_CONN;
+2693   7      
+2694   7                                  //start/restart the lease timer. 
+2695   7                                  //5 minutes earlier than 
+2696   7                                  //the assigned lease time expiration 
+2697   7                                  STM_StopTimer(snam->teiTimer); 
+2698   7      
+2699   7                      if(!snam->teiRenew) 
+2700   7                                  {
+2701   8                                    
+2702   8                      hostEvent_assocInd assocInd;
+2703   8                      u32 renewTime = (staInfo->macAddr[5] * 40);
+2704   8                      
+2705   8                      STM_StartTimer(snam->teiTimer, renewTime);
+2706   8                                    
+2707   8      
+2708   8                      memcpy(&assocInd.ccoAddress,
+2709   8                           &staInfo->ccoScb->macAddr, MAC_ADDR_LEN);
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 45  
+
+2710   8                      
+2711   8                      memcpy(&assocInd.nid, &staInfo->nid, NID_LEN);
+2712   8                      assocInd.tei = assocCnf->staTei;
+2713   8      
+2714   8                                      staInfo->ccoScb->uMinSSN = 0;
+2715   8                                      staInfo->ccoScb->uWrapAround = 0;
+2716   8                      Host_SendIndication(HOST_EVENT_TYPE_ASSOC_IND,
+2717   8                                (u8*)&assocInd, sizeof(assocInd));
+2718   8                        
+2719   8                                      //this is the first CC_ASSOC.REQ
+2720   8                                      //success
+2721   8                                      //TODO: should place the event in the
+2722   8                                      //internal queue, instead of calling 
+2723   8                                      
+2724   8                                      SNSM_Start(&linkl->staNsm, 
+2725   8                                                 LINKL_STA_TYPE_ASSOC);
+2726   8      
+2727   8                                      //set MAC rounting table to start the traffic
+2728   8      
+2729   8                                      /* start the SHOM */
+2730   8                                      SHOM_Start(&linkl->staHom);
+2731   8                    
+2732   8                                      /* start the AKM */
+2733   8      // UKE                                AKM_Start(&linkl->akm, LINKL_STA_MODE_STA, 0);    
+2734   8         
+2735   8       
+2736   8                                      //deliver a successful response to the upper 
+2737   8                                      //layer. may trigger auth process
+2738   8                                      eventBody.netAccRsp.result = 0;
+2739   8                                      SNAM_DeliverEvent(snam, EVENT_TYPE_NET_ACC_RSP,
+2740   8                                                &eventBody);
+2741   8      #ifdef ROUTE
+                                              if(scb)
+                                              {
+                                                  ROUTE_initLrtEntry(scb);
+                                                  scb->lrtEntry.nTei = scb->tei;                                    
+                                                  scb->lrtEntry.rnh = 0;                                    
+                                              }
+                                              
+                                              
+              #endif
+2751   8      
+2752   8      
+2753   8                                  }
+2754   7                    else
+2755   7                    {
+2756   8                      STM_StartTimer(snam->teiTimer, 
+2757   8                            (assocCnf->leaseTime)*60000 - 5000 );
+2758   8      #ifdef NAM_PRINT                      
+              #ifdef P8051
+                              FM_Printf(FM_HINFO, "SNAM:start the tei lease timer(0x%lx)\n",
+              #else
+                              FM_Printf(FM_HINFO, "SNAM:start the tei lease timer(0x%.8x)\n",
+              #endif
+              
+                              (assocCnf->leaseTime)*60000 - 5000);
+              #endif
+2767   8      
+2768   8      
+2769   8                      Host_SendIndication(HOST_EVENT_TEI_RENEWED, (u8*)&staInfo->tei, 1);
+2770   8                    }
+2771   7                                  //else, it is renew, we do not do anything
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 46  
+
+2772   7                                  snam->teiRenew = 0;  //reset
+2773   7                              }
+2774   6                              else
+2775   6                              {
+2776   7                              }
+2777   6                              //for all other cases, stay in the same state and
+2778   6                              //retry when the access timer expires.
+2779   6                           
+2780   6                              break;
+2781   6                          }
+2782   5                          default:
+2783   5                          {
+2784   6                          }
+2785   5                      }
+2786   4                  }
+2787   3                  else  //control event
+2788   3                  {
+2789   4                      switch(event->eventHdr.type)
+2790   4                      {
+2791   5                          case EVENT_TYPE_TIMER_ACC_IND:
+2792   5                          {
+2793   6                              if( snam->txRetryCnt <= HPGP_TX_RETRY_MAX)
+2794   6                              { 
+2795   7                                  //resend the message
+2796   7                                  SNAM_SendMgmtMsg(snam, EVENT_TYPE_CC_ASSOC_REQ);
+2797   7                                  STM_StartTimer(snam->accTimer, HPGP_TIME_ASSOC);
+2798   7                                  snam->txRetryCnt++; 
+2799   7                                  //stay in the same state
+2800   7                                  //snam->state = SNAM_STATE_WAITFOR_CC_ASSOC_RSP;
+2801   7                              }
+2802   6                              else
+2803   6                              {
+2804   7                                  //retry exhausted
+2805   7                                  snam->txRetryCnt = 0; //reset
+2806   7                                  //newEvent = EVENT_Alloc(sizeof(sNetAccRspEvent), 0);
+2807   7                                 // if(newEvent == NULL)
+2808   7                                 // {
+2809   7                                 //     FM_Printf(FM_ERROR, "EAllocErr\n");
+2810   7                                 //     break;
+2811   7                                 // }
+2812   7                                  if(!snam->teiRenew) 
+2813   7                                  {
+2814   8                                      //build Event_Net_ACC_RSP (failure)
+2815   8                                      eventType = EVENT_TYPE_NET_ACC_RSP;
+2816   8                                      eventBody.netAccRsp.result = 1;
+2817   8      
+2818   8                                  }
+2819   7                                  else
+2820   7                                  {
+2821   8                                      snam->teiRenew = 0;
+2822   8                                      SNSM_Stop(&linkl->staNsm);
+2823   8      
+2824   8                                      LINKL_StopSta(linkl);
+2825   8                                      STM_StopTimer(snam->teiTimer);
+2826   8                                      snam->state = SNAM_STATE_INIT;
+2827   8      
+2828   8                                      //remove the TEI MAP
+2829   8                                      CRM_Init(crm);
+2830   8                                      staInfo->staScb = NULL;
+2831   8                                      staInfo->ccoScb = NULL;
+2832   8                              
+2833   8                                      //build Event_Net_LEAVE_IND
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 47  
+
+2834   8                                      eventType = EVENT_TYPE_NET_LEAVE_IND;
+2835   8                                      eventBody.netLeaveInd.reason = 1;
+2836   8                                  }
+2837   7                                  //deliver the event to the upper layer
+2838   7                                  SNAM_DeliverEvent(snam, eventType,
+2839   7                                                    &eventBody);
+2840   7      
+2841   7                                  //change the state    
+2842   7                                  snam->state = SNAM_STATE_READY;
+2843   7                              }
+2844   6                              break;
+2845   6                          }
+2846   5                          default:
+2847   5                          {
+2848   6                          }
+2849   5                      }
+2850   4                  }
+2851   3                  break;
+2852   3              }
+2853   2              case SNAM_STATE_WAITFOR_CC_LEAVE_RSP:
+2854   2              {
+2855   3                  if( event->eventHdr.eventClass == EVENT_CLASS_MSG) 
+2856   3                  {
+2857   4                      switch(event->eventHdr.type)
+2858   4                      {
+2859   5                          case EVENT_TYPE_CC_LEAVE_CNF:
+2860   5                          {
+2861   6      #ifdef P8051
+2862   6                      FM_Printf(FM_MMSG, "SNAM:<<<CC_LEAVE.CNF(tei:%bu)\n", 
+2863   6                                                  hpgpHdr->tei);
+2864   6      #else
+                              FM_Printf(FM_MMSG, "SNAM:<<<CC_LEAVE.CNF(tei:%d)\n", 
+                                                          hpgpHdr->tei);
+              #endif
+2868   6      #ifdef LOG_FLASH
+                                      logEvent(MGMT_MSG, 0, EVENT_TYPE_CC_LEAVE_CNF, &hpgpHdr->tei, 1);
+              #endif
+2871   6                              //message payload for CC_LEAVE.CNF is null
+2872   6      
+2873   6                              STM_StopTimer(snam->accTimer);
+2874   6                              //see below for other operatins taken 
+2875   6                              //when the STA leaves the network
+2876   6                              snam->stopDataPath = 1;
+2877   6      
+2878   6                              //STM_StopTimer(snam->teiTimer);
+2879   6                              //CRM_FreeScb(crm, staInfo->staScb);
+2880   6                              //staInfo->staScb = NULL;
+2881   6                              //SNSM_Stop(&linkl->staNsm);
+2882   6                           
+2883   6      
+2884   6                              //change the state    
+2885   6                              snam->state = SNAM_STATE_READY;
+2886   6      
+2887   6                          //    SNAM_DeliverEvent(snam, EVENT_TYPE_NET_LEAVE_RSP,
+2888   6                            //                    NULL);
+2889   6                                                    
+2890   6                              break;
+2891   6                          }
+2892   5                          default:
+2893   5                          {
+2894   6                          }
+2895   5                      }
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 48  
+
+2896   4                  }
+2897   3                  else  //control event
+2898   3                  {
+2899   4                      switch(event->eventHdr.type)
+2900   4                      {
+2901   5                          case EVENT_TYPE_TIMER_ACC_IND:
+2902   5                          {
+2903   6                              if( snam->txRetryCnt <= HPGP_TX_RETRY_MAX)
+2904   6                              { 
+2905   7                                  //resend the message
+2906   7                                  SNAM_SendMgmtMsg(snam, EVENT_TYPE_CC_LEAVE_REQ);
+2907   7                                  STM_StartTimer(snam->accTimer, HPGP_TIME_ASSOC);
+2908   7                                  snam->txRetryCnt++; 
+2909   7                                  //stay in the same state
+2910   7                                  //snam->state = SNAM_STATE_WAITFOR_CC_LEAVE_RSP;
+2911   7                              }
+2912   6                              else
+2913   6                              {
+2914   7                                  //leave request retry exhausted, leave anyway
+2915   7                                  snam->stopDataPath = 1;
+2916   7      
+2917   7                                  //STM_StopTimer(snam->teiTimer);
+2918   7                              
+2919   7                                  //change the state    
+2920   7                                  snam->state = SNAM_STATE_READY;
+2921   7                              }
+2922   6                              break;
+2923   6                          }
+2924   5                          default:
+2925   5                          {
+2926   6                          }
+2927   5                      }
+2928   4                  }
+2929   3      
+2930   3                  if(snam->stopDataPath)
+2931   3                  {
+2932   4      
+2933   4                      STM_StopTimer(snam->teiTimer);
+2934   4      
+2935   4      //                SNSM_Stop(&linkl->staNsm);
+2936   4      
+2937   4                      //stop the SHOM
+2938   4                      SHOM_Stop(&linkl->staHom);
+2939   4              //set the MAC routing table to stop the data path
+2940   4                            
+2941   4      
+2942   4                      SNAM_DeliverEvent(snam, EVENT_TYPE_NET_LEAVE_RSP, NULL);
+2943   4                              
+2944   4                      snam->stopDataPath = 0;
+2945   4                  }
+2946   3                  //process events
+2947   3                  break;
+2948   3              }
+2949   2      /*
+2950   2              case SNAM_STATE_WAITFOR_AUTH_RSP:
+2951   2              {
+2952   2                  //process events
+2953   2                  if( event->eventHdr.eventClass == EVENT_CLASS_CTRL) 
+2954   2                  {
+2955   2                      switch(event->eventHdr.type)
+2956   2                      {
+2957   2                          case EVENT_TYPE_AUTH_RSP:
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 49  
+
+2958   2                          {
+2959   2                               result = *(newEvent->buffDesc.dataptr); 
+2960   2                          }
+2961   2                          default:
+2962   2                          {
+2963   2                          }
+2964   2                        
+2965   2                      }
+2966   2                  }
+2967   2                  break;
+2968   2              }
+2969   2      */
+2970   2              default:
+2971   2              {
+2972   3                  //perform no operation
+2973   3              }
+2974   2          }
+2975   1      }
+2976          
+2977          
+2978          
+2979          /*
+2980          void  SNAM_PerformHoSwitch(sSnam *snam)
+2981          {
+2982              //stop the SNAM Tei lease timer
+2983              STM_StopTimer(snam->teiTimer);
+2984          }
+2985          */
+2986          
+2987          eStatus SNAM_Stop(sSnam *snam)
+2988          {
+2989   1          sEvent *newEvent = NULL;
+2990   1      //    sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+2991   1          sLinkLayer    *linkl = snam->linkl;
+2992   1      #if 0
+                  newEvent = EVENT_Alloc(0, EVENT_HPGP_CTRL_HEADROOM);
+                  if(newEvent == NULL)
+                  {
+                      FM_Printf(FM_ERROR, "SNSM: Cannot allocate an event.\n");
+                      return STATUS_FAILURE;
+                  }
+              
+                  newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                  newEvent->eventHdr.type = EVENT_TYPE_SNAM_STOP;
+                  //LINKL_SendEvent(linkl, newEvent);
+                  SLIST_Put(&linkl->EventQueue, &newEvent->link);
+              #else
+3005   1      
+3006   1          STM_StopTimer(snam->teiTimer);
+3007   1      #ifdef ROUTE
+                  ROUTE_stopUpdateTimer();
+              #endif
+3010   1          snam->state = SNAM_STATE_INIT;
+3011   1      
+3012   1      #endif
+3013   1          return STATUS_SUCCESS;
+3014   1      
+3015   1      }
+3016          
+3017          eStatus SNAM_Start(sSnam *snam, u8 staType)
+3018          {
+3019   1          sEvent *newEvent = NULL;
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 50  
+
+3020   1          sLinkLayer    *linkl = snam->linkl;
+3021   1      //    sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+3022   1      
+3023   1          newEvent = EVENT_Alloc(sizeof(sSnamStartEvent), EVENT_HPGP_CTRL_HEADROOM);
+3024   1          if(newEvent == NULL)
+3025   1          {
+3026   2              FM_Printf(FM_ERROR, "SNSM: EAllocErr\n");
+3027   2              return STATUS_FAILURE;
+3028   2          }
+3029   1      
+3030   1          newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+3031   1          newEvent->eventHdr.type = EVENT_TYPE_SNAM_START;
+3032   1          *(newEvent->buffDesc.dataptr) = staType;
+3033   1          newEvent->buffDesc.datalen += sizeof(sSnamStartEvent); 
+3034   1          LINKL_SendEvent(linkl, newEvent);
+3035   1          return STATUS_SUCCESS;
+3036   1      }
+3037          
+3038          
+3039          
+3040          
+3041          eStatus SNAM_Init(sSnam *snam, sLinkLayer *linkl)
+3042          {
+3043   1          snam->linkl = linkl;
+3044   1          snam->staInfo = LINKL_GetStaInfo(linkl);
+3045   1      
+3046   1          snam->state = SNAM_STATE_INIT;
+3047   1      
+3048   1      #ifdef CALLBACK
+                  snam->accTimer = STM_AllocTimer(LINKL_TimerHandler, 
+                                       EVENT_TYPE_TIMER_ACC_IND, linkl);
+              #else
+3052   1          snam->accTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK, 
+3053   1                               EVENT_TYPE_TIMER_ACC_IND, linkl);
+3054   1      #endif
+3055   1          if(snam->accTimer == STM_TIMER_INVALID_ID)
+3056   1          {
+3057   2              return STATUS_FAILURE;
+3058   2          }
+3059   1      #ifdef NAM_PRINT  
+              #ifdef P8051
+              FM_Printf(FM_ERROR, "SNSM:acc timer id:%bu\n", snam->accTimer);
+              #else
+              FM_Printf(FM_ERROR, "SNSM:acc timer id:%d\n", snam->accTimer);
+              #endif
+              #endif
+3066   1      #ifdef CALLBACK
+                  snam->teiTimer = STM_AllocTimer(LINKL_TimerHandler, 
+                                       EVENT_TYPE_TIMER_TEI_IND, NULL);
+              #else
+3070   1          snam->teiTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK, 
+3071   1                               EVENT_TYPE_TIMER_TEI_IND, NULL);
+3072   1      #endif
+3073   1      
+3074   1          if(snam->teiTimer == STM_TIMER_INVALID_ID)
+3075   1          {
+3076   2              return STATUS_FAILURE;
+3077   2          }
+3078   1      #ifdef NAM_PRINT  
+              #ifdef P8051
+              FM_Printf(FM_ERROR, "SNSM:tei lease timer id:%bu\n", snam->teiTimer);
+              #else
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 51  
+
+              FM_Printf(FM_ERROR, "SNSM:tei lease timer id:%d\n", snam->teiTimer);
+              #endif
+              #endif
+3085   1      
+3086   1          snam->apptTimer = STM_TIMER_INVALID_ID;
+3087   1      
+3088   1          snam->txRetryCnt = 0;
+3089   1          snam->teiRenew = 0;
+3090   1          snam->stopDataPath = 0;
+3091   1      
+3092   1      //    snam->ccoInfo = LINKL_GetCcoInfo(linkLayer);
+3093   1      
+3094   1      
+3095   1      //    snam->state = SNAM_STATE_READY;
+3096   1          
+3097   1          snam->identifyCapTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK,
+3098   1                                     EVENT_TYPE_IDENTIFY_CAP_TIMEOUT, linkl);
+3099   1          if(snam->identifyCapTimer == STM_TIMER_INVALID_ID)
+3100   1          {
+3101   2              return STATUS_FAILURE;
+3102   2          }
+3103   1      
+3104   1          return STATUS_SUCCESS;
+3105   1      }
+3106          
+3107          
+3108          #endif /* STA_FUNC */
+3109          
+3110          eStatus IDENTIFY_sendFrm(u16 mmType, sEvent *reqEvent, sScb *scb)
+3111          {
+3112   1          sStaIdentifyCaps *idCaps;
+3113   1          eStatus     status = STATUS_FAILURE;
+3114   1          sEvent      *event = NULL;      
+3115   1          sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+3116   1          sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+3117   1          u16         eventSize = (sizeof(sStaIdentifyCaps)); 
+3118   1        sCrm    *crm = LINKL_GetCrm(linkl);
+3119   1          sHpgpHdr    *reqHpgpHdr;
+3120   1        sHpgpHdr    *hpgpHdr;
+3121   1          u8 addIdentify = 0;
+3122   1          sScb *lscb = NULL;
+3123   1          
+3124   1          event = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM );
+3125   1          if(event == NULL)
+3126   1          {
+3127   2              FM_Printf(FM_ERROR, "EAllocErr\n");
+3128   2              return STATUS_FAILURE;
+3129   2          }
+3130   1      
+3131   1          
+3132   1          // prepare event    
+3133   1          event->eventHdr.eventClass = EVENT_CLASS_MSG;
+3134   1      
+3135   1          
+3136   1          hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+3137   1          hpgpHdr->snid = staInfo->snid;
+3138   1          hpgpHdr->eks = staInfo->nekEks;
+3139   1          
+3140   1          switch(mmType)
+3141   1          {
+3142   2              case EVENT_TYPE_CM_STA_IDENTIFY_IND:
+3143   2                  event->eventHdr.type = EVENT_TYPE_CM_STA_IDENTIFY_IND;
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 52  
+
+3144   2                  hpgpHdr->tei = scb->tei;
+3145   2                  hpgpHdr->macAddr = scb->macAddr;
+3146   2                  addIdentify = 1;
+3147   2                  FM_Printf(FM_MMSG, "IDENTIFY:>>>STA_IDENTIFY.IND(tei:%bu)\n",
+3148   2                                     hpgpHdr->tei);
+3149   2                  break;
+3150   2              case EVENT_TYPE_CM_STA_IDENTIFY_RSP:
+3151   2                  reqHpgpHdr = (sHpgpHdr *)reqEvent->buffDesc.buff;
+3152   2                  event->eventHdr.type = EVENT_TYPE_CM_STA_IDENTIFY_RSP;
+3153   2                  hpgpHdr->tei = reqHpgpHdr->tei;
+3154   2                  // find mac addr
+3155   2                  scb = CRM_GetScb(crm, reqHpgpHdr->tei);
+3156   2                  if(scb)
+3157   2                  {
+3158   3                      hpgpHdr->macAddr = scb->macAddr;
+3159   3                  }
+3160   2                  else
+3161   2                  {
+3162   3                      EVENT_Free(event);
+3163   3                      return status;
+3164   3                  }
+3165   2                  FM_Printf(FM_MMSG, "IDENTIFY:>>>IDENTIFY.RSP(tei:%bu)\n",
+3166   2                                             hpgpHdr->tei);
+3167   2                  break;
+3168   2              case EVENT_TYPE_CM_STA_IDENTIFY_REQ:
+3169   2                  event->eventHdr.type = EVENT_TYPE_CM_STA_IDENTIFY_REQ;
+3170   2                  if(scb == staInfo->ccoScb) 
+3171   2                  {
+3172   3                      hpgpHdr->tei = scb->tei;
+3173   3                      hpgpHdr->macAddr = scb->macAddr;
+3174   3                  }
+3175   2      #ifdef ROUTE
+                          else if(scb->tei != scb->lrtEntry.nTei)
+                          {
+              
+                              lscb = CRM_GetScb(crm, scb->lrtEntry.nTei);
+                              if(lscb)
+                              {                
+                                  hpgpHdr->tei = lscb->tei;
+                                  hpgpHdr->macAddr = scb->macAddr;
+                              }
+                              else
+                              {
+                                  EVENT_Free(event);
+                                  return status;
+                              }
+                          }
+              #else
+3192   2                  else 
+3193   2                  {
+3194   3                      hpgpHdr->tei = scb->tei;
+3195   3                      hpgpHdr->macAddr = scb->macAddr;
+3196   3                  }
+3197   2      #endif
+3198   2                  
+3199   2                  FM_Printf(FM_MMSG, "IDENTIFY:>>>STA_IDENTIFY.REQ(tei:%bu)\n",
+3200   2                                     hpgpHdr->tei);
+3201   2                  break;
+3202   2              case EVENT_TYPE_CM_STA_IDENTIFY_CNF:  
+3203   2                  reqHpgpHdr = (sHpgpHdr *)reqEvent->buffDesc.buff;
+3204   2                  event->eventHdr.type = EVENT_TYPE_CM_STA_IDENTIFY_CNF;
+3205   2                  scb = CRM_GetScb(crm, reqHpgpHdr->tei);
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 53  
+
+3206   2                  // find mac addr
+3207   2                  if(scb)
+3208   2                  {                
+3209   3                      hpgpHdr->tei = scb->tei;
+3210   3                      hpgpHdr->macAddr = reqHpgpHdr->macAddr;
+3211   3                  }
+3212   2                  else
+3213   2                  {
+3214   3                      EVENT_Free(event);
+3215   3                      return status;
+3216   3                  }
+3217   2                  addIdentify = 1;
+3218   2                  FM_Printf(FM_MMSG, "IDENTIFY:>>>STA_IDENTIFY.CNF(tei:%bu)\n",
+3219   2                                             hpgpHdr->tei);
+3220   2                  break;
+3221   2              default:
+3222   2                  FM_Printf(FM_MMSG, "IDENTIFY:>>>Invalid Msg\n");
+3223   2      
+3224   2      
+3225   2          }
+3226   1          if(addIdentify)
+3227   1          {
+3228   2              idCaps = (sStaIdentifyCaps*)event->buffDesc.dataptr;
+3229   2      
+3230   2              idCaps->efl = staInfo->identifyCaps.efl;
+3231   2              idCaps->HPAVVer = staInfo->identifyCaps.HPAVVer;
+3232   2              idCaps->routingCap = staInfo->identifyCaps.routingCap;
+3233   2              idCaps->powerSaveCap = staInfo->identifyCaps.powerSaveCap;
+3234   2              idCaps->greenPHYCap = staInfo->identifyCaps.greenPHYCap;
+3235   2      
+3236   2              event->buffDesc.datalen = (sizeof(sStaIdentifyCaps));
+3237   2          }
+3238   1          else
+3239   1          {
+3240   2              
+3241   2              event->buffDesc.datalen = 0;
+3242   2          }
+3243   1          status = MUXL_TransmitMgmtMsg(HPGPCTRL_GetLayer(HP_LAYER_TYPE_MUX), event);
+3244   1          //the event is freed by MUXL if the TX is successful
+3245   1          if(status == STATUS_FAILURE)
+3246   1          {
+3247   2              EVENT_Free(event);
+3248   2          }
+3249   1      
+3250   1          return status;
+3251   1      
+3252   1      
+3253   1      }
+3254          
+3255          eStatus IDENTIFY_procFrm(u16 mmType, sEvent *reqEvent)
+3256          {
+3257   1          sStaIdentifyCaps *idCaps;
+3258   1          sHpgpHdr    *hpgpHdr;
+3259   1          sScb *scb = NULL;
+3260   1          sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+3261   1          sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+3262   1        sCrm    *crm = LINKL_GetCrm(linkl);
+3263   1          eStatus     status = STATUS_FAILURE;
+3264   1      
+3265   1          hpgpHdr = (sHpgpHdr *)reqEvent->buffDesc.buff;
+3266   1          switch(mmType)
+3267   1          {
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 54  
+
+3268   2                  break;
+3269   2              case EVENT_TYPE_CM_STA_IDENTIFY_RSP:
+3270   2                  FM_Printf(FM_MMSG, "IDENTIFY:<<<STA_IDENTIFY.RSP(tei:%bu)\n",
+3271   2                                             hpgpHdr->tei);
+3272   2                  break;
+3273   2              case EVENT_TYPE_CM_STA_IDENTIFY_REQ:
+3274   2                  
+3275   2                  FM_Printf(FM_MMSG, "IDENTIFY:<<<STA_IDENTIFY.REQ(tei:%bu)\n",
+3276   2                                     hpgpHdr->tei);
+3277   2                  IDENTIFY_sendFrm(EVENT_TYPE_CM_STA_IDENTIFY_CNF, reqEvent, NULL);           
+3278   2                  break;
+3279   2                  
+3280   2              case EVENT_TYPE_CM_STA_IDENTIFY_IND:            
+3281   2              case EVENT_TYPE_CM_STA_IDENTIFY_CNF:  
+3282   2                  hpgpHdr = (sHpgpHdr *)reqEvent->buffDesc.buff;
+3283   2                  idCaps = (sStaIdentifyCaps*)reqEvent->buffDesc.dataptr;
+3284   2                  // find mac addr
+3285   2                  scb = CRM_FindScbMacAddr(hpgpHdr->macAddr);
+3286   2                  if(scb)
+3287   2                  {
+3288   3                      scb->idCaps.efl = idCaps->efl;
+3289   3                      scb->idCaps.HPAVVer = idCaps->HPAVVer;
+3290   3                      scb->idCaps.routingCap = idCaps->routingCap;
+3291   3                      scb->idCaps.powerSaveCap = idCaps->powerSaveCap;
+3292   3                      scb->idCaps.greenPHYCap = idCaps->greenPHYCap;
+3293   3                      scb->identityCapUpdated = TRUE;
+3294   3                  }
+3295   2                  else
+3296   2                  {
+3297   3                      return status;
+3298   3                  }
+3299   2                  if(mmType == EVENT_TYPE_CM_STA_IDENTIFY_CNF)
+3300   2                  {
+3301   3                      
+3302   3                      FM_Printf(FM_MMSG, "IDENTIFY:<<<STA_IDENTIFY.CNF(tei:%bu)\n",
+3303   3                                         hpgpHdr->tei);
+3304   3      #ifdef ROUTE
+                              if(scb->idCaps.routingCap == TRUE)
+                              {
+                                  ROUTE_sendRouteInfoReq(scb);
+                              }
+              #endif
+3310   3                  }
+3311   2                  else
+3312   2                  {
+3313   3                      
+3314   3                      FM_Printf(FM_MMSG, "IDENTIFY:<<<STA_IDENTIFY.IND(tei:%bu)\n",
+3315   3                                 hpgpHdr->tei);
+3316   3                      IDENTIFY_sendFrm(EVENT_TYPE_CM_STA_IDENTIFY_RSP, reqEvent, scb);
+3317   3                  }
+3318   2                  break;
+3319   2              default:
+3320   2                  FM_Printf(FM_MMSG, "IDENTIFY:>>>Invalid Msg\n");
+3321   2          }
+3322   1          return STATUS_SUCCESS;
+3323   1      
+3324   1      }
+3325          
+3326          
+3327          /** =========================================================
+3328           *
+3329           * Edit History
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 55  
+
+3330           *
+3331           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/link/nam.c,v $
+3332           *
+3333           * $Log: nam.c,v $
+3334           * Revision 1.26  2014/09/05 09:28:18  ranjan
+3335           * 1. uppermac cco-sta switching feature fix
+3336           * 2. general stability fixes for many station associtions
+3337           * 3. changed mgmt memory pool for many STA support
+3338           *
+3339           * Revision 1.25  2014/08/25 07:37:34  kiran
+3340           * 1) RSSI & LQI support
+3341           * 2) Fixed Sync related issues
+3342           * 3) Fixed timer 0 timing drift for SDK
+3343           * 4) MMSG & Error Logging in Flash
+3344           *
+3345           * Revision 1.24  2014/08/12 08:45:43  kiran
+3346           * 1) Event fixes
+3347           * 2) API to change UART line control parameters
+3348           *
+3349           * Revision 1.23  2014/07/30 12:26:26  kiran
+3350           * 1) Software Recovery for CCo
+3351           * 2) User appointed CCo support in SDK
+3352           * 3) Association process performance fixes
+3353           * 4) SSN related fixes
+3354           *
+3355           * Revision 1.22  2014/07/22 10:03:52  kiran
+3356           * 1) SDK Supports Power Save
+3357           * 2) Uart_Driver.c cleanup
+3358           * 3) SDK app memory pool optimization
+3359           * 4) Prints from STM.c are commented
+3360           * 5) Print messages are trimmed as common no memory left in common
+3361           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+3362           *
+3363           * Revision 1.21  2014/07/05 09:16:27  prashant
+3364           * 100 Devices support- only association tested, memory adjustments
+3365           *
+3366           * Revision 1.20  2014/06/26 17:59:42  ranjan
+3367           * -fixes to make uppermac more robust for n/w change
+3368           *
+3369           * Revision 1.19  2014/06/24 16:26:45  ranjan
+3370           * -zigbee frame_handledata fix.
+3371           * -added reason code for uppermac host events
+3372           * -small cleanups
+3373           *
+3374           * Revision 1.18  2014/06/23 06:56:44  prashant
+3375           * Ssn reset fix upon device reset, Duplicate SNID fix
+3376           *
+3377           * Revision 1.17  2014/06/19 17:13:19  ranjan
+3378           * -uppermac fixes for lvnet and reset command for cco and sta mode
+3379           * -backup cco working
+3380           *
+3381           * Revision 1.16  2014/06/12 13:15:43  ranjan
+3382           * -separated bcn,mgmt,um event pools
+3383           * -fixed datapath issue due to previous checkin
+3384           * -work in progress. neighbour cco detection
+3385           *
+3386           * Revision 1.15  2014/06/11 13:17:47  kiran
+3387           * UART as host interface and peripheral interface supported.
+3388           *
+3389           * Revision 1.14  2014/05/28 10:58:59  prashant
+3390           * SDK folder structure changes, Uart changes, removed htm (UI) task
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 56  
+
+3391           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+3392           *
+3393           * Revision 1.13  2014/05/12 08:09:57  prashant
+3394           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+3395           *
+3396           * Revision 1.12  2014/04/30 22:29:37  tri
+3397           * more PS
+3398           *
+3399           * Revision 1.11  2014/04/09 21:08:52  tri
+3400           * more PS
+3401           *
+3402           * Revision 1.10  2014/04/09 08:18:10  ranjan
+3403           * 1. Added host events for homeplug uppermac indication (Host_SendIndication)
+3404           * 2. timer workaround  + other fixes
+3405           *
+3406           * Revision 1.9  2014/03/25 23:09:15  tri
+3407           * PS
+3408           *
+3409           * Revision 1.8  2014/03/20 23:20:29  tri
+3410           * more PS
+3411           *
+3412           * Revision 1.7  2014/03/12 09:41:22  ranjan
+3413           * 1. added ageout event to cco cnam,backupcco ageout handling
+3414           * 2.  fix linking issue in zb_lx51_asic due to backup cco checkin
+3415           *
+3416           * Revision 1.6  2014/03/10 05:58:10  ranjan
+3417           * 1. added HomePlug BackupCCo feature. verified C&I test.(passed.) (bug 176)
+3418           *
+3419           * Revision 1.5  2014/02/27 10:42:47  prashant
+3420           * Routing code added
+3421           *
+3422           * Revision 1.4  2014/02/26 23:12:54  tri
+3423           * more PS code
+3424           *
+3425           * Revision 1.3  2014/01/28 17:47:02  tri
+3426           * Added Power Save code
+3427           *
+3428           * Revision 1.2  2014/01/10 17:17:53  yiming
+3429           * check in Rajan 1/8/2014 code release
+3430           *
+3431           * Revision 1.5  2014/01/08 10:53:54  ranjan
+3432           * Changes for LM OS support.
+3433           * New Datapath FrameTask
+3434           * LM and UM  datapath, feature verified.
+3435           *
+3436           * known issues : performance numbers needs revisit
+3437           *
+3438           * review : pending.
+3439           *
+3440           * Revision 1.4  2013/09/04 14:51:01  yiming
+3441           * New changes for Hybrii_A code merge
+3442           *
+3443           * Revision 1.31  2013/07/12 08:56:36  ranjan
+3444           * -UKE Push Button Security Feature.
+3445           * Verified : DirectEntry Security Works.Datapath Works.
+3446           *                 command SetSecMode for UKE works.
+3447           * Added against bug-160
+3448           *
+3449           * Revision 1.30  2013/03/22 12:21:49  prashant
+3450           * default FM_MASK and FM_Printf modified for USER INFO
+3451           *
+3452           * Revision 1.29  2013/03/21 07:43:26  ranjan
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 57  
+
+3453           * Starting NDC on "p reset" command
+3454           *
+3455           * Revision 1.28  2013/03/18 13:25:59  prashant
+3456           * Changed release TEI timeout 48 hr and data path fix
+3457           *
+3458           * Revision 1.27  2013/03/14 11:49:18  ranjan
+3459           * 1.handled cases  for CCo toSTA switch and  viceversa
+3460           * 2.UM uses bcntemplate
+3461           *
+3462           * Revision 1.26  2013/02/15 12:53:57  prashant
+3463           * ASSOC.REQ changes for DEVELO
+3464           *
+3465           * Revision 1.25  2012/12/18 12:17:46  prashant
+3466           * Stability checkin
+3467           *
+3468           * Revision 1.24  2012/11/22 09:44:02  prashant
+3469           * Code change for auto ping test, sending tei map ind out, random mac addrr generation.
+3470           *
+3471           * Revision 1.23  2012/11/19 07:55:56  prashant
+3472           * Compilation fix for last checkin
+3473           *
+3474           * Revision 1.22  2012/11/19 07:46:23  ranjan
+3475           * Changes for Network discovery modes
+3476           *
+3477           * Revision 1.21  2012/09/24 06:01:38  yuanhua
+3478           * (1) Integrate the NMA and HAL in Rx path (2) add a Tx queue in HAL to have less stack size needed in tx
+             - path, and Tx in HAL is performed by polling now.
+3479           *
+3480           * Revision 1.20  2012/07/15 17:31:07  yuanhua
+3481           * (1)fixed a potential memory overwriting in MUXL (2)update prints for 8051.
+3482           *
+3483           * Revision 1.19  2012/07/08 18:42:20  yuanhua
+3484           * (1)fixed some issues when ctrl layer changes its state from the UCC to ACC. (2) added a event CNSM_STAR
+             -T.
+3485           *
+3486           * Revision 1.18  2012/07/03 05:18:37  yuanhua
+3487           * fixed an issue in HAL_XmitMacFrame(), which returns the status according to the status from HHAL_PlcTxQ
+             -Write() now.
+3488           *
+3489           * Revision 1.17  2012/06/30 23:36:26  yuanhua
+3490           * return the success status for LINKL_SendEvent() when RTX51 OS is used.
+3491           *
+3492           * Revision 1.16  2012/06/20 21:44:42  kripa
+3493           * Assoc.Cnf dtei set to bcst tei.
+3494           * Committed on the Free edition of March Hare Software CVSNT Client.
+3495           * Upgrade to CVS Suite for more features and support:
+3496           * http://march-hare.com/cvsnt/
+3497           *
+3498           * Revision 1.15  2012/06/20 17:56:31  kripa
+3499           *
+3500           * Committed on the Free edition of March Hare Software CVSNT Client.
+3501           * Upgrade to CVS Suite for more features and support:
+3502           * http://march-hare.com/cvsnt/
+3503           *
+3504           * Revision 1.14  2012/06/08 23:23:48  son
+3505           * Fixed tei display
+3506           *
+3507           * Revision 1.13  2012/06/05 07:25:59  yuanhua
+3508           * (1) add a scan call to the MAC during the network discovery. (2) add a tiny task in ISM for interrupt p
+             -olling (3) modify the frame receiving integration. (4) modify the tiny task in STM.
+3509           *
+3510           * Revision 1.12  2012/06/04 23:34:02  son
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 58  
+
+3511           * Added RTX51 OS support
+3512           *
+3513           * Revision 1.11  2012/05/19 20:32:17  yuanhua
+3514           * added non-callback option for the protocol stack.
+3515           *
+3516           * Revision 1.10  2012/05/19 05:05:15  yuanhua
+3517           * optimized the timer handlers in CTRL and LINK layers.
+3518           *
+3519           * Revision 1.9  2012/05/17 05:05:58  yuanhua
+3520           * (1) added the option for timer w/o callback (2) added task id and name.
+3521           *
+3522           * Revision 1.8  2012/05/12 04:11:46  yuanhua
+3523           * (1) added list.h (2) changed the hal tx for the hw MAC implementation.
+3524           *
+3525           * Revision 1.7  2012/05/01 04:51:09  yuanhua
+3526           * added compiler flags STA_FUNC and CCO_FUNC in link and ctrl layers.
+3527           *
+3528           * Revision 1.6  2012/04/30 04:05:57  yuanhua
+3529           * (1) integrated the HAL mgmt Tx. (2) various updates
+3530           *
+3531           * Revision 1.5  2012/04/20 01:39:33  yuanhua
+3532           * integrated uart module and added compiler flag NMA.
+3533           *
+3534           * Revision 1.4  2012/04/13 06:15:11  yuanhua
+3535           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+3536           *
+3537           * Revision 1.3  2012/03/11 17:02:25  yuanhua
+3538           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+3539           *
+3540           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+3541           * migrate the firmware code from the greenchip to the hybrii.
+3542           *
+3543           * Revision 1.13  2011/09/06 05:01:46  yuanhua
+3544           * Made a fix such that the STA continues periodic TEI renew after CCo handover.
+3545           *
+3546           * Revision 1.12  2011/08/12 23:13:22  yuanhua
+3547           * (1)Added Control Layer (2) Fixed bugs for user-selected CCo handover (3) Made changes to SNAM/CNAM and 
+             -SNSM/CNSM for CCo handover switch (from CCo to STA, from STA to CCo, and from STA to STA but with different CCo) and pos
+             -t CCo handover
+3548           *
+3549           * Revision 1.11  2011/08/09 22:45:44  yuanhua
+3550           * changed to event structure, seperating HPGP-related events from the general event defination so that th
+             -e general event could be used for other purposes than the HPGP.
+3551           *
+3552           * Revision 1.10  2011/08/08 22:05:41  yuanhua
+3553           * user-selected CCo handover fix
+3554           *
+3555           * Revision 1.9  2011/08/05 17:06:29  yuanhua
+3556           * (1) added an internal queue in Link Layer for communication btw modules within Link Layer (2) Fixed bug
+             -s in CCo Handover. Now, CCo handover could be triggered by auto CCo selection, CCo handover messages work fine (3) Made 
+             -some modifications in SHAL.
+3557           *
+3558           * Revision 1.8  2011/08/02 16:06:00  yuanhua
+3559           * (1) Fixed a bug in STM (2) Made STA discovery work according to the standard, including aging timer. (3
+             -) release the resource after the STA leave (4) STA will switch to the backup CCo if the CCo failure occurs (5) At this p
+             -oint, the CCo could work with multiple STAs correctly, including CCo association/leave, TEI renew, TEI map updating, dis
+             -covery beacon scheduling, discovery STA list updating ang aging, CCo failure, etc.
+3560           *
+3561           * Revision 1.7  2011/07/30 02:43:35  yuanhua
+3562           * (1) Split the beacon process into two parts: one requiring an immdiate response, the other tolerating t
+             -he delay (2) Changed the API btw the MUX and SHAL for packet reception (3) Fixed bugs in various modules. Now, multiple 
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 59  
+
+             -STAs could successfully associate/leave the CCo
+3563           *
+3564           * Revision 1.6  2011/07/22 18:51:05  yuanhua
+3565           * (1) added the hardware timer tick simulation (hts.h/hts.c) (2) Added semaphors for sync in simulation a
+             -nd defined macro for critical section (3) Fixed some bugs in list.h and CRM (4) Modified and fixed bugs in SHAL (5) Chan
+             -ged SNSM/CNSM and SNAM/CNAM for bug fix (6) Added debugging prints, and more.
+3566           *
+3567           * Revision 1.5  2011/07/16 17:11:23  yuanhua
+3568           * (1)Implemented SHOM and CHOM modules, including handover procedure, SCB resource updating for HO (2) Up
+             -date SNAM and CNAM modules to support uer-appointed CCo handover (3) Made the SCB resources to support the TEI MAP for t
+             -he STA mode and management of associated STA resources (e.g. TEI) (4) Modified SNSM and CNSM to perform all types of han
+             -dover switch (CCo handover to the new STA, STA taking over the CCo, STA switching to the new CCo)
+3569           *
+3570           * Revision 1.4  2011/07/08 22:23:48  yuanhua
+3571           * (1) Implemented CNSM, including its state machine, beacon transmission and process, discover beacon sch
+             -eduling, auto CCo selection, discover list, handover countdown, etc. (2) Updated SNSM, including discover list processin
+             -g, triggering a switch to the new CCo, etc. (3) Updated CNAM and SNAM, adding the connection state in the SNAM, switch t
+             -o the new CCo, etc. (4) Other updates
+3572           *
+3573           * Revision 1.3  2011/07/02 22:09:01  yuanhua
+3574           * Implemented both SNAM and CNAM modules, including network join and leave procedures, systemm resource (
+             -such as TEI) allocation and release, TEI renew/release timers, and TEI reuse timer, etc.
+3575           *
+3576           * Revision 1.2  2011/06/24 14:33:18  yuanhua
+3577           * (1) Changed event structure (2) Implemented SNSM, including the state machines in network discovery and
+             - connection states, becaon process, discover process, and handover detection (3) Integrated the HPGP and SHAL
+3578           *
+3579           * Revision 1.1  2011/05/28 06:31:19  kripa
+3580           * Combining corresponding STA and CCo modules.
+3581           *
+3582           * Revision 1.1  2011/05/06 19:10:12  kripa
+3583           * Adding link layer files to new source tree.
+3584           *
+3585           * Revision 1.3  2011/04/23 19:48:45  kripa
+3586           * Fixing stm.h and event.h inclusion, using relative paths to avoid conflict with windows system header f
+             -iles.
+3587           *
+3588           * Revision 1.2  2011/04/23 17:34:07  kripa
+3589           * Used relative path for inclusion of stm.h, to avoid conflict with a system header file in VC.
+3590           *
+3591           * Revision 1.1  2011/04/08 21:42:45  yuanhua
+3592           * Framework
+3593           *
+3594           *
+3595           * =========================================================*/
+3596          
+*** WARNING C294 IN LINE 535 OF ..\..\src\link\nam.c: unreachable code
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =  12595    ----
+   CONSTANT SIZE    =   1281    ----
+   XDATA SIZE       =      1     471
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+C51 COMPILER V9.52.0.0   NAM                                                               12/02/2014 14:35:40 PAGE 60  
+
+
+C51 COMPILATION COMPLETE.  3 WARNING(S),  0 ERROR(S)

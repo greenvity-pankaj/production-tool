@@ -1,0 +1,610 @@
+C51 COMPILER V9.52.0.0   MUXL                                                              12/02/2014 14:35:40 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MUXL
+OBJECT MODULE PLACED IN .\obj\muxl.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\src\mux\muxl.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) I
+                    -NCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..\..\
+                    -src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\zigb
+                    -ee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\i
+                    -nc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\src;..
+                    -\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support;..\
+                    -..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,H
+                    -PGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,Hy
+                    -brii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,PR
+                    -OD_TEST) DEBUG PRINT(.\lst\muxl.lst) TABS(2) OBJECT(.\obj\muxl.obj)
+
+line level    source
+
+   1          /** =========================================================
+   2           *
+   3           *  @file mux.c
+   4           * 
+   5           *  @brief Muxtiplex Layer
+   6           *
+   7           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ===========================================================*/
+  11          #ifdef RTX51_TINY_OS
+  12          #include <rtx51tny.h>
+  13          #endif
+  14          #include <string.h>
+  15          #include "papdef.h"
+  16          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  19          #include "green.h"
+  20          #include "fm.h"
+  21          #include "sched.h"
+  22          #include "muxl.h"
+  23          #include "hpgpdef.h"
+  24          #include "hpgpapi.h"
+  25          #include "ism.h"
+  26          #include "hpgpevt.h"
+  27          
+  28          #include "hal.h"
+  29          #include "hybrii_tasks.h"
+  30          
+  31          #if 0
+              eStatus MUXL_SendEvent(sMuxLayer *muxl, sEvent *event)
+              {
+              
+              #ifdef P8051
+              __CRIT_SECTION_BEGIN__
+              #else
+                  SEM_WAIT(&muxl->muxSem);
+              #endif
+              
+                  SLIST_Put(&muxl->eventQueue, &event->link);
+              
+              #ifdef P8051
+              __CRIT_SECTION_END__
+              #else
+                  SEM_POST(&muxl->muxSem);
+C51 COMPILER V9.52.0.0   MUXL                                                              12/02/2014 14:35:40 PAGE 2   
+
+              #endif
+                  return STATUS_SUCCESS;
+              }
+              
+              #endif
+  52          
+  53          
+  54          eStatus MUXL_TransmitMgmtMsg(sMuxLayer *muxl, sEvent *event)
+  55          {
+  56   1          sMmHdr    *mmh = NULL;
+  57   1          sHpgpHdr *hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+  58   1      
+  59   1          if( event->eventHdr.eventClass != EVENT_CLASS_MSG)
+  60   1          {
+  61   2              return STATUS_FAILURE;
+  62   2          }
+  63   1      
+  64   1          /* add the mgmt msg header */
+  65   1          if(event->buffDesc.buff+sizeof(sMmHdr) > event->buffDesc.dataptr)
+  66   1          {
+  67   2              FM_Printf(FM_ERROR,"MUXL: Data buffer is small\n");
+  68   2              return STATUS_FAILURE;
+  69   2          }
+  70   1      
+  71   1          if (((hpgpHdr->mnbc)&&(event->buffDesc.datalen > HPGP_MNBC_PAYLOAD_MAX)) ||
+  72   1               (event->buffDesc.datalen > HPGP_DATA_PAYLOAD_MAX))
+  73   1          {
+  74   2              /* perform the msg fragment */
+  75   2              FM_Printf(FM_ERROR,"MUXL: need msg fragmentation.\n");
+  76   2          }
+  77   1      
+  78   1          event->buffDesc.dataptr -= sizeof(sMmHdr);  
+  79   1          event->buffDesc.datalen += sizeof(sMmHdr);  
+  80   1          mmh = (sMmHdr *) (event->buffDesc.dataptr);  
+  81   1                
+  82   1          //add mgmt msg header
+  83   1          //fragment is not supported at present
+  84   1          mmh->mmv = 0x1;
+  85   1          mmh->mmtype = cpu_to_le16(event->eventHdr.type);
+  86   1          mmh->nfmi = 0;
+  87   1          mmh->fnmi = 0;
+  88   1          mmh->fmsn = 0;
+  89   1      
+  90   1          return HAL_Transmit(HOMEPLUG_GetHal(), event);
+  91   1      
+  92   1      }
+*** WARNING C280 IN LINE 54 OF ..\..\src\mux\muxl.c: 'muxl': unreferenced local variable
+  93          
+  94          eStatus MUX_InitMux(sMux *mux)
+  95          {
+  96   1          SLIST_Init(&mux->rxQueue);
+  97   1          mux->rxqlen = 0;
+  98   1          mux->rxnfmi = 0;
+  99   1          mux->rxfmsn = 0;
+ 100   1         
+ 101   1          return STATUS_SUCCESS;
+ 102   1      }
+ 103          
+ 104          
+ 105          int MUX_ResetReassembly(sMux *mux)
+ 106          {
+ 107   1          sEvent *event = NULL;
+C51 COMPILER V9.52.0.0   MUXL                                                              12/02/2014 14:35:40 PAGE 3   
+
+ 108   1          sSlink *slink = NULL;
+ 109   1      
+ 110   1          while(!SLIST_IsEmpty(&mux->rxQueue))
+ 111   1          {
+ 112   2              slink = SLIST_Pop(&mux->rxQueue);
+ 113   2      
+ 114   2              event = SLIST_GetEntry(slink, sEvent, link);
+ 115   2              EVENT_Free(event);
+ 116   2          }
+ 117   1          mux->rxqlen = 0;
+ 118   1          mux->rxnfmi = 0;
+ 119   1          mux->rxfmsn = 0;
+ 120   1         
+ 121   1          return STATUS_SUCCESS;
+ 122   1      }
+ 123          
+ 124          
+ 125          
+ 126          void MUX_Proc(sMux *mux, sEvent *event)
+ 127          {
+ 128   1          sMmHdr *mmh = NULL; 
+ 129   1      
+ 130   1          //now it is a mgmt msg
+ 131   1          mmh = (sMmHdr *) (event->buffDesc.dataptr);  
+ 132   1      
+ 133   1      //FM_Printf(FM_MUX, "MUX: process a mgmt msg (type = 0x%.2x).\n", mmh->mmtype);
+ 134   1      
+ 135   1          event->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 136   1          event->eventHdr.type = le16_to_cpu(mmh->mmtype);
+ 137   1          //chop off the msg header
+ 138   1          event->buffDesc.dataptr += sizeof(sMmHdr);
+ 139   1          event->buffDesc.datalen -= sizeof(sMmHdr);
+ 140   1      
+ 141   1          if(mux->rxfmsn != mmh->fmsn)
+ 142   1          {
+ 143   2              //receive new mgmt info, reset RX  
+ 144   2              MUX_ResetReassembly(mux);
+ 145   2              mux->rxfmsn = mmh->fmsn;
+ 146   2              mux->rxnfmi = mmh->nfmi;
+ 147   2          }
+ 148   1      
+ 149   1          if(mux->rxnfmi != mmh->nfmi) 
+ 150   1          {
+ 151   2              //should not happen
+ 152   2              MUX_ResetReassembly(mux);
+ 153   2              EVENT_Free(event);
+ 154   2              FM_Printf(FM_WARN, "MUX: error in rx fragement.\n");
+ 155   2              return;
+ 156   2      
+ 157   2          }
+ 158   1      
+ 159   1          if(mux->rxnfmi == 0)
+ 160   1          {
+ 161   2              FM_Printf(FM_MUX, "MUX: deliver a mgmt msg.\n");
+ 162   2              //no fragment and deliver right away
+ 163   2      #ifdef CALLBACK
+                      mux->deliverMgmtMsg(mux->mgmtcookie, event); 
+              #else
+ 166   2              LINKL_RecvMgmtMsg(mux->mgmtcookie, event);
+ 167   2      #endif
+ 168   2          }
+ 169   1          else
+C51 COMPILER V9.52.0.0   MUXL                                                              12/02/2014 14:35:40 PAGE 4   
+
+ 170   1          {
+ 171   2      //        event->eventHdr.fnmi = mmh->fnmi; //??
+ 172   2              //check if it is the first fragment 
+ 173   2      
+ 174   2      //        mux->fnmi = mmh->fnmi; //??
+ 175   2             
+ 176   2              //place the rx fragment into the rx queue in order
+ 177   2              //At present it is assumed that the fragments are 
+ 178   2              //transmitted in order of fragment number. Thus, simply
+ 179   2              //place the fragment at the tail.
+ 180   2              //Otherwise, a general approach is used.
+ 181   2              SLIST_Put(&mux->rxQueue, &event->link);
+ 182   2              mux->rxqlen++;
+ 183   2              if(mux->rxqlen == (mux->rxnfmi+1))
+ 184   2              {
+ 185   3                 //(1) perform message reassembly
+ 186   3                 
+ 187   3                 //(2) deliver the assembled message 
+ 188   3                 FM_Printf(FM_ERROR, "MUX: Message reassembly is not supported at present.\n");
+ 189   3              }
+ 190   2          }
+ 191   1      
+ 192   1          return;
+ 193   1      }
+ 194          
+ 195          
+ 196          u8 MUXL_Proc(void *cookie)
+ 197          {
+ 198   1          sEvent *event = NULL;
+ 199   1          sSlink *slink = NULL;
+ 200   1          u8      ret = 0;
+ 201   1          sMuxLayer *muxl = (sMuxLayer *)cookie;
+ 202   1      //FM_Printf(FM_CTRL, "MUXL: pop a beacon/mgmt.\n");
+ 203   1      
+ 204   1          while(!SLIST_IsEmpty(&muxl->eventQueue)
+ 205   1      #ifndef RTX51_TINY_OS   
+                        && !(ret = SCHED_IsPreempted(&muxl->task))
+              #endif
+ 208   1            )
+ 209   1          {
+ 210   2      #ifdef P8051
+ 211   2      __CRIT_SECTION_BEGIN__
+ 212   2      #else
+                  SEM_WAIT(&muxl->muxSem);
+              #endif
+ 215   2                  slink = SLIST_Pop(&muxl->eventQueue);
+ 216   2      #ifdef P8051
+ 217   2      __CRIT_SECTION_END__
+ 218   2      #else
+                  SEM_POST(&muxl->muxSem);
+              #endif
+ 221   2              event = SLIST_GetEntry(slink, sEvent, link);
+ 222   2              MUX_Proc(&muxl->mux, event);
+ 223   2          }
+ 224   1      
+ 225   1          return ret;
+ 226   1      }
+ 227          
+ 228          
+ 229          void MUXL_RecvMgmtPacket(void* cookie, sEvent *event) __REENTRANT__
+ 230          {
+ 231   1          sMuxLayer *muxl = (sMuxLayer *)cookie;
+C51 COMPILER V9.52.0.0   MUXL                                                              12/02/2014 14:35:40 PAGE 5   
+
+ 232   1          /* check beacon */
+ 233   1          if ((event->eventHdr.eventClass == EVENT_CLASS_CTRL)&&
+ 234   1              (event->eventHdr.type == EVENT_TYPE_CC_BCN_IND))
+ 235   1          {
+ 236   2              FM_Printf(FM_MUX, "MUX: deliver a beacon.\n");
+ 237   2      #ifdef CALLBACK
+                      muxl->mux.deliverMgmtMsg(muxl->mux.mgmtcookie, event); 
+              #else
+ 240   2              LINKL_RecvMgmtMsg(muxl->mux.mgmtcookie, event);
+ 241   2      #endif
+ 242   2              return;
+ 243   2          }
+ 244   1          else if (event->eventHdr.eventClass == EVENT_CLASS_MSG)
+ 245   1          {
+ 246   2      
+ 247   2      #if 0 
+                      /* place the event to the mux layer queue */
+              #ifdef P8051
+              __CRIT_SECTION_BEGIN__
+              #else
+                      SEM_WAIT(&muxl->muxSem);
+              #endif
+                      SLIST_Put(&muxl->eventQueue, &event->link);
+              #ifdef P8051
+              __CRIT_SECTION_END__
+              #else
+                      SEM_POST(&muxl->muxSem);
+              #endif
+                      /* schedule the task */
+              #ifndef RTX51_TINY_OS
+                      SCHED_Sched(&muxl->task);
+              #else
+                      os_set_ready(HPGP_TASK_ID_MUX);
+              #endif
+              
+              #else
+ 268   2      
+ 269   2          MUX_Proc(&muxl->mux, event);
+ 270   2      
+ 271   2      
+ 272   2      #endif
+ 273   2      
+ 274   2          }
+ 275   1      }
+ 276              
+ 277          
+ 278          #if 0
+              //The following function is executed in interrupt context
+              //void MUXL_RecvMgmtPacket(void* cookie)
+              //void MUXL_RecvMgmtPacket(void* cookie, sTxRxDesc *rxdesc, u8 *rxbuf, u16 pktlen)
+              void MUXL_RecvMgmtPacket(void* cookie, sRxDesc *rxdesc, 
+                                       u8 *rxbuf, u16 pktlen,
+                                       u8 *srcMacAddr)
+              {
+                  sEvent    *event = NULL;
+                  sHpgpHdr  *hpgpHdr = NULL;
+              
+                  //check the ETH header
+              //    sEthHdr *ethhdr = NULL;
+              //    sRxDesc rxdesc;
+              //    u16 pktlen = 0;
+                  sMuxLayer *muxl = (sMuxLayer *)cookie;
+C51 COMPILER V9.52.0.0   MUXL                                                              12/02/2014 14:35:40 PAGE 6   
+
+                  //check DTEI: cco tei, my tei, and multicast/broadcast tei
+                  //memset(&rxdesc, 0, sizeof(sRxDesc));
+                  //read Rx descriptor and get packet length
+                  
+              //FM_Printf(FM_CTRL, "MUX: received a beacon/mgmt (%d).\n", pktlen);
+              
+                  //create an event
+                  event = EVENT_Alloc(pktlen + MAC_ADDR_LEN, sizeof(sHpgpHdr));
+                  if(event == NULL)
+                  {
+                      FM_Printf(FM_ERROR, "MUXL: Fail to allcate an event.\n");
+                      return;
+                  }
+              
+                  hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+              
+                  hpgpHdr->tei = rxdesc->stei;
+                  hpgpHdr->snid = rxdesc->snid;
+              
+                  memcpy(event->buffDesc.dataptr, srcMacAddr, MAC_ADDR_LEN);
+                  hpgpHdr->macAddr = event->buffDesc.dataptr;
+                  event->buffDesc.dataptr += MAC_ADDR_LEN;
+              
+                  //copy the mm from HPGP MAC to event buff
+                  memcpy(event->buffDesc.dataptr, rxbuf, pktlen);
+                  event->buffDesc.datalen = pktlen;
+              #ifdef SIMU
+                  if(rxdesc->frameType == FRAME_TYPE_BEACON)
+                  {
+                      FM_Printf(FM_MUX|FM_LINFO, "MUX: received a beacon (%d).\n", pktlen);
+                      event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                      event->eventHdr.type = EVENT_TYPE_CC_BCN_IND;
+                  
+                  }
+                  else //mgmt msg
+                  {
+              FM_Printf(FM_MUX, "MUX: receive a mgmt msg.\n");
+                      event->eventHdr.eventClass = EVENT_CLASS_MSG;
+              
+              //        ethhdr = (sEthHdr *)event->buffDesc.dataptr; 
+              //        event->eventHdr.macAddr = ethhdr->hdr.ethII.srcaddr;
+                      //chop off the ethernet header
+              //        event->buffDesc.dataptr += sizeof(sEthHdr); 
+              //        event->buffDesc.datalen -= sizeof(sEthHdr); 
+                  
+                  }
+              #endif
+              
+                  //place the event to the mux layer queue
+              #ifdef P8051
+              __CRIT_SECTION_BEGIN__
+              #else
+                  SEM_WAIT(&muxl->muxSem);
+              #endif
+                  SLIST_Put(&muxl->eventQueue, &event->link);
+              #ifdef P8051
+              __CRIT_SECTION_END__
+              #else
+                  SEM_POST(&muxl->muxSem);
+              #endif
+              
+              }
+C51 COMPILER V9.52.0.0   MUXL                                                              12/02/2014 14:35:40 PAGE 7   
+
+              #endif
+ 357          
+ 358          void MUXL_RegisterMgmtMsgCallback(sMuxLayer *muxl, 
+ 359              void (*callback)(void XDATA *cookie, sEvent XDATA *event),
+ 360              void *cookie)
+ 361          {
+ 362   1      #ifdef CALLBACK
+                  muxl->mux.deliverMgmtMsg = callback;
+              #endif
+ 365   1          muxl->mux.mgmtcookie = cookie;
+ 366   1      }
+*** WARNING C280 IN LINE 359 OF ..\..\src\mux\muxl.c: 'callback': unreferenced local variable
+ 367          
+ 368          
+ 369          eStatus MUXL_Init(sMuxLayer *muxl)
+ 370          {
+ 371   1          eStatus status = STATUS_SUCCESS;
+ 372   1      
+ 373   1          SLIST_Init(&muxl->eventQueue);
+ 374   1      
+ 375   1          HAL_RegisterRxMgmtCallback(HOMEPLUG_GetHal(), MUXL_RecvMgmtPacket, (void *)muxl); 
+ 376   1      
+ 377   1      #ifndef P8051
+              #if defined(WIN32) || defined(_WIN32)
+                  muxl->muxSem = CreateSemaphore(
+                      NULL,           // default security attributes
+                      SEM_COUNT,      // initial count
+                      SEM_COUNT,      // maximum count
+                      NULL);          // unnamed semaphore
+                  if(muxl->muxSem == NULL)
+              #else
+                  if(sem_init(&muxl->muxSem, 0, SEM_COUNT))
+              #endif
+                  {
+                      status = STATUS_FAILURE;
+                  }
+              #endif
+ 392   1      #ifdef RTX51_TINY_OS  
+ 393   1      //    os_create_task(HPGP_TASK_ID_MUX);
+ 394   1      #else   
+                  SCHED_InitTask(&muxl->task, HPGP_TASK_ID_MUX, "MUX", 
+                                 HPGP_TASK_PRI_MUX, MUXL_Proc, muxl);
+              #endif
+ 398   1          MUX_InitMux(&muxl->mux);
+ 399   1      
+ 400   1      
+ 401   1          FM_Printf(FM_MINFO, "MUX Layer: Initialized.\n");
+ 402   1          return status;
+ 403   1      }
+ 404          
+ 405          #ifdef RTX51_TINY_OS
+ 406          void MUXL_Task(void) //_task_ HPGP_TASK_ID_MUX  
+ 407          {
+ 408   1          sMuxLayer* muxl = (sMuxLayer*)HPGPCTRL_GetLayer(HP_LAYER_TYPE_MUX);
+ 409   1          while (1) {
+ 410   2      #ifdef UART_HOST_INTF
+                  os_switch_task();
+              #else
+ 413   2              os_wait1(K_SIG);
+ 414   2      #endif
+ 415   2              MUXL_Proc(muxl);
+ 416   2          }
+C51 COMPILER V9.52.0.0   MUXL                                                              12/02/2014 14:35:40 PAGE 8   
+
+ 417   1      }
+ 418          #endif
+ 419          
+ 420          
+ 421          /** =========================================================
+ 422           *
+ 423           * Edit History
+ 424           *
+ 425           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/mux/muxl.c,v $
+ 426           *
+ 427           * $Log: muxl.c,v $
+ 428           * Revision 1.6  2014/06/11 13:17:47  kiran
+ 429           * UART as host interface and peripheral interface supported.
+ 430           *
+ 431           * Revision 1.5  2014/05/28 10:58:59  prashant
+ 432           * SDK folder structure changes, Uart changes, removed htm (UI) task
+ 433           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+ 434           *
+ 435           * Revision 1.4  2014/05/12 08:09:57  prashant
+ 436           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+ 437           *
+ 438           * Revision 1.3  2014/02/27 10:42:47  prashant
+ 439           * Routing code added
+ 440           *
+ 441           * Revision 1.2  2014/01/10 17:18:24  yiming
+ 442           * check in Rajan 1/8/2014 code release
+ 443           *
+ 444           * Revision 1.5  2014/01/08 10:53:54  ranjan
+ 445           * Changes for LM OS support.
+ 446           * New Datapath FrameTask
+ 447           * LM and UM  datapath, feature verified.
+ 448           *
+ 449           * known issues : performance numbers needs revisit
+ 450           *
+ 451           * review : pending.
+ 452           *
+ 453           * Revision 1.4  2013/09/04 14:51:16  yiming
+ 454           * New changes for Hybrii_A code merge
+ 455           *
+ 456           * Revision 1.16  2012/10/25 11:38:48  prashant
+ 457           * Sniffer code added for MAC_SAP, Added new commands in MAC_SAP for sniffer, bridge,
+ 458           *  hardware settings and peer information.
+ 459           *
+ 460           * Revision 1.15  2012/07/15 17:31:07  yuanhua
+ 461           * (1)fixed a potential memory overwriting in MUXL (2)update prints for 8051.
+ 462           *
+ 463           * Revision 1.14  2012/07/02 23:41:34  kripa
+ 464           * Converting mmType field from host to hpgp byte order and vice versa.
+ 465           * Committed on the Free edition of March Hare Software CVSNT Client.
+ 466           * Upgrade to CVS Suite for more features and support:
+ 467           * http://march-hare.com/cvsnt/
+ 468           *
+ 469           * Revision 1.13  2012/06/05 22:37:12  son
+ 470           * UART console does not get initialized due to task ID changed
+ 471           *
+ 472           * Revision 1.12  2012/06/05 07:25:59  yuanhua
+ 473           * (1) add a scan call to the MAC during the network discovery. (2) add a tiny task in ISM for interrupt p
+             -olling (3) modify the frame receiving integration. (4) modify the tiny task in STM.
+ 474           *
+ 475           * Revision 1.11  2012/06/04 23:34:34  son
+ 476           * Added RTX51 OS support
+ 477           *
+C51 COMPILER V9.52.0.0   MUXL                                                              12/02/2014 14:35:40 PAGE 9   
+
+ 478           * Revision 1.10  2012/05/19 20:32:17  yuanhua
+ 479           * added non-callback option for the protocol stack.
+ 480           *
+ 481           * Revision 1.9  2012/05/17 05:05:58  yuanhua
+ 482           * (1) added the option for timer w/o callback (2) added task id and name.
+ 483           *
+ 484           * Revision 1.8  2012/05/14 05:22:29  yuanhua
+ 485           * support the SCHED without using callback functions.
+ 486           *
+ 487           * Revision 1.7  2012/04/30 04:05:57  yuanhua
+ 488           * (1) integrated the HAL mgmt Tx. (2) various updates
+ 489           *
+ 490           * Revision 1.6  2012/04/25 13:53:41  yuanhua
+ 491           * changed the HAL_Transmit prototype.
+ 492           *
+ 493           * Revision 1.5  2012/04/13 06:15:11  yuanhua
+ 494           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+ 495           *
+ 496           * Revision 1.4  2012/03/11 17:02:25  yuanhua
+ 497           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+ 498           *
+ 499           * Revision 1.3  2011/09/14 05:52:36  yuanhua
+ 500           * Made Keil C251 compilation.
+ 501           *
+ 502           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+ 503           * migrate the firmware code from the greenchip to the hybrii.
+ 504           *
+ 505           * Revision 1.7  2011/08/09 22:45:44  yuanhua
+ 506           * changed to event structure, seperating HPGP-related events from the general event defination so that th
+             -e general event could be used for other purposes than the HPGP.
+ 507           *
+ 508           * Revision 1.6  2011/07/30 02:43:35  yuanhua
+ 509           * (1) Split the beacon process into two parts: one requiring an immdiate response, the other tolerating t
+             -he delay (2) Changed the API btw the MUX and SHAL for packet reception (3) Fixed bugs in various modules. Now, multiple 
+             -STAs could successfully associate/leave the CCo
+ 510           *
+ 511           * Revision 1.5  2011/07/22 18:51:05  yuanhua
+ 512           * (1) added the hardware timer tick simulation (hts.h/hts.c) (2) Added semaphors for sync in simulation a
+             -nd defined macro for critical section (3) Fixed some bugs in list.h and CRM (4) Modified and fixed bugs in SHAL (5) Chan
+             -ged SNSM/CNSM and SNAM/CNAM for bug fix (6) Added debugging prints, and more.
+ 513           *
+ 514           * Revision 1.4  2011/07/08 22:23:48  yuanhua
+ 515           * (1) Implemented CNSM, including its state machine, beacon transmission and process, discover beacon sch
+             -eduling, auto CCo selection, discover list, handover countdown, etc. (2) Updated SNSM, including discover list processin
+             -g, triggering a switch to the new CCo, etc. (3) Updated CNAM and SNAM, adding the connection state in the SNAM, switch t
+             -o the new CCo, etc. (4) Other updates
+ 516           *
+ 517           * Revision 1.3  2011/07/02 22:09:02  yuanhua
+ 518           * Implemented both SNAM and CNAM modules, including network join and leave procedures, systemm resource (
+             -such as TEI) allocation and release, TEI renew/release timers, and TEI reuse timer, etc.
+ 519           *
+ 520           * Revision 1.2  2011/06/24 14:33:18  yuanhua
+ 521           * (1) Changed event structure (2) Implemented SNSM, including the state machines in network discovery and
+             - connection states, becaon process, discover process, and handover detection (3) Integrated the HPGP and SHAL
+ 522           *
+ 523           * Revision 1.1  2011/05/06 19:12:25  kripa
+ 524           * Adding mux layer files to new source tree.
+ 525           *
+ 526           * Revision 1.4  2011/04/23 23:07:00  kripa
+ 527           * MUX_Proc() ;changed references to 'event->data' to 'event->eventData', since 'data' is reserved word in
+             - Keil.
+C51 COMPILER V9.52.0.0   MUXL                                                              12/02/2014 14:35:40 PAGE 10  
+
+ 528           *
+ 529           * Revision 1.3  2011/04/23 19:48:45  kripa
+ 530           * Fixing stm.h and event.h inclusion, using relative paths to avoid conflict with windows system header f
+             -iles.
+ 531           *
+ 532           * Revision 1.2  2011/04/23 17:16:38  kripa
+ 533           * void MUX_Proc(sMux *mux, sEvent *event) ; event->class to event->eventClass.
+ 534           *
+ 535           * Revision 1.1  2011/04/08 21:42:11  yuanhua
+ 536           * Framework
+ 537           *
+ 538           *
+ 539           * ==========================================================*/
+ 540          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1156    ----
+   CONSTANT SIZE    =    217    ----
+   XDATA SIZE       =   ----      71
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  2 WARNING(S),  0 ERROR(S)

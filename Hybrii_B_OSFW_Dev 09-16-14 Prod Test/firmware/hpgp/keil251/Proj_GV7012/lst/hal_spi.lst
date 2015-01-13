@@ -1,0 +1,1291 @@
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HAL_SPI
+OBJECT MODULE PLACED IN .\obj\hal_spi.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\..\hal\hal_spi.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100)
+                    - INCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..\.
+                    -.\src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\zi
+                    -gbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event
+                    -\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\src;
+                    -..\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support;.
+                    -.\..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC
+                    -,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,
+                    -Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,
+                    -PROD_TEST) DEBUG PRINT(.\lst\hal_spi.lst) TABS(2) OBJECT(.\obj\hal_spi.obj)
+
+line level    source
+
+   1          /*
+   2          * $Id: hal_spi.c,v 1.13 2014/06/10 22:46:03 yiming Exp $
+   3          *
+   4          * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hal/hal_spi.c,v $
+   5          *
+   6          * Description : SPI HAL module.
+   7          *
+   8          * Copyright (c) 2012 Greenvity Communications, Inc.
+   9          * All rights reserved.
+  10          *
+  11          * Purpose :
+  12          *    
+  13          *
+  14          */
+  15          #include <stdio.h>
+  16          #include <string.h>
+  17          #include "papdef.h"
+  18          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  21          #include "hal_common.h"
+  22          #include "hal_hpgp.h"
+  23          #include "hal.h"
+  24          #include "hal_eth.h"
+  25          #include "hal_spi.h"
+  26          #include "utils.h"
+  27          #include "fm.h"
+  28          #include "timer.h"
+  29          #include "stm.h"
+  30          
+  31          #include "datapath.h"
+  32          #ifdef PROD_TEST
+  33          #include "hal_tst.h"
+  34          #include "hal_prod_tst.h"
+  35          #endif
+  36          
+  37          #ifdef _LED_DEMO_
+              #include "led_board.h"
+              extern void HHT_TxLedDemo(u8 *payload_p);
+              #endif
+  41          
+  42          #ifdef HPGP_HAL_TEST
+              void Host_RxHandler(sCommonRxFrmSwDesc* pRxFrmDesc);
+              #else
+  45          extern void Host_RxHandler(sHaLayer *pHal, sCommonRxFrmSwDesc* pRxFrmDesc);
+  46          #endif
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 2   
+
+  47          
+  48          extern eStatus IsHostQueueEmpty();
+  49          static u8 mRdyPollCnt= 0;
+  50                     
+  51          u32 spi_tx_time = 0;
+  52          u8  spi_tx_flag = 0;
+  53          u8  spi_payload_rx_pending = 0;
+  54          
+  55          #ifdef DEBUG_DATAPATH
+              
+              extern u8 sigDbg;
+              extern u8 pktDbg;
+              
+              #endif
+  61          
+  62          #ifdef SPI_DEBUG
+              extern u8 mySpiDebugFlag;
+              #endif
+  65          
+  66          spi_rx_state_t  spi_rx_state;
+  67          hal_spi_stats_t hal_spi_stats;
+  68          
+  69          void hal_spi_stats_show (void)
+  70          {
+  71   1          printf("\nSPI TX DMA Stats %lu/%lu/%u pakets/bytes/to's",
+  72   1                 hal_spi_stats.tx_pkts, 
+  73   1                 hal_spi_stats.tx_bytes, hal_spi_stats.tx_timeout);
+  74   1      
+  75   1          printf("\nSPI RX DMA: %lu/%lu/%u/%u pakets/bytes/to's/crc\n",
+  76   1                 hal_spi_stats.rx_pkts,
+  77   1                 hal_spi_stats.rx_bytes,
+  78   1                 hal_spi_stats.rx_timeout, 
+  79   1                 hal_spi_stats.rx_crc_errors);
+  80   1      }
+  81          
+  82          void hal_spi_setup_rx_buffer (uint16_t data_size)
+  83          {
+  84   1          uint32_t  desc_value;
+  85   1      
+  86   1          desc_value = CPU_TXQDESC_FIRST_DESC;
+  87   1          hal_common_bit_field_set(&desc_value,
+  88   1                                   CPU_TXQDESC_FRAME_LEN_MASK,
+  89   1                                   CPU_TXQDESC_FRAME_LEN_POS,
+  90   1                                   data_size);
+  91   1          /*
+  92   1           * For the 1st descriptor, the buffer len is actually the
+  93   1           * number of descriptor of the packet. For the SPI receiver,
+  94   1           * there are 2 descriptors. One first descriptor and one last
+  95   1           * descriptor.
+  96   1           */
+  97   1          hal_common_bit_field_set(&desc_value,
+  98   1                                   CPU_REQUESTCP_BUFLEN_MASK,
+  99   1                                   CPU_REQUESTCP_BUFLEN_POS,
+ 100   1                                   2);
+ 101   1          hal_common_reg_32_write(SPI_Q_DESC_FIFO, desc_value);
+ 102   1      
+ 103   1          /*
+ 104   1           * Need to put the last descriptor. CP and length is irrelevant
+ 105   1           */
+ 106   1          desc_value = CPU_TXQDESC_LAST_DESC;
+ 107   1          hal_common_reg_32_write(SPI_Q_DESC_FIFO, desc_value);
+ 108   1      }
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 3   
+
+ 109          
+ 110          void hal_spi_cmd_len_rx_rdy ()
+ 111          {
+ 112   1          hal_common_reg_bit_clear(CPU_GPIO_REG, SPI_RX_CMDLEN_RDY);
+ 113   1          hal_common_reg_bit_set(CPU_GPIO_REG, SPI_RX_CMDLEN_RDY);
+ 114   1      }
+ 115          
+ 116          
+ 117          void hal_spi_cmd_len_rx_not_rdy (void)
+ 118          {
+ 119   1         //rajan spi_rx_state = SPI_RX_NOT_RDY;
+ 120   1      #ifdef DEBUG_DATAPATH
+                  if (sigDbg)
+                  FM_Printf(FM_ERROR,"\nrx cmd lo\n");
+              #endif    
+ 124   1          hal_common_reg_bit_clear(CPU_GPIO_REG, SPI_RX_CMDLEN_RDY);
+ 125   1      }
+ 126          
+ 127          void hal_spi_payload_rx_rdy ()
+ 128          {
+ 129   1          hal_common_reg_bit_clear(CPU_GPIO_REG, SPI_RX_PAYLOAD_RDY);
+ 130   1          hal_common_reg_bit_set(CPU_GPIO_REG, SPI_RX_PAYLOAD_RDY);
+ 131   1      }
+ 132          
+ 133          void hal_spi_slave_tx_req ()
+ 134          {
+ 135   1          hal_common_reg_bit_clear(CPU_GPIO_REG, SPI_TX_REQ);
+ 136   1          hal_common_reg_bit_set(CPU_GPIO_REG, SPI_TX_REQ);
+ 137   1      }
+ 138          
+ 139          
+ 140          void hal_spi_prepare_rx_cmd_engine (void)
+ 141          {
+ 142   1      
+ 143   1        uint32_t  value32;
+ 144   1      
+ 145   1          value32 = hal_common_reg_32_read(SPI_CONFIG);
+ 146   1        value32 |= SPI_CONFIG_DIRECT_ACCESS;
+ 147   1          value32 &= ~SPI_CONFIG_WRITE;
+ 148   1      
+ 149   1        hal_common_bit_field_set(&value32, SPI_TX_LEN_MASK, SPI_TX_LEN_POS,
+ 150   1                     FOUR_BYTES);
+ 151   1        hal_common_reg_32_write(SPI_CONFIG, value32);
+ 152   1          hal_common_reg_bit_clear(SPI_CONTROL, SPI_CONTROL_SPIEN);
+ 153   1        hal_common_reg_bit_set(SPI_CONTROL, SPI_CONTROL_SPIEN);
+ 154   1      
+ 155   1        spi_rx_state = SPI_CMD_LEN_EXPECT;
+ 156   1      
+ 157   1      }
+ 158          void hal_spi_set_rx_cmd_len_rdy (void)
+ 159          {
+ 160   1      #if 0//rajan
+                  uint32_t  value32;
+              
+                  value32 = SPI_CONFIG_DIRECT_ACCESS;
+              
+                  hal_common_bit_field_set(&value32, SPI_TX_LEN_MASK, SPI_TX_LEN_POS,
+                                           FOUR_BYTES);
+                  hal_common_reg_32_write(SPI_CONFIG, value32);
+                  hal_common_reg_bit_set(SPI_CONTROL, SPI_CONTROL_SPIEN);
+              
+                  spi_rx_state = SPI_CMD_LEN_EXPECT;
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 4   
+
+              #endif
+ 172   1      
+ 173   1      #ifdef DEBUG_DATAPATH
+                if (sigDbg)
+                  FM_Printf(FM_USER,"rx cmd hi\n");
+              #endif  
+ 177   1          hal_spi_cmd_len_rx_rdy();
+ 178   1      }
+ 179          
+ 180          void hal_spi_set_rx_payload_rdy (uint16_t payload_bytes)
+ 181          {
+ 182   1          uint32_t value32;
+ 183   1      
+ 184   1          hal_common_reg_32_write(SPI_CONTROL, 0);
+ 185   1      
+ 186   1          value32 = hal_common_reg_32_read(SPI_CONFIG);
+ 187   1          value32 |= SPI_CONFIG_SLAVE_NOT_SELECT;
+ 188   1      
+ 189   1          value32 &= ~(SPI_CONFIG_DIRECT_ACCESS);
+ 190   1          value32 &= ~SPI_CONFIG_WRITE;
+ 191   1      
+ 192   1          hal_common_bit_field_set(&value32, SPI_TX_LEN_MASK, SPI_TX_LEN_POS,
+ 193   1                                   FOUR_BYTES);
+ 194   1          hal_common_reg_32_write(SPI_CONFIG, value32);
+ 195   1      
+ 196   1          hal_common_reg_bit_clear(SPI_CONTROL, SPI_CONTROL_SPIEN);
+ 197   1          hal_common_reg_bit_set(SPI_CONTROL, SPI_CONTROL_SPIEN);
+ 198   1          hal_spi_setup_rx_buffer(payload_bytes);
+ 199   1      
+ 200   1          spi_rx_state = SPI_PAYLOAD_EXPECT;
+ 201   1      
+ 202   1          hal_spi_payload_rx_rdy();
+ 203   1      }
+ 204          
+ 205          void hal_spi_tx_cleanup (void)
+ 206          {
+ 207   1       //   hal_common_reg_bit_set(SPI_CONTROL, 
+ 208   1       //                          SPI_CONTROL_QD_FIFO_FLUSH);
+ 209   1          hal_common_reg_bit_set(SPI_CONTROL,
+ 210   1                                 SPI_CONTROL_QD_FIFO_CLEAR |
+ 211   1                                 SPI_CONTROL_TX_FIFO_CLEAR  );
+ 212   1          
+ 213   1      #ifndef HYBRII_B
+                  hal_common_reg_bit_set(PLC_RESET_REG, SPI_RESET);
+                  hal_common_reg_bit_clear(PLC_RESET_REG, SPI_RESET);
+              #else
+ 217   1          hal_common_reg_bit_clear(SPI_CONTROL, SPI_CONTROL_SPIEN);
+ 218   1          hal_common_reg_bit_set(SPI_CONTROL, SPI_CONTROL_SPIEN);
+ 219   1      #endif
+ 220   1      }
+ 221          
+ 222          void hal_spi_rx_cleanup (void)
+ 223          {
+ 224   1          spi_payload_rx_pending = 0;
+ 225   1          hal_common_reg_bit_set(SPI_CONTROL,
+ 226   1                                 SPI_CONTROL_QD_FIFO_FLUSH);
+ 227   1          hal_common_reg_bit_set(SPI_CONTROL,
+ 228   1                                 SPI_CONTROL_QD_FIFO_CLEAR |
+ 229   1                                 SPI_CONTROL_RX_FIFO_CLEAR  );
+ 230   1      
+ 231   1      #ifndef HYBRII_B
+                  hal_common_reg_bit_set(PLC_RESET_REG, SPI_RESET);
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 5   
+
+                  hal_common_reg_bit_clear(PLC_RESET_REG, SPI_RESET);
+              #else
+ 235   1          hal_common_reg_bit_clear(SPI_CONTROL, SPI_CONTROL_SPIEN);
+ 236   1          hal_common_reg_bit_set(SPI_CONTROL, SPI_CONTROL_SPIEN);
+ 237   1      #endif
+ 238   1      }
+ 239          
+ 240          #ifdef SPI_ECHO
+              uint8_t spi_tx_data[1600];
+              #endif
+ 243          
+ 244          #ifdef HPGP_HAL_TEST
+              void hal_spi_frame_rx (sCommonRxFrmSwDesc* rx_frame_info_p)
+              #else
+ 247          void hal_spi_frame_rx (sHaLayer *hal,  sCommonRxFrmSwDesc* rx_frame_info_p)
+ 248          #endif
+ 249          {
+ 250   1          uint16_t frame_len;
+ 251   1      #if defined(SPI_ECHO) || !defined(HYBRII_B)
+                  uint8_t  xdata *cp_addr_p;
+                  uint8_t  cp;
+                  uint8_t  i;
+                  uint8_t  data_size;
+              #ifdef SPI_ECHO
+                  uint16_t j = 0;
+              #endif
+              #endif
+ 260   1          uint16_t crc16;
+ 261   1      #ifdef PROD_TEST
+ 262   1        sprodTstCmd prodCmd;
+ 263   1          uint8_t  xdata *cp_addr_p;
+ 264   1          uint8_t  data_size;
+ 265   1      #endif
+ 266   1      
+ 267   1          if(hostDetected == FALSE) //if(hostIntf == HOST_INTF_NO)
+ 268   1          {
+ 269   2              hostIntf = HOST_INTF_SPI;
+ 270   2          }
+ 271   1      //#ifdef UM
+ 272   1          hostDetected = TRUE;
+ 273   1      //#endif
+ 274   1          frame_len = (rx_frame_info_p->hdrDesc.s.frmLenHi << 
+ 275   1                       PKTQDESC1_FRMLENHI_POS) | 
+ 276   1                       rx_frame_info_p->hdrDesc.s.frmLenLo;
+ 277   1          hal_spi_stats.rx_bytes += frame_len;
+ 278   1          hal_spi_stats.rx_pkts++;
+ 279   1      
+ 280   1      #ifdef DEBUG_DATAPATH
+                if (sigDbg)
+                      FM_Printf(FM_ERROR,"s rx\n");
+              #endif    
+ 284   1      
+ 285   1          crc16 = 0;
+ 286   1      
+ 287   1      #ifdef SPI_PAYLOAD_PRINT
+                  printf("\n");
+              #endif
+ 290   1      
+ 291   1      
+ 292   1      #ifdef DEBUG_DATAPATH
+                if (pktDbg)
+                  FM_Printf(FM_ERROR,"\n s r frame \n");
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 6   
+
+              #endif
+ 296   1      
+ 297   1      #if defined(SPI_ECHO) || !defined(HYBRII_B) 
+                  for (cp = 0; cp < rx_frame_info_p->cpCount; cp++) {
+                      cp_addr_p = CHAL_GetAccessToCP(rx_frame_info_p->cpArr[cp]);
+                      data_size = MIN(frame_len, HYBRII_CELLBUF_SIZE);
+                      for (i = 0; i < data_size; i++) {
+              #ifndef HYBRII_B
+                          crc16 = crc_ccitt_update(crc16, cp_addr_p[i]);
+              #endif
+              #ifdef SPI_ECHO
+                          spi_tx_data[j++] =  cp_addr_p[i];
+              #endif
+              #ifdef DEBUG_DATAPATH
+                      if (pktDbg)
+                      {
+                          FM_Printf(FM_ERROR,"0x%02bX ", cp_addr_p[i]);
+                      }
+              #endif
+              #ifndef _LED_DEMO_
+              #ifndef SPI_CRC_DEBUG
+                       //   cp_addr_p[i] = 0;  /* Clean up the buffer */ // TODO  Need to review again
+              #endif
+              #endif
+                      }
+                      
+                      if (frame_len > HYBRII_CELLBUF_SIZE) {
+                          frame_len -= HYBRII_CELLBUF_SIZE;
+                      }
+                  }
+              #endif /* SPI_ECHO */
+ 326   1      
+ 327   1      #ifdef DEBUG_DATAPATH
+                if (pktDbg)
+                  {
+                  FM_Printf(FM_ERROR,"\nend\n");
+                  }
+              #endif    
+ 333   1      
+ 334   1      #if 0
+                hal_spi_prepare_rx_cmd_engine();
+                  spi_payload_rx_pending = 0;
+              #ifndef HYBRII_FPGA
+              #ifndef HYBRII_ZIGBEE
+                  if (IsHostQueueEmpty() == STATUS_SUCCESS)
+              #endif
+              #endif
+                {
+                    hal_spi_set_rx_cmd_len_rdy();
+                }
+              #endif // #if 0
+ 346   1      #ifdef SPI_PAYLOAD_PRINT
+                  printf("\n");
+              #endif
+ 349   1          if (crc16 != 0) {
+ 350   2      #ifdef SPI_CRC_DEBUG
+                      printf("\nCRC Error 0x%x. Len = %d\n", crc16, frame_len);
+                      for (i = 0; i < frame_len; i++) {
+                          printf("%02bx ", cp_addr_p[i]);
+                      }
+                      printf("\n");
+              #endif
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 7   
+
+ 357   2              hal_spi_stats.rx_crc_errors++;
+ 358   2              hal_common_free_frame(rx_frame_info_p);
+ 359   2              return;       
+ 360   2          } else {
+ 361   2      #ifdef _LED_DEMO_
+              #ifdef HPGP_HAL_TEST
+                      if (TRUE == led_demo) {
+                          cp_addr_p[frame_len - 2] = 0;
+                          HHT_TxLedDemo(cp_addr_p);
+                      }
+              #endif
+              #endif
+ 369   2          }
+ 370   1      
+ 371   1      #ifdef SPI_DIAG
+              #ifdef SPI_ECHO
+                  printf("\rSPI RX: %lu/%lu/%u/%u pkts/bytes/to's/crc - "
+                         " TX: %lu/%lu/%u pkts/bytes/to's",
+                         hal_spi_stats.rx_pkts,
+                         hal_spi_stats.rx_bytes,
+                         hal_spi_stats.rx_timeout, 
+                         hal_spi_stats.rx_crc_errors,
+                         hal_spi_stats.tx_pkts,
+                         hal_spi_stats.tx_bytes,
+                         hal_spi_stats.tx_timeout);
+              #else
+                  printf("\rSPI Receive (DMA): %lu/%lu/%u/%u pakets/bytes/to's/crc",
+                         hal_spi_stats.rx_pkts,
+                         hal_spi_stats.rx_bytes,
+                         hal_spi_stats.rx_timeout, 
+                         hal_spi_stats.rx_crc_errors);
+              #endif
+              #endif
+ 390   1        
+ 391   1          frame_len = (rx_frame_info_p->hdrDesc.s.frmLenHi << 
+ 392   1                       PKTQDESC1_FRMLENHI_POS) | 
+ 393   1                       rx_frame_info_p->hdrDesc.s.frmLenLo;
+ 394   1      
+ 395   1        frame_len -= sizeof(crc16); 
+ 396   1        rx_frame_info_p->hdrDesc.s.frmLenHi = (frame_len & PKTQDESC1_FRMLENHI_MASK) >> PKTQDESC1_FRMLENHI_POS;
+ 397   1        rx_frame_info_p->hdrDesc.s.frmLenLo = (frame_len & PKTQDESC1_FRMLENLO_MASK);
+ 398   1      #ifdef UM
+ 399   1        if(frame_len > MIN_SPI_LEN)
+ 400   1        {        
+ 401   2            Host_RxHandler(hal, rx_frame_info_p);
+ 402   2        }
+ 403   1        else
+ 404   1        {
+ 405   2              hal_common_free_frame(rx_frame_info_p);
+ 406   2              gHpgpHalCB.halStats.HtoPswDropCnt++;
+ 407   2          FM_Printf(FM_ERROR, "Invalid SPI RX Len: %d\n", frame_len);
+ 408   2        }
+ 409   1      #else
+              #ifdef PROD_TEST
+                  cp_addr_p = CHAL_GetAccessToCP(rx_frame_info_p->cpArr[0]);
+                  data_size = MIN(frame_len, HYBRII_CELLBUF_SIZE);
+                fillBuffer(cp_addr_p, &data_size);
+                // verify that it's a Production Test command
+                if ((data_size <= MAX_PROD_TEST_CMD_LEN) && (isProdTstCmd(cp_addr_p, data_size, &prodCmd)))
+                {
+                  prodTestExecCmd(&prodCmd);  // execute the cmd
+                      hal_common_free_frame(rx_frame_info_p); // free the Rx frame (must be after call to ProdTestExecCn
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 8   
+
+             -d())
+                }
+                else
+                {
+              #endif         
+                    //[YM] commnet out this code because it cause SPI FCS error problem
+                  //[YM] For LM Code handle SPI bridge, Rajan added this code
+                  if (eth_plc_bridge)
+                  {
+                      if(frame_len > MIN_SPI_LEN)
+                      {        
+                          Host_RxHandler(rx_frame_info_p);
+                      }
+                  }
+                  else
+                  { 
+                      hal_common_free_frame(rx_frame_info_p);
+                  }
+              #ifdef PROD_TEST
+                }
+              #endif
+              #ifdef SPI_ECHO
+                  hal_spi_tx_dma(spi_tx_data, j - 2);
+              #endif
+              #endif // UM
+ 443   1      
+ 444   1      }
+*** WARNING C280 IN LINE 262 OF ..\..\..\hal\hal_spi.c: 'prodCmd': unreferenced local variable
+*** WARNING C280 IN LINE 263 OF ..\..\..\hal\hal_spi.c: 'cp_addr_p': unreferenced local variable
+*** WARNING C280 IN LINE 264 OF ..\..\..\hal\hal_spi.c: 'data_size': unreferenced local variable
+ 445          
+ 446          void hal_spi_tx_done_handler (void)
+ 447          {
+ 448   1      
+ 449   1        spi_tx_flag = 0;
+ 450   1      #ifdef SPI_DEBUG
+                  hal_spi_stats.spi_tx_done_handler++;
+              #endif
+ 453   1      #ifdef HYBRII_B
+ 454   1          if (hal_common_reg_bit_test(SPI_STATUS, SPI_STATUS_TX_TIME_OUT)) {
+ 455   2              hal_common_reg_bit_set(SPI_STATUS, SPI_STATUS_TX_TIME_OUT);
+ 456   2              hal_spi_stats.tx_timeout++;
+ 457   2          }
+ 458   1      #endif
+ 459   1          /*
+ 460   1           * Done with Tx. Switch to Rx mode
+ 461   1           */
+ 462   1          hal_spi_prepare_rx_cmd_engine();
+ 463   1      #ifndef HYBRII_FPGA
+ 464   1          if (datapath_IsQueueEmpty(HOST_DATA_QUEUE) == TRUE)
+ 465   1      #endif
+ 466   1          {
+ 467   2              hal_spi_set_rx_cmd_len_rdy();
+ 468   2          }
+ 469   1        
+ 470   1      //  printf("\nTx Done ");
+ 471   1      }
+ 472          
+ 473          void hal_spi_cleanup(void)
+ 474          {
+ 475   1      #if 0
+                  u32 i, j;
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 9   
+
+                  hal_spi_tx_cleanup ();
+                  hal_spi_rx_cleanup ();  
+                  for(i = 0; i < 10000; i++)
+                  {
+                      j = i + 1;
+                  }
+                  /*
+                   * Done with Tx. Switch to Rx mode
+                   */
+                  hal_spi_prepare_rx_cmd_engine();
+                  hal_spi_set_rx_cmd_len_rdy();
+                  FM_Printf(FM_ERROR,"\nTx Timeout ");
+              #endif
+ 490   1      
+ 491   1      }
+ 492          
+ 493          void hal_spi_rx_done_handler (void)
+ 494          {
+ 495   1          uint8_t         spi_data_in[4];
+ 496   1          uint8_t         i;
+ 497   1          hybrii_tx_req_t tx_req;
+ 498   1      
+ 499   1          if (spi_rx_state == SPI_CMD_LEN_EXPECT) { 
+ 500   2              spi_payload_rx_pending = 1;
+ 501   2              //printf("\nData 4 Bytes: ");
+ 502   2          for (i = 0; i < 4; i++) {
+ 503   3                  spi_data_in[i] = ReadU8Reg(SPI_DATA_IN + i);
+ 504   3            //printf("-%bx-", spi_data_in[i] ); 
+ 505   3              }
+ 506   2              //printf("\nDone\n");
+ 507   2              tx_req.command_id = 
+ 508   2                   mac_utils_byte_array_to_16_bit(&spi_data_in[0]);
+ 509   2              tx_req.tx_bytes =
+ 510   2                   mac_utils_byte_array_to_16_bit(&spi_data_in[2]);     
+ 511   2              if (HYBRII_TX_REQ != tx_req.command_id) {
+ 512   3                  FM_Printf(FM_ERROR,"\nErr: Invalid Cmd (%x/%x)",
+ 513   3                         tx_req.command_id, tx_req.tx_bytes);
+ 514   3                  hal_spi_stats.rx_invalid_cmd++;
+ 515   3                  
+ 516   3                  spi_payload_rx_pending = 0;
+ 517   3                  return;
+ 518   3              }
+ 519   2          
+ 520   2              if (tx_req.tx_bytes == 0 || 
+ 521   2                  tx_req.tx_bytes >  MAX_SPI_DATA + 2) {
+ 522   3                  FM_Printf(FM_ERROR,"\nErr: Invalid len (%d)",
+ 523   3                         tx_req.tx_bytes);
+ 524   3                  hal_spi_stats.rx_invalid_len++;
+ 525   3                  spi_payload_rx_pending = 0;
+ 526   3                  return;
+ 527   3              }
+ 528   2      #ifdef DEBUG_DATAPATH
+              
+                      if(sigDbg)
+                      printf("\nRx Done (%d)", tx_req.tx_bytes);
+              #endif        
+ 533   2              hal_spi_cmd_len_rx_not_rdy();
+ 534   2              hal_spi_set_rx_payload_rdy(tx_req.tx_bytes);
+ 535   2          } else {
+ 536   2      #ifdef HYBRII_B
+ 537   2              tinybool rx_error = FALSE;
+ 538   2      
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 10  
+
+ 539   2              if (hal_common_reg_bit_test(SPI_STATUS, SPI_STATUS_RX_CRC_ERR)) {
+ 540   3                  /* Write 1 to clear */
+ 541   3                  hal_common_reg_bit_set(SPI_STATUS, SPI_STATUS_RX_CRC_ERR);
+ 542   3                  hal_spi_stats.rx_crc_errors++;
+ 543   3                  rx_error = TRUE;
+ 544   3              }
+ 545   2              if (hal_common_reg_bit_test(SPI_STATUS, SPI_STATUS_RX_TIME_OUT)) {
+ 546   3                  /* Write 1 to clear */
+ 547   3                  hal_common_reg_bit_set(SPI_STATUS, SPI_STATUS_RX_TIME_OUT);
+ 548   3                  hal_spi_stats.rx_timeout++;
+ 549   3                  rx_error = TRUE;           
+ 550   3              }
+ 551   2      #endif
+ 552   2              hal_spi_prepare_rx_cmd_engine();
+ 553   2              spi_payload_rx_pending = 0;
+ 554   2      #ifdef HYBRII_HPGP
+ 555   2              if (datapath_IsQueueEmpty(HOST_DATA_QUEUE)
+ 556   2              == TRUE) {
+ 557   3                hal_spi_set_rx_cmd_len_rdy();
+ 558   3              }
+ 559   2      #else
+                      hal_spi_set_rx_cmd_len_rdy();
+              #endif
+ 562   2          }    
+ 563   1      }
+ 564          
+ 565          bool hal_spi_tx_dma (uint8_t XDATA *tx_data_p, uint16_t tx_req_bytes)
+ 566          {
+ 567   1          uint32_t desc_value;
+ 568   1          uint8_t  desc_count;
+ 569   1          bool     cp_first;
+ 570   1          bool     rc = FALSE;
+ 571   1          uint8_t  buffer_bytes;
+ 572   1          uint16_t tx_size;
+ 573   1          uint16_t data_size;
+ 574   1          uint16_t bytes_cnt;
+ 575   1          uint16_t crc16;
+ 576   1      
+ 577   1      
+ 578   1      #ifndef HYBRII_B
+                hal_spi_tx_cleanup ();
+                  hal_spi_rx_cleanup ();
+              #endif
+ 582   1          
+ 583   1          if ((tx_data_p == NULL) ||
+ 584   1          (!tx_req_bytes)) {
+ 585   2          printf("\nSPI Tx Failed - Len = %d\n", tx_req_bytes);
+ 586   2          return rc;
+ 587   2        }
+ 588   1      
+ 589   1          /*
+ 590   1           * Indicate to host that we cannot receive and chech for Tx
+ 591   1           */
+ 592   1          if( (TRUE == hal_common_reg_bit_test(CPU_GPIO_REG, SPI_RX_MASTER_TX)) ||
+ 593   1              (TRUE == hal_common_reg_bit_test(SPI_STATUS, SPI_STATUS_BUSY))|| (spi_tx_flag == 1) ||
+ 594   1              (spi_payload_rx_pending == 1) ) {
+ 595   2              return rc;
+ 596   2          }
+ 597   1          if (TRUE == hal_common_reg_bit_test(CPU_GPIO_REG, SPI_RX_CMDLEN_RDY)) {
+ 598   2              hal_spi_cmd_len_rx_not_rdy();
+ 599   2          }
+ 600   1          /*
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 11  
+
+ 601   1           * Set DMA Slave Trasmit mode
+ 602   1           */
+ 603   1          hal_spi_set_dma_mode(FALSE, TRUE);
+ 604   1      
+ 605   1      #ifdef HYBRII_B
+ 606   1          data_size = tx_req_bytes;
+ 607   1      #else
+                  data_size = tx_req_bytes + 2;  /* Add 2 bytes for CRC */
+              #endif
+ 610   1      
+ 611   1      //    if (FALSE == hal_common_reg_bit_test(SPI_STATUS, SPI_STATUS_BUSY)) 
+ 612   1          {        
+ 613   2              /* Write the 1st descriptor to the SPI QD FIFO */
+ 614   2              desc_value = CPU_TXQDESC_FIRST_DESC | CPU_TXQDESC_WRITE;
+ 615   2              hal_common_bit_field_set(&desc_value,
+ 616   2                                       CPU_TXQDESC_FRAME_LEN_MASK,
+ 617   2                                       CPU_TXQDESC_FRAME_LEN_POS,
+ 618   2                                       data_size + 
+ 619   2                                       sizeof(hybrii_tx_req_t));
+ 620   2      
+ 621   2              /*
+ 622   2               * For the 1st descriptor, the buffer len is actually the
+ 623   2               * number of descriptor of the packet including the 1st
+ 624   2               * descriptor. For SPI packet to host add 1 descriptor
+ 625   2               * for the packet header
+ 626   2               */
+ 627   2              desc_count = (data_size + (HYBRII_CELLBUF_SIZE - 1)) /
+ 628   2                           HYBRII_CELLBUF_SIZE + 2;
+ 629   2              hal_common_bit_field_set(&desc_value,
+ 630   2                                       CPU_REQUESTCP_BUFLEN_MASK,
+ 631   2                                       CPU_REQUESTCP_BUFLEN_POS,
+ 632   2                                       desc_count);
+ 633   2              hal_common_reg_32_write(SPI_Q_DESC_FIFO, desc_value);
+ 634   2      
+ 635   2              cp_first  = TRUE;
+ 636   2              bytes_cnt = 0;
+ 637   2              crc16     = 0;
+ 638   2              while (data_size) {
+ 639   3                  uint8_t  cp;
+ 640   3                  uint8_t  copy_data;
+ 641   3                  uint8_t  i;
+ 642   3                  eStatus  get_cp_status;
+ 643   3                  u8 xdata *cp_addr_p;
+ 644   3                  u8 xdata *cp_addr_start_p;
+ 645   3      
+ 646   3                  get_cp_status = CHAL_RequestCP(&cp);
+ 647   3                  if (STATUS_SUCCESS == get_cp_status) {
+ 648   4                      hybrii_tx_req_t *tx_req_p;
+ 649   4      
+ 650   4                      desc_value = CPU_TXQDESC_WRITE;
+ 651   4                      cp_addr_start_p = CHAL_GetAccessToCP(cp);
+ 652   4                      cp_addr_p = cp_addr_start_p;
+ 653   4                      if (TRUE == cp_first) {
+ 654   5                          /*
+ 655   5                           * 1st CP is for SPI packet header
+ 656   5                           */
+ 657   5                          cp_first = FALSE;
+ 658   5                          tx_req_p = (hybrii_tx_req_t *)cp_addr_p;
+ 659   5                          mac_utils_16_bit_to_byte_array(HYBRII_TX_REQ,
+ 660   5                                                        (uint8_t *)&tx_req_p->command_id);
+ 661   5                          /* Give host the length including CRC */              
+ 662   5                          mac_utils_16_bit_to_byte_array(tx_req_bytes + 2,
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 12  
+
+ 663   5                                                        (uint8_t *)&tx_req_p->tx_bytes);
+ 664   5                          buffer_bytes = sizeof(hybrii_tx_req_t);                                               
+             -              
+ 665   5                      } else {
+ 666   5                          tx_size = data_size;
+ 667   5                          copy_data = MIN(tx_size, HYBRII_CELLBUF_SIZE);
+ 668   5                          for (i = 0; i < copy_data; i++) {
+ 669   6                              bytes_cnt++;
+ 670   6                              if (bytes_cnt <= tx_req_bytes) {
+ 671   7      #ifndef HYBRII_B
+                                          crc16 = crc_ccitt_update(crc16, *tx_data_p);
+              #endif                            
+ 674   7                                  *cp_addr_p++ = *tx_data_p++;
+ 675   7                              } else {
+ 676   7      #ifndef HYBRII_B
+                                          if (bytes_cnt == (tx_req_bytes + 1)) {
+                                              *cp_addr_p++ = crc16 & 0xFF;
+                                          } else {
+                                              *cp_addr_p++ = (crc16 >> 8) & 0xFF;
+                                          }
+              #endif
+ 683   7                              }
+ 684   6                          }
+ 685   5                          if (data_size > HYBRII_CELLBUF_SIZE) {
+ 686   6                              data_size -= HYBRII_CELLBUF_SIZE;
+ 687   6                              buffer_bytes = HYBRII_CELLBUF_SIZE;
+ 688   6                          } else {
+ 689   6                              desc_value |= CPU_TXQDESC_LAST_DESC;
+ 690   6                              buffer_bytes = cp_addr_p - cp_addr_start_p; 
+ 691   6                              data_size = 0;
+ 692   6                          }
+ 693   5                      }    
+ 694   4                      hal_common_bit_field_set(&desc_value,
+ 695   4                                               CPU_REQUESTCP_BUFLEN_MASK,
+ 696   4                                               CPU_REQUESTCP_BUFLEN_POS,
+ 697   4                                               buffer_bytes);
+ 698   4                      hal_common_bit_field_set(&desc_value, 
+ 699   4                                               CPU_REQUESTCP_CPMASK,
+ 700   4                                               CPU_REQUESTCP_CPPOS, cp);
+ 701   4                      hal_common_reg_32_write(SPI_Q_DESC_FIFO, desc_value);
+ 702   4                  } else {
+ 703   4                      hal_spi_stats.cp_alloc_failed++;
+ 704   4                      printf("\nCP alloc fail\n");
+ 705   4      //                hal_common_reg_bit_set(SPI_CONTROL, 
+ 706   4      //                                       SPI_CONTROL_QD_FIFO_FLUSH);
+ 707   4                      hal_spi_stats.tx_errors++;
+ 708   4                      goto exit;
+ 709   4                  }                        
+ 710   3              }
+ 711   2              spi_tx_flag = 1;
+ 712   2      
+ 713   2              hal_spi_payload_rx_rdy();
+ 714   2              
+ 715   2              hal_spi_stats.tx_bytes += (tx_req_bytes + 2);
+ 716   2              hal_spi_stats.tx_pkts++;
+ 717   2      #ifdef SPI_DIAG
+              #ifdef SPI_ECHO
+                      printf("\rSPI RX: %lu/%lu/%u/%u pkts/bytes/to's/crc - "
+                             " TX: %lu/%lu/%u pkts/bytes/to's",
+                             hal_spi_stats.rx_pkts,
+                             hal_spi_stats.rx_bytes,
+                             hal_spi_stats.rx_timeout, 
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 13  
+
+                             hal_spi_stats.rx_crc_errors,
+                             hal_spi_stats.tx_pkts,
+                             hal_spi_stats.tx_bytes,
+                             hal_spi_stats.tx_timeout);
+              #else
+                      printf("\rSPI Send (%04u DMA): %lu/%lu/%u pakets/bytes/to's",
+                             tx_req_bytes, hal_spi_stats.tx_pkts, 
+                             hal_spi_stats.tx_bytes, hal_spi_stats.tx_timeout);
+              #endif
+              #endif
+ 734   2              rc = TRUE;
+ 735   2          }
+ 736   1      
+ 737   1      
+ 738   1      exit:
+ 739   1          return (rc);
+ 740   1      }
+ 741          
+ 742          
+ 743          bool hal_spi_isTxReady()
+ 744          {
+ 745   1      
+ 746   1        if (TRUE == hal_common_reg_bit_test(CPU_GPIO_REG, SPI_RX_CMDLEN_RDY))
+ 747   1        {
+ 748   2      
+ 749   2          hal_spi_cmd_len_rx_not_rdy();
+ 750   2      
+ 751   2      #if 0
+                  mRdyPollCnt = 0;
+              #else 
+ 754   2          mRdyPollCnt = 10;   //[YM] Rajan suggests using 10, the same as Hybri_A ASIC
+ 755   2      
+ 756   2      #ifdef SPI_DEBUG
+                  if (mySpiDebugFlag)
+                  {
+                    printf("EHT_SendToHost: SPI_RX_CMDLEN_RDY = 1, return\n");
+                  }
+              #endif
+ 762   2          return FALSE;
+ 763   2          
+ 764   2      #endif  // 0
+ 765   2        }
+ 766   1      
+ 767   1        if (mRdyPollCnt)
+ 768   1        {
+ 769   2          mRdyPollCnt--;
+ 770   2          return FALSE;
+ 771   2        }
+ 772   1        
+ 773   1        if( (TRUE == hal_common_reg_bit_test(CPU_GPIO_REG, SPI_RX_MASTER_TX)) ||
+ 774   1          //(TRUE == hal_common_reg_bit_test(CPU_INTSTATUS_REG,CPU_INT_SPI_TX_DONE)) ||
+ 775   1          (TRUE == hal_common_reg_bit_test(SPI_STATUS, SPI_STATUS_BUSY))|| 
+ 776   1          (spi_payload_rx_pending == 1) )
+ 777   1          {
+ 778   2            
+ 779   2            mRdyPollCnt = 0;//s10; //rajan test
+ 780   2          
+ 781   2      #ifdef SPI_DEBUG
+                    if (TRUE == hal_common_reg_bit_test(CPU_GPIO_REG, SPI_RX_MASTER_TX))
+                    {
+                      hal_spi_stats.rx_master_tx++;
+                      if (mySpiDebugFlag)
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 14  
+
+                        printf("EHT_SendToHost: SPI_RX_MASTER_TX = 1, return\n");
+                    }
+                    if (TRUE == hal_common_reg_bit_test(SPI_STATUS, SPI_STATUS_BUSY)) 
+                    {
+                      hal_spi_stats.status_busy++;
+                      if (mySpiDebugFlag)
+                        printf("EHT_SendToHost: STATUS_BUSY = 1, return\n");
+                    }
+                    if (spi_payload_rx_pending == 1)
+                    {
+                      hal_spi_stats.payload_rx_pending++;
+                      if (mySpiDebugFlag)
+                        printf("EHT_SendToHost: spi_payload_rx_pending = 1, return\n");
+                    }
+              #endif
+ 801   2      #ifdef DEBUG_DATAPATH
+                    if (sigDbg)
+                    {
+                      FM_Printf(FM_ERROR,"spi tx poll \n");
+              
+                    }        
+              
+              #endif   //DEBUG_DATAPATH             
+ 809   2            return FALSE;       
+ 810   2          }
+ 811   1        
+ 812   1          if(spi_tx_flag == 1) 
+ 813   1          {
+ 814   2      #ifdef HYBRII_B
+ 815   2            if (hal_common_reg_bit_test(SPI_STATUS, SPI_STATUS_TX_TIME_OUT))
+ 816   2            {
+ 817   3              hal_common_reg_bit_set(SPI_STATUS, SPI_STATUS_TX_TIME_OUT);
+ 818   3              spi_tx_flag = 0;
+ 819   3      #ifdef SPI_DEBUG
+                      hal_spi_stats.pre_tx_timeout++;
+                      if (mySpiDebugFlag)
+                      {
+                        printf("EHT_SendToHost: spi tx tm, set spi_tx_flag to 0\n"); // TODO need to take action if tx failed
+                      }
+              #endif
+ 826   3              FM_Printf(FM_ERROR, "spi tx tm\n"); // TODO need to take action if tx failed
+ 827   3            }
+ 828   2      #endif
+ 829   2            return FALSE;
+ 830   2          }
+ 831   1      
+ 832   1            return TRUE;
+ 833   1      }
+ 834          
+ 835          bool hal_spi_tx_dma_cp (uint16_t tx_req_bytes, 
+ 836                        sSwFrmDesc * pHostTxFrmSwDesc)
+ 837          {
+ 838   1          uint32_t desc_value;
+ 839   1        uint8_t  desc_count;
+ 840   1        uint8_t  cp_cnt = 0;
+ 841   1        bool   cp_first;
+ 842   1        bool   rc = STATUS_SUCCESS;
+ 843   1        uint8_t  buffer_bytes;
+ 844   1        uint16_t data_size;
+ 845   1        uint8_t  j = 0;
+ 846   1        uint8_t  cp;
+ 847   1        uint8_t  copy_data;
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 15  
+
+ 848   1        u8 xdata *cp_addr_p;
+ 849   1        u8 xdata *cp_addr_start_p;    
+ 850   1        hybrii_tx_req_t *tx_req_p;
+ 851   1      
+ 852   1          reg32 r32;
+ 853   1      #ifndef HYBRII_B
+                   // WAR: 
+                  hal_spi_tx_cleanup ();
+                  hal_spi_rx_cleanup ();
+              #endif
+ 858   1      
+ 859   1        /*
+ 860   1         * Indicate to host that we cannot receive
+ 861   1         */
+ 862   1        /*
+ 863   1         * Set DMA Slave Trasmit mode
+ 864   1         */
+ 865   1        hal_spi_set_dma_mode(FALSE, TRUE);
+ 866   1      
+ 867   1        data_size = tx_req_bytes;
+ 868   1             
+ 869   1      #ifdef DEBUG_DATAPATH
+                  if (pktDbg)
+                  {
+                      u8 i;
+              
+                      FM_Printf(FM_ERROR,"\n s tx \n");
+                      for( i=0 ; i<pHostTxFrmSwDesc->cpCount ; i++) {
+                          u8 j;
+                          u8 byteOffset = (u8)pHostTxFrmSwDesc->cpArr[i].offsetU32 << 2;
+              
+                          volatile u8 xdata * cellAddr = CHAL_GetAccessToCP(pHostTxFrmSwDesc->cpArr[i].cp);
+                          // FM_Printf(FM_ERROR,"PktBuf%bu, addr %lu :\n", i+1, (cellAddr+byteOffset));
+                          //                FM_Printf(FM_ERROR, "eth offset 0x%02x \n", byteOffset);
+                          for( j = byteOffset ;  j < (byteOffset + pHostTxFrmSwDesc->cpArr[i].len ); j++)
+                          {
+                              FM_Printf(FM_ERROR,"0x%02bX ", cellAddr[j]);
+                          }
+                          FM_Printf(FM_ERROR,"\n");
+                      }
+                      FM_Printf(FM_ERROR,"\nEnd \n");
+                  }
+              
+              #endif 
+ 892   1      
+ 893   1      #ifdef DEBUG_DATAPATH
+                 if (sigDbg)
+                     FM_Printf(FM_ERROR,"s tx\n");
+              #endif
+ 897   1      
+ 898   1      //  if (FALSE == hal_common_reg_bit_test(SPI_STATUS, SPI_STATUS_BUSY)) 
+ 899   1        {
+ 900   2          /* Write the 1st descriptor to the SPI QD FIFO */
+ 901   2          desc_value = CPU_TXQDESC_FIRST_DESC | CPU_TXQDESC_WRITE;
+ 902   2          hal_common_bit_field_set(&desc_value,
+ 903   2                       CPU_TXQDESC_FRAME_LEN_MASK,
+ 904   2                       CPU_TXQDESC_FRAME_LEN_POS,
+ 905   2                       data_size + 
+ 906   2                       sizeof(hybrii_tx_req_t));
+ 907   2          /*
+ 908   2           * For the 1st descriptor, the buffer len is actually the
+ 909   2           * number of descriptor of the packet including the 1st
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 16  
+
+ 910   2           * descriptor. For SPI packet to host add 1 descriptor
+ 911   2           * for the packet header
+ 912   2           */
+ 913   2          desc_count = pHostTxFrmSwDesc->cpCount + 1;
+ 914   2          hal_common_bit_field_set(&desc_value,
+ 915   2                       CPU_REQUESTCP_BUFLEN_MASK,
+ 916   2                       CPU_REQUESTCP_BUFLEN_POS,
+ 917   2                       desc_count);
+ 918   2          hal_common_reg_32_write(SPI_Q_DESC_FIFO, desc_value);
+ 919   2      
+ 920   2          cp_first  = TRUE;
+ 921   2          cp_cnt  = pHostTxFrmSwDesc->cpCount;
+ 922   2          if(cp_cnt < 0)
+ 923   2          {     
+ 924   3      #ifdef SPI_DEBUG
+                        hal_spi_stats.invalid_cp_cnt++;
+                    if (mySpiDebugFlag)
+                    {
+                              printf("hal_spi_tx_dma_cp: cp_cnt < 0, return ERROR\n");
+                    }
+              #endif
+ 931   3            return STATUS_FAILURE;
+ 932   3          }
+ 933   2          while (cp_cnt--) {  
+ 934   3            desc_value = CPU_TXQDESC_WRITE;     
+ 935   3            cp = pHostTxFrmSwDesc->cpArr[j].cp;
+ 936   3            if (TRUE == cp_first) {
+ 937   4              
+ 938   4              /*
+ 939   4               * 1st CP is for SPI packet header
+ 940   4               */
+ 941   4              
+ 942   4              cp_addr_start_p = CHAL_GetAccessToCP(cp);
+ 943   4              cp_addr_p = cp_addr_start_p;
+ 944   4              cp_first = FALSE;
+ 945   4              tx_req_p = (hybrii_tx_req_t *)cp_addr_p;
+ 946   4              mac_utils_16_bit_to_byte_array(HYBRII_TX_REQ,
+ 947   4                              (uint8_t *)&tx_req_p->command_id);              
+ 948   4              mac_utils_16_bit_to_byte_array(data_size + 2,
+ 949   4                              (uint8_t *)&tx_req_p->tx_bytes);
+ 950   4              buffer_bytes = pHostTxFrmSwDesc->cpArr[j].len;
+ 951   4            } else {
+ 952   4              copy_data = pHostTxFrmSwDesc->cpArr[j].len;
+ 953   4              data_size -= copy_data;
+ 954   4              buffer_bytes = copy_data;
+ 955   4                     
+ 956   4              if (cp_cnt == 0)
+ 957   4                desc_value |= CPU_TXQDESC_LAST_DESC;        
+ 958   4            } 
+ 959   3            r32.w = 0;
+ 960   3                  {
+ 961   4                      
+ 962   4                    r32.s.b2 = buffer_bytes;
+ 963   4                    r32.w <<= 2;
+ 964   4                       
+ 965   4                      // clear field in reg val
+ 966   4                      desc_value  &= ~CPU_REQUESTCP_BUFLEN_MASK;
+ 967   4                      // write field to reg val
+ 968   4                      desc_value  |= r32.w;
+ 969   4                  }   
+ 970   3                  r32.w = 0;
+ 971   3                  {
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 17  
+
+ 972   4                      r32.s.b4 = cp;
+ 973   4                          
+ 974   4                      // clear field in reg val
+ 975   4                      desc_value  &= ~CPU_REQUESTCP_CPMASK;
+ 976   4                      // write field to reg val
+ 977   4                      desc_value  |= r32.w;
+ 978   4                  } 
+ 979   3          /*  hal_common_bit_field_set(&desc_value,
+ 980   3                         CPU_REQUESTCP_BUFLEN_MASK,
+ 981   3                         CPU_REQUESTCP_BUFLEN_POS,
+ 982   3                         buffer_bytes);
+ 983   3            hal_common_bit_field_set(&desc_value, 
+ 984   3                         CPU_REQUESTCP_CPMASK,
+ 985   3                         CPU_REQUESTCP_CPPOS, cp);*/
+ 986   3            hal_common_reg_32_write(SPI_Q_DESC_FIFO, desc_value);
+ 987   3            j++;
+ 988   3          }
+ 989   2      
+ 990   2      #if 0 //def RTX51_TINY_OS         
+                  if((STM_TIME_TICK_MAX - STM_GetTick()) <= (MAX_SPI_TX_TIMEOUT + 1))
+                  {
+                    spi_tx_time = 0;
+                  }
+                  else
+                  {
+                    spi_tx_time = STM_GetTick();
+                  }
+              #endif        
+1000   2          spi_tx_flag = 1;
+1001   2      
+1002   2      #if 0  //rajan v4
+              
+              
+                      hal_spi_slave_tx_req();
+              
+              #else
+1008   2              hal_spi_payload_rx_rdy();
+1009   2      
+1010   2      #endif
+1011   2      
+1012   2              gEthHalCB.TotalTxFrmCnt++;
+1013   2              hal_spi_stats.tx_bytes += (tx_req_bytes);
+1014   2              hal_spi_stats.tx_pkts++;
+1015   2      #ifdef SPI_DIAG
+              #ifdef SPI_ECHO
+                      printf("\rSPI RX: %lu/%lu/%u/%u pkts/bytes/to's/crc - "
+                             " TX: %lu/%lu/%u pkts/bytes/to's",
+                             hal_spi_stats.rx_pkts,
+                             hal_spi_stats.rx_bytes,
+                             hal_spi_stats.rx_timeout, 
+                             hal_spi_stats.rx_crc_errors,
+                             hal_spi_stats.tx_pkts,
+                             hal_spi_stats.tx_bytes,
+                             hal_spi_stats.tx_timeout);
+              #else
+                      printf("\rSPI Send (%04u DMA): %lu/%lu/%u pakets/bytes/to's",
+                             tx_req_bytes, hal_spi_stats.tx_pkts, 
+                             hal_spi_stats.tx_bytes, hal_spi_stats.tx_timeout);
+              #endif
+              #endif
+1032   2          }
+1033   1      //    else
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 18  
+
+1034   1      //    {
+1035   1              // Queue Pkt
+1036   1      //        rc = STATUS_FAILURE;
+1037   1      //    }
+1038   1      
+1039   1          return (rc);
+1040   1      }
+1041          
+1042          bool hal_spi_tx_direct (uint8_t *tx_data_p, uint16_t data_size)
+1043          {
+1044   1          bool    rc;
+1045   1          uint8_t i;
+1046   1      
+1047   1          rc = FALSE;
+1048   1          if (data_size > 4) {
+1049   2              return (rc);
+1050   2          }
+1051   1          if (FALSE == hal_common_reg_bit_test(SPI_STATUS, SPI_STATUS_BUSY)) {
+1052   2              hal_spi_stats.tx_bytes += data_size;
+1053   2              hal_spi_stats.tx_pkts++;
+1054   2              for (i = 0; i < data_size; i++) {                       
+1055   3                   WriteU8Reg(SPI_DATA_OUT + i, tx_data_p[i]);
+1056   3              }
+1057   2              hal_common_reg_bit_set(SPI_CONTROL, SPI_CONTROL_START);
+1058   2              hal_spi_slave_tx_req();
+1059   2      #ifdef SPI_DIAG
+                      printf("\rSPI Send (%04u DMA): %lu/%lu/%u pkts/bytes/to's",
+                             data_size, hal_spi_stats.tx_pkts, 
+                             hal_spi_stats.tx_bytes, hal_spi_stats.tx_timeout);
+              #endif    
+1064   2          }
+1065   1          return (rc);
+1066   1      }
+1067          
+1068          void hal_spi_set_direct_mode (bool master, bool tx)
+1069          {
+1070   1          uint32_t value32;
+1071   1          
+1072   1          value32 = hal_common_reg_32_read(SPI_CONFIG);
+1073   1          value32 |= SPI_CONFIG_DIRECT_ACCESS;
+1074   1              
+1075   1          if (TRUE == master) {
+1076   2              value32 |= SPI_CONFIG_MASTER;
+1077   2          } else {
+1078   2              value32 &= ~SPI_CONFIG_MASTER;
+1079   2          }
+1080   1              
+1081   1          if (TRUE == tx) {
+1082   2              value32 |= SPI_CONFIG_WRITE;
+1083   2          } else {
+1084   2              value32 &= ~SPI_CONFIG_WRITE;
+1085   2          }
+1086   1      
+1087   1          hal_common_bit_field_set(&value32, SPI_TX_LEN_MASK, SPI_TX_LEN_POS,
+1088   1                                   FOUR_BYTES);
+1089   1          hal_common_reg_32_write(SPI_CONFIG, value32);
+1090   1          hal_common_reg_bit_clear(SPI_CONTROL, SPI_CONTROL_SPIEN);
+1091   1          hal_common_reg_bit_set(SPI_CONTROL, SPI_CONTROL_SPIEN);
+1092   1      }
+1093          
+1094          void hal_spi_set_dma_mode (bool master, bool tx)
+1095          {
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 19  
+
+1096   1          uint32_t value32;
+1097   1      
+1098   1          hal_common_reg_32_write(SPI_CONTROL, 0);
+1099   1        
+1100   1          value32 = hal_common_reg_32_read(SPI_CONFIG);
+1101   1          value32 |= SPI_CONFIG_SLAVE_NOT_SELECT;
+1102   1          
+1103   1          if (TRUE == master) {
+1104   2              value32 |= SPI_CONFIG_MASTER;
+1105   2              /*
+1106   2               * Enable Chip Select on Slave when we are
+1107   2               * in Master mode
+1108   2               */
+1109   2              value32 &= ~(SPI_CONFIG_SLAVE_NOT_SELECT);
+1110   2          } else {
+1111   2              value32 &= ~SPI_CONFIG_MASTER;
+1112   2              value32 |= SPI_CONFIG_SLAVE_NOT_SELECT;
+1113   2          }
+1114   1      
+1115   1          value32 &= ~(SPI_CONFIG_DIRECT_ACCESS);
+1116   1      
+1117   1          if (TRUE == tx) {
+1118   2              value32 |= SPI_CONFIG_WRITE;
+1119   2          } else {
+1120   2              value32 &= ~SPI_CONFIG_WRITE;
+1121   2          }
+1122   1      
+1123   1          hal_common_bit_field_set(&value32, SPI_TX_LEN_MASK, SPI_TX_LEN_POS,
+1124   1                                   FOUR_BYTES);
+1125   1          hal_common_reg_32_write(SPI_CONFIG, value32);
+1126   1      
+1127   1          hal_common_reg_bit_clear(SPI_CONTROL, SPI_CONTROL_SPIEN);
+1128   1          hal_common_reg_bit_set(SPI_CONTROL, SPI_CONTROL_SPIEN);
+1129   1      }
+1130          
+1131          void hal_spi_clear_stats (void)
+1132          {       
+1133   1          memset(&hal_spi_stats, 0, sizeof(hal_spi_stats));
+1134   1      }
+1135          
+1136          void hal_spi_get_rx_stats (uint32_t *rx_pkts, uint32_t *rx_bytes)
+1137          {       
+1138   1          *rx_pkts  = hal_spi_stats.rx_pkts;
+1139   1          *rx_bytes = hal_spi_stats.rx_bytes;    
+1140   1      }
+1141          
+1142          void hal_spi_get_tx_stats (uint32_t *tx_pkts, uint32_t *tx_bytes)
+1143          {       
+1144   1          *tx_pkts  = hal_spi_stats.tx_pkts;
+1145   1          *tx_bytes = hal_spi_stats.tx_bytes;    
+1146   1      }
+1147          
+1148          void hal_spi_get_rx_errors_stats (uint16_t *rx_bad_crc,
+1149                                            uint16_t *rx_bad_cmd,
+1150                                            uint16_t *rx_bad_len)
+1151          {       
+1152   1          *rx_bad_crc = hal_spi_stats.rx_crc_errors;
+1153   1          *rx_bad_cmd = hal_spi_stats.rx_invalid_cmd;
+1154   1          *rx_bad_len = hal_spi_stats.rx_invalid_len;   
+1155   1      }
+1156          
+1157          void hal_spi_get_tx_errors_stats (uint16_t *tx_err, uint16_t *cp_alloc_err)
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 20  
+
+1158          {
+1159   1          *tx_err = hal_spi_stats.tx_errors;
+1160   1          *cp_alloc_err = hal_spi_stats.cp_alloc_failed;
+1161   1      }
+1162          
+1163          void hal_spi_init (void)
+1164          {
+1165   1          uint32_t gpio_cfg;
+1166   1      
+1167   1          // Confiure TX_REQ and RX_RDY GPIO as output pins
+1168   1      #ifdef GPIO_FPGA
+                  // 1 -> Output, 0 -> Input
+                  // Config as output for the following pins
+                  gpio_cfg = SPI_TX_REQ_PIN         |
+                             SPI_RX_PAYLOAD_RDY_PIN |
+                             SPI_RX_CMDLEN_RDY_PIN; 
+              #else
+1175   1          // 1 -> Input. 0 -> Output  
+1176   1          gpio_cfg = 0x3F;    // Config as input for all GPIO pins
+1177   1          // Config as output for the following pins
+1178   1          gpio_cfg &= ~(SPI_TX_REQ_PIN         |
+1179   1                        SPI_RX_PAYLOAD_RDY_PIN |
+1180   1                        SPI_RX_CMDLEN_RDY_PIN);
+1181   1      
+1182   1          gpio_cfg |= SPI_RX_MASTER_TX_PIN;//rajan
+1183   1      #endif
+1184   1      #ifdef HYBRII_B
+1185   1          /* Enable HW RX CRC checking */
+1186   1          hal_common_reg_bit_set(SPI_CONFIG, SPI_CONFIG_RX_CRC_EN);
+1187   1      
+1188   1          /* Enable HE TX CRC generating */
+1189   1          hal_common_bit_field_reg_write(SPI_CONFIG_TX_CRC_CAL_START, 4);
+1190   1          hal_common_reg_bit_set(SPI_CONFIG, SPI_CONFIG_TX_CRC_EN);
+1191   1      #endif
+1192   1      #ifdef B_ASICPLC
+1193   1          hal_common_reg_bit_set(SPI_CONFIG, SPI_CONFIG_RX_CLK_EDGE_SEL);   //[YM] For Hybrii_B ASIC SPI TEST
+1194   1      #endif  
+1195   1          hal_common_reg_32_write(CPU_GPIO_REG, gpio_cfg);
+1196   1          hal_common_reg_bit_clear(CPU_GPIO_REG, SPI_TX_REQ);
+1197   1          hal_common_reg_bit_clear(CPU_GPIO_REG, SPI_RX_PAYLOAD_RDY);
+1198   1          hal_common_reg_bit_clear(CPU_GPIO_REG, SPI_RX_CMDLEN_RDY);
+1199   1          
+1200   1          /*
+1201   1           * Enable SPI TX/RX DONE interrupts
+1202   1           */
+1203   1          hal_common_reg_bit_set(CPU_INTENABLE_REG,
+1204   1                                 CPU_INT_SPI_TX_DONE |
+1205   1                                 CPU_INT_SPI_RX_DONE);
+1206   1      
+1207   1          hal_spi_clear_stats();
+1208   1        hal_spi_prepare_rx_cmd_engine();
+1209   1          hal_spi_set_rx_cmd_len_rdy();
+1210   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3804    ----
+   CONSTANT SIZE    =    224    ----
+   XDATA SIZE       =     38     144
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+C51 COMPILER V9.52.0.0   HAL_SPI                                                           12/02/2014 14:35:36 PAGE 21  
+
+   BIT SIZE         =   ----       1
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  3 WARNING(S),  0 ERROR(S)

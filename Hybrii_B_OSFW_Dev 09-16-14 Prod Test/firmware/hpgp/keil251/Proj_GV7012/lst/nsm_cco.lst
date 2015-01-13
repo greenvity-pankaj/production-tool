@@ -1,0 +1,3004 @@
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE NSM_CCO
+OBJECT MODULE PLACED IN .\obj\nsm_cco.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\src\link\nsm_cco.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X210
+                    -0) INCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..
+                    -\..\src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\
+                    -zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\eve
+                    -nt\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\sr
+                    -c;..\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support
+                    -;..\..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FU
+                    -NC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_
+                    -B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVER
+                    -Y,PROD_TEST) DEBUG PRINT(.\lst\nsm_cco.lst) TABS(2) OBJECT(.\obj\nsm_cco.obj)
+
+line level    source
+
+   1          /** ========================================================
+   2           *
+   3           * @file nsm.c
+   4           * 
+   5           *  @brief Network System Manager:
+   6           *         CNSM: CCO Network System Manager
+   7           *         SNSM: STA Network System Manager
+   8           *
+   9           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+  10           *  All Rights Reserved
+  11           *  
+  12           * =========================================================*/
+  13          
+  14          
+  15          #include <string.h>
+  16          #include <stdio.h>
+  17          #include "papdef.h"
+  18          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  21          #include "linkl.h"
+  22          #include "nsm.h"
+  23          #include "nam.h"
+  24          #include "muxl.h"
+  25          #include "hpgpapi.h"
+  26          #include "hpgpconf.h"
+  27          #include "fm.h"
+  28          #include "ism.h"
+  29          #include "hpgpevt.h"
+  30          #include "mmsg.h"
+  31          #include "timer.h"
+  32          #include "stm.h"
+  33          #include "hal.h"
+  34          
+  35          #include "sys_common.h"
+  36          #ifdef HPGP_HAL
+  37          #include "hal_hpgp.h"
+  38          #else
+              #include "sdrv.h"
+              #endif
+  41          
+  42          #ifndef CALLBACK
+  43          #include "hpgpapi.h"
+  44          #endif
+  45          #include "hybrii_tasks.h"
+  46          #ifndef UART_HOST_INTF
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 2   
+
+  47          #define DISC_BCN
+  48          #endif
+  49          #define HPGP_TIME_BBT                  1000   //2 seconds
+  50          
+  51          #define HPGP_TIME_USAI                  1000   //1 seconds
+  52          //#define HPGP_TIME_DISC_AGING            120000 // 2 minutes
+  53          #define HPGP_TIME_DISC_AGING            15000 // test 
+  54          #define HPGP_TIME_DISC_PERIOD_MAX       5000   //10 seconds - MaxDiscoverPeriod
+  55          //#define HPGP_TIME_STA_AGING_CNT       5  //5* 10 seconds - MaxDiscoverPeriod
+  56          
+  57          #define HPGP_HO_COUNTDOWN_MAX           5   //5 beacon periods
+  58          #define HPGP_HO_SWITCH_NONE             0   //no handover switch
+  59          #define HPGP_HO_SWITCH_STA              1   //switch to the STA mdoe/role
+  60          #define HPGP_HO_SWITCH_CCO              2   //switch to the CCO mdoe/role
+  61          
+  62          /* default regions (in unit of ALU) */
+  63          #define HPGP_REGION_MIN_SHARED_CSMA    0x5DC  /* minimum shared CSMA */
+  64                                                        /* 1500 usec */        
+  65          #define HPGP_REGION_MIN_LOCAL_CSMA     0x5DC  /* minimum local CSMA  */
+  66                                                        /* 1500 usec */             
+  67          #define HPGP_REGION_MAX_BEACON         (8*HPGP_BEACON_SLOT_ATU)  
+  68                                                        /* maximum beacon region */
+  69                                                        /* 8 slots */             
+  70          #define HPGP_GLID_LOCAL_CSMA           0xFF
+  71          #define HPGP_GLID_SHARED_CSMA          0xFE
+  72          #define HPGP_GLID_DISC_BEACON          0xFD
+  73          #define HPGP_GLID_GPP                  0xFB
+  74          
+  75          #ifdef SIMU
+              #define HPGP_TIME_BCN_INTERVAL    4 //4 ms
+              #endif
+  78          
+  79          //beacon source
+  80          enum
+  81          {
+  82              BCN_SRC_CCO,  // central beacon from the CCo/proxy CCo in the same network
+  83              BCN_SRC_DISC, // discovery beacon from the STA in the same network 
+  84              BCN_SRC_OTHER_CCO, //CCo or proxy CCo in other networks
+  85              BCN_SRC_OTHER_DISC, //discovery beacon from other networks
+  86              BCN_SRC_UNKNOWN,     //unknown
+  87          };
+  88          u16 CSMA_REGIONS_50Hz[HYBRII_MAXSMAREGION_CNT] = {0x30, 0xE7F ,0xFFF,0xFFF, 0xFFF, 0xFFF }; 
+  89          u16 CSMA_REGIONS_60Hz[HYBRII_MAXSMAREGION_CNT] = {0x30, 0xBF4 ,0xFFF,0xFFF, 0xFFF, 0xFFF };
+  90          extern void LINKL_TimerHandler(u16 type, void *cookie);
+  91          #ifdef ROUTE
+              extern void ROUTE_prepareHoldList(sCrm *crm, sScb *scb);
+              extern void ROUTE_preparteAndSendUnreachable(sScb *scb);
+              extern eStatus ROUTE_sendRouteInfo(u16 mmType, sEvent *reqEvent);
+              #endif
+  96          
+  97          extern u8 psDebug;
+  98          
+  99          
+ 100          void SCB_UpdateDiscStaList(sScb *scb, sDiscStaInfoRef *discStaInfoRef)
+ 101          {
+ 102   1          u8 i;
+ 103   1          u8 new, k;
+ 104   1          sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 105   1          sStaInfo *staInfo = &linkl->staInfo;
+ 106   1      
+ 107   1          //search through the discovered STA list 
+ 108   1          //always update the STA information whether or not it is new or old.
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 3   
+
+ 109   1          new = 0;
+ 110   1          
+ 111   1          k = DISC_STA_LIST_MAX;
+ 112   1          for(i = 0; i < DISC_STA_LIST_MAX; i++)
+ 113   1          {
+ 114   2              if(staInfo->discStaInfo[i].valid == TRUE)
+ 115   2              {
+ 116   3                  if(memcmp(staInfo->discStaInfo[i].macAddr, discStaInfoRef->macAddr, 
+ 117   3                            MAC_ADDR_LEN) == 0)
+ 118   3                  {
+ 119   4                      //update
+ 120   4                      k = i;
+ 121   4                      new = 0;
+ 122   4                      break;
+ 123   4                  }
+ 124   3              } 
+ 125   2              else
+ 126   2              {
+ 127   3                  k = i;  
+ 128   3                  new = 1;
+ 129   3              }
+ 130   2          }
+ 131   1          
+ 132   1          if(k < DISC_STA_LIST_MAX)
+ 133   1          {
+ 134   2              if(new == 1)
+ 135   2              {
+ 136   3                  //found a new discovered STA
+ 137   3                  scb->discUpdate = 1;
+ 138   3                  staInfo->discStaInfo[k].valid = TRUE;
+ 139   3                  memcpy(staInfo->discStaInfo[k].macAddr, discStaInfoRef->macAddr, MAC_ADDR_LEN);
+ 140   3                  scb->numDiscSta++;
+ 141   3              }         
+ 142   2      //        memcpy(scb->discStaInfo[k].nid, discStaInfoRef->nid, NID_LEN-1);
+ 143   2      //        scb->discStaInfo[k].nid[NID_LEN-1] = discStaInfoRef->nid[NID_LEN-1]&0x3F;
+ 144   2              staInfo->discStaInfo[k].tei = discStaInfoRef->tei;
+ 145   2              staInfo->discStaInfo[k].staCap.byte =  discStaInfoRef->discInfo->staCap.byte;
+ 146   2      
+ 147   2              staInfo->discStaInfo[k].sameNet = discStaInfoRef->sameNet;
+ 148   2      
+ 149   2              staInfo->discStaInfo[k].hit = 1;
+ 150   2          }
+ 151   1          else
+ 152   1          {
+ 153   2              FM_Printf(FM_WARN, "SNSM: Discovered STA List is full.\n");
+ 154   2          }
+ 155   1      }
+ 156          
+ 157          void SCB_UpdateDiscNetList(sScb *scb, sDiscNetInfoRef *discNetInfoRef)
+ 158          {
+ 159   1          
+ 160   1          u8 i;
+ 161   1          u8 k;
+ 162   1          sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 163   1          sStaInfo *staInfo = &linkl->staInfo;
+ 164   1          k = DISC_NET_LIST_MAX;
+ 165   1          for(i = 0; i < DISC_NET_LIST_MAX; i++)
+ 166   1          {
+ 167   2              if(staInfo->discNetInfo[i].valid == TRUE)
+ 168   2              {
+ 169   3                  if( (memcmp(staInfo->discNetInfo[i].nid, discNetInfoRef->nid, NID_LEN-1) == 0) &&
+ 170   3                      ((staInfo->discNetInfo[i].nid[NID_LEN-1]&NID_EXTRA_BIT_MASK) == (discNetInfoRef->nid[NID_L
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 4   
+
+             -EN-1]&NID_EXTRA_BIT_MASK)) )
+ 171   3                  {
+ 172   4                      //already in the list. no update
+ 173   4                      staInfo->discNetInfo[k].hit = 1;
+ 174   4                      return;
+ 175   4                  }
+ 176   3              }
+ 177   2              else
+ 178   2              {
+ 179   3                  k = i;  
+ 180   3              }
+ 181   2          }
+ 182   1          if(k < DISC_NET_LIST_MAX)
+ 183   1          {
+ 184   2              //new AVLN is found
+ 185   2              scb->numDiscNet++;
+ 186   2              memcpy(staInfo->discNetInfo[k].nid, discNetInfoRef->nid, NID_LEN-1);
+ 187   2              staInfo->discNetInfo[k].nid[NID_LEN-1] = discNetInfoRef->nid[NID_LEN-1]&NID_EXTRA_BIT_MASK;
+ 188   2      //        memcpy(snsm->discNetInfo[k].bpsto, discNetInfoRef->bpsto, 3);
+ 189   2              staInfo->discNetInfo[k].netMode = discNetInfoRef->netMode;
+ 190   2              staInfo->discNetInfo[k].hybridMode = discNetInfoRef->hybridMode;
+ 191   2              staInfo->discNetInfo[k].numBcnSlots = discNetInfoRef->numBcnSlots;
+ 192   2              staInfo->discNetInfo[k].hit = 1;
+ 193   2              scb->discUpdate = 1;
+ 194   2              staInfo->discNetInfo[k].valid  = 1;
+ 195   2          }
+ 196   1          else
+ 197   1          {
+ 198   2              FM_Printf(FM_WARN, "SNSM:Disc NetList full\n");
+ 199   2          }
+ 200   1      
+ 201   1      }
+ 202          
+ 203          
+ 204          void SCB_AgeDiscLists(sScb *scb)
+ 205          {
+ 206   1          u8 i;
+ 207   1          sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 208   1        sScb          *uscb = NULL;
+ 209   1        sCrm          *crm = LINKL_GetCrm(linkl);
+ 210   1          sStaInfo *staInfo = &linkl->staInfo;
+ 211   1      
+ 212   1          //scb = snsm->staInfo->staScb;
+ 213   1          for(i = 0; i < DISC_STA_LIST_MAX; i++)
+ 214   1          {
+ 215   2              if(staInfo->discStaInfo[i].valid == TRUE)
+ 216   2              {
+ 217   3                  if(staInfo->discStaInfo[i].hit == 1)
+ 218   3                  {
+ 219   4                      staInfo->discStaInfo[i].hit = 0;
+ 220   4                  }
+ 221   3                  else
+ 222   3                  {
+ 223   4      
+ 224   4      #ifdef P8051
+ 225   4                   FM_Printf(FM_MINFO, "SCB:age out disc entry(tei: %bu)\n",
+ 226   4                                        staInfo->discStaInfo[i].tei);
+ 227   4      #else
+                    FM_Printf(FM_MINFO, "SCB:age out disc entry(tei: %d)\n",
+                                    staInfo->discStaInfo[i].tei);
+              #endif
+ 231   4      #if 0   //[YM] temporary commnet ageout function
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 5   
+
+               //Send unreachable Ind
+                      uscb = CRM_GetScb(crm, scb->discStaInfo[i].tei);
+              #ifdef POWERSAVE 
+                      if (uscb->psState == PSM_PS_STATE_ON)
+                      {
+                        // distant STA is is PS mode
+                                scb->discStaInfo[i].hit = 0; // ?? find a limit time before tearing down the connection
+                      }
+                      else
+                      {
+              #endif
+              #ifdef ROUTE
+              
+              
+                        ROUTE_preparteAndSendUnreachable(uscb);        
+              #endif
+                      {
+                        sEvent *newEvent;
+                        
+                        //send the event to the SNAM to renew the TEI
+                        newEvent = EVENT_Alloc(MAC_ADDR_LEN, 
+                                     EVENT_HPGP_CTRL_HEADROOM);
+                        if(newEvent != NULL)
+                        {
+                          sHpgpHdr *hpgpHdr;
+                          newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                          newEvent->eventHdr.type = EVENT_TYPE_STA_AGEOUT;
+                          hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+                          hpgpHdr->scb = (sScb*)uscb;
+              
+                          LINKL_SendEvent(linkl, newEvent);
+                        }
+                        
+              
+                      }
+              
+                              //remove the entry from the list
+                              memset(&staInfo->discStaInfo[i], 0, sizeof(sDiscStaInfo));
+                              scb->discUpdate = 1;
+                              scb->numDiscSta--;
+              #ifdef POWERSAVE 
+                      }
+              #endif
+              #endif  //[YM]
+ 276   4                  }
+ 277   3              }
+ 278   2          }
+ 279   1      
+ 280   1          for(i = 0; i < DISC_NET_LIST_MAX; i++)
+ 281   1          {
+ 282   2              if(staInfo->discNetInfo[i].valid == TRUE)
+ 283   2              {
+ 284   3                  if(staInfo->discNetInfo[i].hit == 1)
+ 285   3                  {
+ 286   4                      staInfo->discNetInfo[i].hit = 0;
+ 287   4                  }
+ 288   3                  else
+ 289   3                  {
+ 290   4                      //remove the entry from the list
+ 291   4                      memset(&staInfo->discNetInfo[i], 0, sizeof(sDiscNetInfo));
+ 292   4                      scb->discUpdate = 1;
+ 293   4                      scb->numDiscNet--;
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 6   
+
+ 294   4                  }
+ 295   3              }
+ 296   2          }
+ 297   1      }
+ 298          
+ 299          #ifdef CCO_FUNC
+ 300          
+ 301          /* ========================== 
+ 302           * CCO  network system manager
+ 303           * ========================== */
+ 304          
+ 305          
+ 306          eStatus CNSM_SendMgmtMsg(sCnsm *cnsm, 
+ 307                      u16 mmType,
+ 308                      u8 snid,
+ 309                      u8 dsttei, u8 *macAddr)
+ 310          {
+ 311   1          eStatus         status = STATUS_SUCCESS;
+ 312   1          sEvent         *newEvent = NULL;
+ 313   1          sHpgpHdr       *hpgpHdr = NULL;
+ 314   1        sStaInfo       *staInfo = cnsm->staInfo;
+ 315   1        
+ 316   1          //send the CC_DISCOVER_LIST.REQ 
+ 317   1          //to query the discovered sta/network list
+ 318   1          //for the topology table
+ 319   1          newEvent = EVENT_MgmtAlloc(HPGP_DATA_PAYLOAD_MIN, EVENT_HPGP_MSG_HEADROOM);
+ 320   1          if(newEvent == NULL)
+ 321   1          {
+ 322   2              FM_Printf(FM_ERROR, "EAllocErr\n");
+ 323   2              return STATUS_FAILURE;
+ 324   2          }
+ 325   1          newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 326   1          newEvent->eventHdr.type = mmType;
+ 327   1      //                        newEvent->eventHdr.tei = event->eventHdr.tei;
+ 328   1          hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 329   1          hpgpHdr->tei = dsttei;
+ 330   1        hpgpHdr->snid = snid;
+ 331   1          hpgpHdr->macAddr = macAddr;
+ 332   1          /* TODO: based on the each station encryption status, set the EKS */
+ 333   1          
+ 334   1                             
+ 335   1          if (mmType == EVENT_TYPE_CC_DISCOVER_LIST_REQ)
+ 336   1          {
+ 337   2      #ifdef P8051
+ 338   2              FM_Printf(FM_MMSG, "CNSM:>>>CC_DISC_LIST.REQ(tei: %bu)\n",
+ 339   2                                  hpgpHdr->tei);
+ 340   2      #else
+                      FM_Printf(FM_MMSG, "CNSM:>>>CC_DISC_LIST.REQ(tei: %d)\n",
+                                          hpgpHdr->tei);
+              #endif
+ 344   2      
+ 345   2          hpgpHdr->eks = staInfo->nekEks;
+ 346   2          }
+ 347   1        else
+ 348   1        if ((mmType == EVENT_TYPE_NN_INL_REQ) ||
+ 349   1          (mmType == EVENT_TYPE_NN_INL_CNF))
+ 350   1        {
+ 351   2          sNnINLReq *inlReq = (sNnINLReq*)newEvent->buffDesc.dataptr;
+ 352   2      
+ 353   2          hpgpHdr->eks = HPGP_EKS_NONE;
+ 354   2          
+ 355   2      //    hpgpHdr->mnbc = 1;
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 7   
+
+ 356   2            
+ 357   2          if (mmType == EVENT_TYPE_NN_INL_REQ)
+ 358   2          {
+ 359   3            FM_Printf(FM_MMSG, "CNSM:>>>NN_INL_REQ(tei:%bu)(snid:%bu)\n",
+ 360   3                          hpgpHdr->tei, snid);
+ 361   3          }else
+ 362   2          if (mmType == EVENT_TYPE_NN_INL_CNF)    
+ 363   2          {
+ 364   3            FM_Printf(FM_MMSG, "CNSM:>>>NN_INL_CNF(tei:%bu)(snid:%bu)\n",
+ 365   3                          hpgpHdr->tei, snid);
+ 366   3          }
+ 367   2         
+ 368   2          inlReq->numNw = 0;
+ 369   2          memcpy(inlReq->srcNid, staInfo->nid, sizeof(staInfo->nid));
+ 370   2          inlReq->srcSnid = staInfo->snid;
+ 371   2          inlReq->srcTei = staInfo->staScb->tei;
+ 372   2          inlReq->srcNumAuthSta = CRM_GetScbNum(cnsm->crm);     
+ 373   2      
+ 374   2          newEvent->buffDesc.datalen = sizeof(sNnINLReq); 
+ 375   2        }
+ 376   1        else  
+ 377   1        {
+ 378   2          newEvent->buffDesc.datalen = HPGP_DATA_PAYLOAD_MIN;
+ 379   2        }
+ 380   1          //transmit CM_UNASSOCIATED_STA_IND in the MNBC
+ 381   1          status = MUXL_TransmitMgmtMsg(HPGPCTRL_GetLayer(HP_LAYER_TYPE_MUX), 
+ 382   1                                        newEvent);
+ 383   1          //the event is freed by MUXL if the TX is successful
+ 384   1          if(status == STATUS_FAILURE)
+ 385   1          {
+ 386   2              EVENT_Free(newEvent);
+ 387   2          }
+ 388   1          return status;
+ 389   1      }
+ 390          
+ 391          
+ 392          void CNSM_UpdateSched(sCnsm *cnsm, u8 schedInd, u8 pscd, u8 cscd)
+ 393          {
+ 394   1          u8 j, k;
+ 395   1          sCsmaRegion *region = cnsm->regionTable[schedInd].region;
+ 396   1          u8 regionNum =  cnsm->regionTable[schedInd].regionNum;
+ 397   1          sSai *sai = cnsm->saiTable[schedInd].sai;
+ 398   1          u16 endTime = 0;
+ 399   1          /* build a sai table based on the region */
+ 400   1          k = 0;
+ 401   1          j = 0;
+ 402   1          while((j< regionNum) && (k < HPGP_SESS_MAX))
+ 403   1          {
+ 404   2              /* we only schedule two types of regions: shared csma and local csma */
+ 405   2              if (region[j].regionType == REGION_TYPE_SHARED_CSMA)
+ 406   2              {
+ 407   3                  /* it is assumed that the contiguous regions should have
+ 408   3                   * different region type */
+ 409   3                  sai[k].stpf = 1;
+ 410   3                  sai[k].glid = HPGP_GLID_SHARED_CSMA;
+ 411   3                  sai[k].startTime = region[j].startTime;
+ 412   3                  sai[k].duration = region[j].endTime - region[j].startTime;
+ 413   3                  k++;
+ 414   3              }
+ 415   2              else if (region[j].regionType == REGION_TYPE_LOCAL_CSMA)
+ 416   2              {
+ 417   3                  /* it is assumed that the contiguous regions should have
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 8   
+
+ 418   3                   * different region type */
+ 419   3                  sai[k].stpf = 1;
+ 420   3                  sai[k].glid = HPGP_GLID_LOCAL_CSMA;
+ 421   3                  sai[k].startTime = region[j].startTime;
+ 422   3                  sai[k].duration = region[j].endTime - region[j].startTime;
+ 423   3                  k++;
+ 424   3              }
+ 425   2              endTime = region[j].endTime;
+ 426   2              j++;
+ 427   2          }
+ 428   1          cnsm->saiTable[schedInd].saiNum = k;
+ 429   1          cnsm->saiTable[schedInd].pscd = pscd;
+ 430   1          cnsm->saiTable[schedInd].cscd = cscd;
+ 431   1      #if 0
+              for (j=0; j<k; j++) {
+              FM_Printf(FM_HINFO, "CNSM: sai %bu \n", j);
+              FM_Printf(FM_HINFO, "stpf %bu, glid %bu, start: 0x%x, duration: 0x%x\n",
+              sai[j].stpf, sai[j].glid, sai[j].startTime, sai[j].duration);
+              }
+              #endif
+ 438   1      }
+ 439          
+ 440          
+ 441          
+ 442          
+ 443          extern u8 gEthMacAddrBrdcast[];
+ 444          #if 1
+ 445          
+ 446          void CNSM_NcoDetected(sCnsm *cnsm, sRxDesc *rxdesc, u8* bcn)
+ 447          {
+ 448   1        sBcnHdr *bcnHdr;
+ 449   1          u8       nbe = 0;
+ 450   1        sBeHdr *beHdr;
+ 451   1        u8    macAddr[MAC_ADDR_LEN];
+ 452   1        u8    *dataptr; 
+ 453   1      
+ 454   1        bcnHdr = (sBcnHdr *)bcn;
+ 455   1                
+ 456   1        nbe = bcnHdr->nbe;
+ 457   1        dataptr = bcn + sizeof(sBcnHdr);
+ 458   1        beHdr = (sBeHdr *) dataptr;
+ 459   1      
+ 460   1      
+ 461   1        //(2) Process Beacon Management Information (BMI)
+ 462   1        //Note: According to the standard, the BENTRYs within the MBI shall 
+ 463   1        //be arranged in increasing order of their BEHDR values.
+ 464   1        while(nbe)
+ 465   1        { 
+ 466   2          dataptr += sizeof(sBeHdr); //move to the start of BEENTRY 
+ 467   2          switch (beHdr->beType)
+ 468   2          { case BEHDR_MAC_ADDR:
+ 469   3            {
+ 470   4              memcpy(macAddr, dataptr, 6);
+ 471   4              break;
+ 472   4            }
+ 473   3            default:
+ 474   3            {
+ 475   4            }
+ 476   3          }
+ 477   2          //move to the next BEHDR
+ 478   2          dataptr = dataptr + beHdr->beLen; 
+ 479   2          beHdr = (sBeHdr *) dataptr;
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 9   
+
+ 480   2          nbe--;
+ 481   2        }
+ 482   1        
+ 483   1        CNSM_SendMgmtMsg(cnsm, EVENT_TYPE_NN_INL_REQ, rxdesc->snid,
+ 484   1                bcnHdr->stei, gEthMacAddrBrdcast);
+ 485   1      
+ 486   1      }
+ 487          #endif
+ 488          
+ 489          //We split the beacon processing into two parts:
+ 490          //High priority: those requiring immdiate response
+ 491          //Low  priority: those tolerating the processing delay .
+ 492          
+ 493          u8 CNSM_ProcBcnLow(sCnsm *cnsm, sRxDesc *rxdesc, u8* bcn )
+ 494          {
+ 495   1          //eStatus         status = STATUS_FAILURE;
+ 496   1          sBcnHdr        *bcnHdr = NULL;
+ 497   1          sBeHdr         *beHdr = NULL;
+ 498   1          u8              nid7; 
+ 499   1          u8              bcnsrc = BCN_SRC_UNKNOWN; 
+ 500   1          u8              reqDiscList = 0;
+ 501   1          u8              nbe = 0;
+ 502   1          u8             *dataptr = 0;
+ 503   1          u8             *macAddr = NULL;
+ 504   1          sDiscInfoEntry *discInfoEntry = NULL;
+ 505   1          sDiscStaInfoRef discStaInfoRef;
+ 506   1          sDiscNetInfoRef discNetInfoRef;
+ 507   1          //sBeHdr         *beRef[NELEMENT(] = NULL;
+ 508   1          //sEvent         *newEvent = NULL;
+ 509   1          //sHpgpHdr       *hpgpHdr = NULL;
+ 510   1          sScb           *scb = NULL; 
+ 511   1          sStaInfo       *staInfo = cnsm->staInfo;
+ 512   1      
+ 513   1          //(1) process the beacon header
+ 514   1      //    bcnHdr = (sBcnHdr *) event->buffDesc.dataptr;
+ 515   1          bcnHdr = (sBcnHdr *)bcn;
+ 516   1      
+ 517   1          nid7 = bcnHdr->nid[NID_LEN-1];
+ 518   1      
+ 519   1          bcnHdr->nid[NID_LEN-1] &= NID_EXTRA_BIT_MASK;
+ 520   1      
+ 521   1          if((memcmp(staInfo->nid, bcnHdr->nid, NID_LEN) == 0))
+ 522   1          {
+ 523   2              if( (bcnHdr->bt == BEACON_TYPE_CENTRAL)||
+ 524   2                  (bcnHdr->bt == BEACON_TYPE_PROXY))
+ 525   2              {
+ 526   3                  //it should not occur
+ 527   3                  FM_Printf(FM_MMSG|FM_LINFO, "CNSM:<<<CENTRAL/PROXY BCN(L)\n");
+ 528   3                  bcnsrc = BCN_SRC_CCO;
+ 529   3      
+ 530   3                  
+ 531   3            CNSM_NcoDetected(cnsm, rxdesc, bcn);
+ 532   3        
+ 533   3            
+ 534   3                  return bcnsrc; 
+ 535   3              }
+ 536   2              else
+ 537   2              {
+ 538   3      #ifdef P8051
+ 539   3                  FM_Printf(FM_HINFO, "CNSM:<<<DISC BCN(L)(tei:%bu)\n", bcnHdr->stei);
+ 540   3      #else
+                          FM_Printf(FM_HINFO, "CNSM:<<<DISC BCN(L)(tei:%d)\n", bcnHdr->stei);
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 10  
+
+              #endif
+ 543   3                  bcnsrc = BCN_SRC_DISC;
+ 544   3      #ifdef LG_WAR
+                          return bcnsrc;
+              #endif
+ 547   3      
+ 548   3              }
+ 549   2          }
+ 550   1          else
+ 551   1          {
+ 552   2              if( (bcnHdr->bt == BEACON_TYPE_CENTRAL)||
+ 553   2                  (bcnHdr->bt == BEACON_TYPE_PROXY))
+ 554   2              {
+ 555   3                  bcnsrc = BCN_SRC_OTHER_CCO;
+ 556   3                  //update the network list
+ 557   3                  discNetInfoRef.nid = bcnHdr->nid;
+ 558   3                  discNetInfoRef.hybridMode = nid7>>6;
+ 559   3                  discNetInfoRef.netMode = bcnHdr->nm;
+ 560   3                  discNetInfoRef.numBcnSlots = bcnHdr->numslots;
+ 561   3                  SCB_UpdateDiscNetList(cnsm->staInfo->ccoScb, &discNetInfoRef);
+ 562   3              }
+ 563   2              else
+ 564   2              {
+ 565   3                  bcnsrc = BCN_SRC_OTHER_DISC;
+ 566   3              }
+ 567   2          }
+ 568   1      //    FM_Printf(FM_MINFO, "CNSM: classify CCo %d.\n", bcnsrc);
+ 569   1      
+ 570   1                              
+ 571   1          nbe = bcnHdr->nbe;
+ 572   1          dataptr = bcn + sizeof(sBcnHdr);
+ 573   1          beHdr = (sBeHdr *) dataptr;
+ 574   1         
+ 575   1          
+ 576   1          //(2) Process Beacon Management Information (BMI)
+ 577   1          //Note: According to the standard, the BENTRYs within the MBI shall 
+ 578   1          //be arranged in increasing order of their BEHDR values.
+ 579   1          while(nbe)
+ 580   1          { 
+ 581   2              dataptr += sizeof(sBeHdr); //move to the start of BEENTRY 
+ 582   2              switch (beHdr->beType)
+ 583   2              {
+ 584   3                  case BEHDR_REGIONS:
+ 585   3                  {
+ 586   4                      u8 nextSchedInd = (cnsm->currSchedInd + 1) & 0x1;
+ 587   4                      u8 j, k;
+ 588   4                      u8 regionNum = 0;
+ 589   4                      sRegionEntry *regionEntry = NULL;
+ 590   4                      sCsmaRegion *nextRegion = NULL, *currRegion = NULL;
+ 591   4                      u16 duration, endTime;
+ 592   4                      if(bcnsrc ==  BCN_SRC_DISC) 
+ 593   4                      {
+ 594   5                          break;
+ 595   5                      }
+ 596   4      
+ 597   4                      if (cnsm->updateSched) 
+ 598   4                      {
+ 599   5                          /* we are already in an updating process */
+ 600   5                          break;
+ 601   5                      }
+ 602   4       
+ 603   4                      currRegion = cnsm->regionTable[cnsm->currSchedInd].region;
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 11  
+
+ 604   4                      /* save the region info in the next region */
+ 605   4                      nextRegion = cnsm->regionTable[nextSchedInd].region;
+ 606   4                      memset(nextRegion, 0, HPGP_REGION_MAX);
+ 607   4                      /* NR */
+ 608   4                      regionNum = *dataptr;
+ 609   4                      regionEntry  = (sRegionEntry *)(dataptr + 1);
+ 610   4                      endTime = 0;
+ 611   4                      j = 0;
+ 612   4                      k = 0;
+ 613   4                      /* regions */     
+ 614   4                      /* assume at present the regions entry will cover the entire 
+ 615   4                       * beacon period, including the beacon region, which will be 
+ 616   4                       * specified by a CCO in uncoordinated or coordinated mode.
+ 617   4                       * but not by a CCO in CSMA-only mode.
+ 618   4                       */
+ 619   4                      while((j < regionNum) && (k < HPGP_REGION_MAX))
+ 620   4                      {
+ 621   5                          nextRegion[k].startTime = endTime;
+ 622   5                          endTime = (regionEntry->endTimeHi << 8) |
+ 623   5                              regionEntry->endTimeLo;
+ 624   5                          duration = endTime - nextRegion[k].startTime;
+ 625   5                          if (regionEntry->regionType == REGION_TYPE_BEACON)
+ 626   5                          {
+ 627   6                               /* The beacon region should be the first region
+ 628   6                               * if it exists. 
+ 629   6                               */
+ 630   6                              nextRegion[k].regionType = REGION_TYPE_BEACON;
+ 631   6                              nextRegion[k].endTime = endTime;
+ 632   6                          }
+ 633   5                          else if (regionEntry->regionType == REGION_TYPE_SHARED_CSMA)
+ 634   5                          {
+ 635   6                              /* the shared csma region is either the first or second
+ 636   6                               * region if the beacon region exists */
+ 637   6                              if (duration >= (HPGP_REGION_MIN_SHARED_CSMA + 
+ 638   6                                  HPGP_REGION_MIN_LOCAL_CSMA)) 
+ 639   6                              {
+ 640   7                                  /* since the shared csma is large enough, 
+ 641   7                                   * split it to two regions: 
+ 642   7                                   * shared csma region and local csma region */
+ 643   7                                  nextRegion[k].endTime = nextRegion[k].startTime + HPGP_REGION_MIN_SHARED_CSMA;
+ 644   7                                  nextRegion[k].regionType = REGION_TYPE_SHARED_CSMA;
+ 645   7                                  k++;
+ 646   7                                  nextRegion[k].startTime = nextRegion[k-1].startTime + HPGP_REGION_MIN_SHARED_C
+             -SMA;
+ 647   7                                  nextRegion[k].endTime = nextRegion[k].startTime + (duration - HPGP_REGION_MIN_
+             -SHARED_CSMA);
+ 648   7                                  nextRegion[k].regionType = REGION_TYPE_LOCAL_CSMA;
+ 649   7                              }
+ 650   6                              else
+ 651   6                              {
+ 652   7                                  nextRegion[k].regionType = REGION_TYPE_SHARED_CSMA;
+ 653   7                                  //nextRegion[k].endTime = nextRegion[k].startTime + duration;
+ 654   7                              }
+ 655   6                          }
+ 656   5                          else
+ 657   5                          {
+ 658   6                              /* to provide passive coordination to a CCO 
+ 659   6                               * in coordinated mode, specify a Stayout region 
+ 660   6                               * in all regions other than CSMA regions */
+ 661   6                              nextRegion[k].regionType = REGION_TYPE_STAYOUT;
+ 662   6                              nextRegion[k].endTime = nextRegion[k].startTime + duration;
+ 663   6                          }
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 12  
+
+ 664   5                          k++;
+ 665   5                          j++;
+ 666   5                          regionEntry++;        
+ 667   5                      }
+ 668   4                      cnsm->regionTable[nextSchedInd].regionNum = k;
+ 669   4                      /* check if the recevied region is different 
+ 670   4                       * from the current region */
+ 671   4                      for (j=0; j< k; j++)
+ 672   4                      {
+ 673   5                          if ((nextRegion[j].regionType != currRegion[j].regionType) || 
+ 674   5                              (nextRegion[j].startTime != currRegion[j].startTime) || 
+ 675   5                              (nextRegion[j].endTime != currRegion[j].endTime) )
+ 676   5                          {
+ 677   6                              cnsm->updateSched = 1;
+ 678   6                              break;
+ 679   6                          }
+ 680   5                      }
+ 681   4                      if (cnsm->updateSched)
+ 682   4                      {
+ 683   5                          /* update the next sai table */
+ 684   5                          CNSM_UpdateSched(cnsm, nextSchedInd, 5, 4);
+ 685   5                      }
+ 686   4                      break;
+ 687   4                  }
+ 688   3                  case BEHDR_MAC_ADDR:
+ 689   3                  {
+ 690   4                      macAddr = dataptr;
+ 691   4                      break;
+ 692   4                  }
+ 693   3                  case BEHDR_DISCOVER:
+ 694   3                  {
+ 695   4                      break;
+ 696   4                  }
+ 697   3                  case BEHDR_DISC_INFO:
+ 698   3                  {
+ 699   4                      discInfoEntry = (sDiscInfoEntry *)dataptr;
+ 700   4                      discStaInfoRef.discInfo = (sDiscInfoEntry *)dataptr;
+ 701   4                      if (macAddr)
+ 702   4                      {
+ 703   5                          discStaInfoRef.macAddr = macAddr;
+ 704   5      //                    discStaInfoRef.nid = bcnHdr->nid;
+ 705   5      //                   discStaInfoRef.tei = rxdesc->stei;
+ 706   5                          discStaInfoRef.tei = bcnHdr->stei;
+ 707   5                          discStaInfoRef.snid = rxdesc->snid;
+ 708   5                          if( bcnsrc == BCN_SRC_DISC)
+ 709   5                          {
+ 710   6                              discStaInfoRef.sameNet = 1;
+ 711   6                          }
+ 712   5                          else //am I interested in other discovery beacons here?
+ 713   5                          {
+ 714   6                              discStaInfoRef.sameNet = 0;
+ 715   6                          }
+ 716   5      
+ 717   5                          //update the discovred STA list
+ 718   5                          SCB_UpdateDiscStaList(cnsm->staInfo->ccoScb, &discStaInfoRef);
+ 719   5                          
+ 720   5      #ifdef ROUTE
+                                  scb = CRM_GetScb(cnsm->crm, bcnHdr->stei);
+                                  if(scb)
+                                  {
+                                      if(scb->lrtEntry.nTei != scb->tei)
+                                      {
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 13  
+
+                                          scb->lrtEntry.nTei = scb->tei;
+                                          scb->lrtEntry.rnh = 0;
+                                      }
+                                  }
+              #endif
+ 731   5                      }
+ 732   4                      
+ 733   4                      scb = CRM_GetScb(cnsm->crm, bcnHdr->stei);
+ 734   4                      if( memcmp(macAddr, scb->macAddr, MAC_ADDR_LEN) )
+ 735   4                      {
+ 736   5                          FM_Printf(FM_WARN, "CNSM:TEI & MAC not matched in Disc BCN\n");
+ 737   5                          break;
+ 738   5                      }
+ 739   4                      if(scb)
+ 740   4                      {
+ 741   5                        sLinkLayer *linkl = (sLinkLayer*)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 742   5                
+ 743   5                          //update the discovery info for the sta
+ 744   5                          scb->staCap.byte = discInfoEntry->staCap.byte; 
+ 745   5                          scb->staStatus = discInfoEntry->staStatus; 
+ 746   5      
+ 747   5                          //scb->numDiscSta = discInfoEntry->numDiscSta; 
+ 748   5                          //scb->numDiscNet = discInfoEntry->numDiscNet;  
+ 749   5                          //scb = CRM_GetScb(cnsm->crm, bcnHdr->stei);
+ 750   5      
+ 751   5                
+ 752   5                if(!linkl->ccoNam.backupCCoCfg.scb)
+ 753   5                  {
+ 754   6                    CNAM_SelectBackupCCo(&linkl->ccoNam, NULL);
+ 755   6                  }
+ 756   5                
+ 757   5                          if(discInfoEntry->staCap.fields.update)
+ 758   5                          {
+ 759   6                              reqDiscList = 1;
+ 760   6                              //send the CC_DISCOVER_LIST.REQ 
+ 761   6                              //to query the discovered sta/network list
+ 762   6                              //for the topology table
+ 763   6                              CNSM_SendMgmtMsg(cnsm, EVENT_TYPE_CC_DISCOVER_LIST_REQ,
+ 764   6                                               staInfo->snid, scb->tei, scb->macAddr);
+ 765   6      /*
+ 766   6                              newEvent = EVENT_Alloc(EVENT_DEFAULT_SIZE, 
+ 767   6                                                     EVENT_HPGP_MSG_HEADROOM);
+ 768   6                              if(newEvent == NULL)
+ 769   6                              {
+ 770   6                                  FM_Printf(FM_ERROR, "Cannot allocate an event.\n");
+ 771   6                                  break;
+ 772   6                              }
+ 773   6                              newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 774   6                              newEvent->eventHdr.type = EVENT_TYPE_CC_DISCOVER_LIST_REQ;
+ 775   6      //                        newEvent->eventHdr.tei = event->eventHdr.tei;
+ 776   6                              hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 777   6                              hpgpHdr->tei = bcnHdr->stei; 
+ 778   6                              hpgpHdr->macAddr = scb->macAddr;
+ 779   6                             
+ 780   6                    FM_Printf(FM_MMSG, "CNSM: >>> CC_DISCOVER_LIST.REQ (tei: %d).\n",
+ 781   6                                        hpgpHdr->tei);
+ 782   6                              //transmit CM_UNASSOCIATED_STA_IND in the MNBC
+ 783   6                              status = MUXL_TransmitMgmtMsg(HOMEPLUG_GetLayer(HP_LAYER_TYPE_MUX), newEvent);
+ 784   6                              //the event is freed by MUXL if the TX is successful
+ 785   6                              if(status == STATUS_FAILURE)
+ 786   6                              {
+ 787   6                                  EVENT_Free(newEvent);
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 14  
+
+ 788   6                              }
+ 789   6      */
+ 790   6                          }
+ 791   5      
+ 792   5                      }
+ 793   4                      break;
+ 794   4                  }
+ 795   3                  case BEHDR_ENCRYP_KEY_CHANGE:
+ 796   3                  {
+ 797   4                      break;
+ 798   4                  }
+ 799   3                  case BEHDR_CCO_HANDOVER:
+ 800   3                  {
+ 801   4                      break;
+ 802   4                  }
+ 803   3                  case BEHDR_BCN_RELOC:
+ 804   3                  {
+ 805   4                      break;
+ 806   4                  }
+ 807   3                  case BEHDR_ACL_SYNC_CNTDOWN:
+ 808   3                  {
+ 809   4                      break;
+ 810   4                  }
+ 811   3                  case BEHDR_CHANGE_NUM_SLOTS:
+ 812   3                  {
+ 813   4                      break;
+ 814   4                  }
+ 815   3                  case BEHDR_CHANGE_HM:
+ 816   3                  {
+ 817   4                      break;
+ 818   4                  }
+ 819   3                  case BEHDR_CHANGE_SNID:
+ 820   3                  {
+ 821   4                      break;
+ 822   4                  }
+ 823   3                  default:
+ 824   3                  {
+ 825   4                  }
+ 826   3              }
+ 827   2              //move to the next BEHDR
+ 828   2              dataptr = dataptr + beHdr->beLen; 
+ 829   2              beHdr = (sBeHdr *) dataptr;
+ 830   2              nbe--;
+ 831   2          }
+ 832   1      
+ 833   1      
+ 834   1          return bcnsrc; 
+ 835   1      }
+ 836          
+ 837          void CNSM_ProcBcnHigh(sCnsm *cnsm, u8* bcn )
+ 838          {
+ 839   1          sBcnHdr        *bcnHdr = NULL;
+ 840   1          sBeHdr         *beHdr = NULL;
+ 841   1          u8              nid7; 
+ 842   1          u8              bcnsrc = BCN_SRC_UNKNOWN; 
+ 843   1          u8              nbe = 0;
+ 844   1          u8             *dataptr = 0;
+ 845   1      
+ 846   1          sStaInfo       *staInfo = cnsm->staInfo;
+ 847   1          //(1) process the beacon header
+ 848   1      //    bcnHdr = (sBcnHdr *) event->buffDesc.dataptr;
+ 849   1          bcnHdr = (sBcnHdr *)bcn;
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 15  
+
+ 850   1      
+ 851   1          nid7 = bcnHdr->nid[NID_LEN-1];
+ 852   1      
+ 853   1          bcnHdr->nid[NID_LEN-1] &= NID_EXTRA_BIT_MASK;
+ 854   1      
+ 855   1          if((memcmp(staInfo->nid, bcnHdr->nid, NID_LEN) == 0))
+ 856   1          {
+ 857   2              if( (bcnHdr->bt == BEACON_TYPE_CENTRAL)||
+ 858   2                  (bcnHdr->bt == BEACON_TYPE_PROXY))
+ 859   2              {
+ 860   3                  //it should not occur
+ 861   3      #ifdef NSM_CCO_PRINT      
+                          FM_Printf(FM_MMSG|FM_LINFO, "CNSM:<<<CENTRAL/PROXY BCN(H)\n");
+              #endif      
+ 864   3                  bcnsrc = BCN_SRC_CCO;
+ 865   3                  return; 
+ 866   3              }
+ 867   2              else
+ 868   2              {
+ 869   3      #ifdef P8051
+ 870   3                  FM_Printf(FM_HINFO, "CNSM:<<<DISC BCN(H)(tei:%bu)\n", bcnHdr->stei);
+ 871   3      #else
+                          FM_Printf(FM_HINFO, "CNSM:<<<DISC BCN(H)(tei:%d)\n", bcnHdr->stei);
+              #endif
+ 874   3                  bcnsrc = BCN_SRC_DISC;
+ 875   3      
+ 876   3      #ifdef LOG_FLASH
+                          logEvent(DISC_BCN_LOG,0,0,&bcnHdr->stei,1);
+              #endif
+ 879   3      
+ 880   3      #ifdef LG_WAR
+                          return;
+              #endif
+ 883   3                  
+ 884   3              }
+ 885   2          }
+ 886   1          else
+ 887   1          {
+ 888   2              if( (bcnHdr->bt == BEACON_TYPE_CENTRAL)||
+ 889   2                  (bcnHdr->bt == BEACON_TYPE_PROXY))
+ 890   2              {
+ 891   3                  bcnsrc = BCN_SRC_OTHER_CCO;
+ 892   3              }
+ 893   2              else
+ 894   2              {
+ 895   3                  bcnsrc = BCN_SRC_OTHER_DISC;
+ 896   3              }
+ 897   2          }
+ 898   1      
+ 899   1          bcnHdr->nid[NID_LEN-1] = nid7;
+ 900   1      
+ 901   1                              
+ 902   1          nbe = bcnHdr->nbe;
+ 903   1          dataptr = bcn + sizeof(sBcnHdr);
+ 904   1          beHdr = (sBeHdr *) dataptr;
+ 905   1          
+ 906   1          //(2) Process Beacon Management Information (BMI)
+ 907   1          //Note: According to the standard, the BENTRYs within the MBI shall 
+ 908   1          //be arranged in increasing order of their BEHDR values.
+ 909   1          while(nbe)
+ 910   1          { 
+ 911   2              dataptr += sizeof(sBeHdr); //move to the start of BEENTRY 
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 16  
+
+ 912   2              switch (beHdr->beType)
+ 913   2              {
+ 914   3                  case BEHDR_NON_PERSISTENT_SCHED:
+ 915   3                  {
+ 916   4                      //copy 
+ 917   4                      break;
+ 918   4                  }
+ 919   3                  case BEHDR_PERSISTENT_SCHED:
+ 920   3                  {
+ 921   4                      break;
+ 922   4                  }
+ 923   3                  case BEHDR_BPSTO:
+ 924   3                  {
+ 925   4                      //set it to MAC
+ 926   4      
+ 927   4                      break;
+ 928   4                  }
+ 929   3                  default:
+ 930   3                  {
+ 931   4                  }
+ 932   3              }
+ 933   2              //move to the next BEHDR
+ 934   2              dataptr = dataptr + beHdr->beLen; 
+ 935   2              beHdr = (sBeHdr *) dataptr;
+ 936   2              nbe--;
+ 937   2          }
+ 938   1      
+ 939   1      }
+ 940          
+ 941          void LINKL_CcoProcBcnHandler(void *cookie, sEvent *event)
+ 942          {
+ 943   1          sLinkLayer     *linkl = (sLinkLayer *)cookie;
+ 944   1          sCnsm          *cnsm = (sCnsm *)LINKL_GetCnsm(linkl);
+ 945   1      
+ 946   1          CNSM_ProcBcnHigh(cnsm, event->buffDesc.dataptr);
+ 947   1      }
+ 948          
+ 949          
+ 950          void CNSM_PerformAutoCcoSelection(sCnsm *cnsm)
+ 951          {
+ 952   1          sScb        *scbIter = NULL;
+ 953   1          sScb        *scb = NULL;
+ 954   1          sEvent      *newEvent = NULL;
+ 955   1          u8          ccoCap = 0;
+ 956   1          u8          staCap = 0;
+ 957   1          sHpgpHdr   *hpgpHdr = NULL;
+ 958   1      //    sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 959   1          sLinkLayer *linkl = cnsm->linkl;
+ 960   1          sStaInfo   *staInfo = LINKL_GetStaInfo(linkl);
+ 961   1          
+ 962   1      
+ 963   1          ccoCap = staInfo->ccoScb->staCap.fields.ccoCap;
+ 964   1          //FM_Printf(FM_ERROR, "CNSM: CCO Cap: %d.\n", ccoCap);
+ 965   1          
+ 966   1          scbIter = CRM_GetNextScb(cnsm->crm, scbIter);
+ 967   1          while(scbIter)
+ 968   1          {
+ 969   2             staCap = scbIter->staCap.fields.ccoCap;
+ 970   2             //FM_Printf(FM_ERROR, "CNSM: TEI: %bu. CCo Cap: %bu.\n", scbIter->tei, staCap); 
+ 971   2      //        if(ccoCap < scbIter->staCap.fields.ccoCap) 
+ 972   2              if(ccoCap < staCap) 
+ 973   2              {
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 17  
+
+ 974   3                 
+ 975   3                   ccoCap = staCap;
+ 976   3      //           ccoCap = scbIter->staCap.fields.ccoCap;  
+ 977   3                 scb = scbIter;
+ 978   3              }
+ 979   2              scbIter = CRM_GetNextScb(cnsm->crm, scbIter);
+ 980   2          }
+ 981   1      
+ 982   1          if(scb)
+ 983   1          {
+ 984   2              //send an indication
+ 985   2              newEvent = EVENT_Alloc(EVENT_DEFAULT_SIZE, EVENT_HPGP_CTRL_HEADROOM);
+ 986   2              if(newEvent == NULL)
+ 987   2              {
+ 988   3                  FM_Printf(FM_ERROR, "EAllocErr\n");
+ 989   3                  return ;
+ 990   3              }
+ 991   2              newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+ 992   2              newEvent->eventHdr.type = EVENT_TYPE_CCO_SELECT_IND;
+ 993   2      
+ 994   2              hpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 995   2              hpgpHdr->scb = scb;
+ 996   2      //FM_Printf(FM_ERROR, "CNSM: send a cco selected ind.\n"); 
+ 997   2              //LINKL_SendEvent(linkl, newEvent);
+ 998   2              SLIST_Put(&linkl->intEventQueue, &newEvent->link);
+ 999   2          }
+1000   1          return;
+1001   1      }
+1002          
+1003          
+1004          
+1005          eStatus CNSM_InitRegion(sCnsm *cnsm, sLinkLayer *linkl)
+1006          {
+1007   1          sCsmaRegion *region = NULL;
+1008   1          u16 *pRegion;
+1009   1          /* initial regsions */
+1010   1          cnsm->currSchedInd = 0;
+1011   1          region = cnsm->regionTable[0].region;
+1012   1          memset(region, 0, HPGP_REGION_MAX);
+1013   1          if(gHpgpHalCB.lineFreq == FREQUENCY_50HZ)
+1014   1          {
+1015   2              pRegion = &CSMA_REGIONS_50Hz[0];
+1016   2          }
+1017   1          else
+1018   1          {
+1019   2              pRegion = &CSMA_REGIONS_60Hz[0];
+1020   2          }
+1021   1      
+1022   1          region[0].startTime = 0x0;
+1023   1      #if 1
+1024   1      //    if (cnsm->staInfo->lineMd == LINE_MODE_DC)
+1025   1          {
+1026   2              region[0].endTime = pRegion[0];
+1027   2              region[0].regionType = REGION_TYPE_BEACON; //REGION_TYPE_SHARED_CSMA;
+1028   2              region[0].rxOnly = 0;
+1029   2              region[0].hybridMd  = 1;
+1030   2              region[1].startTime = pRegion[0];
+1031   2              region[1].endTime  = pRegion[1];
+1032   2              region[1].rxOnly  = 0;
+1033   2              region[1].regionType = REGION_TYPE_LOCAL_CSMA;
+1034   2              region[1].hybridMd   = 1;        
+1035   2              
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 18  
+
+1036   2              region[2].startTime = pRegion[1];
+1037   2              region[2].endTime  = pRegion[2];
+1038   2              region[2].rxOnly  = 1;
+1039   2              region[2].regionType = REGION_TYPE_STAYOUT;
+1040   2              region[2].hybridMd   = 1;
+1041   2              region[3].startTime = pRegion[2];
+1042   2              region[3].endTime  = pRegion[3];
+1043   2              region[3].rxOnly  = 1;
+1044   2              region[3].regionType = REGION_TYPE_STAYOUT;
+1045   2              region[3].hybridMd   = 1;
+1046   2              region[4].startTime = pRegion[3];
+1047   2              region[4].endTime  = pRegion[4];
+1048   2              region[4].rxOnly  = 1;
+1049   2              region[4].regionType = REGION_TYPE_STAYOUT;
+1050   2              region[4].hybridMd   = 1;
+1051   2              region[5].startTime = pRegion[4];
+1052   2              region[5].endTime  = pRegion[5];
+1053   2              region[5].rxOnly  = 1;
+1054   2              region[5].regionType = REGION_TYPE_STAYOUT;
+1055   2              region[5].hybridMd   = 1;
+1056   2          }
+1057   1      #if 0
+                  else
+                  {
+                      region[0].endTime = 0xCA;// 0x2FF; /* in ATU  ( usec) */
+                      region[0].regionType = REGION_TYPE_BEACON; //REGION_TYPE_SHARED_CSMA;
+                      region[0].rxOnly = 0;
+                      region[0].hybridMd  = 1;
+                      region[1].startTime = 0xCA;
+                      region[1].endTime  = 0xAF0;
+                      region[1].rxOnly  = 0;
+                      region[1].regionType = REGION_TYPE_LOCAL_CSMA;
+                      region[1].hybridMd   = 1;
+                      region[2].startTime = 0xAF0;
+                      region[2].endTime  = endOfRegion;//0xD75;
+                      region[2].rxOnly  = 1;
+                      region[2].regionType = REGION_TYPE_STAYOUT;
+                      region[2].hybridMd   = 1;
+                      region[3].startTime = endOfRegion;//0xD75;
+                      region[3].endTime  = endOfRegion;//0xD75;
+                      region[3].rxOnly  = 1;
+                      region[3].regionType = REGION_TYPE_STAYOUT;
+                      region[3].hybridMd   = 1;
+                      region[4].startTime = endOfRegion;//0xD75; /* 0x2FF + 0x6A1 */
+                      region[4].endTime  = endOfRegion;//0xD75;
+                      region[4].rxOnly  = 1;
+                      region[4].regionType = REGION_TYPE_STAYOUT;
+                      region[4].hybridMd   = 1;
+                      region[5].startTime = endOfRegion;//0xD75; /* 0x2FF + 0x6A1 */
+                      region[5].endTime  = endOfRegion;//0xD75;
+                      region[5].rxOnly  = 1;
+                      region[5].regionType = REGION_TYPE_STAYOUT;
+                      region[5].hybridMd   = 1;
+                  }
+              #endif
+1091   1          cnsm->regionTable[0].regionNum = 6;
+1092   1      #else
+                  region[0].endTime = 0xA00; /* in ATU */
+                  region[0].regionType = REGION_TYPE_SHARED_CSMA;
+                  cnsm->regionTable[0].regionNum = 1;
+              #endif  
+1097   1          CNSM_UpdateSched(cnsm, cnsm->currSchedInd, 0, 4);
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 19  
+
+1098   1          cnsm->updateSched = 0;
+1099   1          HHAL_SetCsmaRegions(cnsm->regionTable[0].region, 
+1100   1              cnsm->regionTable[0].regionNum);
+1101   1        return STATUS_SUCCESS;
+1102   1      }
+*** WARNING C280 IN LINE 1005 OF ..\..\src\link\nsm_cco.c: 'linkl': unreferenced local variable
+1103          //Start CCo mode
+1104          eStatus CNSM_Start(sCnsm *cnsm, u8 ccoType)
+1105          {
+1106   1          sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1107   1          sEvent *event = NULL;
+1108   1          u8 *pos = NULL;
+1109   1          static u8 regionInitFlag = 1;
+1110   1          if(regionInitFlag == 1)
+1111   1          {
+1112   2              CNSM_InitRegion(cnsm, linkl);
+1113   2              regionInitFlag = 0;
+1114   2          }
+1115   1          event = EVENT_Alloc(1, EVENT_HPGP_CTRL_HEADROOM);
+1116   1          if(event == NULL)
+1117   1          {
+1118   2              FM_Printf(FM_ERROR, "EAllocErr\n");
+1119   2              return STATUS_FAILURE;
+1120   2          }
+1121   1          
+1122   1          event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1123   1          event->eventHdr.type = EVENT_TYPE_CNSM_START;
+1124   1          pos = event->buffDesc.dataptr;
+1125   1          *pos = ccoType; 
+1126   1       
+1127   1          event->buffDesc.datalen = 1;
+1128   1      #ifdef NSM_CCO_PRINT  
+                FM_Printf(FM_ERROR, "CNSM:Start(%bu)\n", ccoType);
+              #endif  
+1131   1          LINKL_SendEvent(linkl, event);
+1132   1          return STATUS_SUCCESS;
+1133   1      }
+1134          
+1135          
+1136          void CNSM_Stop(sCnsm *cnsm)
+1137          {
+1138   1          cnsm->hoCntDown = HPGP_HO_COUNTDOWN_MAX;
+1139   1          cnsm->hoEnabled = 0;
+1140   1          cnsm->hoReady = 0;
+1141   1          cnsm->nctei = 0;
+1142   1      
+1143   1        gHpgpHalCB.syncComplete = 0;
+1144   1      
+1145   1          
+1146   1          cnsm->state = CNSM_STATE_INIT;
+1147   1      
+1148   1          STM_StopTimer(cnsm->discTimer);   
+1149   1          STM_StopTimer(cnsm->discAgingTimer);   
+1150   1      #ifdef SIMU
+                  STM_StopTimer(cnsm->bcnTimer);   
+              #else
+1153   1          //disable the MAC HW to transmit the beacon
+1154   1      #endif
+1155   1      
+1156   1      }
+1157          
+1158          u8 CNSM_QueryAnyAlvn(sCnsm *cnsm)
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 20  
+
+1159          {
+1160   1          if(cnsm->staInfo->ccoScb->numDiscNet)
+1161   1          {
+1162   2              return TRUE;
+1163   2          }
+1164   1          else
+1165   1          {
+1166   2              return FALSE;
+1167   2          }
+1168   1      }
+1169          
+1170          
+1171          
+1172          void CNSM_EnableHo(sCnsm *cnsm, u8 enable)
+1173          {
+1174   1          cnsm->hoEnabled = enable;
+1175   1      }
+1176          
+1177          
+1178          void CNSM_StartHo(sCnsm *cnsm, u8 nctei)
+1179          {
+1180   1          cnsm->hoReady = 1;
+1181   1          cnsm->nctei = nctei;
+1182   1      }
+1183          
+1184          void CNSM_UpdateDiscBcnSched(sCnsm *cnsm, sScb *scb)
+1185          {
+1186   1          if(cnsm->discScb == scb)
+1187   1          {
+1188   2              cnsm->discScb = CRM_GetNextScb(cnsm->crm, cnsm->discScb);
+1189   2          }
+1190   1      
+1191   1      }
+1192          
+1193          #endif /* CCO_FUNC */
+1194          
+1195          #if 0
+              //beacon entry header type
+              u8 BeHdrType[] =
+              {
+                  BEHDR_NON_PERSISTENT_SCHED,    //0x00   //Non-Persistent Schedule
+                  BEHDR_PERSISTENT_SCHED,        //0x01   //Current Persistent Schedule
+                  BEHDR_PERSISTENT_SCHED,        //0x01   //Preview Persistent Schedule
+                  BEHDR_REGIONS,                 //0x02   //region Schedule
+                  BEHDR_MAC_ADDR,                //0x03   //MAC Address
+                  BEHDR_DISCOVER,                //0x04   //Discover
+                  BEHDR_DISC_INFO,               //0x05   //Discovered Info
+                  BEHDR_BPSTO,                   //0x06   //Beacon Period Start Time Offset
+                  BEHDR_ENCRYP_KEY_CHANGE,       //0x07   //Encryption Key Change
+                  BEHDR_CCO_HANDOVER,            //0x08   //CCo Handover
+                  BEHDR_BCN_RELOC,               //0x09   //Beacon Relocation
+                  BEHDR_ACL_SYNC_CNTDOWN,        //0x0A   //AC Line Sync Countdown
+                  BEHDR_CHANGE_NUM_SLOTS,        //0x0B   //Change NumSlots
+                  BEHDR_CHANGE_HM,               //0x0C   //Change Hybrid Mode
+                  BEHDR_CHANGE_SNID,             //0x0D   //Change SNID
+                  BEHDR_RSN_INFO,                //0x0E   //RSN Info Element
+                  BEHDR_ISP,                     //0x0F   //ISP BENTRY
+                  BEHDR_EXT_BAND_STAY_OUT,       //0x10   //Extended Band Stay Out
+                  BEHDR_AG_ASSIGN,               //0x11   //AG Assignment
+                  BEHDR_EXT_CARR_SUPPORT,        //0x12   //Extended Carriers Support
+                  BEHDR_PWR_SAVE,                //0x13   //Power Save BENTRY
+                  BEHDR_VENDOR_SPEC,             //0xFF   //Vendor Specific
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 21  
+
+              };
+              
+              //Maximum size allowed for each entry corresponding to BeHdrType[]
+              u8 BeLenMax[] =
+              {
+                  sizeof(sBcnHdr) + 2 + 16,     //non-persistent: 4 SAIs (4 octets per SAI)
+                  sizeof(sBcnHdr) + 2 + 16,     //current persistent: 4 SAIs (4 octets per SAI)
+                  sizeof(sBcnHdr) + 2 + 16,     //preview persistent: 4 SAIs (4 octets per SAI)
+                  sizeof(sBcnHdr) + 1 + 8,      //region: 4 regions
+                  sizeof(sBcnHdr) + MAC_ADDR_LEN,  //MAC Address
+                  sizeof(sBcnHdr) + 1,             //Discover
+                  sizeof(sBcnHdr) + sizeof(sDiscInfoEntry),   //Discovered Info
+                  sizeof(sBcnHdr) + 3,            //Beacon Period Start Time Offset
+                  sizeof(sBcnHdr) + sizeof(sEncrypKeyChangeEntry),  //Encryption Key Change
+                  sizeof(sBcnHdr) + sizeof(sCcoHoEntry),      //CCo Handover
+                  sizeof(sBcnHdr) + sizeof(sBcnRelocEntry),   //Beacon Relocation
+                  sizeof(sBcnHdr) + sizeof(sAclSyncCntDownEntry),  //AC Line Sync Countdown
+                  sizeof(sBcnHdr) + sizeof(sChangeNumSlotsEntry),  //Change NumSlots
+                  sizeof(sBcnHdr) + sizeof(sChangeHmEntry),        //Change Hybrid Mode
+                  sizeof(sBcnHdr) + sizeof(sChangeSnidEntry),      //Change SNID
+                  0,                             //RSN Info Element
+                  0,                             //ISP BENTRY
+                  0,                             //Extended Band Stay Out
+                  0,                             //AG Assignment
+                  0,                             //Extended Carriers Support
+                  sizeof(sBcnHdr) + 12,          //Power Save BENTRY: 8 stations
+                  0,                             //Vendor Specific
+              };
+              #else
+1250          extern u8 BeHdrType[];
+1251          extern u8 BeLenMax[];
+1252          #endif
+1253          
+1254          
+1255          #ifdef CCO_FUNC
+1256          
+1257          eStatus CNSM_BcnUpdateActive(sCnsm *cnsm)
+1258          {
+1259   1      
+1260   1          return (cnsm->bcnUpdateProgress);
+1261   1          
+1262   1      }
+1263          eStatus CNSM_BuildBeacon(sCnsm *cnsm, u8 bcnType)
+1264          {
+1265   1          sBcnHdr        *bcnHdr = NULL;
+1266   1          sBeHdr         *beHdr = NULL;
+1267   1          u8              bcnLen = 0;
+1268   1          u8              beLen = 0;
+1269   1          u8             *dataptr = NULL;
+1270   1      //    u8             *nbe = NULL; //number of beacon entries
+1271   1          u8              offset = 0; 
+1272   1          u8              i;
+1273   1          u8              done = 0;
+1274   1          sDiscInfoEntry *discInfoEntry = NULL;
+1275   1          sCcoHoEntry    *ccoHo = NULL;
+1276   1          sRegionEntry   *regionEntry = NULL;
+1277   1          u16             endTime = 0;
+1278   1          u8              schedInd = cnsm->currSchedInd;
+1279   1      //    sLinkLayer     *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1280   1          sLinkLayer     *linkl = cnsm->linkl;
+1281   1          sStaInfo       *staInfo = LINKL_GetStaInfo(linkl);
+1282   1      
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 22  
+
+1283   1      #ifdef NSM_CCO_PRINT
+                  FM_Printf(FM_LINFO, "CNSM:Build a BCN payload\n");
+              #endif
+1286   1          memset(cnsm->bcnBuff, 0, BEACON_BUFF_LEN);
+1287   1      
+1288   1      #ifdef SIMU
+                  offset = sizeof(sFrmCtrlBlk) + sizeof(sTxDesc);
+              #else
+1291   1          offset = sizeof(sFrmCtrlBlk);
+1292   1      #endif
+1293   1          /* build a beacon payload */
+1294   1          bcnHdr = (sBcnHdr *)(cnsm->bcnBuff + offset);
+1295   1      
+1296   1          //build beacon header
+1297   1          memcpy(bcnHdr->nid, staInfo->nid, NID_LEN);
+1298   1          bcnHdr->nid[NID_LEN-1] = (bcnHdr->nid[NID_LEN-1]&NID_EXTRA_BIT_MASK)|(staInfo->hm <<6);
+1299   1          bcnHdr->stei = staInfo->ccoScb->tei;
+1300   1          bcnHdr->bt = bcnType;
+1301   1          bcnHdr->ncnr = 0;
+1302   1          bcnHdr->npsm = 0;
+1303   1          bcnHdr->numslots = 0;
+1304   1          bcnHdr->slotusage = 0;
+1305   1          bcnHdr->ccocap = staInfo->ccoScb->staCap.fields.ccoCap;
+1306   1      
+1307   1          if ( (bcnType == BEACON_TYPE_CENTRAL)&&
+1308   1               (cnsm->hoEnabled))
+1309   1          {
+1310   2              bcnHdr->hoip = 1;
+1311   2          }
+1312   1          else
+1313   1          {
+1314   2              bcnHdr->hoip = 0;
+1315   2          }
+1316   1               
+1317   1      
+1318   1          bcnLen = sizeof(sBcnHdr);    //13 bytes, including nbe
+1319   1      
+1320   1      //    nbe = (u8 *)bcnHdr + sizeof(sBcnHdr);
+1321   1          dataptr = (u8 *)bcnHdr + sizeof(sBcnHdr);
+1322   1          //prepare the Beacon entries  
+1323   1      //    dataptr = nbe;
+1324   1      //    dataptr++;
+1325   1      //    bcnLen += 1;                 //1 byte 
+1326   1      
+1327   1         
+1328   1          i = 0;
+1329   1          done = 0;
+1330   1          beHdr = (sBeHdr *)dataptr;
+1331   1          bcnHdr->nbe = 0;
+1332   1          while((!done) && ((offset + bcnLen + BeLenMax[i]) <= BEACON_PAYLOAD_SIZE))
+1333   1          {
+1334   2              beLen = 0;
+1335   2              switch(BeHdrType[i])
+1336   2              {
+1337   3                  case BEHDR_NON_PERSISTENT_SCHED:
+1338   3                  {
+1339   4                      //build non-persistent schedule entry
+1340   4                      beHdr->beType = BEHDR_NON_PERSISTENT_SCHED;
+1341   4                      //dataptr += sizeof(sBeHdr); 
+1342   4                      break;
+1343   4                  }
+1344   3                  case BEHDR_PERSISTENT_SCHED:
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 23  
+
+1345   3                  {
+1346   4                      /* this case may run twice: */
+1347   4                      /* one for current schedule, the other for the future */
+1348   4                     
+1349   4                      u8 j;
+1350   4                      sSaiWithSt    *saiwst = NULL;
+1351   4                      sSaiWithoutSt *saiwost = NULL;
+1352   4                      u8            *ptr = NULL;
+1353   4                      sSai          *sai = NULL;
+1354   4                      u8            saiNum;
+1355   4                      u8            scd;
+1356   4                      
+1357   4                      /* build a persistent schedule entry */
+1358   4                      beHdr->beType = BEHDR_PERSISTENT_SCHED;
+1359   4                      /* schedule count down */
+1360   4                      if (schedInd == cnsm->currSchedInd)
+1361   4                      {
+1362   5                          /* the first persistent schedule 
+1363   5                           * for the current schedule */
+1364   5                          if (cnsm->updateSched)
+1365   5                          {
+1366   6                              /* CSCD counts down */
+1367   6                              cnsm->saiTable[schedInd].cscd--;
+1368   6                          }
+1369   5                      } 
+1370   4                      else if (cnsm->updateSched)
+1371   4                      {
+1372   5                          /* the second persistent schedule 
+1373   5                           * for the future/preview schedule */
+1374   5                          if (cnsm->saiTable[schedInd].pscd == 0)
+1375   5                          {
+1376   6                              /* switch to the preview scheduler */
+1377   6                              cnsm->currSchedInd = (cnsm->currSchedInd +1)&0x1;
+1378   6                              schedInd = cnsm->currSchedInd;
+1379   6                              cnsm->updateSched = 0;
+1380   6      #ifdef HPGP_HAL
+1381   6           //           HHAL_SetCsmaRegions(cnsm->regionTable[schedInd].regoin, 
+1382   6           //               cnsm->regionTable[schedInd].regionNum);
+1383   6      #endif
+1384   6                          }
+1385   5                          else
+1386   5                          {
+1387   6                              /* PSCD counts down */
+1388   6                              cnsm->saiTable[schedInd].pscd--;
+1389   6                          }
+1390   5                      }
+1391   4                      
+1392   4                      cnsm->saiTable[schedInd].cscd = 0; // test
+1393   4                      if ((schedInd == cnsm->currSchedInd) || (cnsm->updateSched))
+1394   4                      {
+1395   5                          sai = cnsm->saiTable[schedInd].sai;
+1396   5                          saiNum = cnsm->saiTable[schedInd].saiNum;
+1397   5                          scd = cnsm->saiTable[schedInd].pscd |   
+1398   5                                (cnsm->saiTable[schedInd].cscd << 3);
+1399   5                          dataptr += sizeof(sBeHdr); 
+1400   5                          *dataptr = scd;
+1401   5                          /* NS */
+1402   5                          *(dataptr + 1)= saiNum & 0x3F;
+1403   5                          ptr = dataptr + 2;
+1404   5                          beLen = 2;
+1405   5                          endTime = 0;
+1406   5                          for (j=0; j< saiNum; j++)
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 24  
+
+1407   5                          {
+1408   6                              if (sai[j].stpf)
+1409   6                              {
+1410   7                                  saiwst = (sSaiWithSt *)ptr;
+1411   7                                  saiwst->stpf = 1;
+1412   7                                  saiwst->glid = sai[j].glid;
+1413   7                                  saiwst->stLo = (sai[j].startTime) & 0xFF;
+1414   7                                  saiwst->stHi = (sai[j].startTime >> 8) & 0xF;
+1415   7                                  endTime = sai[j].startTime + sai[j].duration;
+1416   7                                  saiwst->etLo = endTime & 0xF;
+1417   7                                  saiwst->etHi = (endTime >> 4) & 0xFF;
+1418   7                                  ptr += sizeof(sSaiWithSt);
+1419   7                                  beLen += sizeof(sSaiWithSt);
+1420   7                              }
+1421   6                              else
+1422   6                              {
+1423   7                                  saiwost = (sSaiWithoutSt *)ptr;
+1424   7                                  saiwost->stpf = 0;
+1425   7                                  saiwost->glid = sai[j].glid;
+1426   7                                  endTime += sai[j].duration;
+1427   7                                  saiwost->etLo = endTime & 0xFF;
+1428   7                                  saiwost->etHi = (endTime >> 8) & 0xF;
+1429   7                                  ptr += sizeof(sSaiWithoutSt);
+1430   7                                  beLen += sizeof(sSaiWithoutSt);
+1431   7                              } 
+1432   6                          }
+1433   5                          schedInd = (schedInd + 1) & 0x1;
+1434   5                      }                
+1435   4      //FM_HexDump(FM_DATA, "CNSM sched entry:", dataptr, beLen);
+1436   4                      break;
+1437   4                  }
+1438   3                  case BEHDR_REGIONS:
+1439   3                  {     
+1440   4                      u8 j;
+1441   4                      u8 regionNum;
+1442   4                      sCsmaRegion *region;
+1443   4                      /* build region entry */
+1444   4                      beHdr->beType = BEHDR_REGIONS;
+1445   4                      dataptr += sizeof(sBeHdr); 
+1446   4                      /* schedule regions */
+1447   4                      schedInd = cnsm->currSchedInd;
+1448   4                      region = cnsm->regionTable[schedInd].region;
+1449   4                      regionNum = cnsm->regionTable[schedInd].regionNum;
+1450   4      
+1451   4                      /* NR */
+1452   4                      *dataptr = regionNum;
+1453   4                      beLen = 1;
+1454   4              regionEntry = (sRegionEntry *)(dataptr + 1);
+1455   4              /* regions */
+1456   4              endTime = region[0].startTime;
+1457   4              for (j=0; j< regionNum; j++)
+1458   4              {
+1459   5                  endTime = region[j].endTime;
+1460   5                  //regionEntry->endTimeHi = (endTime >> 8)&0xF;
+1461   5                //regionEntry->endTimeLo = endTime & 0xFF;
+1462   5                regionEntry->endTimeLo =  (u8) endTime & 0xF;
+1463   5                  regionEntry->endTimeHi = (u8) (endTime >> 4 ) & 0xFF;
+1464   5                regionEntry->regionType = region[j].regionType;
+1465   5                regionEntry++;
+1466   5                beLen += sizeof(sRegionEntry);          
+1467   5              }
+1468   4      //FM_HexDump(FM_DATA, "CNSM region entry:", dataptr, beLen);        
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 25  
+
+1469   4                      break;
+1470   4                  }
+1471   3                  case BEHDR_MAC_ADDR:
+1472   3                  {
+1473   4      //               if(bcnType == BEACON_TYPE_DISCOVER)
+1474   4                    if(cnsm->txDiscBcn)
+1475   4                     {
+1476   5                          beHdr->beType = BEHDR_MAC_ADDR;
+1477   5                          dataptr += sizeof(sBeHdr); 
+1478   5                          memcpy(dataptr, staInfo->ccoScb->macAddr, MAC_ADDR_LEN);
+1479   5                          beLen = MAC_ADDR_LEN;
+1480   5                     } 
+1481   4      
+1482   4                      break;
+1483   4                  }
+1484   3                  case BEHDR_DISCOVER:
+1485   3                  {
+1486   4                      if(cnsm->schedDiscBcn)
+1487   4                      {
+1488   5                          //schedule the discover beacon
+1489   5                          //get the TEI of associated STA
+1490   5                          cnsm->discScb = CRM_GetNextScb(cnsm->crm, cnsm->discScb);
+1491   5                          if( cnsm->discScb != NULL)
+1492   5                          {
+1493   6                          
+1494   6                              if( (cnsm->discScb->tei != staInfo->ccoScb->tei) &&
+1495   6                                  (cnsm->discScb->namState == STA_NAM_STATE_CONN) )
+1496   6                              {
+1497   7      #ifdef P8051
+1498   7       FM_Printf(FM_HINFO, "CNSM:Schedule disc bcn(tei:%bu)\n", 
+1499   7                           cnsm->discScb->tei);
+1500   7      #else
+               FM_Printf(FM_HINFO, "CNSM:Schedule disc bcn(tei:%d)\n", 
+                                   cnsm->discScb->tei);
+              #endif
+1504   7                                  beHdr->beType = BEHDR_DISCOVER;
+1505   7                                  dataptr += sizeof(sBeHdr); 
+1506   7                                  *dataptr = cnsm->discScb->tei;
+1507   7                                  beLen = 1;
+1508   7                              }
+1509   6                              cnsm->bcnUpdate = 1;
+1510   6                          }
+1511   5                          else
+1512   5                          {
+1513   6                              //all STAs have scheduled so far
+1514   6                              cnsm->schedDiscBcn = 0;
+1515   6                              cnsm->bcnUpdate = 1;
+1516   6                          }
+1517   5                      }
+1518   4                      break;
+1519   4                  }
+1520   3                  case BEHDR_DISC_INFO:
+1521   3                  {
+1522   4      //               if(bcnType == BEACON_TYPE_DISCOVER)
+1523   4                     if(cnsm->txDiscBcn)
+1524   4                     {
+1525   5                          cnsm->txDiscBcn--;
+1526   5                          beHdr->beType = BEHDR_DISC_INFO;
+1527   5                          dataptr += sizeof(sBeHdr); 
+1528   5                          discInfoEntry = (sDiscInfoEntry *)dataptr;
+1529   5                          discInfoEntry->staCap.byte = staInfo->ccoScb->staCap.byte;
+1530   5      
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 26  
+
+1531   5                          discInfoEntry->numDiscSta = staInfo->ccoScb->numDiscSta; 
+1532   5                          discInfoEntry->numDiscNet = staInfo->ccoScb->numDiscNet; 
+1533   5      
+1534   5                          discInfoEntry->staStatus.byte = staInfo->ccoScb->staStatus.byte; 
+1535   5                          beLen = sizeof(sDiscInfoEntry);
+1536   5                     }
+1537   4                      break;
+1538   4                  }
+1539   3                  case BEHDR_BPSTO:
+1540   3                  {
+1541   4                      /* build bpsto entry */
+1542   4                      beHdr->beType = BEHDR_BPSTO;
+1543   4                      dataptr += sizeof(sBeHdr); 
+1544   4                      beLen = 3;
+1545   4      //                         cnsm->bpstoOffset = bcnLen + sizeof(sBeHdr);
+1546   4                      cnsm->bpstoOffset = ((u8 *)beHdr  + sizeof(sBeHdr)) -  ((u8 *)cnsm->bcnBuff );
+1547   4                      break;
+1548   4                  }
+1549   3                  case BEHDR_ENCRYP_KEY_CHANGE:
+1550   3                  {
+1551   4                      //build encrption key change entry
+1552   4                      //beHdr->beType = BEHDR_ENCRYP_KEY_CHANGE;
+1553   4                      //dataptr += sizeof(sBeHdr); 
+1554   4      
+1555   4                      break;
+1556   4                  }
+1557   3                  case BEHDR_CCO_HANDOVER:
+1558   3                  {
+1559   4                      //build cco handover entry
+1560   4                      if ( (bcnType == BEACON_TYPE_CENTRAL)&&
+1561   4                           (cnsm->hoReady))
+1562   4                      {
+1563   5                          beHdr->beType = BEHDR_CCO_HANDOVER;
+1564   5                          dataptr += sizeof(sBeHdr); 
+1565   5                          ccoHo = (sCcoHoEntry *)dataptr;
+1566   5                          ccoHo->hcd = cnsm->hoCntDown;
+1567   5                          ccoHo->nctei = cnsm->nctei; //TODO
+1568   5                          beLen = sizeof(sCcoHoEntry);
+1569   5           
+1570   5                      }
+1571   4                      break;
+1572   4                  }
+1573   3                  case BEHDR_BCN_RELOC:
+1574   3                  {
+1575   4                      //build beacon relocation entry
+1576   4                      //beHdr->beType = BEHDR_BCN_RELOC;
+1577   4                      //dataptr += sizeof(sBeHdr); 
+1578   4      
+1579   4                      break;
+1580   4                  }
+1581   3                  case BEHDR_ACL_SYNC_CNTDOWN:
+1582   3                  {
+1583   4                      //build AC line sync countdown entry
+1584   4                      //beHdr->beType = BEHDR_ACL_SYNC_CNTDOWN;
+1585   4                      //dataptr += sizeof(sBeHdr); 
+1586   4      
+1587   4                      break;
+1588   4                  }
+1589   3                  case BEHDR_CHANGE_NUM_SLOTS:
+1590   3                  {
+1591   4                      //build change number of slots entry
+1592   4                      //beHdr->beType = BEHDR_CHANGE_NUM_SLOTS;
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 27  
+
+1593   4                      //dataptr += sizeof(sBeHdr); 
+1594   4      
+1595   4                      break;
+1596   4                  }
+1597   3                  case BEHDR_CHANGE_HM:
+1598   3                  {
+1599   4                      //build change hybrid mode entry
+1600   4                      //beHdr->beType = BEHDR_CHANGE_HM;
+1601   4                      //dataptr += sizeof(sBeHdr); 
+1602   4      
+1603   4                      break;
+1604   4                  }
+1605   3                  case BEHDR_CHANGE_SNID:
+1606   3                  {
+1607   4                      //build change snid entry
+1608   4                      //beHdr->beType = BEHDR_CHANGE_SNID;
+1609   4                      //dataptr += sizeof(sBeHdr); 
+1610   4      
+1611   4                      break;
+1612   4                  }
+1613   3                  case BEHDR_PWR_SAVE:
+1614   3                  {
+1615   4      #ifdef POWERSAVE
+                      sPowerSaveEntry *pPsBentry ;
+                      sHaLayer *hal;
+              
+                              beHdr->beType = BEHDR_PWR_SAVE;
+                              dataptr += sizeof(sBeHdr);
+                      pPsBentry = (sPowerSaveEntry *) dataptr;
+              
+                      hal = (sHaLayer *) HOMEPLUG_GetHal();
+                        if (hal->hhalCb->psAvln == FALSE)
+                      {
+                        // if AVLN PS is disabled, set Stop PS flag to TRUE, no need to set anything else
+                        // if there are HPAV1.1 stations in AVLN, set HPAV11 to TRUE
+                        pPsBentry->spsf = TRUE;
+                          pPsBentry->tpss = 0xf;
+                        if (hal->hhalCb->psHPAV11 == TRUE)
+                        {
+                          pPsBentry->av11pf = TRUE;
+                        }
+              
+                        beLen = sizeof(sPowerSaveEntry);
+                      }
+                      else
+                      {
+                          sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                          sStaInfo      *staInfo = LINKL_GetStaInfo(linkl);
+                          sScb          *scb = NULL;
+                        sStations   *psStation;
+              
+                          pPsBentry->bpCnt_Lo = staInfo->ccoScb->bpCnt & 0xff;    // use only 12 bits
+                          pPsBentry->bpCnt_Hi = (staInfo->ccoScb->bpCnt & 0xf00) >> 8;
+                          pPsBentry->av11pf = FALSE;
+                          pPsBentry->tpss = staInfo->ccoScb->pss;
+                          pPsBentry->pssi = staInfo->ccoScb->pssi;
+                        beLen = sizeof(sPowerSaveEntry);
+                                psStation = (sStations *) (dataptr + beLen);
+                        // go through all STAs in AVLN
+              //printf("CRM_GetscbNum()=%bu\n", CRM_GetScbNum(cnsm->crm));
+                                  scb = CRM_GetNextScb(cnsm->crm, scb);
+                          while(scb)
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 28  
+
+                          {
+                          if (scb->psState == PSM_PS_STATE_ON)
+                          {
+                            psStation->tei = scb->tei;
+                            psStation->pss = scb->pss;
+                            ++psStation;
+                            beLen += sizeof(sStations);
+              //              printf("add PS bentry from tei %bu, pss %bu\n", scb->tei, scb->pss);
+                          }
+                                    scb = CRM_GetNextScb(cnsm->crm, scb);
+                        }
+                      }
+              #ifdef PS_DEBUG
+                      if (psDebug)
+                        printf("CNSM_BuildBeacon:scb->bpCnt=%d\n", staInfo->ccoScb->bpCnt);
+              #endif
+              /*
+                        if (psDebug)
+                        {
+                          u8 i;
+                          u8 *tmpp = dataptr;
+              
+                          for (i=0;i<beLen;i++)
+                            printf("0x%bx ", tmpp[i]);
+                          printf("\n"); 
+                        }
+              */
+                              break;
+              #endif
+1684   4                  }
+1685   3                  case BEHDR_VENDOR_SPEC:  
+1686   3                  {
+1687   4                      done = 1;
+1688   4                      break;
+1689   4                  }
+1690   3                  default:
+1691   3                  {
+1692   4                      //do not build the entry in the beacon
+1693   4                  }
+1694   3              }
+1695   2              //add the non-zero entry 
+1696   2              if( beLen != 0)
+1697   2              { 
+1698   3      //            beHdr->beLen = beLen + sizeof(sBcnHdr); 
+1699   3                  beHdr->beLen = beLen; 
+1700   3                  bcnLen += sizeof(sBeHdr) + beHdr->beLen;
+1701   3                  dataptr += beLen;
+1702   3                  beHdr = (sBeHdr *)dataptr;
+1703   3                  beLen = 0;
+1704   3      //            *nbe = *nbe+1;
+1705   3                  bcnHdr->nbe++;
+1706   3              }
+1707   2              i++;
+1708   2          }
+1709   1          cnsm->bcnLen = bcnLen;
+1710   1          return STATUS_SUCCESS;
+1711   1      }
+1712               
+1713          eStatus CNSM_TransmitBeacon(sCnsm *cnsm)
+1714          {
+1715   1          sTxDesc    txinfo;
+1716   1          sBuffDesc  buffDesc;
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 29  
+
+1717   1          u8         offset = 0;
+1718   1      //    sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1719   1          sLinkLayer *linkl = cnsm->linkl;
+1720   1          sStaInfo   *staInfo = LINKL_GetStaInfo(linkl);
+1721   1      
+1722   1      #ifdef SIMU
+                  offset = sizeof(sFrmCtrlBlk) + sizeof(sTxDesc);
+              #else
+1725   1          offset = sizeof(sFrmCtrlBlk);
+1726   1      #endif
+1727   1      
+1728   1          //transmit the beacon 
+1729   1          txinfo.dtei = 0xFF;
+1730   1          txinfo.stei = staInfo->ccoScb->tei;
+1731   1          txinfo.frameType = BEACON_TYPE_CENTRAL;
+1732   1          txinfo.snid = staInfo->snid;
+1733   1        
+1734   1          //prepare tx control information
+1735   1          buffDesc.buff = cnsm->bcnBuff;
+1736   1          buffDesc.bufflen = BEACON_BUFF_LEN;
+1737   1          buffDesc.dataptr = cnsm->bcnBuff + offset;
+1738   1          buffDesc.datalen = BEACON_PAYLOAD_SIZE;
+1739   1      
+1740   1      //  FM_HexDump(FM_DATA, "CNSM beacon:", buffDesc.dataptr, buffDesc.datalen);
+1741   1      
+1742   1          HAL_TransmitBeacon(HOMEPLUG_GetHal(), &txinfo, &buffDesc, cnsm->bpstoOffset);
+1743   1      
+1744   1              
+1745   1          return STATUS_SUCCESS;    
+1746   1      
+1747   1      }
+1748          
+1749          
+1750          //beacon transmission in the interrupt context
+1751          void LINKL_BcnTxHandler(void* cookie)
+1752          {
+1753   1          sCnsm      *cnsm = NULL;
+1754   1          sEvent     *event = NULL;
+1755   1          eStatus     status = STATUS_SUCCESS;
+1756   1          sScb       *scb = NULL;
+1757   1          sScb       *nextscb = NULL;
+1758   1          sScb       *tmpScb;
+1759   1          sLinkLayer *linkl = (sLinkLayer *)cookie;
+1760   1          sStaInfo   *staInfo = LINKL_GetStaInfo(linkl);
+1761   1      
+1762   1          cnsm = &linkl->ccoNsm;
+1763   1          //build central beacon
+1764   1          status = CNSM_BuildBeacon(cnsm, BEACON_TYPE_CENTRAL);
+1765   1          if(status == STATUS_SUCCESS)
+1766   1          {
+1767   2              CNSM_TransmitBeacon(cnsm);
+1768   2          }
+1769   1      
+1770   1          if(cnsm->hoCntDown == 0)
+1771   1          {
+1772   2      
+1773   2              FM_Printf(FM_HINFO, "CNSM: HO switch (become assoc STA)\n");
+1774   2              //send event CCO_HO_IND to the ctrl       
+1775   2              event = EVENT_Alloc(EVENT_DEFAULT_SIZE, 0);
+1776   2              if(event == NULL)
+1777   2              {
+1778   3                  FM_Printf(FM_ERROR, "EAllocErr\n");
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 30  
+
+1779   3                  return ;
+1780   3              }
+1781   2      
+1782   2              //Handover: switch to the STA mode/role
+1783   2              //still keep the SCBs in CRM for TEI MAP, 
+1784   2              //but free the tei timer for all SCBs
+1785   2              staInfo->staScb = staInfo->ccoScb;
+1786   2              scb = CRM_GetNextScb(cnsm->crm, scb);
+1787   2              while(scb)
+1788   2              {
+1789   3                  STM_StopTimer(scb->teiTimer);
+1790   3                  STM_FreeTimer(scb->teiTimer);
+1791   3                  scb->teiTimer = STM_TIMER_INVALID_ID;
+1792   3                  if (scb->tei == cnsm->nctei)
+1793   3                  {
+1794   4                      staInfo->ccoScb = scb;
+1795   4                  }
+1796   3                  nextscb = CRM_GetNextScb(cnsm->crm, scb);
+1797   3                  scb = nextscb;
+1798   3              }
+1799   2      
+1800   2              if( staInfo->ccoScb == NULL)
+1801   2              {
+1802   3                  //never happen
+1803   3                  FM_Printf(FM_ERROR, "CNSM:can't find cco scb\n");
+1804   3              }
+1805   2              CNSM_Stop(cnsm);
+1806   2      
+1807   2              event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1808   2              event->eventHdr.type = EVENT_TYPE_CCO_HO_IND;
+1809   2              //deliver the event to the upper layer
+1810   2      #ifdef CALLBACK
+                      linkl->deliverEvent(linkl->eventcookie, event);
+              #else
+1813   2              CTRLL_ReceiveEvent(linkl->eventcookie, event);
+1814   2      #endif
+1815   2          }
+1816   1          else
+1817   1          {
+1818   2              if(cnsm->hoReady)
+1819   2              {
+1820   3                  cnsm->hoCntDown--;
+1821   3                  FM_Printf(FM_MINFO, "CNSM:HO cntdown(%d)\n", cnsm->hoCntDown);
+1822   3              }
+1823   2      #ifdef SIMU
+                      STM_StartTimer(cnsm->bcnTimer, HPGP_TIME_BCN_INTERVAL);   
+              #endif
+1826   2          }
+1827   1      }
+*** WARNING C280 IN LINE 1758 OF ..\..\src\link\nsm_cco.c: 'tmpScb': unreferenced local variable
+1828          
+1829          #ifdef SIMU
+              void LINKL_BcnTimerHandler(u16 type, void* cookie)
+              {
+              //    sEvent *event = NULL;
+                  sLinkLayer * linkl = (sLinkLayer *)cookie;
+                  //sCnsm* cnsm =  LINKL_GetCnsm(linkl);
+              
+                  LINKL_BcnTxHandler(linkl);
+                   
+              }
+              #endif
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 31  
+
+1840          
+1841          
+1842          void CNSM_ProcEvent(sCnsm *cnsm, sEvent *event)
+1843          {
+1844   1          sEvent            *newEvent = NULL;
+1845   1          sHpgpHdr          *hpgpHdr = NULL;
+1846   1          sScb              *staScb = NULL;
+1847   1          sCcDiscStaInfo    *ccDiscStaInfo = NULL;
+1848   1          sCcDiscNetInfo    *ccDiscNetInfo = NULL;
+1849   1          sRxDesc           rxdesc;
+1850   1          u8                 num;
+1851   1          u8                *dataptr = NULL;
+1852   1          u8                *bcn = NULL;
+1853   1          u8                 i, ccoType;
+1854   1         
+1855   1      //    sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1856   1          sLinkLayer *linkl = cnsm->linkl;
+1857   1          sStaInfo   *staInfo = LINKL_GetStaInfo(linkl);
+1858   1      #ifdef ROUTE
+                  sCrm              *crm = LINKL_GetCrm(linkl);
+                  u32 ntb;
+              #endif
+1862   1          hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+1863   1          switch(cnsm->state)
+1864   1          { 
+1865   2              case CNSM_STATE_INIT:
+1866   2              {
+1867   3                  if( (event->eventHdr.eventClass == EVENT_CLASS_CTRL) && 
+1868   3                      (event->eventHdr.type == EVENT_TYPE_CNSM_START) )
+1869   3                  {
+1870   4                      dataptr = event->buffDesc.dataptr;
+1871   4                      ccoType = *dataptr;  
+1872   4                      if(ccoType == LINKL_CCO_TYPE_UNASSOC)
+1873   4                      {
+1874   5                          cnsm->ccoNotification = 1;
+1875   5                      }
+1876   4                      else if(ccoType == LINKL_CCO_TYPE_HO)
+1877   4              {
+1878   5                cnsm->ccoNotification = 0;
+1879   5                cnsm->txDiscBcn = 10;
+1880   5                cnsm->bcnUpdate = 1;
+1881   5      
+1882   5                          /* Send CC_DISCOVER_LIST.REQ to each STA mainly due to handover */
+1883   5                          staScb = CRM_GetNextScb(cnsm->crm, staScb);
+1884   5                          while(staScb)
+1885   5                          {
+1886   6                              if(staScb->tei != cnsm->staInfo->ccoScb->tei)
+1887   6                              {
+1888   7                                  CNSM_SendMgmtMsg(cnsm, EVENT_TYPE_CC_DISCOVER_LIST_REQ,
+1889   7                                            staInfo->snid,
+1890   7                                            staScb->tei, 
+1891   7                                            staScb->macAddr);
+1892   7                              }
+1893   6            
+1894   6                              staScb = CRM_GetNextScb(cnsm->crm, staScb);
+1895   6                          }
+1896   5                      }
+1897   4                      else
+1898   4                      {
+1899   5                  /* CNSM starts first time as Associated CCo */
+1900   5                          cnsm->ccoNotification = 0;
+1901   5                      }
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 32  
+
+1902   4                      cnsm->discScb = NULL;
+1903   4      
+1904   4       
+1905   4      
+1906   4      
+1907   4      
+1908   4      
+1909   4      
+1910   4      
+1911   4      
+1912   4      #ifdef DISC_BCN
+1913   4                      STM_StartTimer(cnsm->discTimer, HPGP_TIME_DISC_PERIOD_MAX);
+1914   4      #endif
+1915   4                      STM_StartTimer(cnsm->discAgingTimer, HPGP_TIME_DISC_AGING);
+1916   4      #ifdef NSM_CCO_PRINT        
+              #ifdef P8051   
+              FM_Printf(FM_ERROR, "CNSM:Start disc timer(tid: %bu)\n", cnsm->discTimer);
+              FM_Printf(FM_ERROR, "CNSM:Start disc aging timer(tid: %bu)\n", 
+                       cnsm->discAgingTimer);
+              #else
+              FM_Printf(FM_ERROR, "CNSM: Start disc timer(tid: %d)\n", cnsm->discTimer);
+              FM_Printf(FM_ERROR, "CNSM: Start disc aging timer(tid: %d)\n", 
+                       cnsm->discAgingTimer);
+              #endif
+              #endif
+1927   4          
+1928   4      #ifdef SIMU
+              FM_Printf(FM_ERROR, "CNSM:Start beacon timer(tid: %d)\n", cnsm->bcnTimer);
+                              STM_StartTimer(cnsm->bcnTimer, HPGP_TIME_BCN_INTERVAL);   
+              #else
+1932   4          //enable the MAC HW to transmit the beacon
+1933   4      #ifdef HPGP_HAL
+1934   4                     ISM_EnableMacIrq(MAC_INT_IRQ_PLC_BCN_TX);
+1935   4      #endif
+1936   4      #endif
+1937   4                     cnsm->state = CNSM_STATE_READY;
+1938   4      
+1939   4                      CNSM_BuildBeacon(cnsm, BEACON_TYPE_CENTRAL);
+1940   4      
+1941   4                      CNSM_TransmitBeacon(cnsm);
+1942   4      
+1943   4               if (ccoType != LINKL_CCO_TYPE_HO)
+1944   4                      AKM_Start(&linkl->akm, LINKL_STA_MODE_CCO, AKM_NEW_NEK);
+1945   4      
+1946   4                      
+1947   4                  }
+1948   3                  break;
+1949   3              }
+1950   2              case CNSM_STATE_READY:
+1951   2              {
+1952   3                  if(event->eventHdr.eventClass == EVENT_CLASS_MSG)
+1953   3                  {
+1954   4                      switch(event->eventHdr.type)
+1955   4                      {
+1956   5                        case EVENT_TYPE_CM_UNASSOC_STA_IND:
+1957   5                {
+1958   6                  FM_Printf(FM_MMSG, "CNSM:<<<UNASSOC STA IND(tei:%bu)\n",
+1959   6                                        hpgpHdr->tei);
+1960   6      
+1961   6                  break;
+1962   6      
+1963   6                      }
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 33  
+
+1964   5                        case EVENT_TYPE_NN_INL_REQ:
+1965   5                        case EVENT_TYPE_NN_INL_CNF:
+1966   5                {
+1967   6                  sNnINLReq * inlReq = (sNnINLReq*)event->buffDesc.dataptr;
+1968   6                  u8 numSta = CRM_GetScbNum(cnsm->crm);
+1969   6      
+1970   6      
+1971   6                  if (event->eventHdr.type == EVENT_TYPE_NN_INL_REQ)
+1972   6                  FM_Printf(FM_MMSG, "CNSM:<<<NN_INL_REQ(tei:%bu)\n",
+1973   6                                        hpgpHdr->tei);
+1974   6                  else
+1975   6                  FM_Printf(FM_MMSG, "CNSM:<<<NN_INL_CNF(tei:%bu)\n",
+1976   6                                        hpgpHdr->tei);
+1977   6                               
+1978   6                  if (numSta == inlReq->srcNumAuthSta)
+1979   6                  {             
+1980   7                    //FM_HexDump(FM_ERROR,"m1", staInfo->macAddr, 6);
+1981   7                    //FM_HexDump(FM_ERROR,"m2", hpgpHdr->macAddr, 6);
+1982   7                    
+1983   7                    if (memcmp(staInfo->macAddr, hpgpHdr->macAddr, 6) < 0)
+1984   7                    {
+1985   8                      
+1986   8                      newEvent = EVENT_Alloc(EVENT_DEFAULT_SIZE, 0);
+1987   8                      if(newEvent != NULL)
+1988   8                      {
+1989   9                        //printf("e %bu\n", EVENT_TYPE_NCO_IND);
+1990   9                        newEvent->eventHdr.type = EVENT_TYPE_NCO_IND;
+1991   9                        CTRLL_ReceiveEvent(NULL, newEvent);
+1992   9                      }
+1993   8                    }
+1994   7                    
+1995   7                  }
+1996   6                  else
+1997   6                  if (numSta <= inlReq->srcNumAuthSta)
+1998   6                  {
+1999   7                      newEvent = EVENT_Alloc(EVENT_DEFAULT_SIZE, 0);
+2000   7                      if(newEvent != NULL)
+2001   7                      {
+2002   8                        newEvent->eventHdr.type = EVENT_TYPE_NCO_IND;
+2003   8                        CTRLL_ReceiveEvent(NULL, newEvent);
+2004   8                      }
+2005   7                  }
+2006   6      
+2007   6      
+2008   6                  if (event->eventHdr.type == EVENT_TYPE_NN_INL_REQ)
+2009   6                  {
+2010   7                      
+2011   7                    CNSM_SendMgmtMsg(cnsm, EVENT_TYPE_NN_INL_CNF,
+2012   7                            inlReq->srcSnid,
+2013   7                            inlReq->srcTei, hpgpHdr->macAddr);
+2014   7                  }
+2015   6                            
+2016   6            
+2017   6                  break;
+2018   6      
+2019   6                }
+2020   5      
+2021   5      
+2022   5                case EVENT_TYPE_CC_DISCOVER_LIST_CNF:
+2023   5                          {
+2024   6      #ifdef P8051
+2025   6                              FM_Printf(FM_MMSG, "CNSM:<<<CC_DISC_LIST.CNF(tei:%bu)\n",
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 34  
+
+2026   6                                      hpgpHdr->tei);
+2027   6      #else
+                                      FM_Printf(FM_MMSG, "CNSM:<<<CC_DISC_LIST.CNF(tei:%d)\n",
+                                              hpgpHdr->tei);
+              #endif
+2031   6                              staScb = hpgpHdr->scb;
+2032   6                              if(staScb == NULL)
+2033   6                              {
+2034   7                                  FM_Printf(FM_ERROR, "CNSM:no scb\n");
+2035   7                                  break;
+2036   7                              }
+2037   6      #if 0           
+                                      /* reset the discovered sta/net lists in the scb */
+                                      for (i = 0; i < DISC_STA_LIST_MAX; i ++)
+                                      {
+                                          staScb->discStaInfo[i].valid = 0;
+                                      }
+              
+                                      for (i = 0; i < DISC_NET_LIST_MAX; i ++)
+                                      {
+                                          staScb->discNetInfo[i].valid = 0;
+                                      }
+              #endif            
+2049   6                          staScb->numDiscSta = 0;       
+2050   6                              staScb->numDiscNet = 0;
+2051   6      
+2052   6                              //update the discovered sta/net lists in the scb
+2053   6                              //i.e. update the topology table
+2054   6                              dataptr = event->buffDesc.dataptr;
+2055   6                              num = *dataptr;   //number of stations
+2056   6      #if 0                
+                                      if(num > DISC_STA_LIST_MAX)
+                                      {
+                                          FM_Printf(FM_ERROR, "CNSM: less resource for discovered sta list in SCB\n");
+                                      } 
+              #endif            
+2062   6                              dataptr++;
+2063   6                              i = 0; 
+2064   6      #if 0           
+                                      while(num)
+                                      {
+                                          ccDiscStaInfo = (sCcDiscStaInfo *)dataptr; 
+                                          if(i < DISC_STA_LIST_MAX)
+                                          {
+                                              staScb->discStaInfo[i].valid = 1;
+                                              staScb->discStaInfo[i].hit = 1;
+                                              memcpy(staScb->discStaInfo[i].macAddr,  
+                                                  ccDiscStaInfo->macAddr, MAC_ADDR_LEN);
+                                              staScb->discStaInfo[i].tei = ccDiscStaInfo->tei;
+                                              staScb->discStaInfo[i].sameNet = ccDiscStaInfo->sameNet;
+                                              staScb->discStaInfo[i].snid = ccDiscStaInfo->snid;
+              
+                                              staScb->discStaInfo[i].staCap.byte = ccDiscStaInfo->staCap.byte;
+              
+              //                                staScb->discStaInfo[i].sigLevel = ccDiscStaInfo->sigLevel;
+              //                                staScb->discStaInfo[i].avgBle= ccDiscStaInfo->avgBle;
+                                          }
+                                          else
+                                          {
+              FM_Printf(FM_WARN, "CNSM: size of Rx discover sta list exceeds the max\n");
+                                              break;
+                                          }
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 35  
+
+                                          dataptr += sizeof(sCcDiscStaInfo); 
+                                          i++;
+                                          num--;
+                                      }
+                                      staScb->numDiscSta = i;
+              
+              #else
+2095   6                  staScb->numDiscSta = num;
+2096   6      #endif
+2097   6                              num = *dataptr;   //number of net
+2098   6      #if 0                        
+                                      if(num > DISC_NET_LIST_MAX)
+                                      {
+                                          FM_Printf(FM_ERROR, "CNSM: less resource for discovered net list in SCB\n");
+                                      } 
+              #endif
+2104   6                              dataptr++;
+2105   6                              i = 0; 
+2106   6      #if 0           
+                                      while(num)
+                                      {
+                                          ccDiscNetInfo = (sCcDiscNetInfo *)dataptr; 
+                                          if(i < DISC_NET_LIST_MAX)
+                                          {
+                                              staScb->discNetInfo[i].valid = 1;
+                                              staScb->discNetInfo[i].hit = 1;
+                                              memcpy(staScb->discNetInfo[i].nid,  
+                                                  ccDiscNetInfo->nid, NID_LEN);
+                                              staScb->discNetInfo[i].snid = ccDiscNetInfo->snid;
+                                              staScb->discNetInfo[i].hybridMode = ccDiscNetInfo->hybridMode;
+                                              staScb->discNetInfo[i].numBcnSlots= ccDiscNetInfo->numBcnSlots;
+                                              staScb->discNetInfo[i].coordStatus= ccDiscNetInfo->coordStatus;
+                                              staScb->discNetInfo[i].offset= ccDiscNetInfo->offset;
+                                          }
+                                          else
+                                          {
+                              FM_Printf(FM_WARN, "CNSM:Rx disc exceeds\n");
+                                              break;
+                                          }
+                                          dataptr += sizeof(sCcDiscNetInfo); 
+                                          i++;
+                                          num--;
+                                      }
+                                      staScb->numDiscNet = i;
+              #else
+2133   6                  staScb->numDiscNet = num;
+2134   6      #endif
+2135   6                              break;
+2136   6                         }
+2137   5      #ifdef UKE           
+                                 case EVENT_TYPE_CM_SC_JOIN_REQ: //UKE
+                                 {
+                                      FM_Printf(FM_MMSG, "CNSM:<<<CM_SC_JOIN.REQ\n");
+                                       
+                                     if(staInfo->secMode == SEC_MODE_SC_ADD)
+                                     {
+                                         FM_Printf(FM_MMSG, "SNSM:<<<CM_SC_JOIN.REQ\n");
+                                       
+                                         LINKL_SendMgmtMsg(cnsm->staInfo, EVENT_TYPE_CM_SC_JOIN_CNF,
+                                                      ((sHpgpHdr*)(event->buffDesc.buff))->macAddr);
+              
+                                         CNAM_EnableAssocNotification(&linkl->ccoNam,
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 36  
+
+                                                              ((sHpgpHdr*)(event->buffDesc.buff))->macAddr);
+                                             
+                                     }
+                                         
+                                     
+                                     break;
+                                  } 
+              #endif  
+2158   5                          
+2159   5      #ifdef ROUTE      
+                                  case EVENT_TYPE_CM_ROUTE_INFO_REQ:
+                                  {
+                                      FM_Printf(FM_MMSG, "ROUTE:<<<ROUTE_INFO.REQ(tei:%bu)\n",
+                                             hpgpHdr->tei);
+                                      ROUTE_sendRouteInfo(EVENT_TYPE_CM_ROUTE_INFO_CNF, event);
+                                      break;
+                                  }
+                                  case EVENT_TYPE_CM_ROUTE_INFO_CNF:
+                                  {
+                                      ROUTE_procRouteInfo((sRouteInfo *)&event->buffDesc.dataptr[1], event->buffDesc.dat
+             -aptr[0], hpgpHdr->tei);
+                                      break;
+                                  }
+                                  case EVENT_TYPE_CM_ROUTE_INFO_IND:
+                                  {
+                                      ROUTE_procRouteInfo((sRouteInfo *)&event->buffDesc.dataptr[1], event->buffDesc.dat
+             -aptr[0], hpgpHdr->tei);
+                                      break;
+                                  }
+                                  case EVENT_TYPE_CM_UNREACHABLE_IND:
+                                  {
+                                      u32 *unreachableNtb = event->buffDesc.dataptr;
+                                      ROUTE_procUnreachableInd(&event->buffDesc.dataptr[5], event->buffDesc.dataptr[4], 
+                                          hpgpHdr->tei, (u32)*event->buffDesc.dataptr);
+                                      //Start HD_Duration timer using diff between unreachableNtb and current ntb
+                                      break;
+                                  }
+              #endif
+2186   5                         default:
+2187   5                         {
+2188   6                         }
+2189   5                     }
+2190   4                 }
+2191   3                 else //control events
+2192   3                 {
+2193   4                     switch(event->eventHdr.type)
+2194   4                     {
+2195   5                         case EVENT_TYPE_CNSM_START: 
+2196   5                         {
+2197   6      #ifdef ROUTE
+                                      dataptr = event->buffDesc.dataptr;
+                                      ccoType = *dataptr;  
+                                      if(ccoType == LINKL_CCO_TYPE_ASSOC)
+                                      {
+                                          if(cnsm->staInfo->identifyCaps.routingCap == TRUE)
+                                          {
+                                              ROUTE_startUpdateTimer();
+                                          }
+                                      }
+              #endif
+2208   6                         }
+2209   5                         case EVENT_TYPE_CC_BCN_IND:
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 37  
+
+2210   5                         {
+2211   6                             rxdesc.snid = hpgpHdr->snid;  
+2212   6                             bcn = event->buffDesc.dataptr;
+2213   6      
+2214   6                             if( (CNSM_ProcBcnLow(cnsm, &rxdesc, bcn) == BCN_SRC_OTHER_CCO)
+2215   6                                 &&(cnsm->ccoNotification))
+2216   6                             {
+2217   7                                 newEvent = EVENT_Alloc(EVENT_DEFAULT_SIZE, 0);
+2218   7                                 if(newEvent == NULL)
+2219   7                                 {
+2220   8                                     FM_Printf(FM_ERROR, "EAllocErr\n");
+2221   8                                     return ;
+2222   8                                 }
+2223   7                                 cnsm->ccoNotification = 0; //reset
+2224   7                                 newEvent->eventHdr.type = EVENT_TYPE_NET_DISC_IND;
+2225   7                                 //deliver the event to the upper layer
+2226   7      #ifdef CALLBACK
+                                         linkl->deliverEvent(linkl->eventcookie, newEvent);
+              #else
+2229   7                                 CTRLL_ReceiveEvent(linkl->eventcookie, newEvent);
+2230   7      #endif
+2231   7                             }
+2232   6                             break;
+2233   6                         }
+2234   5                         case EVENT_TYPE_TIMER_DISC_IND: 
+2235   5                         {
+2236   6                             //perform the auto-CCo selection if the cco is not an
+2237   6                             //user-appointed CCo
+2238   6                             if(!staInfo->ccoScb->staStatus.fields.apptCcoStatus)
+2239   6                             {
+2240   7                                // rajan  CNSM_PerformAutoCcoSelection(cnsm);
+2241   7                             }
+2242   6      
+2243   6      /*
+2244   6                      //check alive STA. It may not be needed, as the TEI lease
+2245   6                      //timer provide the same funcation
+2246   6                      scbIter = CRM_GetNextScb(cnsm->crm, scbIter);
+2247   6                      while(scbIter)
+2248   6                      {
+2249   6                          if( scbIter->aliveCnt++ > HPGP_TIME_STA_AGING_CNT)
+2250   6                          {
+2251   6                              //STA is dead, silently remove the STA
+2252   6                              
+2253   6                          }
+2254   6                          scbIter = CRM_GetNextScb(cnam->crm, scbIter);
+2255   6                      }
+2256   6      */
+2257   6      
+2258   6                             //NOTE: transmit the discover info in the central beacon 
+2259   6                             //instead of scheduling the beacon transmission for CCO itself
+2260   6                      
+2261   6      #ifdef NSM_CCO_PRINT
+                                     FM_Printf(FM_HINFO, "CNSM:Add discovery info in beacon\n");
+              #endif             
+2264   6                             cnsm->txDiscBcn = 1;
+2265   6                             cnsm->bcnUpdate = 1;
+2266   6      /*
+2267   6                      status = CNSM_BuildBeacon(cnsm, BEACON_TYPE_DISCOVER);
+2268   6                      if(status == STATUS_SUCCESS)
+2269   6                      {
+2270   6                          CNSM_TransmitBeacon(cnsm);
+2271   6                      }
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 38  
+
+2272   6      */
+2273   6      
+2274   6                             //start to schedule the discover beacon
+2275   6                             //assume that the CCO could schedule all discover beacons
+2276   6                             //in MaxDiscoverPeriod
+2277   6                             cnsm->schedDiscBcn = 1;
+2278   6      
+2279   6                             //restart the discovery timer
+2280   6                            STM_StartTimer(cnsm->discTimer, HPGP_TIME_DISC_PERIOD_MAX);   
+2281   6       
+2282   6                             break;
+2283   6                         }
+2284   5                         case EVENT_TYPE_TIMER_DISC_AGING_IND:
+2285   5                         {
+2286   6      #ifdef DISC_BCN
+2287   6                             SCB_AgeDiscLists(cnsm->staInfo->ccoScb);
+2288   6      #endif
+2289   6                             STM_StartTimer(cnsm->discAgingTimer, HPGP_TIME_DISC_AGING);   
+2290   6      
+2291   6                             break;
+2292   6                         }       
+2293   5      #ifdef ROUTE
+                                 case EVENT_TYPE_ROUTE_UPDATE_TIMEOUT:
+                                 {
+                                     ROUTE_sendRouteInfo(EVENT_TYPE_CM_ROUTE_INFO_IND, NULL);
+                                     ROUTE_startUpdateTimer();
+                                     break;
+                                 }
+                                 case EVENT_TYPE_ROUTE_HD_DURATION_TIMEOUT:
+                                 {
+                                     ROUTE_procHdDurationTimeout();
+                                     break;
+                                 }
+              #endif
+2306   5      
+2307   5                         default:
+2308   5                         {
+2309   6                         }
+2310   5                     }
+2311   4                 }
+2312   3                 break;
+2313   3              }
+2314   2              default:
+2315   2              {
+2316   3              }
+2317   2          }
+2318   1      }
+2319          
+2320          
+2321          
+2322          eStatus CNSM_Init(sCnsm *cnsm, sLinkLayer *linkl)
+2323          {
+2324   1          //sLinkLayer *linkLayer = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+2325   1          cnsm->linkl = linkl;
+2326   1          
+2327   1          cnsm->state = CNSM_STATE_INIT;
+2328   1      #ifdef CALLBACK
+                  cnsm->discTimer = STM_AllocTimer(LINKL_TimerHandler, 
+                                        EVENT_TYPE_TIMER_DISC_IND, linkl);
+              #else
+2332   1          cnsm->discTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK,
+2333   1                                EVENT_TYPE_TIMER_DISC_IND, linkl);
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 39  
+
+2334   1      #endif
+2335   1      
+2336   1          if(cnsm->discTimer == STM_TIMER_INVALID_ID)
+2337   1          {
+2338   2              return STATUS_FAILURE;
+2339   2          }
+2340   1      #ifdef NSM_CCO_PRINT  
+              #ifdef P8051
+              FM_Printf(FM_ERROR, "CNSM:disc timer id:%bu\n", cnsm->discTimer);
+              #else
+              FM_Printf(FM_ERROR, "CNSM:disc timer id:%d\n", cnsm->discTimer);
+              #endif
+              #endif
+2347   1      
+2348   1      #ifdef CALLBACK
+                  cnsm->discAgingTimer = STM_AllocTimer(LINKL_TimerHandler,
+                                             EVENT_TYPE_TIMER_DISC_AGING_IND, linkl);
+              #else
+2352   1          cnsm->discAgingTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK,
+2353   1                                     EVENT_TYPE_TIMER_DISC_AGING_IND, linkl);
+2354   1      #endif
+2355   1          if(cnsm->discAgingTimer == STM_TIMER_INVALID_ID)
+2356   1          {
+2357   2              return STATUS_FAILURE;
+2358   2          }
+2359   1      #ifdef NSM_CCO_PRINT  
+              #ifdef P8051
+              FM_Printf(FM_ERROR, "CNSM:disc aging timer id:%bu\n", cnsm->discAgingTimer);
+              #else
+              FM_Printf(FM_ERROR, "CNSM:disc aging timer id:%d\n", cnsm->discAgingTimer);
+              #endif
+              #endif
+2366   1      
+2367   1      #ifdef SIMU
+                  //simulate the beacon tx interrup for beacon interval
+              #ifdef CALLBACK
+                  cnsm->bcnTimer = STM_AllocTimer(LINKL_BcnTimerHandler, 
+                                       EVENT_TYPE_TIMER_BCN_TX_IND, linkl);
+              #else
+                  cnsm->bcnTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK,
+                                       EVENT_TYPE_TIMER_BCN_TX_IND, linkl);
+              #endif
+              #ifdef NSM_CCO_PRINT
+              FM_Printf(FM_ERROR, "CNSM:BCN timer id: %d\n", cnsm->bcnTimer);
+              #endif
+              #endif
+2380   1      
+2381   1          ISM_RegisterIntHandler(MAC_INT_IRQ_PLC_BCN_TX, LINKL_BcnTxHandler, linkl);
+2382   1      
+2383   1          cnsm->state = CNSM_STATE_INIT;
+2384   1      
+2385   1          cnsm->staInfo = LINKL_GetStaInfo(linkl);
+2386   1      //    cnsm->ccoInfo = LINKL_GetCcoInfo(linkLayer);
+2387   1          cnsm->crm = LINKL_GetCrm(linkl);
+2388   1          cnsm->discScb = NULL;
+2389   1          cnsm->hoEnabled = 0;
+2390   1          cnsm->hoReady = 0;
+2391   1          cnsm->nctei = 0;
+2392   1          cnsm->ccoNotification = 0;
+2393   1          cnsm->schedDiscBcn = 0;
+2394   1          cnsm->bcnUpdate = 0;
+2395   1          cnsm->bcnUpdateProgress =0;
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 40  
+
+2396   1          cnsm->txDiscBcn = 0;
+2397   1          cnsm->stopSnam = 0;
+2398   1          cnsm->hoCntDown = HPGP_HO_COUNTDOWN_MAX;
+2399   1          /* initial regsions */
+2400   1          /* minimum CSMA regsion */
+2401   1      
+2402   1          
+2403   1          CNSM_InitRegion(cnsm, linkl);
+2404   1              
+2405   1      
+2406   1      
+2407   1          return STATUS_SUCCESS;
+2408   1      }
+2409          #endif /* CCO_FUNC */
+2410          
+2411          //
+2412          #if 0
+              void SNSM_Start(sSns
+              {
+                  switch(staType)
+                  {
+                      case LINKL_STA_TYPE_UNASSOC:
+                      {
+                          //NOTE: better to send an start event, 
+                          //instead of setting the state here
+                          snsm->enableCcoSelection = 1;
+                          snsm->enableCcoDetection = 1;
+                          //select PhyClk
+              
+                          STM_StartTimer(snsm->usttTimer, HPGP_TIME_USAI);   
+                          STM_StartTimer(snsm->discAgingTimer, HPGP_TIME_DISC_AGING);   
+                          snsm->state = SNSM_STATE_NET_DISC;
+                          break;
+                      }
+                      case LINKL_STA_TYPE_NETDISC:
+                      {
+                          snsm->enableCcoSelection = 0;
+                          snsm->enableCcoDetection = 1;
+                          //select PhyClk
+              
+                          STM_StartTimer(snsm->usttTimer, HPGP_TIME_USAI);   
+                          STM_StartTimer(snsm->discAgingTimer, HPGP_TIME_DISC_AGING);   
+                          snsm->state = SNSM_STATE_NET_DISC;
+                          break;
+                      }
+                      case LINKL_STA_TYPE_ASSOC:
+                      {
+                          //NOTE: better to send an start event, 
+                          //instead of setting the state here
+                          STM_StopTimer(snsm->usttTimer);   
+                          snsm->enableCcoSelection = 0;
+                          snsm->enableCcoDetection = 1;
+                          snsm->state = SNSM_STATE_CONN;
+                          break;
+                      }
+                      case LINKL_STA_TYPE_CONN:
+                      {
+                          //NOTE: better to send an start event, 
+                          //instead of setting the state here
+                          STM_StopTimer(snsm->usttTimer);   
+                          snsm->enableCcoSelection = 0;
+                          snsm->enableCcoDetection = 0;
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 41  
+
+                          snsm->state = SNSM_STATE_CONN;
+                      }
+                      default:
+                      {
+                      }
+                  }
+              }
+              #endif
+2466          
+2467          
+2468          /*
+2469          void SNSM_StartConn(sSnsm *snsm)
+2470          {
+2471              STM_StopTimer(snsm->usttTimer);   
+2472              snsm->state = SNSM_STATE_CONN;
+2473          }
+2474          
+2475          
+2476          void SNSM_LeaveConn(sSnsm *snsm)
+2477          {
+2478              snsm->state = SNSM_STATE_INIT;
+2479          }
+2480          */
+2481          
+2482          
+2483          /** =========================================================
+2484           *
+2485           * Edit History
+2486           *
+2487           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/link/nsm_cco.c,v $
+2488           *
+2489           * $Log: nsm_cco.c,v $
+2490           * Revision 1.32  2014/09/05 09:28:18  ranjan
+2491           * 1. uppermac cco-sta switching feature fix
+2492           * 2. general stability fixes for many station associtions
+2493           * 3. changed mgmt memory pool for many STA support
+2494           *
+2495           * Revision 1.31  2014/08/25 07:37:34  kiran
+2496           * 1) RSSI & LQI support
+2497           * 2) Fixed Sync related issues
+2498           * 3) Fixed timer 0 timing drift for SDK
+2499           * 4) MMSG & Error Logging in Flash
+2500           *
+2501           * Revision 1.30  2014/08/05 13:12:55  kiran
+2502           * Fixed CP loss issue with UART Host & Peripheral interface
+2503           *
+2504           * Revision 1.29  2014/07/22 10:03:52  kiran
+2505           * 1) SDK Supports Power Save
+2506           * 2) Uart_Driver.c cleanup
+2507           * 3) SDK app memory pool optimization
+2508           * 4) Prints from STM.c are commented
+2509           * 5) Print messages are trimmed as common no memory left in common
+2510           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+2511           *
+2512           * Revision 1.28  2014/07/16 10:47:40  kiran
+2513           * 1) Updated SDK
+2514           * 2) Fixed Diag test in SDK
+2515           * 3) Ethernet and SPI interfaces removed from SDK as common memory is less
+2516           * 4) GPIO access API's added in SDK
+2517           * 5) GV701x chip reset command supported
+2518           * 6) Start network and Join network supported in SDK (Forced CCo and STA)
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 42  
+
+2519           * 7) Some bug fixed in SDK (CP free, p app command issue etc.)
+2520           *
+2521           * Revision 1.27  2014/07/11 10:23:37  kiran
+2522           * power save changes
+2523           *
+2524           * Revision 1.26  2014/07/10 11:42:45  prashant
+2525           * power save commands added
+2526           *
+2527           * Revision 1.25  2014/07/05 09:16:27  prashant
+2528           * 100 Devices support- only association tested, memory adjustments
+2529           *
+2530           * Revision 1.24  2014/06/19 17:13:19  ranjan
+2531           * -uppermac fixes for lvnet and reset command for cco and sta mode
+2532           * -backup cco working
+2533           *
+2534           * Revision 1.23  2014/06/19 07:16:02  prashant
+2535           * Region fix, frequency setting fix
+2536           *
+2537           * Revision 1.22  2014/06/13 14:55:11  ranjan
+2538           * -fixing memory issue due to previous checkin
+2539           *
+2540           * Revision 1.21  2014/06/12 13:15:44  ranjan
+2541           * -separated bcn,mgmt,um event pools
+2542           * -fixed datapath issue due to previous checkin
+2543           * -work in progress. neighbour cco detection
+2544           *
+2545           * Revision 1.20  2014/06/11 15:08:28  tri
+2546           * took out debug printf
+2547           *
+2548           * Revision 1.19  2014/06/11 13:17:47  kiran
+2549           * UART as host interface and peripheral interface supported.
+2550           *
+2551           * Revision 1.18  2014/06/05 10:26:07  prashant
+2552           * Host Interface selection isue fix, Ac sync issue fix
+2553           *
+2554           * Revision 1.17  2014/06/05 08:38:41  ranjan
+2555           * -flash function enabled for uppermac
+2556           * - commit command after any change would flash systemprofiles
+2557           * - verfied upper mac
+2558           *
+2559           * Revision 1.16  2014/05/28 10:58:59  prashant
+2560           * SDK folder structure changes, Uart changes, removed htm (UI) task
+2561           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+2562           *
+2563           * Revision 1.15  2014/05/21 23:02:09  tri
+2564           * more PS
+2565           *
+2566           * Revision 1.14  2014/05/20 05:57:45  prashant
+2567           * persistent schedule code updated
+2568           *
+2569           * Revision 1.13  2014/05/13 20:05:46  tri
+2570           * more PS
+2571           *
+2572           * Revision 1.12  2014/05/12 08:09:57  prashant
+2573           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+2574           *
+2575           * Revision 1.11  2014/04/24 21:51:07  yiming
+2576           * Working Code for Mitsumi
+2577           *
+2578           * Revision 1.10  2014/04/09 21:10:07  tri
+2579           * more PS
+2580           *
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 43  
+
+2581           * Revision 1.9  2014/03/20 23:20:46  tri
+2582           * more PS
+2583           *
+2584           * Revision 1.8  2014/03/12 09:41:22  ranjan
+2585           * 1. added ageout event to cco cnam,backupcco ageout handling
+2586           * 2.  fix linking issue in zb_lx51_asic due to backup cco checkin
+2587           *
+2588           * Revision 1.7  2014/03/10 05:58:10  ranjan
+2589           * 1. added HomePlug BackupCCo feature. verified C&I test.(passed.) (bug 176)
+2590           *
+2591           * Revision 1.6  2014/02/27 10:42:47  prashant
+2592           * Routing code added
+2593           *
+2594           * Revision 1.5  2014/02/26 23:16:02  tri
+2595           * more PS code
+2596           *
+2597           * Revision 1.4  2014/02/19 10:22:41  ranjan
+2598           * - common sync for hal_tst and upper mac project
+2599           * - ism.c is MAC interrupt handler for hhal_tst and upper mac.
+2600           *    chal_ext1isr function   is removed
+2601           * - verified : lower mac sync, upper mac sync data traffic.
+2602           *
+2603           * Revision 1.3  2014/01/28 17:45:15  tri
+2604           * Added Power Save code
+2605           *
+2606           * Revision 1.2  2014/01/10 17:17:53  yiming
+2607           * check in Rajan 1/8/2014 code release
+2608           *
+2609           * Revision 1.5  2014/01/08 10:53:54  ranjan
+2610           * Changes for LM OS support.
+2611           * New Datapath FrameTask
+2612           * LM and UM  datapath, feature verified.
+2613           *
+2614           * known issues : performance numbers needs revisit
+2615           *
+2616           * review : pending.
+2617           *
+2618           * Revision 1.4  2013/09/04 14:51:01  yiming
+2619           * New changes for Hybrii_A code merge
+2620           *
+2621           * Revision 1.7  2013/07/12 08:56:36  ranjan
+2622           * -UKE Push Button Security Feature.
+2623           * Verified : DirectEntry Security Works.Datapath Works.
+2624           *                 command SetSecMode for UKE works.
+2625           * Added against bug-160
+2626           *
+2627           * Revision 1.6  2013/04/17 13:00:59  ranjan
+2628           * Added FW ready event, Removed hybrii header from datapath, Modified hybrii header
+2629           *  formate
+2630           *
+2631           * Revision 1.5  2013/03/26 12:07:26  ranjan
+2632           * -added  host sw reset command
+2633           * - fixed issue in bcn update
+2634           *
+2635           * Revision 1.4  2013/03/22 12:21:49  prashant
+2636           * default FM_MASK and FM_Printf modified for USER INFO
+2637           *
+2638           * Revision 1.3  2013/03/14 11:49:18  ranjan
+2639           * 1.handled cases  for CCo toSTA switch and  viceversa
+2640           * 2.UM uses bcntemplate
+2641           *
+2642           * Revision 1.2  2013/02/15 12:53:57  prashant
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 44  
+
+2643           * ASSOC.REQ changes for DEVELO
+2644           *
+2645           * Revision 1.1  2012/09/05 00:13:08  mark
+2646           * separate nsm.c into nsm_cco.c and nsm_sta.c,  reason is nsm.c can't be put into bank
+2647           *
+2648           * Revision 1.40  2012/08/25 15:12:01  yuanhua
+2649           * correct the csma region setting in SNSM when a persistent schedule is received
+2650           *
+2651           * Revision 1.39  2012/08/25 05:49:15  yuanhua
+2652           * fix a potential overwriting of region array in SNSM when receive a beacon.
+2653           *
+2654           * Revision 1.38  2012/08/24 04:40:12  yuanhua
+2655           * set initial regions in CNSM for CCO
+2656           *
+2657           * Revision 1.37  2012/08/23 04:06:52  yuanhua
+2658           * made a fix in SNSM for persistent schedule process
+2659           *
+2660           * Revision 1.36  2012/08/20 04:57:35  yuanhua
+2661           * modify the region entry and add persistent schedule entry for beacon
+2662           *
+2663           * Revision 1.35  2012/08/03 04:03:23  kripa
+2664           * *** empty log message ***
+2665           *
+2666           * Revision 1.34  2012/08/01 04:56:02  kripa
+2667           * Fixed the variable reuse within BuildBeacon regions Bentry, that was causing bcn corruption.
+2668           * Committed on the Free edition of March Hare Software CVSNT Client.
+2669           * Upgrade to CVS Suite for more features and support:
+2670           * http://march-hare.com/cvsnt/
+2671           *
+2672           * Revision 1.33  2012/07/31 14:53:34  kripa
+2673           * Initilalizing snsm->hoSwitch = HPGP_HO_SWITCH_NONE ; it fixes a bug that causes STA to begin a Handover
+             - process, soon afer initial sync.
+2674           *
+2675           * Revision 1.32  2012/07/30 04:37:55  yuanhua
+2676           * fixed an issue that an event memory could be overwritten in the HAL when the HAL receives a mgmt messag
+             -e.
+2677           *
+2678           * Revision 1.31  2012/07/15 17:31:07  yuanhua
+2679           * (1)fixed a potential memory overwriting in MUXL (2)update prints for 8051.
+2680           *
+2681           * Revision 1.30  2012/07/12 05:47:34  kripa
+2682           * Commenting out Disc Bcn dump, as this could interfere with sync.
+2683           * Committed on the Free edition of March Hare Software CVSNT Client.
+2684           * Upgrade to CVS Suite for more features and support:
+2685           * http://march-hare.com/cvsnt/
+2686           *
+2687           * Revision 1.29  2012/07/08 18:42:20  yuanhua
+2688           * (1)fixed some issues when ctrl layer changes its state from the UCC to ACC. (2) added a event CNSM_STAR
+             -T.
+2689           *
+2690           * Revision 1.28  2012/06/30 19:53:58  kripa
+2691           * Commenting out Schedule Bentrys enoding & parsing temporarily.
+2692           * Committed on the Free edition of March Hare Software CVSNT Client.
+2693           * Upgrade to CVS Suite for more features and support:
+2694           * http://march-hare.com/cvsnt/
+2695           *
+2696           * Revision 1.27  2012/06/30 19:47:39  kripa
+2697           * Commenting out Schedule Bentry encoding+parsing temporarily.
+2698           * Committed on the Free edition of March Hare Software CVSNT Client.
+2699           * Upgrade to CVS Suite for more features and support:
+2700           * http://march-hare.com/cvsnt/
+2701           *
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 45  
+
+2702           * Revision 1.26  2012/06/29 03:05:31  kripa
+2703           * Commenting out SetCsmaRegions() call temporarily until it has been tested.
+2704           * Passing Linemode argument to setDevMode call.
+2705           * Committed on the Free edition of March Hare Software CVSNT Client.
+2706           * Upgrade to CVS Suite for more features and support:
+2707           * http://march-hare.com/cvsnt/
+2708           *
+2709           * Revision 1.25  2012/06/27 04:28:18  yuanhua
+2710           * added region entry in the beacon.
+2711           *
+2712           * Revision 1.24  2012/06/20 17:57:05  kripa
+2713           * Multiple changes to fix bcn sync. May need review later.
+2714           * Committed on the Free edition of March Hare Software CVSNT Client.
+2715           * Upgrade to CVS Suite for more features and support:
+2716           * http://march-hare.com/cvsnt/
+2717           *
+2718           * Revision 1.23  2012/06/15 04:35:21  yuanhua
+2719           * add a STA type of passive unassoc STA. With this STA type, the device acts as a STA during the network 
+             -discovery. It performs the network scan for beacons from the CCO, but does not transmit the UNASSOC_STA.IND and does not
+             - involve in the CCO selection process. Thus, it joins the existing network.
+2720           *
+2721           * Revision 1.22  2012/06/14 06:51:50  yuanhua
+2722           * still keep discovery aging timer to run after the CCO is found.
+2723           *
+2724           * Revision 1.21  2012/06/14 06:45:06  yuanhua
+2725           * stop the periodic timers after the STA finds the CCo during the network discovery, as no need to transm
+             -it an unassociated_sta.ind if the CCO is detected.
+2726           *
+2727           * Revision 1.20  2012/06/14 06:14:47  yuanhua
+2728           * (1) remove the net scan when the device is set to the CCO mode(2) start the net scan when the CCO is fo
+             -und, but the STA is not sync with CCO yet.
+2729           *
+2730           * Revision 1.19  2012/06/13 16:10:06  son
+2731           * Commenting out ScanNet() call in Network Discovery state - so that unassocSta.Ind messages can be sent.
+2732           * Committed on the Free edition of March Hare Software CVSNT Client.
+2733           * Upgrade to CVS Suite for more features and support:
+2734           * http://march-hare.com/cvsnt/
+2735           *
+2736           * Revision 1.18  2012/06/13 06:24:31  yuanhua
+2737           * add code for tx bcn interrupt handler integration and data structures for region entry schedule. But th
+             -ey are not in execution yet.
+2738           *
+2739           * Revision 1.17  2012/06/11 14:49:59  yuanhua
+2740           * changed the HAL back to the STA mode after finding the CCo during the network discovery so that the CTR
+             -LL issues an association request in the HAL STA mode.
+2741           *
+2742           * Revision 1.16  2012/06/11 06:29:01  yuanhua
+2743           * changed HAL_SetBpsto to HAL_SyncNet.
+2744           *
+2745           * Revision 1.15  2012/06/08 05:50:57  yuanhua
+2746           * added snid function.
+2747           *
+2748           * Revision 1.14  2012/06/05 22:37:12  son
+2749           * UART console does not get initialized due to task ID changed
+2750           *
+2751           * Revision 1.13  2012/06/05 07:25:59  yuanhua
+2752           * (1) add a scan call to the MAC during the network discovery. (2) add a tiny task in ISM for interrupt p
+             -olling (3) modify the frame receiving integration. (4) modify the tiny task in STM.
+2753           *
+2754           * Revision 1.12  2012/06/04 23:34:02  son
+2755           * Added RTX51 OS support
+2756           *
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 46  
+
+2757           * Revision 1.11  2012/05/19 20:32:17  yuanhua
+2758           * added non-callback option for the protocol stack.
+2759           *
+2760           * Revision 1.10  2012/05/19 05:05:15  yuanhua
+2761           * optimized the timer handlers in CTRL and LINK layers.
+2762           *
+2763           * Revision 1.9  2012/05/17 05:05:58  yuanhua
+2764           * (1) added the option for timer w/o callback (2) added task id and name.
+2765           *
+2766           * Revision 1.8  2012/05/01 04:51:09  yuanhua
+2767           * added compiler flags STA_FUNC and CCO_FUNC in link and ctrl layers.
+2768           *
+2769           * Revision 1.7  2012/05/01 00:18:47  son
+2770           * Added _CCO_FUNC_ and _STA_FUNC_ compiler flags
+2771           *
+2772           * Revision 1.6  2012/04/30 04:05:57  yuanhua
+2773           * (1) integrated the HAL mgmt Tx. (2) various updates
+2774           *
+2775           * Revision 1.5  2012/04/20 01:39:33  yuanhua
+2776           * integrated uart module and added compiler flag NMA.
+2777           *
+2778           * Revision 1.4  2012/04/13 06:15:11  yuanhua
+2779           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+2780           *
+2781           * Revision 1.3  2012/03/11 17:02:25  yuanhua
+2782           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+2783           *
+2784           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+2785           * migrate the firmware code from the greenchip to the hybrii.
+2786           *
+2787           * Revision 1.12  2011/09/06 05:01:46  yuanhua
+2788           * Made a fix such that the STA continues periodic TEI renew after CCo handover.
+2789           *
+2790           * Revision 1.11  2011/08/12 23:13:22  yuanhua
+2791           * (1)Added Control Layer (2) Fixed bugs for user-selected CCo handover (3) Made changes to SNAM/CNAM and 
+             -SNSM/CNSM for CCo handover switch (from CCo to STA, from STA to CCo, and from STA to STA but with different CCo) and pos
+             -t CCo handover
+2792           *
+2793           * Revision 1.10  2011/08/09 22:45:44  yuanhua
+2794           * changed to event structure, seperating HPGP-related events from the general event defination so that th
+             -e general event could be used for other purposes than the HPGP.
+2795           *
+2796           * Revision 1.9  2011/08/08 22:05:41  yuanhua
+2797           * user-selected CCo handover fix
+2798           *
+2799           * Revision 1.8  2011/08/05 17:06:29  yuanhua
+2800           * (1) added an internal queue in Link Layer for communication btw modules within Link Layer (2) Fixed bug
+             -s in CCo Handover. Now, CCo handover could be triggered by auto CCo selection, CCo handover messages work fine (3) Made 
+             -some modifications in SHAL.
+2801           *
+2802           * Revision 1.7  2011/08/02 16:06:00  yuanhua
+2803           * (1) Fixed a bug in STM (2) Made STA discovery work according to the standard, including aging timer. (3
+             -) release the resource after the STA leave (4) STA will switch to the backup CCo if the CCo failure occurs (5) At this p
+             -oint, the CCo could work with multiple STAs correctly, including CCo association/leave, TEI renew, TEI map updating, dis
+             -covery beacon scheduling, discovery STA list updating ang aging, CCo failure, etc.
+2804           *
+2805           * Revision 1.6  2011/07/30 02:43:35  yuanhua
+2806           * (1) Split the beacon process into two parts: one requiring an immdiate response, the other tolerating t
+             -he delay (2) Changed the API btw the MUX and SHAL for packet reception (3) Fixed bugs in various modules. Now, multiple 
+             -STAs could successfully associate/leave the CCo
+2807           *
+C51 COMPILER V9.52.0.0   NSM_CCO                                                           12/02/2014 14:35:38 PAGE 47  
+
+2808           * Revision 1.5  2011/07/22 18:51:05  yuanhua
+2809           * (1) added the hardware timer tick simulation (hts.h/hts.c) (2) Added semaphors for sync in simulation a
+             -nd defined macro for critical section (3) Fixed some bugs in list.h and CRM (4) Modified and fixed bugs in SHAL (5) Chan
+             -ged SNSM/CNSM and SNAM/CNAM for bug fix (6) Added debugging prints, and more.
+2810           *
+2811           * Revision 1.4  2011/07/16 17:11:23  yuanhua
+2812           * (1)Implemented SHOM and CHOM modules, including handover procedure, SCB resource updating for HO (2) Up
+             -date SNAM and CNAM modules to support uer-appointed CCo handover (3) Made the SCB resources to support the TEI MAP for t
+             -he STA mode and management of associated STA resources (e.g. TEI) (4) Modified SNSM and CNSM to perform all types of han
+             -dover switch (CCo handover to the new STA, STA taking over the CCo, STA switching to the new CCo)
+2813           *
+2814           * Revision 1.3  2011/07/08 22:23:48  yuanhua
+2815           * (1) Implemented CNSM, including its state machine, beacon transmission and process, discover beacon sch
+             -eduling, auto CCo selection, discover list, handover countdown, etc. (2) Updated SNSM, including discover list processin
+             -g, triggering a switch to the new CCo, etc. (3) Updated CNAM and SNAM, adding the connection state in the SNAM, switch t
+             -o the new CCo, etc. (4) Other updates
+2816           *
+2817           * Revision 1.2  2011/06/24 14:33:18  yuanhua
+2818           * (1) Changed event structure (2) Implemented SNSM, including the state machines in network discovery and
+             - connection states, becaon process, discover process, and handover detection (3) Integrated the HPGP and SHAL
+2819           *
+2820           * Revision 1.1  2011/05/28 06:31:19  kripa
+2821           * Combining corresponding STA and CCo modules.
+2822           *
+2823           * Revision 1.1  2011/05/06 19:10:12  kripa
+2824           * Adding link layer files to new source tree.
+2825           *
+2826           * Revision 1.3  2011/04/23 19:48:45  kripa
+2827           * Fixing stm.h and event.h inclusion, using relative paths to avoid conflict with windows system header f
+             -iles.
+2828           *
+2829           * Revision 1.2  2011/04/23 17:35:36  kripa
+2830           * Used relative path for inclusion of stm.h, to avoid conflict with a system header file in VC.
+2831           *
+2832           * Revision 1.1  2011/04/08 21:42:45  yuanhua
+2833           * Framework
+2834           *
+2835           *
+2836           * =========================================================*/
+2837          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =  10023    ----
+   CONSTANT SIZE    =    604    ----
+   XDATA SIZE       =     25     399
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  2 WARNING(S),  0 ERROR(S)

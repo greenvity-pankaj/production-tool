@@ -1,0 +1,241 @@
+C51 COMPILER V9.52.0.0   HHAL_LED                                                          01/10/2015 21:25:29 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HHAL_LED
+OBJECT MODULE PLACED IN .\obj\hhal_led.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE src\hhal_led.c LARGE OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..
+                    -\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\src\nma;..\..\hal;.\
+                    -src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;..\..\hpgp\src\route
+                    -;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\components\utilities\linkli
+                    -st\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\sampleapp\inc;..\..\..\
+                    -components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC_SW_SYNC=1,inline,H
+                    -PGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_SPI_TX_CRC,HW_SPI_R
+                    -X_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND PRINT(.\lst\hhal_le
+                    -d.lst) TABS(2) OBJECT(.\obj\hhal_led.obj)
+
+line level    source
+
+   1          /*
+   2          * $Id: hhal_led.c,v 1.2 2014/01/14 23:34:22 son Exp $
+   3          *
+   4          * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/project/hal/src/hhal_led.c,v $
+   5          *
+   6          * Description : HPGP Tx fuctions for LED Demo.
+   7          *
+   8          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+   9          * All rights reserved.
+  10          *
+  11          * Purpose :
+  12          *     Defines functions for sending LED Demo command frame.
+  13          *
+  14          *
+  15          */
+  16          
+  17          #include <stdio.h>
+  18          #include <string.h>
+  19          #include <intrins.h>
+  20          #include "fm.h"
+  21          #include "hal_common.h"
+  22          #include "hal_hpgp.h"
+  23          #include "hal_tst.h"
+  24          #ifdef _LED_DEMO_
+              #include "led_board.h"
+              #include "utils.h"
+              #endif
+  28          
+  29          int getline(char *s, int lim);
+  30          u8 led_demo_pkt_retry = 10;
+  31          u16 led_demo_tx_drop = 0;
+  32          
+  33          #ifdef POWER_SAVE
+              extern u8 ethDebugON;
+              #endif
+  36                  
+  37          bool HHT_DemoModeTx(u8* demoFrm, u16 frmLen)
+  38          {
+  39   1      #ifdef _LED_DEMO_
+                  sTxFrmSwDesc    plcTxFrmSwDesc;
+                  eStatus         status;
+                  volatile u8 xdata *       cellAddr;
+                  u8              cp;
+                  u16             tmpFrmLen;
+                u8              actualDescLen;
+                  u16             i,j;
+                  bool            rc = FALSE;
+C51 COMPILER V9.52.0.0   HHAL_LED                                                          01/10/2015 21:25:29 PAGE 2   
+
+                  memset(&plcTxFrmSwDesc, 0, sizeof(sTxFrmSwDesc));
+              
+                  plcTxFrmSwDesc.frmLen     = frmLen+1;  // account for the i byte seq num
+                                                         // that will be prepended
+                  tmpFrmLen                 = 0;
+              
+                  plcTxFrmSwDesc.frmInfo.plc.mcstMode   = HPGP_UCST;
+                  plcTxFrmSwDesc.frmInfo.plc.plid       = HPGP_PLID0;
+                  plcTxFrmSwDesc.frmType    = HPGP_HW_FRMTYPE_MSDU;
+                  plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 1;
+                  plcTxFrmSwDesc.frmInfo.plc.dtei       = gHpgpHalCB.remoteTei;
+                  plcTxFrmSwDesc.frmInfo.plc.stei       = gHpgpHalCB.selfTei;
+                  plcTxFrmSwDesc.frmInfo.plc.bcnDetectFlag = 1;
+                  plcTxFrmSwDesc.frmInfo.plc.eks        = HPGP_UNENCRYPTED_EKS;
+                  plcTxFrmSwDesc.frmInfo.plc.phyPendBlks = HPGP_PPB_CAP0;
+                  plcTxFrmSwDesc.frmInfo.plc.clst = HPGP_CONVLYRSAPTYPE_RSV;
+                  plcTxFrmSwDesc.cpCount     = 0;
+              
+                while(tmpFrmLen < plcTxFrmSwDesc.frmLen)
+                {
+                      i = plcTxFrmSwDesc.cpCount;
+                      // Fetch CP
+                      status = CHAL_RequestCP(&cp);
+                      if (status == STATUS_FAILURE) 
+                      {
+                          return (rc);
+                      }
+              
+                      actualDescLen =  (plcTxFrmSwDesc.frmLen-tmpFrmLen)>HYBRII_CELLBUF_SIZE?HYBRII_CELLBUF_SIZE:(plcTxF
+             -rmSwDesc.frmLen-tmpFrmLen);
+              
+                      // Fill Buffer with pattern
+                      cellAddr = CHAL_GetAccessToCP(cp);
+                      if( i==0 )
+                      {
+                          cellAddr[0] = (u8)gHpgpHalCB.halStats.TxSeqNum+1;
+                      }
+                      for( j=1 ; j<actualDescLen ;j++)
+                      {
+                          cellAddr[j] = demoFrm[j-1];
+                      }
+              
+                  plcTxFrmSwDesc.cpArr[i].offsetU32 = 0;
+                  plcTxFrmSwDesc.cpArr[i].len  = actualDescLen;
+              
+                      tmpFrmLen += plcTxFrmSwDesc.cpArr[i].len; 
+                      plcTxFrmSwDesc.cpArr[i].cp = cp;
+                      plcTxFrmSwDesc.cpCount++;
+                  }
+              
+                  // queue this frame to PLC Tx queue
+                  status = HHAL_PlcTxQWrite(&plcTxFrmSwDesc);
+                  if (status == STATUS_FAILURE)
+                  {
+                      led_demo_tx_drop++;
+                      CHAL_FreeFrameCp(plcTxFrmSwDesc.cpArr, plcTxFrmSwDesc.cpCount);
+                      return (FALSE);
+                  }
+              
+                  // gHpgpHalCB.halStats.CurTxTestFrmCnt will be incremented in HHAL_ProcessPlcTxDone()   
+                  gHpgpHalCB.halStats.TxSeqNum++;
+              #endif
+C51 COMPILER V9.52.0.0   HHAL_LED                                                          01/10/2015 21:25:29 PAGE 3   
+
+ 109   1          return (TRUE);
+ 110   1      }
+*** WARNING C280 IN LINE 37 OF src\hhal_led.c: 'demoFrm': unreferenced local variable
+*** WARNING C280 IN LINE 37 OF src\hhal_led.c: 'frmLen': unreferenced local variable
+ 111          
+ 112          void HHT_TxLedDemo(u8 *payload_p)
+ 113          {
+ 114   1      #ifdef _LED_DEMO_
+                  sPlcDemoFrame   plcDemoFrm;
+                  u8 retry = 0;
+                  bool rc;
+              
+                  memset(&plcDemoFrm, 0, sizeof(plcDemoFrm));
+                  memcpy(plcDemoFrm.hdrStr, PLC_LED_DEMO_CMD, strlen(PLC_LED_DEMO_CMD));
+                  memcpy(plcDemoFrm.disStr, payload_p, strlen(payload_p));
+                  printf("\nSend LED command: <%s>\n", plcDemoFrm.disStr);
+                  while (retry++ < led_demo_pkt_retry) {
+                      rc = HHT_DemoModeTx( (u8*) &plcDemoFrm, sizeof(sPlcDemoFrame));
+                      if (rc) {
+                          gHpgpHalCB.halStats.TxSeqNum--;
+                      }
+                      mac_utils_delay_ms(200);
+                  }
+                  gHpgpHalCB.halStats.TxSeqNum++;
+              #endif   
+ 132   1      }
+*** WARNING C280 IN LINE 112 OF src\hhal_led.c: 'payload_p': unreferenced local variable
+ 133          
+ 134          void HHT_LedDemoTxMenu(u8* CmdBuf)
+ 135          {
+ 136   1      #ifdef _LED_DEMO_
+                  u8              i = 0;
+                  char            input[10];
+              
+                  //printf("\n\n%s", CmdBuf);
+              
+                  while (CmdBuf[i++] == 0x20);
+                  if(i)
+                      i--;
+                  CmdBuf = &CmdBuf[i];
+                  
+                  if(strncmp(CmdBuf, PLC_DISP_GVC_CMD, strlen(PLC_DISP_GVC_CMD)) == 0)
+                  {  
+                      CmdBuf+= strlen(PLC_DISP_GVC_CMD) + 1;
+                      HHT_TxLedDemo(CmdBuf);
+                  }
+                  else if(strncmp(CmdBuf, PLC_LED_DEMO_RETRY_CMD, 
+                          strlen(PLC_LED_DEMO_RETRY_CMD)) == 0) {
+                      printf("Enter Retry(%bu) value: ", led_demo_pkt_retry);
+                      while (getline(input, sizeof(input)) > 0)
+                      {
+                          if (sscanf(input,"%bd", &led_demo_pkt_retry) >= 1)
+                              break;
+                      }
+                  }
+                  else if(strncmp(CmdBuf, PLC_LED_DEMO_STATS_CMD, 
+                          strlen(PLC_LED_DEMO_STATS_CMD)) == 0) 
+                  {
+                      printf("TotalTxLedFrmDrop     = %d\n", led_demo_tx_drop);
+                  }
+                  else if(strncmp(CmdBuf, PLC_LED_DEMO_RSTSTATS_CMD, 
+                          strlen(PLC_LED_DEMO_RSTSTATS_CMD)) == 0) 
+C51 COMPILER V9.52.0.0   HHAL_LED                                                          01/10/2015 21:25:29 PAGE 4   
+
+                  {
+                      led_demo_tx_drop = 0;
+                  }
+                  else
+                  {
+                      printf("Command not supported\n");
+                  }
+              
+              #else
+ 177   1          printf("Command not supported\n");
+ 178   1      #endif
+ 179   1      }
+*** WARNING C280 IN LINE 134 OF src\hhal_led.c: 'CmdBuf': unreferenced local variable
+ 180          
+ 181          u8  HHT_DemoModeRx(u8* demoFrm)
+ 182          {
+ 183   1           bool bDemoMode = 0;
+ 184   1      #ifdef _LED_DEMO_
+              
+                  if(strncmp(demoFrm, PLC_LED_DEMO_CMD, strlen(PLC_LED_DEMO_CMD)) == 0 )
+                  {
+                      sPlcDemoFrame*  pPlcDemoFrame;
+              
+                      bDemoMode    = 1;
+                      pPlcDemoFrame = ( sPlcDemoFrame* ) demoFrm;
+                      printf("\n<%s>\n", pPlcDemoFrame->disStr);
+                      led_msg_decode(pPlcDemoFrame->disStr);
+                      printf("\n");
+                  }
+              #endif
+ 197   1          return bDemoMode;
+ 198   1      }
+*** WARNING C280 IN LINE 181 OF src\hhal_led.c: 'demoFrm': unreferenced local variable
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     47    ----
+   CONSTANT SIZE    =     23    ----
+   XDATA SIZE       =      3      14
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  5 WARNING(S),  0 ERROR(S)

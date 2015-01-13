@@ -1,0 +1,710 @@
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HAL_ETH
+OBJECT MODULE PLACED IN .\obj\hal_eth.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\hal\hal_eth.c LARGE OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(
+                    -..\..\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\src\nma;..\..\h
+                    -al;.\src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;..\..\hpgp\src\
+                    -route;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\components\utilities\l
+                    -inklist\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\sampleapp\inc;..\.
+                    -.\..\components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC_SW_SYNC=1,inl
+                    -ine,HPGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_SPI_TX_CRC,HW_
+                    -SPI_RX_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND PRINT(.\lst\ha
+                    -l_eth.lst) TABS(2) OBJECT(.\obj\hal_eth.obj)
+
+line level    source
+
+   1          /*
+   2          * $Id: hal_eth.c,v 1.9 2014/08/25 07:37:34 kiran Exp $
+   3          *
+   4          * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hal/hal_eth.c,v $
+   5          *
+   6          * Description : ETH HAL module.
+   7          *
+   8          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+   9          * All rights reserved.
+  10          *
+  11          * Purpose :
+  12          *     Defines Ethernet PHY/MAC register read/write , fields set/reset, Init, Tx/Rx functions.
+  13          *
+  14          *
+  15          */
+  16          
+  17          #ifdef RTX51_TINY_OS
+  18          #include <rtx51tny.h>
+  19          #endif
+  20          #include <stdio.h>
+  21          #include <stdlib.h>
+  22          #include <string.h>
+  23          #include "papdef.h"
+  24          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  27          
+  28          #ifndef HPGP_HAL_TEST
+              #include "hal.h"
+              #include "linkl.h"
+              
+              #include "hpgpapi.h"
+              #include "mac_intf_common.h"
+              
+              #endif
+  36          #include "hal_reg.h"
+  37          #ifdef UM
+              #include "timer.h"
+              #include "stm.h"
+              #endif
+  41          
+  42          #include "hal_common.h"
+  43          #include "hal_hpgp.h"
+  44          #include "hal_cfg.h"
+  45          #include "hal_eth.h"
+  46          #include "hal_tst.h"
+  47          #include "fm.h"
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 2   
+
+  48          
+  49          #if 0
+              #define printf(x)
+              #define FM_Printf(x, z)
+              
+              #endif
+  54          extern sHpgpHalCB gHpgpHalCB;
+  55          #ifdef ETH_BRDG_DEBUG
+              extern u8 myDebugFlag;
+              extern u8 myDebugFlag1;
+              extern u32 numPlcPendingRet;
+              extern u32 numForcePlcTxDone; 
+              extern u32 numEthTxDoneInts;
+              extern u32 numEthTxCpReleased;
+              extern u32 numPlcTxCp;
+              extern u32 plcTxWriteFail;
+              extern u32 plcTxFrameCnt;
+              
+              extern u32 ethTxFrameCnt;
+              extern u32 numEthTxCp;
+              
+              extern u32 ethRxFrameCnt;
+              #endif
+  71          
+  72          #ifdef HPGP_HAL_TEST   
+  73          extern sHalCB gHalCB;
+  74          #endif
+  75          
+  76          sEthHalCB gEthHalCB;
+  77          u8 ethTxDone = 1;
+  78          //#define MAX_ETH_BUFF 1600
+  79                     
+  80          #ifdef DEBUG_DATAPATH
+              extern u8 pktDbg;
+              extern u8 sigDbg;
+              #endif
+  84          
+  85          
+  86          
+  87          
+  88          #ifdef HYBRII_ETH
+  89          void EHAL_Clear_ethHWStat()
+  90          {
+  91   1          WriteU8Reg(ETHMAC_STATCLR_REG, 1);
+  92   1          printf("ETH TX and RX HW Stats are cleared:\n");
+  93   1      
+  94   1      }
+  95          
+  96          void EHAL_Print_ethHWStat()
+  97          {
+  98   1          u8 i;
+  99   1      
+ 100   1          printf("ETH RX HW Stats:\n");
+ 101   1          for (i = 0; i < 0x15; i++)
+ 102   1          {
+ 103   2              printf("    RegRd:  [0x%02bX] --> %08lu\n", i, rtocl(EHAL_ReadEthStatReg(i)));     
+ 104   2          }
+ 105   1          printf("ETH TX HW Stats:\n");
+ 106   1          for (i = 0x80; i < 0x96; i++)
+ 107   1          {
+ 108   2              printf("    RegRd:  [0x%02bX] --> %08lu\n", i, rtocl(EHAL_ReadEthStatReg(i)));     
+ 109   2          }
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 3   
+
+ 110   1      }
+ 111          #endif
+ 112          
+ 113          void EHAL_EthSendPause()
+ 114          {
+ 115   1          u8 pause_Flag = 1;
+ 116   1      
+ 117   1          WriteU8Reg(ETHMAC_PAUSQNT_REG, 0xFF);
+ 118   1          WriteU8Reg(ETHMAC_PAUSQNT_REG+1, 0x10);
+ 119   1          WriteU8Reg(ETHMAC_SENDPAUSE_REG, pause_Flag);
+ 120   1      }
+ 121          
+ 122          #ifdef HYBRII_ETH
+ 123          void EHAL_DoRelEthTxCP()
+ 124          {
+ 125   1          uEthTxFreeCPCntReg  ethTxFreeCPCnt;
+ 126   1          uEthTxRelCPQReg     ethTxRelCPQ;
+ 127   1          u8 i;
+ 128   1      
+ 129   1        // keep releasing free CPs until there's no more in Free CP register
+ 130   1        while (TRUE)
+ 131   1        {
+ 132   2            ethTxFreeCPCnt.reg = ReadU32Reg(ETHMAC_TXFREECPCNT_REG);
+ 133   2          if (ethTxFreeCPCnt.s.freeCPCnt == 0)
+ 134   2            break;
+ 135   2      #ifdef ETH_BRDG_DEBUG
+                  numEthTxCpReleased += ethTxFreeCPCnt.s.freeCPCnt;
+              #endif
+ 138   2            for( i=0 ; i<ethTxFreeCPCnt.s.freeCPCnt ; i++)
+ 139   2            {
+ 140   3                ethTxRelCPQ.reg = ReadU32Reg(ETHMAC_TXRELEASECPQ_REG);
+ 141   3                CHAL_DecrementReleaseCPCnt((u8)ethTxRelCPQ.s.cp);
+ 142   3            }
+ 143   2        }
+ 144   1      }
+ 145          #endif
+ 146          
+ 147          //#ifdef HYBRII_ETH
+ 148          
+ 149          //=============================================================================
+ 150          // Procedure:   EHAL_PHYReg
+ 151          //
+ 152          // Description: This function Read/Write PHY Registers.
+ 153          //
+ 154          // Arguments:
+ 155          //      u8   sddr
+ 156          //      u8   *pData
+ 157          //      eRegOp  regOp
+ 158          //
+ 159          // Returns:
+ 160          //      0 - Success , 1 - Failure
+ 161          //=============================================================================
+ 162          eStatus EHAL_EthPhyRegOp(u8 phyAddr, u8 addr, u16 *pData, eRegOp regOp)
+ 163          {
+ 164   1          eStatus status = STATUS_FAILURE;
+ 165   1      #ifdef HYBRII_ETH
+ 166   1          uEthMacMdioCmdReg       ethMacMdioCmd;
+ 167   1          uEthMacMdioStatReg      ethMacMdioStat;
+ 168   1      //    unsigned long dwTmp;
+ 169   1          int i;
+ 170   1      
+ 171   1          status = STATUS_SUCCESS;
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 4   
+
+ 172   1         // MDIO GO ?
+ 173   1      
+ 174   1          i=2000;
+ 175   1          while(i--)
+ 176   1          {
+ 177   2             ethMacMdioCmd.s2.MDIOCmd4    = ReadU8Reg(ETHMAC_MDIOCMD4_REG);
+ 178   2             if(ethMacMdioCmd.s1.Go == 0)
+ 179   2             break;
+ 180   2          }
+ 181   1          if(ethMacMdioCmd.s1.Go != 0)
+ 182   1          {
+ 183   2              return STATUS_FAILURE;
+ 184   2           }
+ 185   1          /*Read Ethernet PHY Register*/
+ 186   1      
+ 187   1           ethMacMdioCmd.reg = 0;
+ 188   1          /* set the Phy reg address in MDIO Cmd register
+ 189   1           * with MDIOWrite bit set to 0 */
+ 190   1           ethMacMdioCmd.s1.PHYReg   = addr;
+ 191   1           ethMacMdioCmd.s1.PHYAddr1 = phyAddr & 0x7;
+ 192   1           ethMacMdioCmd.s1.PHYAddr2 = (phyAddr >> 3)& 0x3;
+ 193   1      
+ 194   1           if(regOp ==  RD)
+ 195   1           {
+ 196   2                ethMacMdioCmd.s1.MDIOWrite  = 0;
+ 197   2           }else
+ 198   1           {
+ 199   2                ethMacMdioCmd.s1.MDIOWrite    = 1;
+ 200   2                ethMacMdioCmd.s1.WriteData1  = * ((u8*)pData);
+ 201   2                ethMacMdioCmd.s1.WriteData2  = * ((u8*)pData + 1);
+ 202   2           }
+ 203   1           ethMacMdioCmd.s1.Go       = 1;
+ 204   1      
+ 205   1           WriteU8Reg(ETHMAC_MDIOCMD1_REG, ethMacMdioCmd.s2.MDIOCmd1);
+ 206   1           WriteU8Reg(ETHMAC_MDIOCMD2_REG, ethMacMdioCmd.s2.MDIOCmd2);
+ 207   1           WriteU8Reg(ETHMAC_MDIOCMD3_REG, ethMacMdioCmd.s2.MDIOCmd3);
+ 208   1           WriteU8Reg(ETHMAC_MDIOCMD4_REG, ethMacMdioCmd.s2.MDIOCmd4);
+ 209   1      
+ 210   1           i = 2000;
+ 211   1           while(i--)
+ 212   1           {
+ 213   2               /*  check the busy bit to see if
+ 214   2                *  HW has completed the register operation*/
+ 215   2                ethMacMdioCmd.s2.MDIOCmd4    = ReadU8Reg(ETHMAC_MDIOCMD4_REG);
+ 216   2                if(ethMacMdioCmd.s1.Go == 0)
+ 217   2                {
+ 218   3                    break;
+ 219   3                }
+ 220   2           }
+ 221   1           if(i < 1)
+ 222   1           {
+ 223   2              //FM_Printf(FM_ERROR, "Failed to complete Ethernet PHY Register Read\n");
+ 224   2             // printf("PHYAddr = %bu, RegAddr = %bu\n", (ethMacMdioCmd.s1.PHYAddr2 << 3)| ethMacMdioCmd.s1.PHYA
+             -ddr1, addr);
+ 225   2              return STATUS_FAILURE;
+ 226   2           }
+ 227   1      
+ 228   1      
+ 229   1            if(regOp ==  RD)
+ 230   1            {
+ 231   2      
+ 232   2            /*  Read back the Status and value */
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 5   
+
+ 233   2            ethMacMdioStat.reg = 0;
+ 234   2            ethMacMdioStat.s2.MDIOStat1    = ReadU8Reg(ETHMAC_MDIOSTAT1_REG);
+ 235   2            ethMacMdioStat.s2.MDIOStat2    = ReadU8Reg(ETHMAC_MDIOSTAT2_REG);
+ 236   2            ethMacMdioStat.s2.MDIOStat3    = ReadU8Reg(ETHMAC_MDIOSTAT3_REG);
+ 237   2            ethMacMdioStat.s2.MDIOStat4    = ReadU8Reg(ETHMAC_MDIOSTAT4_REG);
+ 238   2      
+ 239   2            if(ethMacMdioStat.s1.RdErr)
+ 240   2            {
+ 241   3                //FM_Printf(FM_ERROR, "Error reading Ethernet PHY Register\n");
+ 242   3                return STATUS_FAILURE ;
+ 243   3            }
+ 244   2                * ((u8*)pData)     = ethMacMdioStat.s1.ReadData1 ;
+ 245   2                * ((u8*)pData + 1) = ethMacMdioStat.s1.ReadData2 ;
+ 246   2            }
+ 247   1          // printf("data is: %X",*pData);
+ 248   1      #endif
+ 249   1           return status;
+ 250   1      }
+ 251          
+ 252          
+ 253          void EHAL_Init()
+ 254          {
+ 255   1      
+ 256   1      #ifdef HYBRII_ETH
+ 257   1          uEthPhyStatReg          ethPhyStat;
+ 258   1      //    uEthMacModeReg          ethMacMode;
+ 259   1          uEthMacTxCtl1Reg        ethMacTxCtl1;
+ 260   1      //    uEthMacTxCtl2Reg        ethMacTxCtl2;
+ 261   1          uEthMacRxCtlReg         ethMacRxCtl;
+ 262   1          uEthRxEndianReg         ethRxEnd;
+ 263   1          sEthMacPrtEmtThresReg   ethMacPrtEmtThres;
+ 264   1          sEthMacPrtFulThresReg   ethMacPrtFulThres;
+ 265   1          sEthMacTxBufSzReg       ethMacTxBufSz;
+ 266   1          u8                      i;
+ 267   1          eStatus status;
+ 268   1          u8 ethMacAddr[MAC_ADDR_LEN] = {0x00,0x11,0x22,0x33,0x44,0x55};
+ 269   1          u8 seedVal = (u8) gHalCB.timerIntCnt;
+ 270   1      
+ 271   1          //printf("====> EHAL_InitETH\n");
+ 272   1      
+ 273   1          // Write to Ethernet Unicast Address and Source Address registers
+ 274   1          for(i=0;i< MAC_ADDR_LEN;i++)
+ 275   1          ethMacAddr[i] = gEthHalCB.macAddrDef[i];
+ 276   1      
+ 277   1          // Write the Threshold registers and Buffer size
+ 278   1          ethMacPrtEmtThres.PartEmpty  = 0x04;//0x80;
+ 279   1          WriteU8Reg(ETHMAC_PRTEMTTH_REG, ethMacPrtEmtThres.PartEmpty);
+ 280   1      
+ 281   1          ethMacPrtFulThres.PartFull   = 0xC0; //0x80;
+ 282   1          WriteU8Reg(ETHMAC_PRTFULTH_REG, ethMacPrtFulThres.PartFull);
+ 283   1      
+ 284   1          ethMacTxBufSz.TxBufSz        = 5; // 0x80, 0x40;
+ 285   1          WriteU8Reg(ETHMAC_TXBUFSZ_REG, ethMacTxBufSz.TxBufSz);
+ 286   1          WriteU8Reg( ETHMAC_SEED_REG, seedVal );
+ 287   1          WriteU8Reg( ETHMAC_SLOTTM_REG, 128 );   // 10Mbps/100Mbps: slot time = 128, Gigabit: 512
+ 288   1          WriteU8Reg( ETHMAC_TXCTL2_REG, 0x0a);   // # of  tx retry
+ 289   1      
+ 290   1          // PC - don't change
+ 291   1        for(i=0 ; i<32 ; i++) 
+ 292   1          {
+ 293   2             status = EHAL_EthPhyRegOp(i,ETHPHY_STAT,&ethPhyStat.reg,RD);
+ 294   2             if(status == STATUS_SUCCESS)
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 6   
+
+ 295   2             {
+ 296   3                FM_Printf(FM_MINFO, "ETH Phy Addr = %bX, regAddr = %bX, data = %04X\n", i, ETHPHY_STAT,ethPhySta
+             -t.reg);
+ 297   3                gEthHalCB.phyChipAddr = i;
+ 298   3                break;
+ 299   3             }
+ 300   2          }
+ 301   1      
+ 302   1          if(status == STATUS_FAILURE)
+ 303   1          {
+ 304   2              FM_Printf(FM_ERROR, "ETH Phy Addr scan failed. Cannot access MDIO Reg.\n");
+ 305   2      
+ 306   2          }
+ 307   1          if(ethPhyStat.s.ANComp)
+ 308   1          {
+ 309   2              // Enable Ethernet MAC TX and RX  - Any other parameters ?
+ 310   2              ethMacRxCtl.reg         = 0;
+ 311   2              ethMacRxCtl.s.RxEn      = 1;
+ 312   2              ethMacRxCtl.s.SendCRC   = 0;
+ 313   2              WriteU8Reg( ETHMAC_RXCTL_REG, ethMacRxCtl.reg );
+ 314   2      
+ 315   2              ethMacTxCtl1.reg        = 0;
+ 316   2              ethMacTxCtl1.s.TxEn     = 1;
+ 317   2              ethMacTxCtl1.s.RetryEn  = 1;
+ 318   2              ethMacTxCtl1.s.PadEn    = 1;
+ 319   2              ethMacTxCtl1.s.FCSAppnd = 1;
+ 320   2              WriteU8Reg( ETHMAC_TXCTL1_REG, ethMacTxCtl1.reg );
+ 321   2          }
+ 322   1          else
+ 323   1          {
+ 324   2          //FM_Printf(FM_MINFO, "InitETH : Auto Neg not complete");
+ 325   2          }
+ 326   1      
+ 327   1          ethRxEnd.reg = 0;
+ 328   1          ethRxEnd.s.rxLittleEnd = 1;
+ 329   1          WriteU32Reg( ETHMAC_RXENDIAN_REG, ethRxEnd.reg );
+ 330   1          EHAL_ResetStat();
+ 331   1          memset(&ConnState, 0, sizeof(sConnState)*MAX_NUM_STATIONS); // for ETH tests
+ 332   1      #endif
+ 333   1      }
+ 334          #ifdef HYBRII_ETH
+ 335          u32 EHAL_ReadEthStatReg(u8 reg_addr)
+ 336          {
+ 337   1      
+ 338   1          u32 stat;
+ 339   1          char*   pStat = &stat;
+ 340   1          // Read ETH MAC Status
+ 341   1          WriteU8Reg(ETHMAC_STATIDX_REG,reg_addr);
+ 342   1      
+ 343   1          pStat[0]     = ReadU8Reg(ETHMAC_STATDAT1_REG);
+ 344   1          pStat[1]     = ReadU8Reg(ETHMAC_STATDAT2_REG);
+ 345   1          pStat[2]     = ReadU8Reg(ETHMAC_STATDAT3_REG);
+ 346   1          pStat[3]     = ReadU8Reg(ETHMAC_STATDAT4_REG);
+ 347   1      
+ 348   1          return stat;
+ 349   1      
+ 350   1      }
+ 351          #endif
+ 352          
+ 353          
+ 354          u8 EHAL_GetEthTxQFreeDescCnt()
+ 355          {
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 7   
+
+ 356   1      #ifdef HYBRII_ETH
+ 357   1          uEthTxQDescCntReg ethTxQDescCnt;
+ 358   1          u8 freeDescCnt;
+ 359   1      
+ 360   1          ethTxQDescCnt.reg = ReadU32Reg(ETHMAC_TXQDESCCNT_REG);
+ 361   1          freeDescCnt = ETH_TXQ_DEPTH - ethTxQDescCnt.s.descCnt;
+ 362   1          //printf("PLCTxQStatusReg = 0x%08lX, PLCTxQ[%bu].freeDescCnt = %bu\n", RTOCL(capTxQStat.reg),plid, fre
+             -eDescCnt);
+ 363   1          return  freeDescCnt;
+ 364   1      #endif
+ 365   1      }
+ 366          
+ 367          
+ 368          #ifdef HYBRII_ETH
+ 369          eStatus EHAL_EthTxQWrite(sSwFrmDesc * pEthTxFrmSwDesc)
+ 370          {
+ 371   1        u16 mycnt=0;
+ 372   1      
+ 373   1          u8 frmDescCnt;
+ 374   1      //    u8 ethTxFreeDescCnt;
+ 375   1          eStatus status=STATUS_SUCCESS;
+ 376   1      
+ 377   1          frmDescCnt = 1 + pEthTxFrmSwDesc->cpCount;
+ 378   1          ethTxDone = 0;
+ 379   1      //  FM_Printf(FM_USER,"etx\n");
+ 380   1      
+ 381   1          // Check if the respective CAP queue has enough space to hold the descritpors.
+ 382   1          if(EHAL_GetEthTxQFreeDescCnt() >= frmDescCnt)
+ 383   1          {
+ 384   2              uEthTxPktQDesc1       pktQDesc1;
+ 385   2              uEthTxPktQCPDesc      pktQDescCP;
+ 386   2              u8                    i;
+ 387   2      #ifdef ETH_BRDG_DEBUG
+                  u16           frame_len, tmp_frame_len=0; //cur_oversize_frames, tmp_oversize_frames;
+              #endif
+ 390   2      
+ 391   2              //1.Create header/first descriptor
+ 392   2              pktQDesc1.reg        = 0;
+ 393   2      
+ 394   2              //1.1 Write Frame Length
+ 395   2              pktQDesc1.s.frmLenLo =  pEthTxFrmSwDesc->frmLen & PKTQDESC1_FRMLENLO_MASK;
+ 396   2              pktQDesc1.s.frmLenHi = (pEthTxFrmSwDesc->frmLen & PKTQDESC1_FRMLENHI_MASK) >> PKTQDESC1_FRMLENHI_P
+             -OS;
+ 397   2      #ifdef ETH_BRDG_DEBUG
+                  frame_len = (pktQDesc1.s.frmLenHi << PKTQDESC1_FRMLENHI_POS) + pktQDesc1.s.frmLenLo;
+              //    cur_oversize_frames = rtocl(EHAL_ReadEthStatReg(0x88));
+                  if (frame_len > 1518)
+                    printf("EHAL_EthTxQWrite: ERROR - frame len exceeds maximum len: frame_len=%d\n", frame_len);
+                    
+                  if (myDebugFlag1)
+                  {
+                    printf("EHAL_EthTxQWrite: frame_len=%d, pEthTxFrmSwDesc->frmLen\n", frame_len, pEthTxFrmSwDesc->frmLen)
+             -;
+                  }
+              #endif
+ 408   2      
+ 409   2              // 1.6 Set First Descriptor Flag
+ 410   2              pktQDesc1.s.bFirstDesc   = 1;
+ 411   2      
+ 412   2              // Set Little Endian flag
+ 413   2              pktQDesc1.s.litEndian = 1;
+ 414   2          
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 8   
+
+ 415   2      #ifdef DEBUG_DATAPATH
+              
+                      FM_Printf(FM_HINFO,"\nEthTxQfreeDescCnt = %bu , FreeCPCnt = %bu\n",
+                                  EHAL_GetEthTxQFreeDescCnt(),
+                                  CHAL_GetFreeCPCnt());
+                      FM_Printf(FM_HINFO,"EHAL_EthTxQWrite: HdrDesc    = 0x%08lX, frmLen = %u\n", 
+                              RTOCL(pktQDesc1.reg), pEthTxFrmSwDesc->frmLen);
+              #endif
+ 423   2      
+ 424   2      // 1.7 Write first descriptor to the queue
+ 425   2          WriteU32Reg(ETHMAC_QUEUEDATA_REG, pktQDesc1.reg);
+ 426   2      
+ 427   2      #ifdef DEBUG_DATAPATH
+                      
+                      if (pktDbg)
+                      {
+                          FM_Printf(FM_ERROR, "\neth tx\n");
+                      }
+              
+              #endif
+ 435   2              // 6. Create CP Descriptors are write one by one
+ 436   2              for( i=0 ; i<pEthTxFrmSwDesc->cpCount ; i++)
+ 437   2              {
+ 438   3                  pktQDescCP.reg          = 0;
+ 439   3                  pktQDescCP.s.cp         = pEthTxFrmSwDesc->cpArr[i].cp;
+ 440   3                  pktQDescCP.s.descLenLo  = pEthTxFrmSwDesc->cpArr[i].len & PKTQDESCCP_DESCLENLO_MASK;
+ 441   3                  pktQDescCP.s.descLenHi  = (pEthTxFrmSwDesc->cpArr[i].len & 
+ 442   3                              PKTQDESCCP_DESCLENHI_MASK)>> PKTQDESCCP_DESCLENHI_POS;
+ 443   3      #ifdef ETH_BRDG_DEBUG
+                    tmp_frame_len += (pktQDescCP.s.descLenHi << PKTQDESCCP_DESCLENHI_POS) + pktQDescCP.s.descLenLo;
+              #endif
+ 446   3                  if( i == pEthTxFrmSwDesc->cpCount-1 )
+ 447   3                  {
+ 448   4                      pktQDescCP.s.lastDesc = 1;
+ 449   4                  }
+ 450   3                  pktQDescCP.s.offset     = pEthTxFrmSwDesc->cpArr[i].offsetU32;
+ 451   3      
+ 452   3                  // Write CP descriptor to the queue
+ 453   3                  // SwapWriteU32Reg(PLC_CAP_REG, pPlcTxFrmSwDesc->capValue);
+ 454   3                  WriteU32Reg(ETHMAC_QUEUEDATA_REG, pktQDescCP.reg);
+ 455   3      
+ 456   3      //            FM_Printf(FM_LINFO,"EHAL_EthTxQWrite: CPDesc%Bu    = 0x%08lX, Offset = %bu, descLen = %bu,cp
+             - = %bu\n",
+ 457   3      //                                i+1,RTOCL(pktQDescCP.reg), pktQDescCP.s.offset, pEthTxFrmSwDesc->cpArr[i
+             -].len, pktQDescCP.s.cp );
+ 458   3      #if defined(ETH_DEBUG_PACKET) || defined(DEBUG_DATAPATH)
+                          
+              #ifdef DEBUG_DATAPATH
+              
+                     if (pktDbg)
+              #endif        
+                      
+                          {
+                              u8 j;
+                              u8 byteOffset = (u8)pEthTxFrmSwDesc->cpArr[i].offsetU32 << 2;
+              
+                              volatile u8 xdata * cellAddr = CHAL_GetAccessToCP(pEthTxFrmSwDesc->cpArr[i].cp);
+                              FM_Printf(FM_USER,"PktBuf%bu, addr %lu :\n", i+1, (cellAddr+byteOffset));
+                              FM_Printf(FM_USER, "eth offset 0x%02x \n", byteOffset);
+                              for( j = byteOffset ;  j < (byteOffset + pEthTxFrmSwDesc->cpArr[i].len ); j++)
+                              {
+                                  FM_Printf(FM_USER,"0x%02bX ", cellAddr[j]);
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 9   
+
+                              }
+                              FM_Printf(FM_USER,"\n\n");
+                          }
+              #endif             
+ 479   3              }    
+ 480   2      #ifdef ETH_BRDG_DEBUG
+                  if (frame_len != tmp_frame_len)
+                  {
+                    printf("EHAL_EthTxQWrite: ERROR - frame lens don't match: frame_len=%d, tmp_frame_len=%d\n", frame_len,
+             - tmp_frame_len);
+                  }
+                  /*
+                  tmp_oversize_frames = rtocl(EHAL_ReadEthStatReg(0x88));
+                  if (cur_oversize_frames != tmp_oversize_frames)
+                  {
+                    printf("EHAL_EthTxQWrite: frame_len %d produces an oversize frame: %d\n", tmp_oversize_frames);
+                  }
+              */
+              #endif
+ 493   2              // update statistics
+ 494   2              gEthHalCB.TotalTxFrmCnt++;
+ 495   2              gEthHalCB.TotalTxBytesCnt+=pEthTxFrmSwDesc->frmLen;
+ 496   2      
+ 497   2      #ifdef ETH_BRDG_DEBUG
+                  ethTxFrameCnt++;
+                  numEthTxCp += pEthTxFrmSwDesc->cpCount;
+              #endif
+ 501   2          }
+ 502   1          else
+ 503   1          {
+ 504   2      
+ 505   2            ethTxDone = 1;
+ 506   2              status =  STATUS_FAILURE;
+ 507   2            printf("EHAL_EthTxQWrite(): Failed 1: EHAL_GetEthTxQFreeDescCnt()=%bu, frmDescCnt=bu\n", EHAL_GetEthTxQ
+             -FreeDescCnt(), frmDescCnt);
+ 508   2      #ifdef ETH_BRDG_DEBUG
+                  if (myDebugFlag1)
+                    printf("EHAL_EthTxQWrite(): Failed 1: EHAL_GetEthTxQFreeDescCnt()=%bu, frmDescCnt=bu\n", EHAL_GetEthTxQ
+             -FreeDescCnt(), frmDescCnt);
+              #endif
+ 512   2          }
+ 513   1          return status;
+ 514   1      
+ 515   1      }
+ 516          #endif
+ 517          
+ 518          #ifdef HYBRII_ETH
+ 519          
+ 520          bool EHAL_IsTxReady()
+ 521          {
+ 522   1      
+ 523   1        if(ethTxDone != 1)
+ 524   1        {
+ 525   2      
+ 526   2          return FALSE;
+ 527   2        }
+ 528   1      
+ 529   1        return TRUE;
+ 530   1      }
+ 531          #endif
+ 532          void EHAL_ResetStat()
+ 533          {
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 10  
+
+ 534   1      //#ifdef HYBRII_ETH
+ 535   1          // Rx Statistics counters
+ 536   1          gEthHalCB.TotalRxFrmCnt     = 0;
+ 537   1          gEthHalCB.TotalRxBytesCnt   = 0;
+ 538   1      
+ 539   1          // Tx Statistics counters
+ 540   1          gEthHalCB.TotalTxFrmCnt     = 0;
+ 541   1          gEthHalCB.TotalTxBytesCnt   = 0;
+ 542   1      
+ 543   1          // Test Statistics
+ 544   1          gEthHalCB.CurTxTestFrmCnt   = 0;
+ 545   1          gEthHalCB.CurTxTestBytesCnt = 0;
+ 546   1      //#endif
+ 547   1      }
+ 548          
+ 549          void EHAL_DisplayEthStat()
+ 550          {
+ 551   1      //#ifdef HYBRII_ETH
+ 552   1          u16 outStandingDescCnt;
+ 553   1      
+ 554   1          outStandingDescCnt = ETH_TXQ_DEPTH - EHAL_GetEthTxQFreeDescCnt();
+ 555   1      
+ 556   1          if(gEthHalCB.TotalRxBytesCnt)
+ 557   1          {
+ 558   2              printf("\n============ HOST Rx Statistics ==============\n");
+ 559   2              printf("TotalRxFrmCnt     = %lu\n",gEthHalCB.TotalRxFrmCnt);
+ 560   2              printf("TotalRxBytesCnt   = %lu\n\n",gEthHalCB.TotalRxBytesCnt);
+ 561   2          }
+ 562   1      
+ 563   1          if(gEthHalCB.TotalTxFrmCnt)
+ 564   1          {
+ 565   2              printf("\n============ HOST Tx Statistics ==============\n");
+ 566   2              printf("TotalTxFrmCnt     = %lu\n",gEthHalCB.TotalTxFrmCnt);
+ 567   2              printf("TotalTxBytesCnt   = %lu\n\n",gEthHalCB.TotalTxBytesCnt);
+ 568   2          }
+ 569   1          printf("TimerIntCnt       = %lu\n",gHalCB.timerIntCnt);
+ 570   1          printf("FreeCPCnt         = %bu\n\n",CHAL_GetFreeCPCnt());
+ 571   1      
+ 572   1      //#endif
+ 573   1      }
+ 574          
+ 575          // ConnExistSlave is called from a slave station. It returns:
+ 576          //      - TRUE if there is already an Open connection for this station. 
+ 577          //        It also returns the index to that station.
+ 578          //      - FALSE otherwise. In this case, it returns the index to the first 
+ 579          //        available station
+ 580          //
+ 581          #ifdef HYBRII_ETH
+ 582          
+ 583          u8  ConnExistSlave(u8 *MACaddr, u8 *StationId)
+ 584          {
+ 585   1          u8  firstFreeConn = 0xff;
+ 586   1          u8  i;
+ 587   1      
+ 588   1          for (i = 0; i < MAX_NUM_STATIONS; i++)
+ 589   1          {
+ 590   2              if (!memcmp(ConnState[i].myMACaddr, MACaddr, MAC_ADDR_LEN) 
+ 591   2                  && (ConnState[i].state == GCI_STATE_OPEN))
+ 592   2              {
+ 593   3                  *StationId = i;
+ 594   3                  return(TRUE);
+ 595   3              } else
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 11  
+
+ 596   2              {
+ 597   3                  if (firstFreeConn == 0xff)
+ 598   3                      firstFreeConn = i;
+ 599   3              }
+ 600   2          }
+ 601   1          *StationId = firstFreeConn;
+ 602   1          return(FALSE);
+ 603   1      }
+ 604          #endif
+ 605          // ConnExistMaster is called from a master station. It returns:
+ 606          //      - TRUE if there is already an Open connection for this station.
+ 607          //        It also returns the index to that station
+ 608          //      - FALSE otherwise. In this case, it returns the index to the first available station
+ 609          //
+ 610          #ifdef HYBRII_ETH
+ 611          
+ 612          u8  ConnExistMaster(u8 *masterMACaddr, u8 *slaveMACaddr,u8 *StationId)
+ 613          {
+ 614   1          u8  firstFreeConn = 0xff;
+ 615   1          u8  i;
+ 616   1      
+ 617   1          for (i = 0; i < MAX_NUM_STATIONS; i++)
+ 618   1          {
+ 619   2              if (!memcmp(ConnState[i].myMACaddr, masterMACaddr, MAC_ADDR_LEN)
+ 620   2                  && !memcmp(ConnState[i].slaveMACaddr, slaveMACaddr, MAC_ADDR_LEN))
+ 621   2              {
+ 622   3                  *StationId = i;
+ 623   3                  return(TRUE);
+ 624   3              } else
+ 625   2              {
+ 626   3                  if (firstFreeConn == 0xff)
+ 627   3                      firstFreeConn = i;
+ 628   3              }
+ 629   2          }
+ 630   1          *StationId = firstFreeConn;
+ 631   1          return(FALSE);
+ 632   1      }
+ 633          #endif // HYBRII_ETH
+ 634          
+ 635          
+ 636          void EHAL_ReleaseEthTxCPIntHandler()
+ 637          {
+ 638   1      #ifdef HYBRII_ETH
+ 639   1          EHAL_DoRelEthTxCP();
+ 640   1          ethTxDone = 1;
+ 641   1      #ifdef ETH_BRDG_DEBUG
+                numEthTxDoneInts++;
+              #endif
+ 644   1      #endif
+ 645   1      }
+ 646          
+ 647          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2066    ----
+   CONSTANT SIZE    =    540    ----
+   XDATA SIZE       =     32      91
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+C51 COMPILER V9.52.0.0   HAL_ETH                                                           01/10/2015 21:25:29 PAGE 12  
+
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

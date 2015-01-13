@@ -1,0 +1,1783 @@
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HAL_HPGPRX
+OBJECT MODULE PLACED IN .\obj\hal_hpgpRx.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\..\hal\hal_hpgpRx.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X21
+                    -00) INCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;.
+                    -.\..\src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..
+                    -\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\ev
+                    -ent\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\s
+                    -rc;..\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_suppor
+                    -t;..\..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_F
+                    -UNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII
+                    -_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVE
+                    -RY,PROD_TEST) DEBUG PRINT(.\lst\hal_hpgpRx.lst) TABS(2) OBJECT(.\obj\hal_hpgpRx.obj)
+
+line level    source
+
+   1          /*
+   2          * $Id: hal_hpgpRx.c,v 1.26 2014/09/05 09:28:18 ranjan Exp $
+   3          *
+   4          * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hal/hal_hpgpRx.c,v $
+   5          *
+   6          * Description : HPGP HAL Receive module.
+   7          *
+   8          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+   9          * All rights reserved.
+  10          *
+  11          * Purpose :
+  12          *     Defines beacon and data receive functions for HPGP, .
+  13          *
+  14          *
+  15          */
+  16          
+  17          #include <stdio.h>
+  18          #include <string.h>
+  19          #include "papdef.h"
+  20          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  23          #include "fm.h"
+  24          
+  25          #include "hal_common.h"
+  26          #include "hal.h"
+  27          #include "mac_intf_common.h"
+  28          #include "hal_hpgp.h"
+  29          #include "hal_eth.h"
+  30          #include "hal_tst.h"
+  31          #include "hpgpevt.h"
+  32          #include "hpgpdef.h"
+  33          
+  34          #ifdef HPGP_HAL_TEST
+              #include "hal_cfg.h"
+              #include "mmsg.h"
+              #else
+  38          #ifndef CALLBACK
+  39          #include "hpgpapi.h"
+  40          #endif
+  41          #endif
+  42          #include "frametask.h"
+  43          
+  44          #include "datapath.h"
+  45          #include "hybrii_tasks.h"
+  46          #include "sys_common.h"
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 2   
+
+  47          
+  48          #ifdef DEBUG_DATAPATH
+              
+              extern u8 pktDbg;
+              
+              extern u8 sigDbg;
+              #endif
+  54          #ifdef PLC_TEST
+  55          u16 oldssn = 0;
+  56          #endif
+  57          
+  58          u8 gpbcscorrect, gvalid;
+  59          u32 gsnid;
+  60          u32 debugcnt = 0;
+  61          extern u32 gBcnPer;
+  62          u32 misscnt = 0;
+  63          u8 gbcnstart, gflag;
+  64          extern u32 gbpst1, gtimer2, gtimer1;
+  65          extern u8 opMode;
+  66          extern u8 gBcnMissingRescanCnt;
+  67          extern u16  prevCsmaRgns[HYBRII_MAXSMAREGION_CNT];
+  68          #ifdef ROUTE_TEST
+              u8 dropTei[3] = {0,0,0};
+              #endif
+  71          
+  72          #ifdef PLC_TEST
+  73          extern void printmsg(u8* buff, u8 len);
+  74          extern void HHT_ProcessPlcFrame(sSwFrmDesc* plcRxFrmSwDesc);
+  75          #endif
+  76          
+  77            
+  78          #ifdef ASSOC_TEST
+              extern eStatus LM_RecvFrame(sSwFrmDesc *rxFrmSwDesc, 
+                               uRxFrmHwDesc*  pRxPktQ1stDesc,
+                               uRxCpDesc*   pRxPktQCPDesc);
+                
+              #endif
+  84          #ifdef ROUTE
+              extern sScb* ROUTE_lookUpLRT(u8 *mac);
+              #endif
+  87          
+  88          extern void EHT_FromPlcBcnTx(u8* rxBcnByteArr, u16 frameSize);
+  89          
+  90          
+  91          uCSMARegionReg   csmaRegArr[HYBRII_MAXSMAREGION_CNT]; 
+  92          u32              u32CSMARegs[HYBRII_MAXSMAREGION_CNT];
+  93          
+  94          
+  95          eStatus CHAL_ReadFrame(sHaLayer *hal,
+  96                                 sSwFrmDesc *rxFrmSwDesc,
+  97                                 sBuffDesc *buffDesc)
+  98          {
+  99   1          volatile u8 XDATA *cellAddr;
+ 100   1          u8        frmOffset = 0;
+ 101   1          u8        i;
+ 102   1          s16       frmLen = rxFrmSwDesc->frmLen;
+ 103   1          s16       cellLen;
+ 104   1          u8       *dataptr = NULL;
+ 105   1          sHpgpHdr *hpgpHdr = NULL;
+ 106   1          eStatus   ret = STATUS_SUCCESS;
+ 107   1      
+ 108   1      
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 3   
+
+ 109   1          /* sanity test on frame length */
+ 110   1      /*    if (frmLen != ((rxFrmSwDesc->cpCount -1)*HYBRII_CELLBUF_SIZE +
+ 111   1                        rxFrmSwDesc->lastDescLen))       
+ 112   1          {
+ 113   1              FM_Printf(FM_ERROR, "CHAL: Frame length error.\n");
+ 114   1              ret = STATUS_FAILURE;
+ 115   1              goto done;
+ 116   1          } */
+ 117   1      
+ 118   1          if (rxFrmSwDesc->rxPort == PORT_PLC)
+ 119   1          {
+ 120   2              /* the first cell of the mgmt frame contains 4-byte */
+ 121   2              frmOffset = ((rxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_MGMT) ? 4 : 0);
+ 122   2          }
+ 123   1      
+ 124   1      
+ 125   1          frmLen -= frmOffset;
+ 126   1          buffDesc->datalen = frmLen;
+ 127   1        //cellLen = HYBRII_CELLBUF_SIZE - frmOffset;
+ 128   1        cellLen = MIN(HYBRII_CELLBUF_SIZE - frmOffset, frmLen);
+ 129   1      //FM_Printf(FM_MINFO,"rx data len: %d, cell len: %d, cp cnt %bu\n", buffDesc->datalen, cellLen, rxFrmSwDes
+             -c->cpCount);
+ 130   1      //FM_HexDump(FM_DATA|FM_MINFO, "rx buff:", (u8 *)buffDesc->dataptr, 256 );  
+ 131   1           
+ 132   1          dataptr = buffDesc->dataptr; 
+ 133   1      
+ 134   1        i = 0;
+ 135   1      //    for (i = 0; i < rxFrmSwDesc->cpCount; i++)
+ 136   1          while((i < rxFrmSwDesc->cpCount) && cellLen > 0)
+ 137   1          {
+ 138   2              cellAddr = CHAL_GetAccessToCP(rxFrmSwDesc->cpArr[i].cp);
+ 139   2              memcpy(dataptr, cellAddr+frmOffset, cellLen);
+ 140   2              dataptr += cellLen;
+ 141   2              frmLen -= cellLen;
+ 142   2              cellLen = MIN(HYBRII_CELLBUF_SIZE, frmLen);
+ 143   2              frmOffset = 0;
+ 144   2          i++;
+ 145   2          }
+ 146   1      //FM_Printf(FM_MINFO,"rx data len: %d, frm len: %d\n", buffDesc->datalen, frmLen);
+ 147   1      //FM_HexDump(FM_DATA|FM_MINFO, "rx data:", (u8 *)buffDesc->dataptr, 256 );  
+ 148   1      //done:
+ 149   1          /* free cp */
+ 150   1          CHAL_FreeFrameCp(rxFrmSwDesc->cpArr, rxFrmSwDesc->cpCount);
+ 151   1          return ret;
+ 152   1      }
+*** WARNING C280 IN LINE 95 OF ..\..\..\hal\hal_hpgpRx.c: 'hal': unreferenced local variable
+ 153          
+ 154          #if !defined (HPGP_HAL_TEST) && !defined(UM)
+              
+              void HHAL_ProcRxFrameDesc(struct haLayer *hal, uRxFrmHwDesc *rxFrmHwDesc,
+                                        sSwFrmDesc *plcRxFrmSwDesc)
+              {
+                  uPlcRssiLqiReg  rssiLqi;
+                  uPlcStatusReg   plcStatus;
+                  u16             frmLen;
+                  u8              stei;
+              
+              #ifdef _AES_SW_    
+                  // Reset AES Block
+                  plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+                  plcStatus.s.aesReset = 1;
+                  WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 4   
+
+              
+                  plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+                  plcStatus.s.aesReset = 0;
+                  WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+              #endif
+              
+                  /* Retrieve LQI_RSSI */
+                  rssiLqi.reg         = ReadU32Reg(PLC_RSSILQI_REG);
+                  plcRxFrmSwDesc->frmInfo.plc.rssi = rssiLqi.s.rssi;
+                  plcRxFrmSwDesc->frmInfo.plc.lqi  = rssiLqi.s.lqi;
+              
+                  /* Extract Frame Length */
+                  frmLen = rxFrmHwDesc->sof.frmLenHi;
+                  frmLen = frmLen<<PKTQDESC1_FRMLENHI_POS | rxFrmHwDesc->sof.frmLenLo;
+                  plcRxFrmSwDesc->frmLen = frmLen;
+              //  printf("\nfrmLen : %d \n", frmLen);
+              
+                  /* Extract PLC Frame Type */
+                  plcRxFrmSwDesc->frmType = (eHpgpHwFrmType)rxFrmHwDesc->sof.frmType;
+                  /* Extract source TEI */
+                  stei   = rxFrmHwDesc->sof.steiHi2;
+                  stei   = (stei << PKTQDESC1_STEIHI_POS ) | rxFrmHwDesc->sof.steiLo6;
+                  plcRxFrmSwDesc->frmInfo.plc.stei    = stei; 
+              
+              
+              //  printf("rx len %d\n", frmLen);
+                  
+              
+                  if(plcRxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_MSDU)
+                  {
+                      gHpgpHalCB.halStats.RxGoodDataCnt++;
+                      /* Extract PLC Frame Mcst Mode */
+                      if(rxFrmHwDesc->sof.bcst)
+                      {
+                          plcRxFrmSwDesc->frmInfo.plc.mcstMode = HPGP_MNBCST;
+                      }
+                      else if(rxFrmHwDesc->sof.mcst)
+                      {
+                          plcRxFrmSwDesc->frmInfo.plc.mcstMode = HPGP_MCST;
+                      }
+                      else
+                      {
+                          plcRxFrmSwDesc->frmInfo.plc.mcstMode = HPGP_UCST;
+                      }
+                  }
+                  else if(plcRxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_SOUND)
+                  {
+                      /*
+                       * H/W does not provide STEI for Sound packet
+                       */
+                      plcRxFrmSwDesc->frmInfo.plc.stei = 0;
+                      gHpgpHalCB.halStats.RxGoodSoundCnt++;
+                  }
+                  else 
+                  {
+                      gHpgpHalCB.halStats.RxGoodMgmtCnt++;
+                  }          
+              
+                  plcRxFrmSwDesc->frmInfo.plc.clst    = rxFrmHwDesc->sof.clst;
+              
+              
+                  /* Update HPGP statistics - may be needed only in diag mode */
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 5   
+
+                  gHpgpHalCB.halStats.TotalRxGoodFrmCnt++;
+                  gHpgpHalCB.halStats.TotalRxBytesCnt += plcRxFrmSwDesc->frmLen;
+                  gHpgpHalCB.halStats.macRxStuckCnt = 0;
+                  gHpgpHalCB.halStats.smRxStuckCnt = 0;
+              }
+              
+              #endif
+ 238          
+ 239          #ifndef HPGP_HAL_TEST
+ 240          
+ 241          
+ 242          eStatus HAL_RecvFrame(sHaLayer *hal, sSwFrmDesc *rxFrmSwDesc, 
+ 243                                       uRxFrmHwDesc*  pRxPktQ1stDesc,
+ 244                                       uRxCpDesc*     pRxPktQCPDesc)
+ 245          {
+ 246   1          sEvent      *event = NULL;
+ 247   1          sBuffDesc   *buffDesc = NULL;
+ 248   1          sEth2Hdr    *ethhdr = NULL;
+ 249   1          sHpgpHdr    *hpgpHdr = NULL; 
+ 250   1          eStatus      ret = STATUS_SUCCESS;
+ 251   1          volatile u8 XDATA *cellAddr;
+ 252   1        sLinkLayer *linkl = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);    
+ 253   1          u16 frmlen;
+ 254   1          u8 i;
+ 255   1          u8 frmOffset;
+ 256   1        sScb *scb = CRM_GetScb(LINKL_GetCrm(linkl), rxFrmSwDesc->frmInfo.plc.stei);
+ 257   1        
+ 258   1      #ifdef ROUTE
+                  sScb *rScb = NULL;    
+                  sStaInfo *staInfo = LINKL_GetStaInfo(linkl);
+              #endif
+ 262   1          switch(rxFrmSwDesc->rxPort)
+ 263   1          {
+ 264   2              case PORT_PLC:
+ 265   2              {
+ 266   3                  cellAddr = CHAL_GetAccessToCP(rxFrmSwDesc->cpArr[0].cp);
+ 267   3                  frmOffset = ((rxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_MGMT) ? 4 : 0);
+ 268   3                  
+ 269   3                ethhdr = (sEth2Hdr *)&cellAddr[frmOffset];
+ 270   3                  
+ 271   3      #if 1
+ 272   3      
+ 273   3                      // Drop frm if dest MAC not match with device MAC address
+ 274   3                      if(IS_GROUP(ethhdr->dstaddr))
+ 275   3                      {
+ 276   4                      }
+ 277   3                      else if(memcmp(ethhdr->dstaddr, hal->macAddr, MAC_ADDR_LEN) == 0)
+ 278   3                      {
+ 279   4                          
+ 280   4                      }
+ 281   3      #ifdef ROUTE
+                              else if((rScb = ROUTE_lookUpLRT(ethhdr->dstaddr)) != NULL)
+                              {
+                                  
+                                  //FM_Printf(FM_USER, "LH: %bu\n",scb->tei);
+                                  if(rScb->lrtEntry.routeIsInvalid == TRUE || rScb->lrtEntry.routeOnHold == TRUE)
+                                  {
+                                      return STATUS_FAILURE;
+                                  }
+                                  rxFrmSwDesc->frmInfo.plc.dtei = rScb->lrtEntry.nTei;
+                                  rxFrmSwDesc->frmInfo.plc.eks = staInfo->nekEks;
+                                  if(linkl->mode == LINKL_STA_MODE_CCO)
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 6   
+
+                                  {
+              
+                                      rxFrmSwDesc->frmInfo.plc.stei = staInfo->ccoScb->tei;
+                                  }
+                                  else
+                                  {
+                                      rxFrmSwDesc->frmInfo.plc.stei =  staInfo->tei;
+                                  }
+              
+              
+                                 {
+              
+              
+                                      rxFrmSwDesc->frmInfo.plc.bcnDetectFlag  = REG_FLAG_SET;// REG_FLAG_CLR;
+                                      rxFrmSwDesc->frmInfo.plc.clst = HPGP_CONVLYRSAPTYPE_ETH;
+              
+                                      rxFrmSwDesc->frmInfo.plc.plid = 0;   //[YM] This line of code has to be changed ba
+             -se on differnet QoS priority
+              
+              
+                                      if (rxFrmSwDesc->frmInfo.plc.plid == 0)
+                                      rxFrmSwDesc->frmInfo.plc.phyPendBlks    = HPGP_PPB_CAP0;
+                                      else
+                                      rxFrmSwDesc->frmInfo.plc.phyPendBlks    = HPGP_PPB_CAP123;
+              
+                                      rxFrmSwDesc->frmInfo.plc.mcstMode       = HPGP_UCST;  // Unicast
+              
+                                      rxFrmSwDesc->frmInfo.plc.stdModeSel     = STD_ROBO_TEST; // std robo
+                                      rxFrmSwDesc->frmInfo.plc.dt_av = HPGP_DTAV_SOF;
+                                      rxFrmSwDesc->frmInfo.plc.saf = 1;
+              
+              
+                                  }
+              
+                                  
+                                  frmlen = rxFrmSwDesc->frmLen;
+                                  for(i = 0; i< rxFrmSwDesc->cpCount; i++)
+                                  {
+                                      if(( i == 0) && (rxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_MGMT))
+                                      {
+                                          rxFrmSwDesc->cpArr[i].offsetU32 = 1;                           
+                                      }
+                                      rxFrmSwDesc->cpArr[i].len = MIN(frmlen, HYBRII_CELLBUF_SIZE);
+                                      frmlen = frmlen - HYBRII_CELLBUF_SIZE;
+                                  }
+                                  rxFrmSwDesc->txPort = PORT_PLC;
+                                  fwdAgent_handleData(rxFrmSwDesc);
+                                  return STATUS_SUCCESS;
+                              }
+              #endif 
+ 342   3                      else
+ 343   3                      {
+ 344   4                          // Drop frm
+ 345   4      #ifdef DEBUG_DATAPATH
+                                  if(pktDbg)
+                                  {
+                                      FM_Printf(FM_MINFO, "Drop\n");
+                                  }
+              #endif
+ 351   4                          gHpgpHalCB.halStats.PtoHswDropCnt++;
+ 352   4                          return STATUS_FAILURE;
+ 353   4                      }
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 7   
+
+ 354   3      #endif
+ 355   3      
+ 356   3            if (!scb)
+ 357   3            {
+ 358   4              if (rxFrmSwDesc->frmType != HPGP_HW_FRMTYPE_MGMT)
+ 359   4              {
+ 360   5                gHpgpHalCB.halStats.PtoHswDropCnt++;            
+ 361   5                return STATUS_FAILURE;
+ 362   5              }
+ 363   4            
+ 364   4            }
+ 365   3            else
+ 366   3            {
+ 367   4              scb->rssiLqi.s.rssi = rxFrmSwDesc->frmInfo.plc.rssi;
+ 368   4              scb->rssiLqi.s.lqi = rxFrmSwDesc->frmInfo.plc.lqi;
+ 369   4            }
+ 370   3      
+ 371   3            
+ 372   3            //printf("tei %bu rssi %bu\n", scb->tei, scb->rssiLqi.s.rssi);
+ 373   3            
+ 374   3      
+ 375   3                  if ((rxFrmSwDesc->frmInfo.plc.stei == 0) || (IS_GROUP(ethhdr->dstaddr)))
+ 376   3            {
+ 377   4            
+ 378   4            }
+ 379   3                  else if (scb)
+ 380   3            {
+ 381   4              
+ 382   4                      if(scb->uWrapAround)
+ 383   4                      {
+ 384   5                          if(rxFrmSwDesc->frmInfo.plc.ssn < 1000)
+ 385   5                          {                    
+ 386   6                              scb->uWrapAround = 0;
+ 387   6                              scb->uMinSSN = 0;
+ 388   6                          }
+ 389   5                      }
+ 390   4                      
+ 391   4      
+ 392   4              //printf("tei %bu rssi %bu\n", scb->tei, scb->rssiLqi.s.rssi);
+ 393   4              
+ 394   4              if ((rxFrmSwDesc->frmInfo.plc.ssn <= scb->uMinSSN) && (scb->uMinSSN != 0))
+ 395   4                      {
+ 396   5                  // Drop duplicate frm
+ 397   5                  gHpgpHalCB.halStats.DuplicateRxCnt++;                    
+ 398   5                          //printf("Dup frm: %u, %u \n",rxFrmSwDesc->frmInfo.plc.ssn, scb->uMinSSN);
+ 399   5                return STATUS_FAILURE;
+ 400   5              }
+ 401   4                      
+ 402   4                      scb->uMinSSN = rxFrmSwDesc->frmInfo.plc.ssn;// + numPBs;
+ 403   4                      
+ 404   4                      if(scb->uMinSSN >= 1500)
+ 405   4                      {
+ 406   5                          scb->uWrapAround = 1;
+ 407   5                      }
+ 408   4      
+ 409   4            }
+ 410   3      
+ 411   3                  
+ 412   3                  if (rxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_MGMT)
+ 413   3                  {
+ 414   4                      /* create an event for the mgmt message */
+ 415   4                      event = EVENT_MgmtAlloc(rxFrmSwDesc->frmLen, sizeof(sHpgpHdr));
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 8   
+
+ 416   4                      if (event == NULL)
+ 417   4                      {
+ 418   5                          FM_Printf(FM_ERROR, "HAL: EAllocErr\n");
+ 419   5                          return STATUS_FAILURE;
+ 420   5                      }
+ 421   4      
+ 422   4                      buffDesc = &event->buffDesc;
+ 423   4      
+ 424   4                      if (CHAL_ReadFrame(hal, rxFrmSwDesc, buffDesc) == STATUS_SUCCESS)
+ 425   4                      {
+ 426   5                          hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+ 427   5                          //hpgpHdr->snid = hal->hhalCb->snid;
+ 428   5                          hpgpHdr->snid = rxFrmSwDesc->frmInfo.plc.snid;
+ 429   5                          hpgpHdr->tei = rxFrmSwDesc->frmInfo.plc.stei;
+ 430   5                          FM_Printf(FM_MINFO, "HAL: Rx Snid=%bu, Stei=%bu\n", hpgpHdr->snid, hpgpHdr->tei);
+ 431   5                          event->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 432   5                          /* process the MAC header */
+ 433   5                          ethhdr = (sEth2Hdr *)event->buffDesc.dataptr; 
+ 434   5      #ifdef LOG_FLASH
+                                  logEvent(MGMT_MSG,0,event->eventHdr.type,&hpgpHdr->tei,1);
+              #endif
+ 437   5      #if 1         
+ 438   5                          // Drop frm if dest MAC not match with device MAC address
+ 439   5                          if(IS_GROUP(ethhdr->dstaddr))
+ 440   5                          {
+ 441   6                          }
+ 442   5                          else if(memcmp(ethhdr->dstaddr, hal->macAddr, MAC_ADDR_LEN) == 0)
+ 443   5                          {
+ 444   6                          }
+ 445   5                          
+ 446   5      #ifdef ROUTE
+                                  else if((scb = ROUTE_lookUpLRT(ethhdr->dstaddr)) != NULL)
+                                  {
+                                      if(scb->lrtEntry.routeIsInvalid == TRUE || scb->lrtEntry.routeOnHold == TRUE)
+                                      {
+                                          return STATUS_SUCCESS;
+                                      }
+                                      
+                                      FM_Printf(FM_USER, "LRT hit: %bu\n",scb->tei);
+                                      hpgpHdr->tei = scb->lrtEntry.nTei;
+                                      hpgpHdr->eks = staInfo->nekEks;
+                                      //rxFrmSwDesc->plc.stei =  // TBD
+                                      fwdAgent_sendFrame(PORT_PLC ,event);
+                                      return STATUS_SUCCESS;
+                                  }
+              #endif
+ 462   5                          else
+ 463   5                          {
+ 464   6                              // Drop frm
+ 465   6      #ifdef DEBUG_DATAPATH
+                                      if(pktDbg)
+                                      {
+                                          FM_Printf(FM_MINFO, "MGMT drop\n");
+                                      }
+              #endif
+ 471   6                              EVENT_Free(event);
+ 472   6                              return STATUS_SUCCESS; //STATUS_FAILURE;
+ 473   6                          }
+ 474   5      #endif                    
+ 475   5                          hpgpHdr->macAddr = ethhdr->srcaddr;
+ 476   5      //                    hpgpHdr->scb = CRM_FindScbMacAddr(hpgpHdr->macAddr);
+ 477   5      
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 9   
+
+ 478   5                                                                  
+ 479   5                          /* chop off the ethernet header */
+ 480   5                          event->buffDesc.dataptr += sizeof(sEth2Hdr); 
+ 481   5                          event->buffDesc.datalen -= sizeof(sEth2Hdr); 
+ 482   5                          /* deliver the mgmt message to the upper layer */
+ 483   5      #ifdef CALLBACK
+                                  hal->deliverMgmtPacket(hal->mgmtCookie, event);
+              #else
+ 486   5                          MUXL_RecvMgmtPacket(hal->mgmtCookie, event);
+ 487   5      #endif
+ 488   5                       //   CHAL_FreeFrameCp(rxFrmSwDesc->cpArr, rxFrmSwDesc->cpCount);
+ 489   5                      }
+ 490   4                      else
+ 491   4                      {
+ 492   5                          EVENT_Free(event);
+ 493   5                      }
+ 494   4                  }
+ 495   3                  else if (rxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_MSDU)
+ 496   3                {
+ 497   4                    /* deliver the data packet to the data plane */
+ 498   4      
+ 499   4                    
+ 500   4                
+ 501   4                          // FM_Printf(FM_USER,"DATA ssn: %u\n", rxFrmSwDesc->frmInfo.plc.ssn);
+ 502   4      
+ 503   4                    
+ 504   4      
+ 505   4      #ifdef ROUTE
+              
+                                  //  cellAddr = CHAL_GetAccessToCP(rxFrmSwDesc->cpArr[0].cp);
+                                  //  ethhdr = (sEth2Hdr *)cellAddr;
+                                    // Drop frm if dest MAC not match with device MAC address
+                                    if(IS_GROUP(ethhdr->dstaddr))
+                                    {
+                                    }
+                                    else if(memcmp(ethhdr->dstaddr, hal->macAddr, MAC_ADDR_LEN) == 0)
+                                    {
+                                        
+                                    }
+                                    else if((scb = ROUTE_lookUpLRT(ethhdr->dstaddr)) != NULL)
+                                    {
+                                        
+                                          FM_Printf(FM_USER, "LH: %bu\n",scb->tei);
+                                        if(scb->lrtEntry.routeIsInvalid == TRUE || scb->lrtEntry.routeOnHold == TRUE)
+                                        {
+                                            return STATUS_FAILURE;
+                                        }
+                                        rxFrmSwDesc->frmInfo.plc.dtei = scb->lrtEntry.nTei;
+                                        rxFrmSwDesc->frmInfo.plc.eks = staInfo->nekEks;
+                                          if(linkl->mode == LINKL_STA_MODE_CCO)
+                                          {
+              
+                                              rxFrmSwDesc->frmInfo.plc.stei = staInfo->ccoScb->tei;
+                                          }
+                                          else
+                                          {
+                                              rxFrmSwDesc->frmInfo.plc.stei =  staInfo->tei;
+                                          }
+              
+              
+                                          {
+              
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 10  
+
+              
+                                              rxFrmSwDesc->frmInfo.plc.bcnDetectFlag  = REG_FLAG_SET;// REG_FLAG_CLR;
+                                              rxFrmSwDesc->frmInfo.plc.clst = HPGP_CONVLYRSAPTYPE_ETH;
+              
+                                              rxFrmSwDesc->frmInfo.plc.plid = 0;   //[YM] This line of code has to be ch
+             -anged base on differnet QoS priority
+              
+              
+                                              if (rxFrmSwDesc->frmInfo.plc.plid == 0)
+                                              rxFrmSwDesc->frmInfo.plc.phyPendBlks    = HPGP_PPB_CAP0;
+                                              else
+                                              rxFrmSwDesc->frmInfo.plc.phyPendBlks    = HPGP_PPB_CAP123;
+              
+                                              rxFrmSwDesc->frmInfo.plc.mcstMode       = HPGP_UCST;  // Unicast
+              
+                                              rxFrmSwDesc->frmInfo.plc.stdModeSel     = STD_ROBO_TEST; // std robo
+                                              rxFrmSwDesc->frmInfo.plc.dt_av = HPGP_DTAV_SOF;
+                                              rxFrmSwDesc->frmInfo.plc.saf = 1;
+              
+              
+                                          }
+                                          frmlen = rxFrmSwDesc->frmLen;
+                                          for(i = 0; i< rxFrmSwDesc->cpCount; i++)
+                                          {
+                                              rxFrmSwDesc->cpArr[i].offsetU32 = 0;
+                                              rxFrmSwDesc->cpArr[i].len = MIN(frmlen, HYBRII_CELLBUF_SIZE);
+                                              frmlen = frmlen - HYBRII_CELLBUF_SIZE;
+                                          }
+                                        rxFrmSwDesc->txPort = PORT_PLC;
+                            fwdAgent_handleData(rxFrmSwDesc);
+                                        return STATUS_SUCCESS;
+                                    }
+                                    else
+                                    {
+                                        // Drop frm
+              #ifdef DEBUG_DATAPATH
+                                        if(pktDbg)
+                                        {
+                                            FM_Printf(FM_MINFO, "DATA drop\n");
+                                        }
+              #endif
+                                        return STATUS_FAILURE;
+                                    }
+              #endif
+ 583   4      
+ 584   4      
+ 585   4        //            FM_Printf(FM_USER, "prx\n");
+ 586   4                  fwdAgent_handleData(rxFrmSwDesc);
+ 587   4                }
+ 588   3                  else
+ 589   3                  {
+ 590   4                      /* unknown HPGP frame type */
+ 591   4                  }
+ 592   3                  break;
+ 593   3              }
+ 594   2              case PORT_ZIGBEE:
+ 595   2                  break;
+ 596   2              case PORT_SPI:
+ 597   2              {
+ 598   3                  /* TODO: need to differentiate the mgmt and data */             
+ 599   3                  /* create an event for the mgmt message */
+ 600   3                  event = EVENT_MgmtAlloc(rxFrmSwDesc->frmLen, 0);
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 11  
+
+ 601   3                  if (event == NULL)
+ 602   3                  {
+ 603   4                      FM_Printf(FM_ERROR, "HAL: EAllocErr\n");
+ 604   4                      return STATUS_FAILURE;
+ 605   4                  }
+ 606   3      
+ 607   3                  buffDesc = &event->buffDesc;
+ 608   3                  if (CHAL_ReadFrame(hal, rxFrmSwDesc, buffDesc) == STATUS_SUCCESS)
+ 609   3                  {
+ 610   4                      /* deliver the mgmt message to the upper layer */
+ 611   4      #ifdef NMA
+ 612   4      #ifdef CALLBACK
+                              hal->deliverNetMgmtPacket(hal->netMgmtCookie, event);
+              #else
+ 615   4                      NMA_RecvMgmtPacket(hal->netMgmtCookie, event);
+ 616   4      #endif
+ 617   4      #endif
+ 618   4                     // CHAL_FreeFrameCp(rxFrmSwDesc->cpArr, rxFrmSwDesc->cpCount); // [PRA] double free
+ 619   4                  }
+ 620   3                  else
+ 621   3                  {
+ 622   4                      EVENT_Free(event);
+ 623   4                  }
+ 624   3                  break;
+ 625   3              }
+ 626   2              default:
+ 627   2              {
+ 628   3                  /* deliver the data packet to the data plane */
+ 629   3                  //hal->deliverDataPacket(hal->dataCookie, rxFrmSwDesc);
+ 630   3              }
+ 631   2          }
+ 632   1      
+ 633   1          return ret;
+ 634   1      }
+*** WARNING C280 IN LINE 243 OF ..\..\..\hal\hal_hpgpRx.c: 'pRxPktQ1stDesc': unreferenced local variable
+*** WARNING C280 IN LINE 244 OF ..\..\..\hal\hal_hpgpRx.c: 'pRxPktQCPDesc': unreferenced local variable
+*** WARNING C280 IN LINE 253 OF ..\..\..\hal\hal_hpgpRx.c: 'frmlen': unreferenced local variable
+*** WARNING C280 IN LINE 254 OF ..\..\..\hal\hal_hpgpRx.c: 'i': unreferenced local variable
+ 635          
+ 636          
+ 637          
+ 638          #endif
+ 639          
+ 640          #ifdef Z_P_BRIDGE
+              extern bool zb_plc_bridging;
+              extern void mac_hal_zb_pkt_bridge(sCommonRxFrmSwDesc* rx_frame_info_p);
+              #endif
+ 644          
+ 645          void HHAL_RxSoundIntHandler()
+ 646          {
+ 647   1          uPlcRssiLqiReg  rssiLqi;
+ 648   1          // Retrieve LQI_RSSI   
+ 649   1          rssiLqi.reg         = ReadU32Reg(PLC_RSSI_REG);
+ 650   1          //printf(" SOUND int: 0xE4C REG Value= %lx, \n", rssiLqi.reg);
+ 651   1        
+ 652   1        //rssiLqi.reg         = ReadU32Reg(PLC_RSSILQI_REG);
+ 653   1        //printf(" SOUND 2: 0xE48 REG Value= %lx, \n", ReadU32Reg(PLC_RSSILQI_REG));
+ 654   1        
+ 655   1      }
+ 656          
+ 657          
+ 658          #ifdef HPGP_HAL_TEST
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 12  
+
+              void HHAL_RxIntHandler(sCommonRxFrmSwDesc* pRxFrmDesc)
+              #else
+ 661          void HHAL_RxIntHandler(sCommonRxFrmSwDesc* pRxFrmDesc, void *cookie)
+ 662          #endif
+ 663          {
+ 664   1      
+ 665   1          // If SrcPort is PLC, Frametype Bcn,Mgmt
+ 666   1          // Write to PLCCmdQ
+ 667   1      //#ifdef PLC_TEST
+ 668   1          volatile u8 xdata * cellAddr;
+ 669   1      //#endif
+ 670   1          uRxFrmHwDesc*   pRxPktQ1stDesc;
+ 671   1          uRxCpDesc*      pRxPktQCPDesc;
+ 672   1          uPlcRssiLqiReg  rssiLqi;
+ 673   1          sSwFrmDesc      plcRxFrmSwDesc;
+ 674   1          u16             frmLen;
+ 675   1          u16             tmpfrmLen;
+ 676   1          u8              snid;
+ 677   1          u8              stei;
+ 678   1          u16             ssn;
+ 679   1          u8              i;
+ 680   1          eStatus         status = STATUS_SUCCESS;
+ 681   1          sEth2Hdr         *ethHdr;
+ 682   1      #ifdef UM
+ 683   1          sScb *scb;
+ 684   1      #endif
+ 685   1      #ifdef _AES_SW_    
+                  // Reset AES Block
+                  plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+                  plcStatus.s.aesReset = 1;
+                  WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+              
+                  plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+                  plcStatus.s.aesReset = 0;
+                  WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+              #endif
+ 695   1      
+ 696   1      #ifdef PLC_DELAY    
+                  CHAL_DelayTicks(500);
+              #endif
+ 699   1      
+ 700   1      
+ 701   1      
+ 702   1      
+ 703   1      
+ 704   1      #if 0
+                  // Retrieve LQI_RSSI   -- [YM] May change to only do this on sound packet
+                  //rssiLqi.reg         = ReadU32Reg(PLC_RSSI_REG);
+                  rssiLqi.reg         = ReadU32Reg(PLC_RSSILQI_REG);
+                  //plcRxFrmSwDesc.frmInfo.plc.rssi = rssiLqi.s.rssi;
+                  //plcRxFrmSwDesc.frmInfo.plc.lqi  = rssiLqi.s.lqi;  
+                printf(" E48 REG = %lx, \n", rssiLqi.reg);
+                rssiLqi.reg         = ReadU32Reg(PLC_RSSI_REG);
+                printf(" E4C REG = %lx, \n", rssiLqi.reg);
+              
+              #endif
+ 715   1      
+ 716   1          pRxPktQ1stDesc      = (uRxFrmHwDesc*)&pRxFrmDesc->hdrDesc;
+ 717   1          pRxPktQCPDesc       = (uRxCpDesc*)&pRxFrmDesc->firstCpDesc;
+ 718   1      
+ 719   1          plcRxFrmSwDesc.rxPort = pRxPktQ1stDesc->sof.srcPort;
+ 720   1        plcRxFrmSwDesc.txPort = pRxPktQ1stDesc->sof.dstPort;
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 13  
+
+ 721   1          plcRxFrmSwDesc.frmInfo.plc.rssi = pRxFrmDesc->rssiLqi.s.rssi;
+ 722   1          plcRxFrmSwDesc.frmInfo.plc.lqi  = pRxFrmDesc->rssiLqi.s.lqi;
+ 723   1          // 1.1.1 Extract PLC Frame Length
+ 724   1          frmLen = pRxPktQ1stDesc->sof.frmLenHi;
+ 725   1          frmLen = frmLen<<PKTQDESC1_FRMLENHI_POS | pRxPktQ1stDesc->sof.frmLenLo;
+ 726   1          plcRxFrmSwDesc.frmLen = frmLen;
+ 727   1      
+ 728   1          // 1.1.2 Extract PLC Frame Type
+ 729   1          plcRxFrmSwDesc.frmType = (eHpgpHwFrmType)pRxPktQ1stDesc->sof.frmType;
+ 730   1          stei   = pRxPktQ1stDesc->sof.steiHi2;
+ 731   1          stei   = (stei << PKTQDESC1_STEIHI_POS ) | pRxPktQ1stDesc->sof.steiLo6;
+ 732   1      
+ 733   1          snid   = pRxPktQCPDesc->plc.snidHi;
+ 734   1          snid   = (snid << PKTQDESC1_SNIDHI_POS ) | pRxPktQCPDesc->plc.snidLo;
+ 735   1          
+ 736   1          tmpfrmLen = frmLen;
+ 737   1          // Update HPGP statistics - may be needed only in diag mode
+ 738   1      
+ 739   1      
+ 740   1        /*{
+ 741   1      
+ 742   1          uPlcTxPktQDescVF0 *vf0 = (uPlcTxPktQDescVF0*)&pRxFrmDesc->fc[0];
+ 743   1      
+ 744   1      
+ 745   1            stei = vf0->s.stei;
+ 746   1      
+ 747   1            snid  = vf0->s.snid;
+ 748   1      
+ 749   1      
+ 750   1        }*/
+ 751   1      #ifdef UM
+ 752   1          if (stei == 0)       
+ 753   1          {
+ 754   2            cellAddr = CHAL_GetAccessToCP(pRxPktQCPDesc->plc.cp);
+ 755   2              //if(cellAddr != NULL)// cellAddress is never NULL. Kiran
+ 756   2              //{
+ 757   2                   if (plcRxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_MGMT)
+ 758   2                   {
+ 759   3                       ethHdr = (sEth2Hdr*)(&(cellAddr + 4));
+ 760   3                   }
+ 761   2                   else
+ 762   2                   {
+ 763   3                       ethHdr = (sEth2Hdr*)cellAddr;
+ 764   3                   }
+ 765   2                   scb = CRM_FindScbMacAddr(ethHdr->srcaddr);
+ 766   2                   if(scb != NULL)
+ 767   2                   {
+ 768   3                       stei = scb->tei;
+ 769   3                   }
+ 770   2              //}
+ 771   2          }
+ 772   1      #endif
+ 773   1          plcRxFrmSwDesc.frmInfo.plc.snid    = snid;
+ 774   1          plcRxFrmSwDesc.frmInfo.plc.stei    = stei; 
+ 775   1      
+ 776   1          ssn    = pRxPktQCPDesc->plc.ssnHi;
+ 777   1          ssn    = (ssn << PKTQDESC1_SSNHI_POS ) | pRxPktQCPDesc->plc.ssnLo;
+ 778   1      #ifdef PLC_TEST
+ 779   1          if(opMode == LOWER_MAC)
+ 780   1          {
+ 781   2              if(pRxPktQ1stDesc->sof.bcst == 0 && pRxPktQ1stDesc->sof.mcst == 0)
+ 782   2              {
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 14  
+
+ 783   3                  if((ssn == oldssn) && (ssn != 0))
+ 784   3                  {
+ 785   4                      CHAL_DecrementReleaseCPCnt(pRxPktQCPDesc->plc.cp);
+ 786   4                      for (i = 1; i < pRxFrmDesc->cpCount; i++)
+ 787   4                      {
+ 788   5                      CHAL_DecrementReleaseCPCnt(pRxFrmDesc->cpArr[i]);
+ 789   5                      }
+ 790   4                      //printf("Dup frm: %u, %u \n",ssn, oldssn);
+ 791   4                      return;
+ 792   4                  }
+ 793   3                  oldssn = ssn;
+ 794   3                  if(oldssn == 2047)
+ 795   3                  {
+ 796   4                      oldssn = 0;
+ 797   4                  }
+ 798   3              }
+ 799   2          }
+ 800   1      #endif    
+ 801   1          gHpgpHalCB.halStats.TotalRxGoodFrmCnt++;
+ 802   1          gHpgpHalCB.halStats.TotalRxBytesCnt += plcRxFrmSwDesc.frmLen;
+ 803   1          gHpgpHalCB.halStats.macRxStuckCnt = 0;
+ 804   1          gHpgpHalCB.halStats.smRxStuckCnt = 0;
+ 805   1      
+ 806   1          if(plcRxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_MSDU)
+ 807   1          {
+ 808   2              gHpgpHalCB.halStats.RxGoodDataCnt++;
+ 809   2              // 1.1.3 Extract PLC Frame Mcst Mode
+ 810   2              if(pRxPktQ1stDesc->sof.bcst)
+ 811   2              {
+ 812   3                  plcRxFrmSwDesc.frmInfo.plc.mcstMode = HPGP_MNBCST;
+ 813   3              }
+ 814   2              else if(pRxPktQ1stDesc->sof.mcst)
+ 815   2              {
+ 816   3                  plcRxFrmSwDesc.frmInfo.plc.mcstMode = HPGP_MCST;
+ 817   3              }
+ 818   2              else
+ 819   2              {
+ 820   3                  plcRxFrmSwDesc.frmInfo.plc.mcstMode = HPGP_UCST;
+ 821   3              }
+ 822   2          }
+ 823   1          else if(plcRxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_SOUND)
+ 824   1          {
+ 825   2              /*
+ 826   2               * H/W does not provide STEI for Sound packet
+ 827   2               */
+ 828   2              plcRxFrmSwDesc.frmInfo.plc.stei = 0;
+ 829   2              gHpgpHalCB.halStats.RxGoodSoundCnt++;
+ 830   2          //rssiLqi.reg         = ReadU32Reg(PLC_RSSILQI_REG);
+ 831   2              //plcRxFrmSwDesc.frmInfo.plc.rssi = rssiLqi.s.rssi;
+ 832   2              //plcRxFrmSwDesc.frmInfo.plc.lqi  = rssiLqi.s.lqi;  
+ 833   2            //printf(" SOUND: E48 REG = %lx, \n", rssiLqi.reg);
+ 834   2            rssiLqi.reg         = ReadU32Reg(PLC_RSSI_REG);
+ 835   2            //printf(" SOUND: E4C REG = %lx, \n", rssiLqi.reg);   
+ 836   2          }
+ 837   1          else 
+ 838   1          {
+ 839   2              gHpgpHalCB.halStats.RxGoodMgmtCnt++;
+ 840   2          }
+ 841   1                     
+ 842   1      #ifdef Z_P_BRIDGE
+                  if (zb_plc_bridging) {
+                      mac_hal_zb_pkt_bridge(pRxFrmDesc);
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 15  
+
+                      return;
+                  }
+              #endif  //Z_P_BRIDGE
+ 848   1      
+ 849   1          plcRxFrmSwDesc.frmInfo.plc.clst    = pRxPktQ1stDesc->sof.clst;
+ 850   1          
+ 851   1          plcRxFrmSwDesc.frmInfo.plc.ssn = ssn;
+ 852   1      
+ 853   1          plcRxFrmSwDesc.cpArr[0].cp = pRxPktQCPDesc->plc.cp;
+ 854   1          plcRxFrmSwDesc.cpArr[0].offsetU32 =0;
+ 855   1          plcRxFrmSwDesc.lastDescLen  = pRxFrmDesc->lastDescLen;
+ 856   1      
+ 857   1          // 1.1.4 Read second and subsequent CP descriptors
+ 858   1          plcRxFrmSwDesc.cpCount = pRxFrmDesc->cpCount;
+ 859   1      
+ 860   1          for( i=1 ; i< plcRxFrmSwDesc.cpCount ; i++ )
+ 861   1          {
+ 862   2              plcRxFrmSwDesc.cpArr[i].cp = pRxFrmDesc->cpArr[i];
+ 863   2              plcRxFrmSwDesc.cpArr[i].offsetU32 = 0;
+ 864   2          }
+ 865   1          // 1.1.6 Call PLC Rx Callback -- tbd
+ 866   1        
+ 867   1      #ifdef PLC_TEST
+ 868   1              cellAddr = CHAL_GetAccessToCP(plcRxFrmSwDesc.cpArr[0].cp);
+ 869   1              
+ 870   1              if((cellAddr[0] == '/') && 
+ 871   1                  (cellAddr[1] == '?') &&
+ 872   1                  (cellAddr[2] == '!'))//chek /?! header bytes for propritary protocol
+ 873   1              {
+ 874   2                      
+ 875   2                  //printf("\n cell add");
+ 876   2                  //printmsg(&cellAddr[0],6);
+ 877   2                 gHpgpHalCB.halStats.RxGoodDataCnt--;
+ 878   2                  HHT_ProcessPlcFrame(&plcRxFrmSwDesc);
+ 879   2              }
+ 880   1             else
+ 881   1      #endif
+ 882   1          
+ 883   1      #ifdef HPGP_HAL_TEST
+                  if (plcRxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_SOUND)
+                // Sound  pakcet process
+                { 
+                     printf("free sound packet, dt_av=%X\n", plcRxFrmSwDesc.frmType);
+                   CHAL_FreeFrameCp(plcRxFrmSwDesc.cpArr, plcRxFrmSwDesc.cpCount);
+                }
+                else
+                {
+                  if(1 == eth_plc_bridge)
+                  //if((1 == eth_plc_bridge) && (plcRxFrmSwDesc.frmType != HPGP_HW_FRMTYPE_SOUND))
+                  { 
+              #ifdef ASSOC_TEST         
+                      if (plcRxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_MGMT)
+                      {
+                           LM_RecvFrame(&plcRxFrmSwDesc,pRxPktQ1stDesc,
+                                          pRxPktQCPDesc);
+                      }
+                      else
+              #endif
+                      {
+              #ifdef HYBRII_ETH
+              //      memcpy((u8*)plcRxFrmSwDesc.fc, (u8*)pRxFrmDesc->fc, VF_SIZE);
+              
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 16  
+
+              
+                    fwdAgent_handleData(&plcRxFrmSwDesc);
+              #endif  //HYBRII_ETH
+              
+                      }
+                  }
+                  else
+                  {
+                      HHT_ProcessPlcMacFrame(&plcRxFrmSwDesc);
+                  }
+                }  //End of frame type = SOUND
+              
+              #else  //HPGP_HAL_TEST
+ 920   1          if(1 == eth_plc_bridge)
+ 921   1          {
+ 922   2      #ifdef HYBRII_ETH
+ 923   2      //        memcpy((u8*)plcRxFrmSwDesc.fc, (u8*)pRxFrmDesc->fc, VF_SIZE);
+ 924   2      
+ 925   2      
+ 926   2           fwdAgent_handleData(&plcRxFrmSwDesc);
+ 927   2      #else
+                         CHAL_FreeFrameCp(plcRxFrmSwDesc.cpArr, plcRxFrmSwDesc.cpCount);
+              #endif  //HYBRII_ETH
+ 930   2          }
+ 931   1          else
+ 932   1          {
+ 933   2              status = HAL_RecvFrame((sHaLayer *)cookie, &plcRxFrmSwDesc,pRxPktQ1stDesc,
+ 934   2                                  pRxPktQCPDesc);
+ 935   2          }
+ 936   1          
+ 937   1      
+ 938   1      #endif  //HPGP_HAL_TEST
+ 939   1          if (status == STATUS_FAILURE)
+ 940   1          {
+ 941   2              CHAL_FreeFrameCp(plcRxFrmSwDesc.cpArr, plcRxFrmSwDesc.cpCount);
+ 942   2          }
+ 943   1      }
+ 944          
+ 945          
+ 946          #ifdef HPGP_HAL_TEST
+              extern sHalCB gHalCB;
+              void HHAL_BcnRxIntHandler()
+               {
+                      u32 xdata        rxBcnWordArr[(PLC_BCNRX_LEN>>2) + 5];  // 5 DWORD of Ether II header
+                                                                                 // and hostHdr_t
+                      u32              *prxBcnWordArr = NULL;
+                      u8*              rxBcnByteArr;
+                      u8               i, u8val;
+                      u8               bcnDataOffset;
+                      uPlcStatusReg    plcStatus;
+                      sHybriiRxBcnHdr* pRxBcnHdr;
+                      
+                      if(1 == eth_plc_sniffer)
+                      {
+                          bcnDataOffset = (sizeof(hostHdr_t) + sizeof(sEth2Hdr));
+                  }
+                  else
+                  {
+                      bcnDataOffset = 0;
+                  }
+              
+              
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 17  
+
+                  plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+                  rxBcnByteArr  = (u8*)rxBcnWordArr;
+              
+                  prxBcnWordArr =  (u32*)(rxBcnByteArr + bcnDataOffset);
+                  gHpgpHalCB.halStats.BcnRxIntCnt++;
+                  gHpgpHalCB.halStats.smRxStuckCnt = 0;
+                  // Confirm that Bcn Rx Fifo is not emplty.  //[YM] We should check the BcnCnt to make sure there is a 
+             -valid beacon in RxFifo
+                  do
+                  {
+                      // Read from fifo to local memory.
+                      for( i=0 ; i<(PLC_BCNRX_LEN>>2) ; i++)
+                      {
+                          prxBcnWordArr[i] = ReadU32Reg(PLC_BCNRXFIFO_REG);
+                      }
+                  // use R/W byte operation so we don't set plcTxQRdy here
+                  u8val = ReadU8Reg(PLC_STATUS_REG+1);
+                  u8val |= 0x80;    // plcBcnCntDecr (bit 15 of PLC_STATUS_REG)
+                    WriteU8Reg(PLC_STATUS_REG+1, u8val);
+                     
+                      pRxBcnHdr = (sHybriiRxBcnHdr*)(rxBcnByteArr + (bcnDataOffset*4));
+                      // Update statistics.  //[YM] why check rsv1,2,3,4 bit fields??
+                      //if(pRxBcnHdr->fccsCorrect && pRxBcnHdr->pbcsCorrect && !pRxBcnHdr->rsv1 && !pRxBcnHdr->rsv2 && !
+             -pRxBcnHdr->rsv3 && !pRxBcnHdr->rsv4)  
+                      if(pRxBcnHdr->fccsCorrect && pRxBcnHdr->pbcsCorrect)
+                      {             
+                          gHpgpHalCB.halStats.TotalRxGoodFrmCnt++;
+                          gHpgpHalCB.halStats.RxGoodBcnCnt++;
+                          gHpgpHalCB.halStats.macRxStuckCnt = 0; 
+              #ifdef FREQ_DETECT
+                              if(gHpgpHalCB.gFreqCB.freqDetected == FALSE && (gHpgpHalCB.devMode == DEV_MODE_STA))
+                              {
+                                  FREQDET_DetectFrequencyUsingBcn();
+                              }
+              #endif
+                      }
+                      else
+                      {
+                         gHpgpHalCB.halStats.RxErrBcnCnt++;
+                         gHpgpHalCB.halStats.macRxStuckCnt++;  //[YM] It is not a right way to add macRxStuck count here
+             -. 
+                      }
+                      // Call BeaconProcess function
+                      if(pRxBcnHdr->fccsCorrect)
+                      {
+                          if(0 == eth_plc_sniffer)
+                          {
+                              HHAL_ProcBcnLow(rxBcnByteArr + bcnDataOffset * 4);
+                          }
+                      }
+              #ifdef HYBRII_ETH
+                      if(1 == eth_plc_sniffer)
+                      {
+                          EHT_FromPlcBcnTx((rxBcnByteArr + sizeof(sHybriiRxBcnHdr)), 
+                                               (PLC_BCNRX_LEN-sizeof(sHybriiRxBcnHdr)));
+                      }
+              #endif
+                      // Any more beacons ?
+                      plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+                  } while (plcStatus.s.plcBcnCnt);
+              }
+              
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 18  
+
+              void HAL_SetCsmaRegions(uCSMARegionReg* regionArr)
+              {
+                  uCSMARegionReg   *pCSMARgn;
+                  u8 i = 0;
+              
+                  pCSMARgn = regionArr;
+                  
+              
+                  while(i < HYBRII_MAXSMAREGION_CNT)
+                  {
+                      switch(i)
+                      {
+                          case 0:
+                              
+                              WriteU32Reg(PLC_CSMAREGION0_REG, (pCSMARgn->reg));
+                              
+                          break;
+                      
+                          case 1:
+                           WriteU32Reg(PLC_CSMAREGION1_REG, (pCSMARgn->reg));
+                               //printf("\n ET2_low = %bu",  pCSMARgn->s.csma_endtime_lo);
+                               //printf("\n ET2_h = %bu",  pCSMARgn->s.csma_endtime_hi);
+                          break;
+              
+                          case 2:
+                               WriteU32Reg(PLC_CSMAREGION2_REG, (pCSMARgn->reg));
+                          break;
+              
+                          case 3:
+                               WriteU32Reg(PLC_CSMAREGION3_REG, (pCSMARgn->reg));
+                          break;
+              
+                          case 4:
+                               WriteU32Reg(PLC_CSMAREGION4_REG, (pCSMARgn->reg));
+                          break;
+              
+                          case 5:
+                           WriteU32Reg(PLC_CSMAREGION5_REG, (pCSMARgn->reg));
+                          break;
+                      }
+                      i++;
+                      pCSMARgn++;
+                  }
+              }
+              
+              void process_region(u8 *dataptr)
+              {
+              //  sBEntry     *   pEntry;
+                  sRegion  *pRgn;
+                  uCSMARegionReg   *pCSMARgn;
+                  u8      i, rgn_num;
+              //    u32     new_csma;
+                  u16     start_time;
+                  u8      update = 0;
+                  sRegions    *pRgns;
+              
+              //  pEntry = (sBEntry  *)dataptr;
+              //  rgn_num = pEntry->entry.region.nr;
+              //  pRgn = pEntry->entry.region.regn;
+                  pRgns = (sRegions *)dataptr;
+                  rgn_num = pRgns->nr;
+                  pRgn = pRgns->regn;
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 19  
+
+              
+              //printf("rgns : %bd\n", rgn_num);
+                  memset(&csmaRegArr[0], 0, sizeof(csmaRegArr));
+                  pCSMARgn = &csmaRegArr[0];
+              
+                  start_time = 0;
+                if (rgn_num > HYBRII_MAXSMAREGION_CNT)
+                  rgn_num = HYBRII_MAXSMAREGION_CNT;
+              
+                  for (i=0; i < rgn_num; i++, pRgn++, pCSMARgn++)
+                  {
+                  // only set CSMA regions if they're different than previous values
+                  if (pRgn->reg16 != prevCsmaRgns[i])
+                  {
+                        update = 1;
+              //      printf("update CSMA regions: pRgn->reg16=0x%x, prevCsmaRgns[%bu]=0x%x, rgn_num=%bu\n",pRgn->reg16, i,
+             - prevCsmaRgns[i],rgn_num);
+                    prevCsmaRgns[i] = pRgn->reg16;
+              
+                      pRgn->reg16 = rtocs(pRgn->reg16);
+              
+                        pCSMARgn->s.csma_start_time_lo = 0; //start_time;
+                        pCSMARgn->s.csma_start_time_hi = 0;
+                        if(pRgn->s.region_type == REGION_TYPE_STAYOUT)
+                            pCSMARgn->s.csma_rxOnly = 1;    //stayout region is rx only region
+                        //pCSMARgn->s.bcnRegion = 0; //pRgn->s.region_type;
+                        pCSMARgn->s.csma_hybrid = 1;
+                        pCSMARgn->s.csma_endtime_lo = pRgn->s.region_end_time & 0x00FF;
+                        pCSMARgn->s.csma_endtime_hi = ((pRgn->s.region_end_time & 0xFF00) >> 8);
+                        //printf("type:%X\n", pRgn->s.region_type);
+                        // printf("endHi: %bx\n", pCSMARgn->s.csma_endtime_hi);
+                        // printf("endLo: %bx\n", pCSMARgn->s.csma_endtime_lo);
+                        start_time = pRgn->s.region_end_time;
+                  }
+              //    else printf(" no update CSMA region %bu\n", i);
+                  }
+              
+                  if (update != 0)
+                  {
+                      /*for (i=rgn_num; i < HYBRII_MAXSMAREGION_CNT; i++, pCSMARgn++)
+                      {
+                          pCSMARgn->reg = 0;  
+                      } */
+              
+                    //  printf(" \n ET0_low = %bu", csmaRegArr[0].s.csma_endtime_lo);
+                     //  printf(" \n ET0_hi = %bu", csmaRegArr[0].s.csma_endtime_hi);
+                     //   printf(" \n ET1_low = %bu", csmaRegArr[1].s.csma_endtime_lo);
+                      // printf(" \n ET1_hi = %bu", csmaRegArr[1].s.csma_endtime_hi);
+                      
+              
+                      HAL_SetCsmaRegions(csmaRegArr);
+                  }
+              }
+              
+              #ifdef ASSOC_TEST
+              extern u8 gCCoMacAddr;
+              #endif
+              void HHAL_ProcBcnLow(u8* bcn)
+              {
+                  sHybriiRxBcnHdr* pRxBcnHdr;
+                  sFrmCtrlBlk*     pFrmCtrlBlk;
+                  sHybriiRxBcn*    rxBcn;      
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 20  
+
+                  sBcnHdr*         pBcnHdr = 0;
+                  sBeHdr*          pBeHdr = 0;
+                  u8               hm; 
+                  u8               reqDiscList = 0;
+                  u8               nbe = 0;
+                  u8*              dataptr = 0;
+                  u8*              macAddr = 0;   
+                  u32              bts;
+              
+                  rxBcn       = (sHybriiRxBcn*)bcn;
+                  pRxBcnHdr   = (sHybriiRxBcnHdr*)bcn; 
+                  pFrmCtrlBlk = (sFrmCtrlBlk*) (bcn + sizeof(sHybriiRxBcnHdr)) ;
+                  pBcnHdr     = (sBcnHdr*) ((u8*)pFrmCtrlBlk + sizeof(sFrmCtrlBlk)); 
+                  hm          = (pBcnHdr->nid[NID_LEN-1])&0xC0;
+                  //pBcnHdr->nid[NID_LEN-1] &= 0x3F;
+                  //pBcnHdr->nid[NID_LEN-1] &= 0xFC;                          
+                  nbe         = pBcnHdr->nbe;
+                  dataptr     = (u8*)pBcnHdr + sizeof(sBcnHdr);
+                  pBeHdr      = (sBeHdr*) dataptr;
+              
+                  bts  =  ((u32)(pFrmCtrlBlk->bts[3])<<24) + ((u32)(pFrmCtrlBlk->bts[2])<<16) + ((u32)(pFrmCtrlBlk->bts[
+             -1])<<8) + (u32)(pFrmCtrlBlk->bts[0]); 
+                  memcpy(gHpgpHalCB.nid, pBcnHdr->nid, NID_LEN);
+              
+                  gHpgpHalCB.nid[NID_LEN-1]  &= NID_EXTRA_BIT_MASK;
+                  // Extract Bto, deduce AC mode Cco's Bcn Period Len and write SWBcnPeriodAvg register.
+              
+                 // HHAL_AdjustNextBcnTime(&pFrmCtrlBlk->bto[0]);
+                 /* if (gHpgpHalCB.lineMode == LINE_MODE_AC)
+                  {   
+                     
+                      if(gHpgpHalCB.devMode == DEV_MODE_STA)
+                      {
+                          WriteU32Reg( PLC_SWBCNPERAVG_REG, ctorl(PLC_AC_BP_LEN));//33.31
+                          //WriteU32Reg( PLC_SWBCNPERAVG_REG, ctorl(0xCB5E8));
+                          
+                      }
+                  }*/
+                 
+              
+                  // Process Low MAC relevant BENTRYs
+                  if(gHpgpHalCB.devMode == DEV_MODE_STA &&  pRxBcnHdr->pbcsCorrect  && pRxBcnHdr->valid)
+                  {
+                      while(nbe)
+                      { 
+                          dataptr += sizeof(sBeHdr); //move to the start of BEENTRY 
+                          switch (pBeHdr->beType)
+                          {
+                              case BEHDR_MAC_ADDR:
+                              {
+                                  macAddr = dataptr;
+              #ifdef ASSOC_TEST
+                                  memcpy ((u8*)&gCCoMacAddr, macAddr, 6);
+              #endif
+                                  break;
+                              }
+                              case BEHDR_BPSTO:
+                              {        
+                                  
+                                   gsnid = pFrmCtrlBlk->snid;
+                                    
+                                  if( ((pBcnHdr->bt == BEACON_TYPE_CENTRAL) || (pBcnHdr->bt == BEACON_TYPE_PROXY))   &&
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 21  
+
+                                        (pFrmCtrlBlk->snid == gHpgpHalCB.snid) && gHpgpHalCB.nwSelected )              
+                                   {
+                                      gHpgpHalCB.snapShot = pRxBcnHdr->snapShot;
+                                      gHpgpHalCB.bcnDetectFlag = 1;
+                                      HHAL_SyncNet(dataptr);
+                                   }
+                                  break;
+                              }
+                              case BEHDR_REGIONS:
+                                  process_region(dataptr); // WAR: Need to revisit code, deactivated to reduce loss in l
+             -ower mac
+                                  break;
+              
+                              default:
+                              {
+                                  break;
+                              }
+                          }
+                          //move to the next BEHDR
+                          dataptr = dataptr + pBeHdr->beLen; 
+                          pBeHdr = (sBeHdr*) dataptr;
+                          nbe--;
+                      }
+                      HHT_ProcessBcnHle(bcn);
+                  }
+               
+              }
+              
+              
+              void HHAL_BcnRxTimeoutIntHandler()
+              {
+              //     uPlcLineControlReg plcLineCtrl;
+              
+              
+                
+              
+                 
+                 /* if(gtimer2 > gsyncTimeout)  //if time is greate then 40 ms
+                  {
+                      
+                      //gflag = 0;
+                     // printf("\n miss");
+                      misscnt++;
+                   
+                      gbpst1 += gBcnPer; 
+                      gtimer2 = 1;
+                      WriteU32Reg(PLC_BPST_REG,ctorl(gbpst1)); 
+                   }*/
+                  /* misscnt++;
+              
+                   if(misscnt > 6)   //go for rescan
+                   {
+                      
+                      if(gHpgpHalCB.lineMode == LINE_MODE_DC )
+                          WriteU32Reg(PLC_CSMAREGION0_REG, ctorl(0x8F430000));
+                      else 
+                          WriteU32Reg(PLC_CSMAREGION0_REG, ctorl(0x8CB60000));
+                      
+                      gHpgpHalCB.scanEnb           = 0;
+                      HHAL_SetSWStatReqScanFlag(REG_FLAG_SET); //afetr this when we receive next bcn snid will be set an
+             -d nw sel will be set
+                      gtimer2 = 0;
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 22  
+
+                      misscnt =0;
+                      gHpgpHalCB.devMode = DEV_MODE_STA;
+                      HHAL_SetDevMode(gHpgpHalCB.devMode, gHpgpHalCB.lineMode); 
+                      HHAL_SetDefAddrConfig();
+                      printf("\n Rescan");
+                   }   */
+                   /*if(gtimer1 > gBcnMissingRescanCnt)
+                   {
+                      if(gHpgpHalCB.lineMode == LINE_MODE_DC )
+                          WriteU32Reg(PLC_CSMAREGION0_REG, ctorl(0x8F430000));
+                      else 
+                          WriteU32Reg(PLC_CSMAREGION0_REG, ctorl(0x8CB60000));
+                      
+                      gHpgpHalCB.scanEnb           = 0;
+                      HHAL_SetSWStatReqScanFlag(REG_FLAG_SET); //afetr this when we receive next bcn snid will be set an
+             -d nw sel will be set
+                      gtimer2 = 0;
+                      gtimer1 = 0;
+                      gHpgpHalCB.devMode = DEV_MODE_STA;
+                      HHAL_SetDevMode(gHpgpHalCB.devMode, gHpgpHalCB.lineMode); 
+                      HHAL_SetDefAddrConfig();
+                      printf("\n rescan");
+                      
+                   }*/ 
+              
+                  //if((gHalCB.timerIntCnt >= gHpgpHalCB.lastBcnRxTime + 13) && (gflag ==1)) //13 *4 = 52ms
+                 /* if((gHalCB.timerIntCnt >= gHpgpHalCB.lastBcnRxTime + 12) && (gflag ==1)) //13 *4 = 52ms
+                  {
+                     
+                      gflag = 0;
+                      //if(gtimer2 > 10)   //we miss bcn
+                      if(gtimer2 > 9)   //we miss bcn
+                      {
+                         gHpgpHalCB.lastBcnRxTime = (gHalCB.timerIntCnt - 4); 
+                         gflag = 1; 
+                         //gtimer2 = 0;
+                          printf("\n miss");
+                           if(gHpgpHalCB.lineMode == LINE_MODE_DC)
+                       gbpst1 += PLC_DC_BP_LEN;
+                       else
+                        gbpst1 += PLC_AC_BP_LEN;
+              
+                     WriteU32Reg(PLC_BPST_REG,ctorl(gbpst1)); 
+                      }
+                     
+                  } */
+              
+              }    
+              
+              /*
+              void HHAL_BPIntHandler()
+              {
+                  uPlcMedStatReg  plcMedStat;   
+                  uPlcStatusReg   plcStatus;
+                  static u32 prevBPInt_TimerCnt;
+                  static u32 curBPInt_TimerCnt;
+                  static u8  bpInit;
+              
+                  // Determine time gap between 2  consecutive HPGP BP interrupts.
+                  if( gHpgpHalCB.halStats.bpIntCnt )
+                  {
+                        bpInit = 1;
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 23  
+
+                  } 
+                  if( bpInit )
+                  {
+                      prevBPInt_TimerCnt = curBPInt_TimerCnt;
+                  }
+                  curBPInt_TimerCnt   = gHalCB.timerIntCnt;
+                  gHpgpHalCB.bpIntGap = curBPInt_TimerCnt - prevBPInt_TimerCnt;
+                  gHpgpHalCB.halStats.bpIntCnt++;
+              
+                  // Compute running average of prev 64 ZeroCrossing periods
+                  // and write to Bcn Period Average register.
+                  if( gHpgpHalCB.devMode == DEV_MODE_CCO && gHpgpHalCB.lineMode == LINE_MODE_AC )
+                  {
+                      //printf("HW Bcn PER = %lx\n",rtocl(ReadU32Reg(PLC_HWBCNPERLEN_REG)));
+                      gHpgpHalCB.curBcnPer = rtocl(ReadU32Reg(PLC_HWBCNPERCUR_REG));
+                      if( gHpgpHalCB.curBcnPer < PLC_MIN_AC_BPLEN )
+                      {
+                          gHpgpHalCB.curBcnPer = PLC_MIN_AC_BPLEN;
+                      }
+                      else if( gHpgpHalCB.curBcnPer > PLC_MAX_AC_BPLEN )
+                      {
+                          gHpgpHalCB.curBcnPer = PLC_MAX_AC_BPLEN;
+                      }
+              
+                      gHpgpHalCB.bcnPerSum += gHpgpHalCB.curBcnPer;
+                      gHpgpHalCB.perSumCnt ++;
+              
+                      if( gHpgpHalCB.perSumCnt >= PLC_BCNPERAVG_CNT )
+                      {
+                          gHpgpHalCB.bPerAvgInitDone = 1;
+                      }
+                      if( gHpgpHalCB.bPerAvgInitDone )
+                      {
+                          gHpgpHalCB.curBcnPer       = gHpgpHalCB.bcnPerSum >> PLC_BCNPERAVG_DIVCNT;
+                          gHpgpHalCB.bcnPerSum      -= gHpgpHalCB.curBcnPer;
+                      }
+                      WriteU32Reg(PLC_SWBCNPERAVG_REG, ctorl(gHpgpHalCB.curBcnPer));
+                      //WriteU32Reg( PLC_SWBCNPERAVG_REG, ctorl(0xCB735));
+                      //printf("SW Bcn PER = %lx\n",gHpgpHalCB.curBcnPer);
+                  }
+              
+                  // Prepare and send beacon here for now.
+                  // This will eventually be done by hpgp nsm module.
+                  HHT_BPIntHandler();
+              
+                  // PHY Active Hang workaround
+                  plcStatus.reg  = ReadU32Reg(PLC_STATUS_REG);
+                  plcMedStat.reg = ReadU32Reg(PLC_MEDIUMSTATUS_REG); 
+                  if( plcMedStat.s.phyActive && plcMedStat.s.mpiRxEn )
+                  {
+                      if(gHpgpHalCB.halStats.paRxEnHiCnt > PLC_RXPHYACT_HANG_THRES )
+                      {
+              #ifdef _RX_RECOVERY_                        
+                          plcStatus.s.nRxEn = 1;
+                          WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+                          CHAL_DelayTicks(5);
+                          
+                          plcStatus.s.plcRxEnSwCtrl  = 0;
+                          WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+              
+                          plcStatus.s.plcRxEnSwCtrl  = 1;
+                          WriteU32Reg(PLC_STATUS_REG, plcStatus.reg); 
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 24  
+
+              #endif             
+                          gHpgpHalCB.halStats.paRxEnHiCnt = 0;   
+                          gHpgpHalCB.halStats.phyActHangRstCnt++;                    
+                      }
+                      else if( gHpgpHalCB.halStats.prevBPTotalRxCnt == gHpgpHalCB.halStats.TotalRxGoodFrmCnt )
+                      {
+                          gHpgpHalCB.halStats.paRxEnHiCnt ++;
+                      } 
+                      else
+                      {
+                          gHpgpHalCB.halStats.paRxEnHiCnt = 0;  
+                      }                
+                  }
+                  gHpgpHalCB.halStats.prevBPTotalRxCnt = gHpgpHalCB.halStats.TotalRxGoodFrmCnt;  
+              }
+              */
+              #else  /* HPGP_HAL_TEST */
+1412          
+1413          u8 HHAL_IsSnidMatched (sHaLayer *hal, uRxCpDesc *rxCpDesc)
+1414          {
+1415   1          u8  snid;
+1416   1          snid = rxCpDesc->plc.snidHi;
+1417   1          snid = (snid << PKTQDESC1_SNIDHI_POS) | rxCpDesc->plc.snidLo;
+1418   1          return (snid == hal->hhalCb->snid);
+1419   1      }
+1420          
+1421          #if 0
+              eStatus HHAL_ProcRxFrameDesc(sHaLayer *hal, 
+                                         uRxFrmHwDesc *rxFrmHwDesc, 
+                                         sRxFrmSwDesc *rxFrmSwDesc)
+              {
+                  uPlcRssiLqiReg   rssiLqi;
+                  u8               stei;
+              
+                  /*  LQI and RSSI */
+                  rssiLqi.reg = ReadU32Reg(PLC_RSSILQI_REG);
+                  rxFrmSwDesc->frmInfo.plc.rssi = rssiLqi.s.rssi;
+                  rxFrmSwDesc->frmInfo.plc.lqi = rssiLqi.s.lqi;
+              
+                  /*  multicast and unicast */
+                  if(rxFrmHwDesc->plc.bcst)
+                  {
+                      rxFrmSwDesc->frmInfo.plc.mcstMode = HPGP_MNBCST;
+                  }
+                  else if(rxFrmHwDesc->plc.mcst)
+                  {
+                      rxFrmSwDesc->frmInfo.plc.mcstMode = HPGP_MCST;
+                  }
+                  else
+                  {
+                      rxFrmSwDesc->frmInfo.plc.mcstMode = HPGP_UCST;
+                  }
+              
+                  /* source TEI */
+                  stei = rxFrmHwDesc->plc.steiHi2;
+                  stei = (stei << PKTQDESC1_STEIHI_POS ) | rxFrmHwDesc->plc.steiLo6;
+                  rxFrmSwDesc->frmInfo.plc.stei = stei;
+              
+                  /* CLST */
+                  rxFrmSwDesc->frmInfo.plc.clst = rxFrmHwDesc->plc.clst;
+                  return STATUS_SUCCESS;
+              
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 25  
+
+              }
+              
+              #endif
+1460          
+1461          
+1462          
+1463          #endif /* HPGP_HAL_TEST */
+1464          
+1465          
+1466          
+1467          void HAL_beaconRxHandler(void *cookie)
+1468           {
+1469   1       
+1470   1      #ifndef HPGP_HAL_TEST
+1471   1        sHaLayer         *hal = (sHaLayer *)cookie;
+1472   1        sHpgpHalCB       *hhalCb = hal->hhalCb;
+1473   1          sEvent           *event = NULL;
+1474   1          sHpgpHdr         *hpgpHdr = NULL;
+1475   1      #else //#ifndef HPGP_HAL_TEST
+                  // 5 DWORD of Ether II header
+                sHpgpHalCB       *hhalCb = &gHpgpHalCB;                              // and hostHdr_t
+              #endif // #ifndef HPGP_HAL_TEST
+1479   1          sBcnHdr        *bcnHdr = NULL;
+1480   1        u32 xdata    rxBcnWordArr[(PLC_BCNRX_LEN>>2) + 5];
+1481   1        sFrmCtrlBlk      *pFrmCtrlBlk = NULL;
+1482   1      
+1483   1        u32              *prxBcnWordArr = NULL;
+1484   1        u8*              rxBcnByteArr;
+1485   1        u8               i, u8val;
+1486   1        u32        bts;
+1487   1        u8               bcnDataOffset;
+1488   1        sHybriiRxBcnHdr* pRxBcnHdr;
+1489   1          
+1490   1          uPlcStatusReg    plcStatus;
+1491   1        
+1492   1        if(1 == eth_plc_sniffer)
+1493   1        {
+1494   2          bcnDataOffset = (sizeof(hostHdr_t) + sizeof(sEth2Hdr));
+1495   2        }
+1496   1        else
+1497   1        {
+1498   2          bcnDataOffset = 0;
+1499   2        }
+1500   1      
+1501   1          // Confirm that Bcn Rx Fifo is not emplty.  //[YM] We should check the BcnCnt to make sure there is a 
+             -valid beacon in RxFifo
+1502   1          do
+1503   1        {
+1504   2            
+1505   2              if(eth_plc_sniffer == 1)
+1506   2              {
+1507   3                  // Size for (Ethernet header  + Hybri header) added
+1508   3                  //event = EVENT_Alloc(BEACON_LEN + (sizeof(sEth2Hdr) + sizeof(hostHdr_t)+4), sizeof(sHpgpHdr))
+             -;
+1509   3                  rxBcnByteArr  = (u8*)(rxBcnWordArr);
+1510   3              }
+1511   2              else
+1512   2              {
+1513   3              
+1514   3      #ifndef HPGP_HAL_TEST
+1515   3          
+1516   3                  event = EVENT_BcnAlloc(BEACON_LEN, sizeof(sHpgpHdr));
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 26  
+
+1517   3            if (event == NULL)
+1518   3                  {
+1519   4                      FM_Printf(FM_ERROR, "Bcn.AllocErr\n");
+1520   4                      return;
+1521   4                  }
+1522   3            
+1523   3          
+1524   3                  event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1525   3                  event->eventHdr.type = EVENT_TYPE_CC_BCN_IND;
+1526   3                  
+1527   3                  rxBcnByteArr = event->buffDesc.dataptr;
+1528   3                  
+1529   3                  event->buffDesc.datalen = BEACON_LEN;
+1530   3      #else
+                          rxBcnByteArr  = (u8*)(rxBcnWordArr);
+                  
+              #endif
+1534   3          
+1535   3              }
+1536   2              
+1537   2              prxBcnWordArr =  (u32*)((u8*)rxBcnByteArr + bcnDataOffset);
+1538   2              
+1539   2              hhalCb->halStats.smRxStuckCnt = 0;
+1540   2          // Read from fifo to local memory.
+1541   2          for( i=0 ; i<(PLC_BCNRX_LEN>>2) ; i++)
+1542   2          {
+1543   3            prxBcnWordArr[i] = ReadU32Reg(PLC_BCNRXFIFO_REG);
+1544   3          }
+1545   2              
+1546   2              bcnHdr = (sBcnHdr *) (rxBcnByteArr + (sizeof(sFrmCtrlBlk) + sizeof(sHybriiRxBcnHdr)));
+1547   2          hhalCb->halStats.BcnRxIntCnt++;            
+1548   2      
+1549   2          pRxBcnHdr = (sHybriiRxBcnHdr*)&prxBcnWordArr[0];
+1550   2      
+1551   2          hhalCb->snapShot = pRxBcnHdr->snapShot;
+1552   2          
+1553   2          // use R/W byte operation so we don't set plcTxQRdy here
+1554   2          plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+1555   2          u8val = ReadU8Reg(PLC_STATUS_REG+1);
+1556   2          u8val |= 0x80;    // plcBcnCntDecr (bit 15 of PLC_STATUS_REG)
+1557   2          WriteU8Reg(PLC_STATUS_REG+1, u8val);
+1558   2      
+1559   2              
+1560   2              
+1561   2      
+1562   2          if(1 == eth_plc_sniffer)
+1563   2          {
+1564   3          
+1565   3          
+1566   3      #ifdef HYBRII_ETH        
+1567   3            EHT_FromPlcBcnTx((rxBcnByteArr + sizeof(sHybriiRxBcnHdr)), 
+1568   3                     (PLC_BCNRX_LEN-sizeof(sHybriiRxBcnHdr)));
+1569   3      #endif
+1570   3            return;
+1571   3      
+1572   3          }
+1573   2      
+1574   2          // Update statistics.  //[YM] why check rsv1,2,3,4 bit fields??
+1575   2          //if(pRxBcnHdr->fccsCorrect && pRxBcnHdr->pbcsCorrect && !pRxBcnHdr->rsv1 && !pRxBcnHdr->rsv2 && !pRxBcn
+             -Hdr->rsv3 && !pRxBcnHdr->rsv4)  
+1576   2          if(pRxBcnHdr->fccsCorrect && pRxBcnHdr->pbcsCorrect)
+1577   2          {             
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 27  
+
+1578   3            gHpgpHalCB.halStats.TotalRxGoodFrmCnt++;
+1579   3            gHpgpHalCB.halStats.RxGoodBcnCnt++;
+1580   3            gHpgpHalCB.halStats.macRxStuckCnt = 0; 
+1581   3       #ifdef FREQ_DETECT
+1582   3                      if((gHpgpHalCB.gFreqCB.freqDetected == FALSE) &&  (gHpgpHalCB.devMode == DEV_MODE_STA))
+1583   3                      {
+1584   4                          FREQDET_DetectFrequencyUsingBcn();
+1585   4      //                    printf("\n using bcn \n");
+1586   4                      }
+1587   3      #endif
+1588   3      
+1589   3          }
+1590   2          else
+1591   2          {
+1592   3            gHpgpHalCB.halStats.RxErrBcnCnt++;
+1593   3            gHpgpHalCB.halStats.macRxStuckCnt++;  //[YM] It is not a right way to add macRxStuck count here. 
+1594   3      
+1595   3      #ifndef HPGP_HAL_TEST
+1596   3      
+1597   3            EVENT_Free(event);
+1598   3            
+1599   3      #endif
+1600   3            return;
+1601   3          }
+1602   2      
+1603   2          
+1604   2      
+1605   2          pFrmCtrlBlk = (sFrmCtrlBlk*) (rxBcnByteArr + sizeof(sHybriiRxBcnHdr)) ;
+1606   2          
+1607   2          bts  =  ((u32)(pFrmCtrlBlk->bts[3])<<24) +
+1608   2              ((u32)(pFrmCtrlBlk->bts[2])<<16) + 
+1609   2              ((u32)(pFrmCtrlBlk->bts[1])<<8) + 
+1610   2               (u32)(pFrmCtrlBlk->bts[0]); 
+1611   2          if( (bcnHdr->bt == BEACON_TYPE_CENTRAL)||
+1612   2                  (bcnHdr->bt == BEACON_TYPE_PROXY))
+1613   2                  {     
+1614   3                      
+1615   3                      hhalCb->bcnmisscnt = 0;
+1616   3                  gCCO_BTS = bts;
+1617   3                  hhalCb->bts = bts;
+1618   3                      hhalCb->bcnDetectFlag = 1;
+1619   3                  }
+1620   2      #ifdef ROUTE_TEST
+              
+                      for(i=0; i < 3; i++)
+                      {
+                          if(bcnHdr->stei == dropTei[i])
+                          {
+              
+                              
+              #ifndef HPGP_HAL_TEST
+                              
+                                          EVENT_Free(event);
+                                          
+              #endif
+                                          return;
+                          }
+                      }
+                  
+              #endif
+1638   2      
+1639   2      #ifdef HPGP_HAL_TEST
+C51 COMPILER V9.52.0.0   HAL_HPGPRX                                                        12/02/2014 14:35:34 PAGE 28  
+
+                  
+                      HHAL_ProcBcnLow(rxBcnByteArr);
+              #else
+1643   2      
+1644   2          hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+1645   2          hpgpHdr->snid = pFrmCtrlBlk->snid;
+1646   2      
+1647   2          event->buffDesc.dataptr += (sizeof(sFrmCtrlBlk) + sizeof(sHybriiRxBcnHdr));
+1648   2          event->buffDesc.datalen -= (sizeof(sFrmCtrlBlk) + sizeof(sHybriiRxBcnHdr)); 
+1649   2          
+1650   2          if (hhalCb->devMode == DEV_MODE_CCO)
+1651   2          {
+1652   3      #ifdef CCO_FUNC
+1653   3            LINKL_CcoProcBcnHandler(hal->bcnCookie, event);
+1654   3      #endif
+1655   3          }
+1656   2          else 
+1657   2          {
+1658   3      #ifdef STA_FUNC
+1659   3            LINKL_StaProcBcnHandler(hal->bcnCookie, event);
+1660   3      #endif
+1661   3          }
+1662   2      
+1663   2          MUXL_RecvMgmtPacket(hal->mgmtCookie, event);
+1664   2      
+1665   2      
+1666   2      #endif
+1667   2      
+1668   2      
+1669   2      
+1670   2        }while(plcStatus.s.plcBcnCnt);
+1671   1      
+1672   1      }
+1673          
+1674          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3531    ----
+   CONSTANT SIZE    =     58    ----
+   XDATA SIZE       =     66     371
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  5 WARNING(S),  0 ERROR(S)

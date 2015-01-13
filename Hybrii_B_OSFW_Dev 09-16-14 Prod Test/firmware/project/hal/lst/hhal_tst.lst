@@ -1,0 +1,3912 @@
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HHAL_TST
+OBJECT MODULE PLACED IN .\obj\hhal_tst.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE src\hhal_tst.c LARGE OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..
+                    -\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\src\nma;..\..\hal;.\
+                    -src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;..\..\hpgp\src\route
+                    -;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\components\utilities\linkli
+                    -st\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\sampleapp\inc;..\..\..\
+                    -components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC_SW_SYNC=1,inline,H
+                    -PGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_SPI_TX_CRC,HW_SPI_R
+                    -X_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND PRINT(.\lst\hhal_ts
+                    -t.lst) TABS(2) OBJECT(.\obj\hhal_tst.obj)
+
+line level    source
+
+   1          /*
+   2          *
+   3          * $Id: hhal_tst.c,v 1.16 2014/06/24 16:26:45 ranjan Exp $
+   4          *
+   5          * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/project/hal/src/hhal_tst.c,v $
+   6          *                              
+   7          * Description  : HAL test cases module.
+   8          * 
+   9          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+  10          * All rights reserved.
+  11          *
+  12          * Purpose      :
+  13          *     Implements test cases for HPGP HAL as well as common HAL.
+  14          *
+  15          *
+  16          */
+  17          
+  18          #ifdef RTX51_TINY_OS
+  19          #include <rtx51tny.h>
+  20          #endif
+  21          #include <stdio.h>
+  22          #include <string.h>
+  23          #include <intrins.h>
+  24          #include "fm.h"
+  25          #include "mmsg.h"
+  26          #include "hpgpdef.h"
+  27          #include "hal_common.h"
+  28          #include "hal.h"
+  29          
+  30          #include "hal_hpgp.h"
+  31          #include "hal_eth.h"
+  32          #include "hal_tst.h"
+  33          #include "hal_cfg.h"
+  34          #ifdef _LED_DEMO_
+              #include "led_board.h"
+              #endif
+  37          #include "sys_common.h"
+  38          #include "ism.h"
+  39          #include "datapath.h"
+  40          
+  41          #ifdef UART_HOST_INTF 
+              #include "uart_driver.h"
+              #endif
+  44          
+  45          #ifdef PROD_TEST 
+  46          #include "hal_prod_tst.h"
+  47          #endif
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 2   
+
+  48          
+  49          u16 var1 = 0;
+  50          
+  51          extern u8 testCmd;
+  52          
+  53          extern u8 gpbcscorrect;
+  54          extern u8 gvalid;
+  55          extern u32 gsnid;
+  56          //extern u32 missarr[1000];
+  57          extern u32 cnt5;
+  58          extern u32 misscnt;
+  59          extern u32 debugcnt;
+  60          extern u32 TX_RXLatency_TCC[8];
+  61          extern u8 TCC_REG_485_486_val[8][2];
+  62          u32 oldgbpst; 
+  63          u32 gbcnsent = 0;
+  64          extern sHalCB gHalCB;
+  65          int getline(char *s, int lim);
+  66          
+  67          #ifdef ASSOC_TEST
+              extern  void LM_SendAssocReq();
+              extern  void LM_SendGetKeyReq();
+              extern  void LM_SendIdentifyReq();
+                               
+              
+              #endif
+  74          
+  75          extern u16 CSMA_REGIONS_VAL_DC[HYBRII_MAXSMAREGION_CNT];
+  76          extern u16 CSMA_REGIONS_VAL_AC[HYBRII_MAXSMAREGION_CNT];
+  77          
+  78          void hhal_tst_sniff_cfg (bool sniff_en)
+  79          {
+  80   1          uPlcStatusReg  plcStatus;
+  81   1          
+  82   1          if (sniff_en)
+  83   1          {
+  84   2              printf("Enable \n");
+  85   2          }
+  86   1          else
+  87   1          {   printf("Disable \n");
+  88   2          }
+  89   1          printf("Sniffer Mode\n");
+  90   1          plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+  91   1          plcStatus.s.promiscModeEn  = sniff_en; 
+  92   1          plcStatus.s.snifferMode    = sniff_en;
+  93   1          WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+  94   1      }
+  95          
+  96          void EHT_SimulateTx(sEthSimTxTestParams*);
+  97          //void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams);
+  98          //void broadcast_CCOTEI(void);
+  99          // FIXED_LEN_ALT_ROBO test mode = Length select array
+ 100          extern u16 gAltRoboLenArr[];//={101,401,801,1201};
+ 101          extern u8 gAltEksTstArr[];// = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15}; // 7 NEKs, 2 PPEKs, Unenc
+ 102          //extern u16 gAltRoboLenArr[];
+ 103          //extern u8 gAltEksTstArr[];
+ 104          
+ 105          // Security test constants
+ 106          u8 gDefKey[10][16] = {
+ 107          {0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F},
+ 108          {0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x1D,0x1E,0x1F},
+ 109          {0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x29,0x2A,0x2B,0x2C,0x2D,0x2E,0x2F},
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 3   
+
+ 110          {0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3A,0x3B,0x3C,0x3D,0x3E,0x3F},
+ 111          {0x40,0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4A,0x4B,0x4C,0x4D,0x4E,0x4F},
+ 112          {0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5A,0x5B,0x5C,0x5D,0x5E,0x5F},
+ 113          {0x60,0x61,0x62,0x63,0x64,0x65,0x66,0x67,0x68,0x69,0x6A,0x6B,0x6C,0x6D,0x6E,0x6F},
+ 114          {0x70,0x71,0x72,0x73,0x74,0x75,0x76,0x77,0x78,0x79,0x7A,0x7B,0x7C,0x7D,0x7E,0x7F},
+ 115          {0x80,0x81,0x82,0x83,0x84,0x85,0x86,0x87,0x88,0x89,0x8A,0x8B,0x8C,0x8D,0x8E,0x8F},
+ 116          {0x90,0x91,0x92,0x93,0x94,0x95,0x96,0x97,0x98,0x99,0x9A,0x9B,0x9C,0x9D,0x9E,0x9F}
+ 117          //{0xA0,0xA1,0xA2,0xA3,0xA4,0xA5,0xA6,0xA7,0xA8,0xA9,0xAA,0xAB,0xAC,0xAD,0xAE,0xAF},
+ 118          //{0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBA,0xBB,0xBC,0xBD,0xBE,0xBF},
+ 119          //{0xC0,0xC1,0xC2,0xC3,0xC4,0xC5,0xC6,0xC7,0xC8,0xC9,0xCA,0xCB,0xCC,0xCD,0xCE,0xCF},
+ 120          //{0xD0,0xD1,0xD2,0xD3,0xD4,0xD5,0xD6,0xD7,0xD8,0xD9,0xDA,0xDB,0xDC,0xDD,0xDE,0xDF},
+ 121          //{0xE0,0xE1,0xE2,0xE3,0xE4,0xE5,0xE6,0xE7,0xE8,0xE9,0xEA,0xEB,0xEC,0xED,0xEE,0xEF},
+ 122          //{0xF0,0xF1,0xF2,0xF3,0xF4,0xF5,0xF6,0xF7,0xF8,0xF9,0xFA,0xFB,0xFC,0xFD,0xFE,0xFF},
+ 123          //
+ 124          //
+ 125          //{0xFF,0xFE,0xFD,0xFC,0xFB,0xFA,0xF9,0xF8,0xF7,0xF6,0xF5,0xF4,0xF3,0xF2,0xF1,0xF0},
+ 126          //{0xEF,0xEE,0xED,0xEC,0xEB,0xEA,0xE9,0xE8,0xE7,0xE6,0xE5,0xE4,0xE3,0xE2,0xE1,0xE0},
+ 127          //{0xDF,0xDE,0xDD,0xDC,0xDB,0xDA,0xD9,0xD8,0xD7,0xD6,0xD5,0xD4,0xD3,0xD2,0xD1,0xD0},
+ 128          //{0xCF,0xCE,0xCD,0xCC,0xCB,0xCA,0xC9,0xC8,0xC7,0xC6,0xC5,0xC4,0xC3,0xC2,0xC1,0xC0},
+ 129          //{0xBF,0xBE,0xBD,0xBC,0xBB,0xBA,0xB9,0xB8,0xB7,0xB6,0xB5,0xB4,0xB3,0xB2,0xB1,0xB0},
+ 130          //{0xAF,0xAE,0xAD,0xAC,0xAB,0xAA,0xA9,0xA8,0xA7,0xA6,0xA5,0xA4,0xA3,0xA2,0xA1,0xA0},
+ 131          //{0x9F,0x9E,0x9D,0x9C,0x9B,0x9A,0x99,0x98,0x97,0x96,0x95,0x94,0x93,0x92,0x91,0x90},
+ 132          //{0x8F,0x8E,0x8D,0x8C,0x8B,0x8A,0x89,0x88,0x87,0x86,0x85,0x84,0x83,0x82,0x81,0x80},
+ 133          //{0x7F,0x7E7,0x7D,0x7C,0x7B,0x7A,0x79,0x78,0x77,0x76,0x75,0x74,0x73,0x72,0x71,0x70},
+ 134          //{0x6F,0x6E,0x6D,0x6C,0x6B,0x6A,0x69,0x68,0x67,0x66,0x65,0x64,0x63,0x62,0x61,0x60},
+ 135          //{0x5F,0x5E,0x5D,0x5C,0x5B,0x5A,0x59,0x58,0x57,0x56,0x55,0x54,0x53,0x52,0x51,0x50},
+ 136          //{0x4F,0x4E,0x4D,0x4C,0x4B,0x4A,0x49,0x48,0x47,0x46,0x45,0x44,0x43,0x42,0x41,0x40},
+ 137          //{0x3F,0x3E,0x3D,0x3C,0x3B,0x3A,0x39,0x38,0x37,0x36,0x35,0x34,0x33,0x32,0x31,0x30},
+ 138          //{0x2F,0x2E,0x2D,0x2C,0x2B,0x2A,0x29,0x28,0x27,0x26,0x25,0x24,0x23,0x22,0x21,0x20},
+ 139          //{0x1F,0x1E,0x1D,0x1C,0x1B,0x1A,0x19,0x18,0x17,0x16,0x15,0x14,0x13,0x12,0x11,0x10},
+ 140          //{0x0F,0x0E,0x0D,0x0C,0x0B,0x0A,0x09,0x08,0x07,0x06,0x05,0x04,0x03,0x02,0x01,0x00}
+ 141          };
+ 142          
+ 143          #ifdef ETH_BRDG_DEBUG
+              u8 myDebugFlag = FALSE;
+              u8 myDebugFlag1 = FALSE;
+              u32 numTxFrms=0;
+              u32 numTxDoneInts=0;
+              u32 numPlcPendingRet=0;
+              u32 numForcePlcTxDone=0; 
+              u32 ethRxFrameCnt=0;
+              u32 ethTxFrameCnt=0;
+              u32 numEthTxDoneInts=0;
+              u32 oldNumEthTxDoneInts=0;
+              u32 ethTxWriteFail=0;
+              u32 numEthTxCp=0;
+              u32 numEthTxCpReleased=0;
+              u32 numPlcTxCp=0;
+              u32 plcTxWriteFail=0;
+              u32 TotalRxCpCnt=0;
+              u32 TotalRxFrameCnt=0;
+              u32 plcRxFrameCnt = 0;
+              u32 plcTxFrameCnt = 0;
+              u8 EthTxQueueCnt();
+              u8 PlcTxQueueCnt();
+              extern u8 gPlcPendingHead;
+              extern u8 gPlcPendingTail;
+              extern u8 ethTxDone;
+              #endif
+ 169          extern u8 gNekEks;                                     
+ 170          u8 bcnupdate = 1;                                  
+ 171          void HHT_SendBcn(u8 bcnType)
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 4   
+
+ 172          {
+ 173   1        u8              *bcnMPDU = gHpgpHalCB.lmBcn.cBcn.bcnBuff;//[PLC_BCN_LEN] = {0};
+ 174   1          u8 i;
+ 175   1        sHybriiPlcTxBcn* pPlcTxBcn;
+ 176   1        //sFrmCtrlBlk*    pAvFcBlk;
+ 177   1        sBcnHdr*        pBcnHdr;
+ 178   1        sBeHdr*         pBeHdr;
+ 179   1      //    u16             bto;
+ 180   1        u8              bpstoValueAddr;
+ 181   1        u8              bpstoValueOffset;
+ 182   1        sBEntry   *   pEntry;
+ 183   1        sRegion       v_region;
+ 184   1        sStEtTime       st_et;
+ 185   1          
+ 186   1          if(bcnupdate == 1) 
+ 187   1          {
+ 188   2            pPlcTxBcn    = (sHybriiPlcTxBcn*) bcnMPDU;
+ 189   2            pBcnHdr          = &pPlcTxBcn->bcnHdr;
+ 190   2            pBeHdr           = (sBeHdr*) &pPlcTxBcn->bcnHdr + sizeof(sBcnHdr);
+ 191   2            
+ 192   2      #if 1
+ 193   2          bcnupdate = 0;
+ 194   2              pPlcTxBcn->avFcBlk.bto[0] = PLC_PHY_TXLATENCY_FOR_TCC3;  //PLC_PHY_TXLATENCY_FOR_TCC2;
+ 195   2              pPlcTxBcn->avFcBlk.bto[1] = PLC_PHY_TXLATENCY_FOR_TCC3;
+ 196   2              pPlcTxBcn->avFcBlk.bto[2] = PLC_PHY_TXLATENCY_FOR_TCC3;
+ 197   2              pPlcTxBcn->avFcBlk.bto[3] = PLC_PHY_TXLATENCY_FOR_TCC3;
+ 198   2            pEntry           = (sBEntry *)pPlcTxBcn->bcnPld;
+ 199   2            memset(bcnMPDU, 0, sizeof(bcnMPDU));
+ 200   2      
+ 201   2      
+ 202   2          //[YM] - Beacon frame construction should be separated with Beacon frame Tx control
+ 203   2        // Beacon Header
+ 204   2          memcpy(pBcnHdr->nid, gHpgpHalCB.nid, NID_LEN);
+ 205   2      //    pBcnHdr->nid[6] = (pBcnHdr->nid[6] & NID_EXTRA_BIT_MASK) | (HYBRID_MODE_FULL << 6);
+ 206   2          pBcnHdr->nid[6] = (pBcnHdr->nid[6] & 0x3F) | (HYBRID_MODE_FULL << 6);
+ 207   2        
+ 208   2        pBcnHdr->stei  = gHpgpHalCB.selfTei;
+ 209   2        pBcnHdr->bt      = bcnType;
+ 210   2        pBcnHdr->slotusage      = 1;
+ 211   2        pBcnHdr->nm      = NET_MODE_CSMA_ONLY;
+ 212   2        pBcnHdr->ccocap  = CCO_CAP_LEVEL0;
+ 213   2        pBcnHdr->nbe     = 4;
+ 214   2      
+ 215   2          // Beacon Entry
+ 216   2      
+ 217   2          pEntry->beHDR = BEHDR_PERSISTENT_SCHED;
+ 218   2          pEntry->beLen = 6;
+ 219   2        pEntry->entry.persist_sch.pscd = 0;
+ 220   2        pEntry->entry.persist_sch.cscd = 0;
+ 221   2        pEntry->entry.persist_sch.ns   = 1;
+ 222   2        pEntry->entry.persist_sch.sai[0].sai4.stpf = 1;
+ 223   2        pEntry->entry.persist_sch.sai[0].sai4.stpf = 1;
+ 224   2        pEntry->entry.persist_sch.sai[0].sai4.glid = 0x7E;
+ 225   2      
+ 226   2          st_et.reg32 = MAKE_ST_ET(0x0034, 0x0cb8);
+ 227   2        st_et.reg32 = ctorl(st_et.reg32);
+ 228   2      
+ 229   2        pEntry->entry.persist_sch.sai[0].sai4.st_et[0]   = st_et.st_et[0];
+ 230   2        pEntry->entry.persist_sch.sai[0].sai4.st_et[1]   = st_et.st_et[1];
+ 231   2        pEntry->entry.persist_sch.sai[0].sai4.st_et[2]   = st_et.st_et[2];
+ 232   2      
+ 233   2          pEntry = (sBEntry *)((u8 *)pEntry + 8);
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 5   
+
+ 234   2      
+ 235   2      
+ 236   2          pEntry->beHDR = BEHDR_REGIONS;  // 2 bytes
+ 237   2         /* if(gHpgpHalCB.lineMode == LINE_MODE_AC)
+ 238   2          {
+ 239   2              pEntry->beLen = 7;
+ 240   2              pEntry->entry.regions.nr  = 3;    
+ 241   2          }
+ 242   2          else  */
+ 243   2          {
+ 244   3              pEntry->beLen = 13;
+ 245   3              pEntry->entry.regions.nr  = 6;
+ 246   3      //        pEntry->beLen = 5;
+ 247   3      //        pEntry->entry.regions.nr  = 2;
+ 248   3          }    
+ 249   2      
+ 250   2          for(i = 0; i < pEntry->entry.regions.nr; i++)
+ 251   2          {
+ 252   3          
+ 253   3              if((i == 0) || (i == 2))  //just set this to test stayout region , so for AC we want 1st region an
+             -d 3rd region as stayout
+ 254   3              {
+ 255   4                  v_region.s.region_type = REGION_TYPE_STAYOUT;
+ 256   4              }
+ 257   3              else 
+ 258   3              {
+ 259   4                  v_region.s.region_type = REGION_TYPE_SHARED_CSMA;
+ 260   4              }
+ 261   3              
+ 262   3              if(gHpgpHalCB.lineMode == LINE_MODE_DC)
+ 263   3              {
+ 264   4                  v_region.s.region_end_time = CSMA_REGIONS_VAL_DC[i];
+ 265   4              }
+ 266   3              else if(gHpgpHalCB.lineMode == LINE_MODE_AC)
+ 267   3              {
+ 268   4                  v_region.s.region_end_time = CSMA_REGIONS_VAL_AC[i];
+ 269   4              }
+ 270   3              pEntry->entry.regions.regn[i].reg16 = ctors(v_region.reg16);
+ 271   3      
+ 272   3          }
+ 273   2         /* if(gHpgpHalCB.lineMode == LINE_MODE_AC)
+ 274   2          {
+ 275   2              pEntry = (sBEntry *)((u8 *)pEntry + 9);   // pEntry->beHDR = BEHDR_REGIONS; + pEntry->beLen  // 7+
+             - BEHDR_REGIONS 2 bytes = 9
+ 276   2          }
+ 277   2          else  */
+ 278   2          {
+ 279   3               pEntry = (sBEntry *)((u8 *)pEntry + 15);
+ 280   3      //         pEntry = (sBEntry *)((u8 *)pEntry + 7);   
+ 281   3          }
+ 282   2      
+ 283   2          pEntry->beHDR = BEHDR_MAC_ADDR;
+ 284   2          pEntry->beLen = 6;
+ 285   2          pEntry->entry.mac_address[0] = 0xCC;
+ 286   2          pEntry->entry.mac_address[1] = 0x5D;
+ 287   2          pEntry->entry.mac_address[2] = 0x4E;
+ 288   2          pEntry->entry.mac_address[3] = 0x00;
+ 289   2          pEntry->entry.mac_address[4] = 0x35;
+ 290   2          pEntry->entry.mac_address[5] = 0x4E;
+ 291   2          pEntry = (sBEntry *)((u8 *)pEntry + 8);
+ 292   2      
+ 293   2          pEntry->beHDR = BEHDR_BPSTO;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 6   
+
+ 294   2          pEntry->beLen = 3;
+ 295   2          pEntry->entry.bpsto[0] = 0x28;
+ 296   2          pEntry->entry.bpsto[1] = 0x1B;
+ 297   2          pEntry->entry.bpsto[2] = 0x00;
+ 298   2      
+ 299   2          bpstoValueOffset = (u8 *)pEntry -  (u8 *)pPlcTxBcn  + 2;
+ 300   2      
+ 301   2          bpstoValueAddr   = (u8*) pBeHdr + sizeof(sBeHdr) - (u8*) pPlcTxBcn;
+ 302   2              gHpgpHalCB.lmBcn.cBcn.bpstoOffset = bpstoValueOffset;
+ 303   2          }
+ 304   1      
+ 305   1        
+ 306   1         // HHAL_PlcBcnWrite(bcnMPDU, bcnType, bpstoValueOffset);
+ 307   1      
+ 308   1      
+ 309   1      #else
+                  //printf("bto= %bx%02bx\n", pAvFcBlk->bto0[1],pAvFcBlk->bto0[0]);
+              #if (PLC_BCNDATA_TXHANG_TEST  && PLC_BCNDATA_FIXED_PATTERN)
+                 for(i=1 ; i<PLC_BCN_LEN ; i++)
+                  {
+                      bcnMPDU[i] = 0x55;
+                  }
+              #else                   
+                // Beacon Header
+                pBcnHdr->stei  = gHpgpHalCB.selfTei;
+                pBcnHdr->bt      = bcnType;
+                pBcnHdr->nm      = NET_MODE_CSMA_ONLY;
+                pBcnHdr->ccocap  = CCO_CAP_LEVEL0;
+                pBcnHdr->nbe     = 1;
+                  memcpy(pBcnHdr->nid, gHpgpHalCB.nid, NID_LEN);
+              
+                  // Beacon Entry
+                pBeHdr->beType   = BEHDR_BPSTO;
+                pBeHdr->beLen    = 3;
+              
+                for( i=bpstoValueAddr + 3 ; i< (PLC_BCN_PLD_LEN + HPGP_AVFC_LEN + HPGP_HP10FC_LEN) ; i++)
+                {
+                  bcnMPDU[i] = i;
+                }
+                  
+                  if(!gHpgpHalCB.halStats.TxBcnCnt)
+                  {
+                  //printf("bcnPldLen = %bd, bpstoValueAddr = %bd, lastByteIdx=%bu\n", sizeof(sHybriiPlcTxBcn)+5, bpstoV
+             -alueAddr, i );
+                  }
+              #endif
+                  bpstoValueAddr   = (u8*) pBeHdr + sizeof(sBeHdr) - (u8*) pPlcTxBcn;
+                HHAL_PlcBcnWrite(bcnMPDU, bcnType, bpstoValueAddr);
+              #endif
+ 342   1      
+ 343   1      }
+ 344          
+ 345          #if 0
+              void HHT_GetMinMaxLen ( sPlcSimTxTestParams* pTestParams, u8* stdModeSel, u8* minFrmLen, u8* maxFrmLen )
+              {
+                if(pTestParams->lenTestMode == INC_LEN_SINGLE_ROBO)
+                {
+                  if(pTestParams->roboTestMode == MINI_ROBO_TEST)
+                  {
+                    *minFrmLen =  1 ;
+                    *maxFrmLen = pTestParams->frmType?HYBRII_MINIROBO_DATALEN_MAX:HYBRII_MINIROBO_MGMTLEN_MAX;
+                  } 
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 7   
+
+                  else if(pTestParams->roboTestMode == STD_ROBO_TEST) 
+                  {
+                    *minFrmLen = pTestParams->frmType ? (HYBRII_MINIROBO_DATALEN_MAX+1):(HYBRII_MINIROBO_MGMTLEN_MAX+1);
+                    *maxFrmLen = pTestParams->frmType ? (HYBRII_STD1PBHSROBO_DATALEN_MAX):(HYBRII_STD1PBHSROBO_MGMTLEN_MAX)
+             -;
+                    *stdModeSel = 1;
+                  } 
+                  else if(pTestParams->roboTestMode == HS1PB_ROBO_TEST)
+                  {
+                    *minFrmLen = pTestParams->frmType ? (HYBRII_MINIROBO_DATALEN_MAX+1):(HYBRII_MINIROBO_MGMTLEN_MAX+1);
+                    *maxFrmLen = pTestParams->frmType ?( HYBRII_STD1PBHSROBO_DATALEN_MAX):(HYBRII_STD1PBHSROBO_MGMTLEN_MAX)
+             -;
+                    *stdModeSel = 0;
+                  }
+                  else if(pTestParams->roboTestMode == HS2PB_ROBO_TEST)
+                  {
+                    *minFrmLen = pTestParams->frmType ? (HYBRII_STD1PBHSROBO_DATALEN_MAX+1):(HYBRII_STD1PBHSROBO_MGMTLEN_MA
+             -X+1);
+                    *maxFrmLen = pTestParams->frmType ? (HYBRII_2PBHSROBO_DATALEN_MAX):(HYBRII_2PBHSROBO_MGMTLEN_MAX);
+                  }
+                  else if(pTestParams->roboTestMode == HS3PB_ROBO_TEST)
+                  {
+                    *minFrmLen = pTestParams->frmType ? (HYBRII_2PBHSROBO_DATALEN_MAX+1):(HYBRII_2PBHSROBO_MGMTLEN_MAX+1);
+                    *maxFrmLen = pTestParams->frmType ? (HYBRII_3PBHSROBO_DATALEN_MAX):(HYBRII_3PBHSROBO_MGMTLEN_MAX);
+                  }
+                      else if(pTestParams->roboTestMode == HSALLPB_ROBO_TEST)
+                      {
+                          *minFrmLen = pTestParams->frmType ? (HYBRII_MINIROBO_DATALEN_MAX+1):(HYBRII_MINIROBO_MGMTLEN_M
+             -AX+1);
+                          *maxFrmLen = pTestParams->frmType ? (HYBRII_3PBHSROBO_DATALEN_MAX):(HYBRII_3PBHSROBO_MGMTLEN_M
+             -AX);
+                      }
+                }
+                else if(pTestParams->lenTestMode == INC_LEN_ALL_ROBO)
+                {
+                  *stdModeSel = 1;
+                  *minFrmLen  = 1;
+                  *maxFrmLen  =  pTestParams->frmType ? (HYBRII_3PBHSROBO_DATALEN_MAX):(HYBRII_3PBHSROBO_MGMTLEN_MAX);
+                }
+                else if(pTestParams->lenTestMode == FIXED_LEN_ALT_ROBO)
+                {
+                  *stdModeSel = 1;
+                  *minFrmLen  = gAltRoboLenArr[0];
+                }
+              }
+              
+              #endif
+ 397          
+ 398          eHpgpRoboMod HHT_GetRoboModFrmLen ( u8 stdModeSel, u16 frmLen, eHpgpHwFrmType frmType)
+ 399          {
+ 400   1          eHpgpRoboMod      roboMode; 
+ 401   1          u16                   miniRoboFrmLenMax;
+ 402   1          u16                   stdRoboFrmLenMax;
+ 403   1          u16                   hsRobo2PbFrmLenMax;
+ 404   1          u16                   hsRobo3PbFrmLenMax;
+ 405   1          if(frmType == HPGP_HW_FRMTYPE_MGMT)
+ 406   1          {
+ 407   2              miniRoboFrmLenMax             = HYBRII_MINIROBO_MGMTLEN_MAX;
+ 408   2              stdRoboFrmLenMax              = HYBRII_STD1PBHSROBO_MGMTLEN_MAX;
+ 409   2              hsRobo2PbFrmLenMax            = HYBRII_2PBHSROBO_MGMTLEN_MAX;
+ 410   2              hsRobo3PbFrmLenMax            = HYBRII_3PBHSROBO_MGMTLEN_MAX;
+ 411   2          }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 8   
+
+ 412   1          else
+ 413   1          {
+ 414   2              miniRoboFrmLenMax             = HYBRII_MINIROBO_DATALEN_MAX;
+ 415   2              stdRoboFrmLenMax              = HYBRII_STD1PBHSROBO_DATALEN_MAX;
+ 416   2              hsRobo2PbFrmLenMax            = HYBRII_2PBHSROBO_DATALEN_MAX;
+ 417   2              hsRobo3PbFrmLenMax            = HYBRII_3PBHSROBO_DATALEN_MAX; 
+ 418   2          } 
+ 419   1          if(frmLen <= miniRoboFrmLenMax)
+ 420   1          {
+ 421   2              roboMode       = HPGP_ROBOMD_MINI;
+ 422   2          }
+ 423   1          else if( (frmLen > miniRoboFrmLenMax) && (frmLen <= stdRoboFrmLenMax))
+ 424   1          {
+ 425   2              if(stdModeSel)
+ 426   2              {
+ 427   3                  roboMode    = HPGP_ROBOMD_STD;
+ 428   3              } else
+ 429   2              {
+ 430   3                  roboMode    = HPGP_ROBOMD_HS;
+ 431   3              }                    
+ 432   2          }
+ 433   1          else
+ 434   1          {
+ 435   2              roboMode       = HPGP_ROBOMD_HS;
+ 436   2           }
+ 437   1         return roboMode;
+ 438   1      }
+ 439          
+ 440          
+ 441          void update_powermode(u8 TxRxPowermode)
+ 442          {
+ 443   1          char            input[10];
+ 444   1          u8 powermode;
+ 445   1         
+ 446   1         
+ 447   1          if(TxRxPowermode == 0)
+ 448   1          {
+ 449   2              do
+ 450   2              {
+ 451   3                  printf("Enter Transmission Power mode  : 0 - Automotive, 1 - Normal, 2 - High Power ");
+ 452   3                  while (getline(input, sizeof(input)) > 0)
+ 453   3                  {
+ 454   4                      if(sscanf(input,"%bd",&powermode) >= 1)
+ 455   4                      break;
+ 456   4                  }
+ 457   3              }while (powermode>2);
+ 458   2              if(powermode == 0)
+ 459   2              {
+ 460   3                 mac_utils_spi_write(0x34,0x08);   //added by varsha
+ 461   3                 mac_utils_spi_write(0x35,0x30);   //added by varsha
+ 462   3                  
+ 463   3              }
+ 464   2              else if(powermode == 1)
+ 465   2              {
+ 466   3                  mac_utils_spi_write(0x34,0x00);   //added by varsha
+ 467   3                  mac_utils_spi_write(0x35,0x00);   //added by varsha
+ 468   3              }
+ 469   2              else if(powermode == 2)
+ 470   2              {
+ 471   3                  mac_utils_spi_write(0x34,0x00);   //added by varsha
+ 472   3                  mac_utils_spi_write(0x35,0x0f);   //added by varsha
+ 473   3              }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 9   
+
+ 474   2          }
+ 475   1          else
+ 476   1          {
+ 477   2              do
+ 478   2              {
+ 479   3                  printf("Enter Receiver Power mode  : 0 - Normal, 1 - Power Saving ");
+ 480   3                  while (getline(input, sizeof(input)) > 0)
+ 481   3                  {
+ 482   4                      if(sscanf(input,"%bd",&powermode) >= 1)
+ 483   4                      break;
+ 484   4                  }
+ 485   3              }while (powermode>1);  
+ 486   2      
+ 487   2               if(powermode == 0)
+ 488   2              {
+ 489   3                 mac_utils_spi_write(0x26,0x00);   //added by varsha
+ 490   3                
+ 491   3                  
+ 492   3              }
+ 493   2              else if(powermode == 1)
+ 494   2              {
+ 495   3                  mac_utils_spi_write(0x26,0x1C);   //added by varsha
+ 496   3                 
+ 497   3              }
+ 498   2      
+ 499   2      
+ 500   2      
+ 501   2          }
+ 502   1      
+ 503   1      
+ 504   1      }
+ 505          
+ 506          
+ 507          
+ 508          #if 0
+              
+              void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
+              {
+              //  sPlcTxFrmSwDesc plcTxFrmSwDesc;
+              //#ifdef Packet_grouping
+                  u32             Sw_command_queue[8];
+                  u8              cmd_num;
+              //#endif  
+              //    uPlcTxPktQCAP_Write   cap_write;
+                  uTxCMDQueueWrite      txCmdQueueWrtie;
+                  sTxFrmSwDesc    plcTxFrmSwDesc;
+                  u8              stdModeSel;
+                  u16             stdRoboFrmLenMax;
+                  u8              minFrmLen;
+                  u8              maxFrmLen;
+                  u16             curFrmLen;     
+                  eFrmMcstMode    mcstMode;
+                  eHpgpHwFrmType  frmType;
+                  // mixed mode variables
+                  u16             tmpFrmLen;
+                  u8              curOffsetDW;
+                  u8              curDescLen;
+                  u8              eksArrIdx;
+                  uAltPlid        altPlid;
+                  uAltRoboLenIdx  altRoboLenIdx;        
+                  eStatus         status;
+                  u8              i;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 10  
+
+                  u8              j;
+                  u8              quit; 
+                  u16             tmpPayloadLen;
+                u8        cp_localBuf[HYBRII_CELLBUF_SIZE]; // local CP buffer
+                  u8              dbc_pktchange;
+              
+                dbc_pktchange     = 0;
+                  quit              = 0;
+                  altPlid.val       = 0;
+                  altRoboLenIdx.val = 0;
+                  eksArrIdx         = 0;
+              //#ifdef Packet_grouping0 
+                cmd_num           = 0;     
+              //#endif
+              
+                  memset((u8*)&plcTxFrmSwDesc, 0x00, sizeof(plcTxFrmSwDesc));
+                  
+                  plcTxFrmSwDesc.frmInfo.plc.eks            = pTestParams->eks;       
+                  plcTxFrmSwDesc.frmInfo.plc.bcnDetectFlag  = REG_FLAG_SET;// REG_FLAG_CLR;
+                  plcTxFrmSwDesc.frmInfo.plc.clst = HPGP_CONVLYRSAPTYPE_RSV;//HPGP_CONVLYRSAPTYPE_ETH; 
+              
+                  if(pTestParams->frmType == 0)     
+                  {
+                          plcTxFrmSwDesc.frmType = HPGP_HW_FRMTYPE_MGMT;
+                          frmType                = HPGP_HW_FRMTYPE_MGMT;
+                  }
+                  else if(pTestParams->frmType == 1)
+                  {
+                      plcTxFrmSwDesc.frmType        = HPGP_HW_FRMTYPE_MSDU;
+                      frmType                       = HPGP_HW_FRMTYPE_MSDU;
+                  }
+                  else if (pTestParams->frmType == 2) // frmType = 2
+                  {
+                      plcTxFrmSwDesc.frmType = HPGP_HW_FRMTYPE_SOUND;
+                      frmType                = HPGP_HW_FRMTYPE_SOUND;
+                      plcTxFrmSwDesc.frmInfo.plc.src     = pTestParams->src;
+                      plcTxFrmSwDesc.frmInfo.plc.saf     = pTestParams->saf;
+                      plcTxFrmSwDesc.frmInfo.plc.scf     = pTestParams->scf;
+                  }
+                else if (pTestParams->frmType == HPGP_HW_FRMTYPE_RTS)
+                {
+                    plcTxFrmSwDesc.frmType        = HPGP_HW_FRMTYPE_MSDU;  //HPGP_HW_FRMTYPE_RTS;
+                      frmType                       = HPGP_HW_FRMTYPE_MSDU;  //HPGP_HW_FRMTYPE_RTS;
+                      plcTxFrmSwDesc.frmInfo.plc.dt_av = HPGP_DTAV_RTS_CTS;
+                }
+                else if  (pTestParams->frmType == HPGP_HW_FRMTYPE_CTS)
+                  {
+                    plcTxFrmSwDesc.frmType        = HPGP_HW_FRMTYPE_MSDU;  //HPGP_HW_FRMTYPE_CTS;
+                      frmType                       = HPGP_HW_FRMTYPE_MSDU;  //HPGP_HW_FRMTYPE_CTS;
+                      plcTxFrmSwDesc.frmInfo.plc.dt_av = HPGP_DTAV_RTS_CTS;
+                }
+                  
+                  mcstMode           = pTestParams->mcstMode;
+                  if(pTestParams->mcstMode == 0)   
+                  {
+                      plcTxFrmSwDesc.frmInfo.plc.dtei           = gHpgpHalCB.remoteTei;       
+                  }
+                  else
+                  {
+                      plcTxFrmSwDesc.frmInfo.plc.dtei           = 0xFF;
+                  }
+              
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 11  
+
+                  if(pTestParams->altPlidTest)
+                  {
+                      plcTxFrmSwDesc.frmInfo.plc.plid = pTestParams->plid; //0;
+                  }
+                  else
+                  {
+                      plcTxFrmSwDesc.frmInfo.plc.plid  = pTestParams->plid;   
+                  }                                
+                //printf("plid = %d\n",plcTxFrmSwDesc.frmInfo.plc.plid);  //[YM] debug Hybrii_B data pkt Tx
+                
+                  plcTxFrmSwDesc.frmInfo.plc.stei           = gHpgpHalCB.selfTei;//HYBRII_DEFAULT_TEISTA;
+              
+              
+                  stdModeSel                    = pTestParams->stdModeSel;
+              
+                  // Incremental/alternating length modes
+                  if(pTestParams->frmLen == 0)   //Continuous Tx mode
+                  {
+                      HHT_GetMinMaxLen(pTestParams, &stdModeSel, &minFrmLen, &maxFrmLen);
+                      
+                      stdRoboFrmLenMax = plcTxFrmSwDesc.frmType==HPGP_HW_FRMTYPE_MSDU?(HYBRII_STD1PBHSROBO_DATALEN_MAX):
+             -(HYBRII_STD1PBHSROBO_MGMTLEN_MAX);               
+                      curFrmLen = minFrmLen;
+                      FM_Printf(FM_LINFO,"\nStarting from len = %u\n",curFrmLen);
+                  }
+                  else
+                  {
+                      // fixed length test
+                      curFrmLen = pTestParams->frmLen;
+                  }
+                  plcTxFrmSwDesc.frmInfo.plc.stdModeSel = stdModeSel;
+                  curOffsetDW  = pTestParams->offsetDW;
+                  curDescLen   = pTestParams->descLen; 
+                  gHpgpHalCB.halStats.CurTxTestFrmCnt = 0;
+                
+                  //for each frame
+                  while(1)
+                  {
+                      u8  frmData = 0;
+                      tmpFrmLen   = 0;
+                      tmpPayloadLen = 0;
+              
+                      if (plcTxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_SOUND)
+                      {
+                          if(pTestParams->frmLen <= 136)
+                              plcTxFrmSwDesc.frmLen = pTestParams->frmLen; //136;
+                          else
+                              plcTxFrmSwDesc.frmLen = pTestParams->frmLen; //520;
+                      }
+                      else
+                      {
+                          // check for mgmt frm max len, in case this is inclen & altfrmtype test
+                          plcTxFrmSwDesc.frmLen         =  (plcTxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_MGMT && curFrmLen 
+             -> HYBRII_3PBHSROBO_MGMTLEN_MAX) ? \
+                                                            HYBRII_3PBHSROBO_MGMTLEN_MAX : curFrmLen ;  
+                      }   
+                  
+                      //[YM] Add DBC Code
+                    if (pTestParams->dbc)
+                    {
+                        if (pTestParams->pattern == 1)  // One RoBo + One Mini RoBo
+                        {
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 12  
+
+                              if (dbc_pktchange > 1)
+                        dbc_pktchange = 0;
+                      if (dbc_pktchange == 0)
+                            {
+                                plcTxFrmSwDesc.frmLen =  HYBRII_STD1PBHSROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 1;  //Std RoBo
+                            }
+                      else if (dbc_pktchange == 1)
+                      {
+                          plcTxFrmSwDesc.frmLen =  HYBRII_MINIROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;
+                      }
+                        }
+                    else if (pTestParams->pattern == 2)  // Three Mini RoBo
+                    {
+                          plcTxFrmSwDesc.frmLen =  HYBRII_MINIROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;
+                    }
+                    else if (pTestParams->pattern == 3)  //Two MiniRoBo + One HS RoBo 1 PB
+                    {
+                      if ((dbc_pktchange == 0)|(dbc_pktchange == 1))
+                            {
+                                plcTxFrmSwDesc.frmLen =  HYBRII_MINIROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;  
+                            }
+                      else
+                      {
+                          plcTxFrmSwDesc.frmLen =  HYBRII_STD1PBHSROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;
+                      }
+                    }
+                    else if (pTestParams->pattern == 4)  //One MiniRoBo + One HS RoBo 2PB
+                    {
+                      if (dbc_pktchange == 0)
+                            {
+                                plcTxFrmSwDesc.frmLen =  HYBRII_MINIROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;  
+                            }
+                      else
+                      {
+                          plcTxFrmSwDesc.frmLen =  HYBRII_2PBHSROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;
+                      }
+                    }
+                    else if (pTestParams->pattern == 5)  //Two HS RoBo with 1 PB
+                    {
+                            plcTxFrmSwDesc.frmLen =  HYBRII_STD1PBHSROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;  
+                    }
+                    else if (pTestParams->pattern == 6)  //One Mini RoBo + One HS RoBo with 3 PB
+                    {
+              
+                      if (dbc_pktchange == 0)
+                      {
+                          plcTxFrmSwDesc.frmLen =  HYBRII_MINIROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;  
+                      }
+                      else
+                      {
+                        plcTxFrmSwDesc.frmLen =  HYBRII_3PBHSROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;
+                      } 
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 13  
+
+                    }
+                    else if (pTestParams->pattern == 7)  //One RoBo + One HS RoBo with 1 PB
+                    {
+                      if (dbc_pktchange == 0)
+                      {
+                          plcTxFrmSwDesc.frmLen =  HYBRII_STD1PBHSROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 1;  
+                      }
+                      else
+                      {
+                        plcTxFrmSwDesc.frmLen =  HYBRII_STD1PBHSROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;
+                      } 
+                    }
+                    else if (pTestParams->pattern == 8)  //One HSRoBo with 1 PB + One HSRoBo with 2 PB
+                    {
+                      if (dbc_pktchange == 0)
+                      {
+                          plcTxFrmSwDesc.frmLen =  HYBRII_STD1PBHSROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;  
+                      }
+                      else
+                      {
+                        plcTxFrmSwDesc.frmLen =  HYBRII_2PBHSROBO_DATALEN_MAX;
+                          plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;
+                      }
+                    }
+                      }
+              
+                          plcTxFrmSwDesc.cpCount        = 0; 
+                    plcTxFrmSwDesc.frmInfo.plc.phyPendBlks    = pTestParams->plid>0 ? HPGP_PPB_CAP123 : HPGP_PPB_CAP0;
+                          plcTxFrmSwDesc.frmInfo.plc.mcstMode       = mcstMode;       
+                  
+                      if (mcstMode > 0)
+                          plcTxFrmSwDesc.frmInfo.plc.phyPendBlks = HPGP_PPB_MCFRPT;
+                        else
+                            plcTxFrmSwDesc.frmInfo.plc.phyPendBlks    = (pTestParams->plid > 0) ? HPGP_PPB_CAP123 : HPGP_
+             -PPB_CAP0;             
+              
+                  
+                      if(pTestParams->altPlidTest)
+                      {
+                          pTestParams->plid = (gHpgpHalCB.halStats.CurTxTestFrmCnt & 0x3) ; //plid value will be changed
+             - in sequence;
+                          plcTxFrmSwDesc.frmInfo.plc.plid  = pTestParams->plid;    
+                      }
+                  else
+                    plcTxFrmSwDesc.frmInfo.plc.plid  = pTestParams->plid;
+                                  
+                      // create cp descriptors
+                      while(tmpFrmLen < plcTxFrmSwDesc.frmLen)
+                      {       
+                          u8        cp;
+                          u8        tmpOffsetDW;
+                          u8        tmpOffsetByte;
+                          u8        tmpDescLen;
+                          u8        remDescLen;
+                          u8        actualDescLen;
+                          volatile u8 xdata *       cellAddr;
+              
+                          tmpOffsetDW =      curOffsetDW;
+                          tmpDescLen  =      curDescLen; 
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 14  
+
+                          // Fetch CP
+                    //printf("(C)\n");
+                          do
+                          {
+                              status = CHAL_RequestCP(&cp);
+              #ifdef _FIXME_
+                              if( CHT_Poll() == 'q')
+                              {
+                                  // Realease CPs fetched so far for current frame -- tbd
+                                  quit = 1;
+                                  break;
+                              }
+              
+              #endif
+                          }while (status != STATUS_SUCCESS);
+                          // check for user initiated exit task
+                          if(quit)
+                          {
+                              break;
+                          }
+                    
+                          i = plcTxFrmSwDesc.cpCount;
+                          // test offset and desc len - only for first CPs
+                          if((i==0 || i==1) && (pTestParams->frmType != 2))
+                          //if(i==0 || i==1)
+                          { 
+                              if(pTestParams->altOffsetDescLenTest)
+                              {
+                                  curOffsetDW--;
+                                  curDescLen+=4;    
+                                  tmpOffsetDW =      curOffsetDW;  
+                                  tmpDescLen  =      curDescLen;  
+                                  if( curOffsetDW==0 )
+                                  {
+                                      curOffsetDW  = pTestParams->offsetDW; // 0
+                                      curDescLen   = pTestParams->descLen;  //HYBRII_DEFAULT_SNID;
+                                      FM_Printf(FM_LINFO,"OffsetDW & DescLen resetting to %bu & %bu respectively.\n", cu
+             -rOffsetDW, curDescLen);
+                                  }
+                              } //printf("curOffsetDW = %bu, tempDescLen=%bu\n", tmpOffsetDW, tmpDescLen);              
+             -              
+                          }
+                          else if(pTestParams->frmType == 2)
+                          {
+                                tmpOffsetDW =      0;  
+                                tmpDescLen  =      curDescLen;  
+                          }
+                          else
+                          {
+                              tmpOffsetDW = 0;
+                              tmpDescLen  = HYBRII_CELLBUF_SIZE;
+                          }
+              
+                          tmpOffsetByte = tmpOffsetDW << 2;
+                          actualDescLen =  (plcTxFrmSwDesc.frmLen-tmpFrmLen)>tmpDescLen ? tmpDescLen : (plcTxFrmSwDesc.f
+             -rmLen-tmpFrmLen);
+                          remDescLen    =  actualDescLen;
+              
+                          if(( i==0 || i==1 ) && tmpOffsetDW != 0)
+                          {
+                              FM_Printf(FM_LINFO,"curFrmLen = %u, curOffsetDW = %bu, curDescLen=%bu, free CPCnt = %bu\n"
+             -, 
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 15  
+
+                                                           plcTxFrmSwDesc.frmLen, tmpOffsetDW, actualDescLen, CHAL_GetFr
+             -eeCPCnt());
+                          }
+                          //FM_Printf(FM_LINFO,"curOffsetByte = %bu, curDescLen=%bu\n", tmpOffsetByte, actualDescLen);
+                          
+                          // Fill Buffer with pattern
+              #ifdef MEM_PROTECTION
+                    // Get local CP buffer
+                    cellAddr = &cp_localBuf[0];
+              #else
+                          cellAddr = CHAL_GetAccessToCP(cp);
+              #endif
+                    memset(&cp_localBuf[0], 0, HYBRII_CELLBUF_SIZE);  // clear read buf for every new test
+                          FM_Printf(FM_LINFO,"cp = %bu, cellAddr=%08lX, seqNum=%bu\n",cp,(u32)cellAddr, gHpgpHalCB.halSt
+             -ats.TxSeqNum);
+                          //printf("cp = %bu, cellAddr=%08lX, seqNum=%bu\n",cp,(u32)cellAddr, gHpgpHalCB.halStats.TxSeqN
+             -um);
+                    
+                          // Add Seq Num as first byte of first CP
+                          if ( i==0 )
+                          {
+                              if (pTestParams->frmType != 2)
+                              {
+              #if  PLC_BCNDATA_FIXED_PATTERN
+                              cellAddr[tmpOffsetByte] = 0xBB;
+                              // Start frame data from seq num.
+                              frmData   = (u8)(gHpgpHalCB.halStats.TxSeqNum+1);   
+              
+              #elif PLC_DATA_FIXED_PATTERN
+              
+                              cellAddr[tmpOffsetByte] = (u8)((gHpgpHalCB.halStats.TxSeqNum + 1) & 0xFF);
+                              // Alternatig frame bytes
+                              frmData = ((gHpgpHalCB.halStats.TxSeqNum + 1) & 0x01) ?  0xAA : 0x55 ;
+              #endif        
+                              tmpOffsetByte +=1;
+                              remDescLen    -=1; 
+                              }
+                              else 
+                              {                     
+                                  //cellAddr[tmpOffsetByte] = (u8)((gHpgpHalCB.halStats.TxSeqNum + 1) & 0xFF);
+                                  // Alternatig frame bytes
+                                  frmData = ((gHpgpHalCB.halStats.TxSeqNum + 1) & 0x01) ?  0x00 : 0x00 ;
+               
+                                  //tmpOffsetByte +=1;
+                                  //remDescLen    -=1; 
+                              }
+                          }
+              
+                          if (pTestParams->frmType == 2) // Sound packet 
+                          {
+                              for( j=tmpOffsetByte ; j<tmpOffsetByte+remDescLen ; j++)
+                              {    
+                                  cellAddr[j] = 0x0;
+                              }
+                          }
+                          else
+                          {
+                              for( j=tmpOffsetByte ; j<tmpOffsetByte+remDescLen ; j++)
+                              {
+                  #if  PLC_BCNDATA_FIXED_PATTERN
+                                  cellAddr[j] = 0xBB;
+                  #elif PLC_DATA_FIXED_PATTERN                    
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 16  
+
+                                  cellAddr[j] = frmData;
+                                  frmData     = _cror_(frmData, 1);
+                  #else
+                                  cellAddr[j] = frmData++;
+                  #endif
+                              }
+                          }
+              #if 0       
+                          // [YM] debug message
+                    printf("CP len: %bu, offset=%bu\n", remDescLen, tmpOffsetByte);                         
+                    
+                          for( j=tmpOffsetByte ; j<tmpOffsetByte+remDescLen ; j++)
+                          {
+                              printf("0X%bx ", cellAddr[j]);
+                      if ((j>0) && ((j % 20) == 0))
+                        printf("\n");
+                          } 
+              #endif                              
+                    //printf("\n");
+                          plcTxFrmSwDesc.cpArr[i].offsetU32 = tmpOffsetDW;
+                          plcTxFrmSwDesc.cpArr[i].len       = actualDescLen; 
+                          tmpFrmLen                        += plcTxFrmSwDesc.cpArr[i].len; 
+                          plcTxFrmSwDesc.cpArr[i].cp        = cp;
+                          plcTxFrmSwDesc.cpCount++;
+                          tmpPayloadLen += (plcTxFrmSwDesc.cpArr[i].len - tmpOffsetByte);
+              
+                          // Alternate Encryption Test Mode
+                          if(pTestParams->secTestMode == ALT_UNENC_NEK)
+                          {
+                              plcTxFrmSwDesc.frmInfo.plc.eks = (plcTxFrmSwDesc.frmInfo.plc.eks  >= HPGP_MAX_NEKS) ? 0  :
+             - (plcTxFrmSwDesc.frmInfo.plc.eks + 1);
+                          }
+                          else if(pTestParams->secTestMode == ALT_UNENC_NEK_PPEK)
+                          {
+                              plcTxFrmSwDesc.frmInfo.plc.eks  = gAltEksTstArr[eksArrIdx++];
+                              plcTxFrmSwDesc.frmInfo.plc.dtei = gHpgpHalCB.remoteTei;
+                          }
+              
+              #ifdef MEM_PROTECTION
+                    // now copy the CP local buf to the actual CP memory
+                    if (HHAL_CP_Put_Copy(cp, cellAddr, HYBRII_CELLBUF_SIZE) == STATUS_FAILURE)
+                    {
+                      printf("HHT_SimulateTx: Failed to put a copy of CP %bu. Continue with nex CP\n", cp);
+                      continue;
+                    }
+              #endif
+                      } 
+                    
+                  
+              #ifdef Packet_grouping0
+                      //[YM] Check multiple packet queueing is requested or not
+                      if (gHpgpHalCB.plcMultiPktTest > 1 )
+                      {
+                              cmd_num++;
+              
+                      //printf("1-0. cmd_num = %bu \n", cmd_num);
+                              /*  Write PLC Command Queue Write Register to trigger HW Tx */
+                              txCmdQueueWrtie.reg = 0;
+                              txCmdQueueWrtie.s.txQ = pTestParams->plid;
+                            txCmdQueueWrtie.s.txCap = pTestParams->plid;
+                            txCmdQueueWrtie.s.txRobo = pTestParams->stdModeSel;
+              #ifdef ETH_BRDG_DEBUG
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 17  
+
+                      if (myDebugFlag)
+                      {
+                        //printf("txCmdQueueWrtie.reg = %lx\n",txCmdQueueWrtie.reg);
+                      //printf("txCmdQueueWrtie.s.txQ = %bu\n", txCmdQueueWrtie.s.txQ);
+                      printf("txCmdQueueWrtie.s.txCap = %bu\n", txCmdQueueWrtie.s.txCap);
+                      //printf("txCmdQueueWrtie.s.txRobo = %bu\n", txCmdQueueWrtie.s.txRobo);
+                      }
+              #endif
+                      //WriteU32Reg(PLC_CMDQ_REG, txCmdQueueWrtie.reg);
+                      //[YM] store command queue setting value to a software queue, will write all stored command queue sett
+             -ing value to 
+                      //command queue later
+                      Sw_command_queue[cmd_num - 1] = txCmdQueueWrtie.reg;
+                      if (cmd_num > (gHpgpHalCB.plcMultiPktTest - 1))
+                        {
+                                     u8 p;
+                           
+                           // Write all the store command settings in sw command queue [64] to HW command queue register
+                           for (p = 0; p < gHpgpHalCB.plcMultiPktTest; p++)
+                            {
+                               WriteU32Reg(PLC_CMDQ_REG, Sw_command_queue[p]);
+                             printf("Write PLC_CMDQ_REQ = %u\n", Sw_command_queue[p]);
+                            }
+                           if (cmd_num > 0)
+                               printf("1. Write PLC_CMDQ_REG %bu times\n", cmd_num);
+                           cmd_num = 0;
+                           gHpgpHalCB.plcMultiPktTest = 0;
+                        }
+                      }
+              #endif  //Packet_grouping0  
+                      // check for user initiated exit task
+                      if(status == STATUS_SUCCESS)
+                      {
+                                 u16 pkt_retry = 0;
+                          do
+                          {
+                              // Transmit the frame;
+                              //printf("(D)\n");
+                              status = HHAL_PlcTxQWrite(&plcTxFrmSwDesc);
+                      if (status == STATUS_FAILURE)
+                      {
+                        pkt_retry++;
+                        //printf("Write PLC Tx Q failed, %bu times, cp = %bu\n", pkt_retry, plcTxFrmSwDesc.cpCount);
+                        // [YM] - retry the packet transmission until it failed too many times
+              
+                                  CHAL_DelayTicks(64);
+                        if (pkt_retry > 20)
+                        {
+                                      printf("\nWrite PLC Tx Q failed, cp = %bu, Quit !!!!\n", plcTxFrmSwDesc.cpCount);
+                            quit = 1;
+                            break;
+                        }
+                      }
+                              // check for user initiated exit task from infinite loop
+                              if( CHT_Poll() == 'q')              
+                              {
+                                  // if TxQWrite failed, release CPs for current frame -- tbd
+                                  quit = 1;
+                                  break;
+                              }
+                          } while(status == STATUS_FAILURE);
+                            pkt_retry = 0;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 18  
+
+                      }
+              
+                   
+                      if(status == STATUS_SUCCESS)
+                      {
+                          gHpgpHalCB.halStats.CurTxTestFrmCnt++;
+                          gHpgpHalCB.halStats.TxSeqNum++;
+              
+                          // check for alternating plid
+                          plcTxFrmSwDesc.frmInfo.plc.plid = pTestParams->altPlidTest ? altPlid.s.plid++ : pTestParams->p
+             -lid;
+              
+                          // check for alternating frametype
+                          if(pTestParams->altFrmTypeTest)
+                          {
+                              plcTxFrmSwDesc.frmType = (plcTxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_MSDU) ? HPGP_HW_FRMTYP
+             -E_MGMT : HPGP_HW_FRMTYPE_MSDU;
+                          }
+                          else
+                          {
+                              plcTxFrmSwDesc.frmType = frmType;
+                          }
+              
+                          // check for alternating mcstMode
+                          if(pTestParams->altMcstTest)
+                          {
+                              if(mcstMode == 2)
+                              {
+                                  mcstMode = 0;
+                                  plcTxFrmSwDesc.frmInfo.plc.dtei           = gHpgpHalCB.remoteTei;         
+                              }
+                              else
+                              {
+                                  mcstMode++;
+                                  plcTxFrmSwDesc.frmInfo.plc.dtei           = 0xFF;       
+                              }
+                          }
+              
+                    if (!pTestParams->dbc)
+                    {
+                          // check for incremental length single robo
+                          if(pTestParams->lenTestMode == INC_LEN_SINGLE_ROBO)
+                          {
+                              curFrmLen++;
+                              if(curFrmLen > maxFrmLen)
+                              {
+                                  FM_Printf(FM_LINFO,"\nCur Frame Len = %u, Starting over from len %u\n",curFrmLen-1,min
+             -FrmLen);
+                                  curFrmLen = minFrmLen;
+                              }
+                          }             
+                          // check for incremental length all robo
+                          else if(pTestParams->lenTestMode == INC_LEN_ALL_ROBO)
+                          {
+                              curFrmLen++;            
+                              if(curFrmLen > stdRoboFrmLenMax && plcTxFrmSwDesc.frmInfo.plc.stdModeSel)
+                              {
+                                  plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 0;
+                                  curFrmLen                 = HYBRII_MINIROBO_DATALEN_MAX+1;
+                                  FM_Printf(FM_LINFO,"Switching to HS Mode; len = %u\n",curFrmLen);
+                                  
+                              }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 19  
+
+                              // restart inc len test
+                              if(curFrmLen > maxFrmLen)
+                              {
+                                  FM_Printf(FM_LINFO,"\nCur Frame Len = %u, Starting over from len %u\n",curFrmLen-1,min
+             -FrmLen);
+                                  curFrmLen                 = minFrmLen;
+                                  plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 1;                  
+                              }
+                          } 
+                          // check for fixed length alternating robo
+                          else if(pTestParams->lenTestMode == FIXED_LEN_ALT_ROBO)
+                          {
+                              curFrmLen  = gAltRoboLenArr[altRoboLenIdx.s.idx++];
+                          }
+                    }
+                    else  //DBC Test
+                    {
+                        if (dbc_pktchange == 0)
+                        dbc_pktchange = 1;
+                      else if (dbc_pktchange == 1)
+                        dbc_pktchange = 2;
+                      else
+                        dbc_pktchange = 0;
+                    }
+                      
+                      }
+                  
+                      if((gHpgpHalCB.halStats.CurTxTestFrmCnt & (u32)(0xFF)) == 0)
+                      {  
+                          printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b
+             -\b\b\b");
+              #ifndef MPER      
+                          printf("Sent %ld, Received %ld HPGP frames.", gHpgpHalCB.halStats.CurTxTestFrmCnt, gHpgpHalCB.
+             -halStats.TotalRxGoodFrmCnt - gHpgpHalCB.halStats.RxGoodBcnCnt);
+              #else
+                          printf("Sent %ld, Received %ld HPGP frames.", gHpgpHalCB.halStats.CurTxTestFrmCnt, gHpgpHalCB.
+             -halStats.TotalRxGoodFrmCnt - gHpgpHalCB.halStats.RxGoodBcnCnt - gHpgpHalCB.halStats.DuplicateRxCnt);
+              #endif
+                      }
+              
+                  
+                      if(!pTestParams->contMode)
+                      {
+                          pTestParams->numFrames--;
+              //      printf(" Remaining Tx packet number = %ld\n",pTestParams->numFrames);
+                          if(!pTestParams->numFrames)
+                          {
+                              quit = 1;
+                          }
+                      }
+              
+                  
+                      if(!quit && pTestParams->delay != 0xFF)
+                      {
+                          u32 delay64ticks = pTestParams->delay;
+                          if(delay64ticks == 0)
+                          {
+                              printf("press c to continue\n");
+                              while(1)
+                              {
+                                                    
+                        u8 userInput = CHT_Poll();  
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 20  
+
+                        //printf("<E>\n");  
+                                  if( userInput == 'c' || userInput == 'C')
+                                  {
+                                      // exit delay loop and resume transmission
+                                      break;                      
+                                  }
+                                  else if( userInput == 'q' || userInput == 'Q')
+                                  {
+                                      // exit delay loop and quite transmission
+                                      quit = 1;
+                                      break;
+                                  }
+                              }
+                          }
+                          else
+                          while(delay64ticks--)
+                          {
+                              CHAL_DelayTicks(64);
+                              // check for user initiated exit task from infinite loop
+                              if( CHT_Poll() == 'q')              
+                              {
+                                  quit = 1;
+                                  break;
+                              }
+                          }  
+                      }
+                  
+                      if(quit )//|| CHAL_GetFreeCPCnt() < 100 || HHAL_GetPlcTxQFreeDescCnt(plcTxFrmSwDesc.plid) < 32 )
+                      {
+              //#ifdef Packet_grouping0
+                      //[YM] write sw command queue setting values to HW command queue
+                      printf("2. Write PLC_CMDQ_REG %bu times\n", cmd_num);
+                  while (cmd_num > 0)
+                  {
+                                     u8 p;
+                           
+                           //printf("(F)\n");
+                           // Write all the store command settings in sw command queue [64] to HW command queue register
+                           for (p = 0; p < cmd_num; p++)
+                               WriteU32Reg(PLC_CMDQ_REG, Sw_command_queue[p]);
+                           cmd_num--;
+                  }
+              //#endif
+              
+              
+                          printf("Sent %ld HPGP frames.\n", gHpgpHalCB.halStats.CurTxTestFrmCnt);
+                          printf("Quit Tx: Free CP Cnt = %bu, curFrmLen = %u\n", CHAL_GetFreeCPCnt(), curFrmLen);
+                          break;
+                      }       
+                  } // while(1)   
+              }
+              
+              #endif
+1189          
+1190          void HHT_SimulateTxTestMenu()
+1191          {
+1192   1        sPlcSimTxTestParams testParams;
+1193   1        // test mode variables
+1194   1        u8              eks;
+1195   1          eSecTestMode    secTestMode;
+1196   1        u16             frmLen;
+1197   1        u8              frmType;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 21  
+
+1198   1        u8              stdModeSel = 0;
+1199   1        eRoboTestMode   roboTestMode;
+1200   1        eFrmMcstMode    mcstMode;
+1201   1        eHpgpPlidValue  plid;
+1202   1        u32             numFrames;
+1203   1        eLenTestMode    lenTestMode;
+1204   1          u8              alterDescLenNOffset;  
+1205   1        u16             miniRoboFrmLenMax;
+1206   1        u16             stdRoboFrmLenMax;
+1207   1        u16             HS2PBRoboFrmLenMax;
+1208   1        u16             HS3PBRoboFrmLenMax;
+1209   1        u32             delay;  
+1210   1        char            input[10];
+1211   1      
+1212   1          memset(&testParams, 0, sizeof(testParams));
+1213   1          eks = HPGP_UNENCRYPTED_EKS;
+1214   1          //Set Frame Length
+1215   1        do
+1216   1        {
+1217   2      #ifdef ER_TEST
+                      printf("Enter FrameLen  : 0-Inc/Mixed Len, 1 to %u -Fixed Len  :: ", ER_PACKET_LIMIT );
+              #else
+1220   2          printf("Enter FrameLen  : 0-Inc/Mixed Len, 1 to 1536-Fixed Len  :: ");
+1221   2      #endif
+1222   2          while (getline(input, sizeof(input)) > 0)
+1223   2          {
+1224   3            if(sscanf(input,"%d",&frmLen) >= 1)
+1225   3            break;
+1226   3          }
+1227   2      #ifdef ER_TEST
+                  }while (frmLen> ER_PACKET_LIMIT);
+              #else
+1230   2        }while (frmLen>1536);
+1231   1      #endif
+1232   1        // For continuous mode (frame length = 0)
+1233   1        if(frmLen == 0)
+1234   1        {
+1235   2          do
+1236   2          {
+1237   3            printf("Enter Len mode : 0-IncSingleRobo , 1-IncAllRobo, 2-AlterRobo :: ");
+1238   3            while (getline(input, sizeof(input)) > 0)
+1239   3            {
+1240   4              if(sscanf(input,"%bd",&lenTestMode) >= 1)
+1241   4              break;
+1242   4            }
+1243   3          }while(lenTestMode>2);  
+1244   2        }
+1245   1        else
+1246   1        {
+1247   2            lenTestMode = FIXED_LEN;
+1248   2        }
+1249   1      
+1250   1        //Select Test mode for continuous Tx test mode
+1251   1        if(frmLen == 0 && lenTestMode == 0)
+1252   1        {
+1253   2          do
+1254   2          {
+1255   3            printf("Enter Robo Mode : 0-Mini, 1-Std, 2-HS1PB, 3-HS2PB, 4-HS3PB, 5-AllHS :: ");
+1256   3            while (getline(input, sizeof(input)) > 0)
+1257   3            {
+1258   4              if(sscanf(input,"%bd",&roboTestMode) >= 1)
+1259   4              break;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 22  
+
+1260   4            }
+1261   3          }while(roboTestMode>5); 
+1262   2        }
+1263   1      
+1264   1        //Select Frame type
+1265   1        do
+1266   1        {
+1267   2          printf("Enter Frame Type : 0-Mgmt, 1-Data, 2-Sound, 3-Alter              :: ");
+1268   2          while (getline(input, sizeof(input)) > 0)
+1269   2          {
+1270   3            if(sscanf(input,"%bd",&frmType) >= 1)
+1271   3            break;
+1272   3          }
+1273   2        }while (frmType>3);
+1274   1      
+1275   1        //For sound packet
+1276   1                 if(frmType == 2)
+1277   1                  {
+1278   2                      do
+1279   2                      {
+1280   3                          printf("Ack Flag : 0/1                                          :: ");
+1281   3                          while (getline(input, sizeof(input)) > 0)
+1282   3                          {
+1283   4                              if (sscanf(input,"%bd",&testParams.saf) >= 1)
+1284   4                                  break;
+1285   4                          }
+1286   3                      } while (testParams.saf > 1);
+1287   2                      do
+1288   2                      {
+1289   3                          printf("Complete Flag : 0/1                                     :: ");
+1290   3                          while (getline(input, sizeof(input)) > 0)
+1291   3                          {
+1292   4                              if (sscanf(input,"%bd",&testParams.scf) >= 1)
+1293   4                                  break;
+1294   4                          }
+1295   3                      } while (testParams.scf > 1);
+1296   2                      do
+1297   2                      {
+1298   3                          printf("Enter Sound Reason Code : 0-Tone Map Error, "
+1299   3                                 "1-No AC Line Tone Map, 2-Unusable Interval :: ");
+1300   3                          while (getline(input, sizeof(input)) > 0)
+1301   3                          {
+1302   4                              if (sscanf(input,"%bd",&testParams.src) >= 1)
+1303   4                                  break;
+1304   4                          }
+1305   3                      } while (testParams.src > 2);
+1306   2                  }
+1307   1          // For Management packet
+1308   1              if(frmType == 0)
+1309   1              {
+1310   2                  // get robo mode max lens for Mgmt
+1311   2                  miniRoboFrmLenMax  = HYBRII_MINIROBO_MGMTLEN_MAX;
+1312   2                  stdRoboFrmLenMax   = HYBRII_STD1PBHSROBO_MGMTLEN_MAX;
+1313   2      #if 0
+                          do
+                        {
+                              printf("Enter DT_AV : 0-SOF, 1-SOUND                            :: ");
+                              while (getline(input, sizeof(input)) > 0)
+                              {
+                                  if (sscanf(input,"%bd",&testParams.dt_av) >= 1)
+                                      break;
+                              }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 23  
+
+                        } while (testParams.dt_av > 1);
+              
+                          if(testParams.dt_av == 1)
+                          {
+                              do
+                              {
+                                  printf("Ack Flag : 0/1                                          :: ");
+                                  while (getline(input, sizeof(input)) > 0)
+                                  {
+                                      if (sscanf(input,"%bd",&testParams.saf) >= 1)
+                                          break;
+                                  }
+                              } while (testParams.saf > 1);
+                              do
+                              {
+                                  printf("Complete Flag : 0/1                                     :: ");
+                                  while (getline(input, sizeof(input)) > 0)
+                                  {
+                                      if (sscanf(input,"%bd",&testParams.scf) >= 1)
+                                          break;
+                                  }
+                              } while (testParams.scf > 1);
+                              do
+                              {
+                                  printf("Enter Sound Reason Code : 0-Tone Map Error, "
+                                         "1-No AC Line Tone Map, 2-Unusable Interval :: ");
+                                  while (getline(input, sizeof(input)) > 0)
+                                  {
+                                      if (sscanf(input,"%bd",&testParams.src) >= 1)
+                                          break;
+                                  }
+                              } while (testParams.src > 2);
+                          }
+              #endif
+1356   2          }
+1357   1        else   //Select Data packet as test packet
+1358   1        {
+1359   2          // get robo mode max lens for Data
+1360   2          miniRoboFrmLenMax             = HYBRII_MINIROBO_DATALEN_MAX;
+1361   2          stdRoboFrmLenMax        = HYBRII_STD1PBHSROBO_DATALEN_MAX;
+1362   2          HS2PBRoboFrmLenMax            = HYBRII_2PBHSROBO_DATALEN_MAX;
+1363   2          HS3PBRoboFrmLenMax            = HYBRII_3PBHSROBO_DATALEN_MAX;
+1364   2        }
+1365   1      
+1366   1        if(frmType == 2)  // Sound packet
+1367   1          {
+1368   2             if(frmLen > 136)
+1369   2                 stdModeSel = 0;
+1370   2             else
+1371   2                 stdModeSel = 2;
+1372   2          }
+1373   1          else
+1374   1          {
+1375   2            if( (frmLen > miniRoboFrmLenMax) && (frmLen <= stdRoboFrmLenMax))
+1376   2            {
+1377   3              printf("Enter RoboMode : 0-HSRobo, 1-StdRobo                   :: ");
+1378   3              while (getline(input, sizeof(input)) > 0)
+1379   3              {
+1380   4                if(sscanf(input,"%bd",&stdModeSel) >= 1)
+1381   4                break;
+1382   4              }     
+1383   3            }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 24  
+
+1384   2          
+1385   2              if ((frmLen > stdRoboFrmLenMax) && (frmLen <= HS2PBRoboFrmLenMax))
+1386   2              stdModeSel = 0x1;
+1387   2            else if (frmLen > HS3PBRoboFrmLenMax)
+1388   2              stdModeSel = 0x1;
+1389   2            else
+1390   2              stdModeSel = 0x2;
+1391   2        }
+1392   1      #ifndef MPER
+1393   1          do
+1394   1        {
+1395   2          printf("Enter Mcst Mode : 0-Ucst, 1-Mcst, 2-Mnbcst, 3-Alter     :: ");
+1396   2          while (getline(input, sizeof(input)) > 0)                             
+1397   2          {
+1398   3            if(sscanf(input,"%bu",&mcstMode) >= 1)
+1399   3            break;
+1400   3          }
+1401   2        }while(mcstMode > 3);
+1402   1      #endif
+1403   1      
+1404   1        do
+1405   1        {
+1406   2          printf("Enter PLID : 0 to 3-Fixed PLID, 4-Alter                 :: ");
+1407   2          while (getline(input, sizeof(input)) > 0)
+1408   2          {
+1409   3            if(sscanf(input,"%bu",&plid) >= 1)
+1410   3            break;
+1411   3          }
+1412   2        }while(plid>4);
+1413   1        do
+1414   1        {
+1415   2          printf("Enable DescLen & Offset Test ? : 0-Disable, 1-Enable    :: ");
+1416   2          while (getline(input, sizeof(input)) > 0)
+1417   2          {
+1418   3            if(sscanf(input,"%bu",&alterDescLenNOffset) >= 1)
+1419   3            break;
+1420   3          }
+1421   2        }while(alterDescLenNOffset != 0 && alterDescLenNOffset!= 1);
+1422   1        do
+1423   1        {
+1424   2          printf("Enter Sec Test Mode : 0-UnEnc, 1-Enc, 2-Mix_UnEncNek, 3-Mix_UnEncNekPpek :: ");
+1425   2          while (getline(input, sizeof(input)) > 0)
+1426   2          {
+1427   3            if(sscanf(input,"%bu",&secTestMode) >= 1)
+1428   3            break;
+1429   3          }
+1430   2        }while(secTestMode > 3);
+1431   1      
+1432   1          if(secTestMode == 0)
+1433   1        {
+1434   2          eks = HPGP_UNENCRYPTED_EKS;
+1435   2        }    
+1436   1        else if(secTestMode == 1)
+1437   1          {
+1438   2          do
+1439   2          {
+1440   3            printf("Enter EKS : NEK-0to7, PPEK-8,9 ");
+1441   3            while (getline(input, sizeof(input)) > 0)
+1442   3            {
+1443   4              if(sscanf(input,"%bd",&eks) >= 1)
+1444   4              break;
+1445   4            }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 25  
+
+1446   3          }while( eks>0x9 );
+1447   2          }
+1448   1          else
+1449   1        {
+1450   2          eks = 0;
+1451   2        }
+1452   1      
+1453   1        if(!gHpgpHalCB.diagModeEnb)
+1454   1        {
+1455   2          printf("Enter number of frames: 0-ContMode, N-NumOfFrames       :: ");
+1456   2          while (getline(input, sizeof(input)) > 0)
+1457   2          {
+1458   3            if(sscanf(input,"%ld",&numFrames) >= 1)
+1459   3            break;
+1460   3          }
+1461   2        }
+1462   1        else
+1463   1        {
+1464   2          numFrames = 1;
+1465   2        }
+1466   1        printf("Enter delay (unit of 64 timer ticks)    :: ");
+1467   1        while (getline(input, sizeof(input)) > 0)
+1468   1        {
+1469   2          if(sscanf(input,"%lu",&delay) >= 1)
+1470   2          break;
+1471   2        }
+1472   1      
+1473   1        // fill tx test params structure
+1474   1        testParams.numFrames  = numFrames;
+1475   1        if(!testParams.numFrames)
+1476   1        {
+1477   2          testParams.contMode = 1;
+1478   2        }
+1479   1        else
+1480   1        {
+1481   2          testParams.contMode = 0;
+1482   2        }
+1483   1        testParams.frmLen = frmLen;
+1484   1        testParams.lenTestMode = lenTestMode;
+1485   1        
+1486   1          // [YM] roboTestMode value assignment
+1487   1        testParams.roboTestMode   = roboTestMode;
+1488   1        
+1489   1        if(frmType == 3)
+1490   1        {
+1491   2           testParams.altFrmTypeTest = 1;
+1492   2           testParams.frmType        = 0;
+1493   2        }
+1494   1        else
+1495   1        {
+1496   2          testParams.frmType = frmType;
+1497   2          testParams.altFrmTypeTest = 0;
+1498   2        }
+1499   1        if(plid == 4)
+1500   1        {
+1501   2            testParams.altPlidTest = 1;
+1502   2        }
+1503   1        else
+1504   1        {
+1505   2              testParams.altPlidTest = 0;
+1506   2          testParams.plid = plid;
+1507   2        }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 26  
+
+1508   1        
+1509   1        // [YM] StdModeSel assignment
+1510   1        testParams.stdModeSel = stdModeSel;
+1511   1        
+1512   1          if(mcstMode == 3)
+1513   1          {
+1514   2              testParams.altMcstTest = 1;
+1515   2              testParams.mcstMode    = 0;
+1516   2          }
+1517   1          else
+1518   1          {
+1519   2              testParams.altMcstTest = 0;
+1520   2      #ifndef MPER    
+1521   2              testParams.mcstMode    = mcstMode;
+1522   2      #else
+                      testParams.mcstMode    = 0;   //set unicast as default mode [YM]
+              #endif
+1525   2          }
+1526   1          testParams.secTestMode = secTestMode;
+1527   1        testParams.eks        = eks;
+1528   1        testParams.altOffsetDescLenTest = alterDescLenNOffset;
+1529   1          if(alterDescLenNOffset)
+1530   1          {
+1531   2          testParams.offsetDW  = 31;
+1532   2          testParams.descLen   = 3;
+1533   2          }
+1534   1          else
+1535   1          {
+1536   2          testParams.offsetDW  = 0;
+1537   2          testParams.descLen   = HYBRII_CELLBUF_SIZE;
+1538   2          }
+1539   1          testParams.delay = delay;
+1540   1          // Trigger the tx test
+1541   1          HHT_SimulateTx(&testParams);
+1542   1      }
+1543          
+1544          void sendSingleFrame(u8 mcstMode)  //1 = multicast, 0 unicast
+1545          {
+1546   1          
+1547   1          sPlcSimTxTestParams testParams;
+1548   1          memset(&testParams, 0, sizeof(testParams));
+1549   1          testParams.numFrames      = 1;
+1550   1      
+1551   1        testParams.contMode = 0;
+1552   1      
+1553   1        testParams.frmLen         = 1000;
+1554   1        testParams.lenTestMode    = FIXED_LEN;
+1555   1        //testParams.roboTestMode   = roboTestMode;
+1556   1        testParams.frmType        = 1;
+1557   1          testParams.altFrmTypeTest = 0;
+1558   1          testParams.altMcstTest    = 0;
+1559   1        testParams.plid           = 0;
+1560   1        testParams.altPlidTest    = 0;
+1561   1        testParams.stdModeSel     = 0;
+1562   1        testParams.mcstMode       = mcstMode;
+1563   1        testParams.offsetDW       = 0;
+1564   1        testParams.descLen        = HYBRII_CELLBUF_SIZE;
+1565   1          testParams.secTestMode    = UNENCRYPTED;
+1566   1        testParams.eks            = HPGP_UNENCRYPTED_EKS;
+1567   1          testParams.altOffsetDescLenTest = 0;
+1568   1        testParams.delay          = 40;
+1569   1        testParams.plcMultiPktTest = 0;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 27  
+
+1570   1        // Trigger the tx test
+1571   1      #ifdef Packet_grouping0
+                if (plcMultiPktTest > 1)
+                {
+                    gHpgpHalCB.plcMultiPktTest = plcMultiPktTest;  //[YM] Enable multiple packet queueing for Tx test   
+                } 
+              #endif  
+1577   1          //printf(" (A) gHpgpHalCB.plcMultiPktTest = %bu\n", gHpgpHalCB.plcMultiPktTest);
+1578   1        HHT_SimulateTx(&testParams);
+1579   1      }
+1580          
+1581          void HHT_BasicTxMenu()
+1582          {
+1583   1        sPlcSimTxTestParams testParams;
+1584   1        // test mode variables
+1585   1        u8              dbc, pattern, rts, cts, rsof;
+1586   1          u16             frmLen;
+1587   1        u8              stdModeSel;
+1588   1        eRoboTestMode   roboTestMode;
+1589   1        eFrmMcstMode    mcstMode;
+1590   1        u8              cap;
+1591   1      //  u8              plcMultiPktTest;
+1592   1        u32             numFrames;
+1593   1        u16             miniRoboFrmLenMax;
+1594   1        u16             stdRoboFrmLenMax;
+1595   1        u32             delay;
+1596   1        u8              input[8];
+1597   1      
+1598   1          // get robo mode max lens for Data
+1599   1        miniRoboFrmLenMax             = HYBRII_MINIROBO_DATALEN_MAX;
+1600   1        stdRoboFrmLenMax        = HYBRII_STD1PBHSROBO_DATALEN_MAX;
+1601   1      
+1602   1      #ifndef MPER    
+1603   1          {
+1604   2              printf("Do DBC Test?  : 1 = YES, other = No  :: ");
+1605   2          while (getline(input, sizeof(input)) > 0)
+1606   2          {
+1607   3            if(sscanf(input,"%bu",&dbc) >= 1)
+1608   3            break;
+1609   3          }
+1610   2          if (dbc != 1)
+1611   2          {
+1612   3              dbc = 0;
+1613   3          //printf("DBC command = %x\n", dbc);
+1614   3          //else
+1615   3              printf("Do RTS/CTS Tx Test?  : 1 = YES, other = No  :: ");
+1616   3                  while (getline(input, sizeof(input)) > 0)
+1617   3              {
+1618   4               if(sscanf(input,"%bu",&rts) >= 1)
+1619   4               break;
+1620   4              }
+1621   3              if (rts!= 1)
+1622   3            {
+1623   4                 rts = 0;
+1624   4            //else
+1625   4            //{
+1626   4                printf("Do Reverse SOF Tx Test?  : 1 = YES, other = No  :: ");
+1627   4                      while (getline(input, sizeof(input)) > 0)
+1628   4                  {
+1629   5                   if(sscanf(input,"%bu",&rsof) >= 1)
+1630   5                   break;
+1631   5                  }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 28  
+
+1632   4                  if (rsof!= 1)
+1633   4                     rsof= 0;
+1634   4            }
+1635   3          }     
+1636   2          }
+1637   1      #endif
+1638   1      #ifdef MPER
+                if (dbc == 1)  // [YM] Do DBC Test
+                {
+              
+                do
+                {
+                  printf("Enter DBC Test Pattern: 1-1RoBo+1MiniRoBo, 2-3 MiniRobo, 3-2MiniRoBo+1HSRoBo1PB,\n");
+                  printf("4-1MiniRoBo+1HSRoBo2PB, 5-2HSRoBo1PB, 6-1MiniRoBo+1HSRoBo3PB, 7-1RoBo+1HSRoBo1PB, 8-1HSRoBo1PB+1
+             -HSRoBo2PB  :: ");
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input,"%bu",&pattern) >= 1)
+                    break;
+                  }
+                }while(pattern<1 && pattern>6);
+              
+                do
+                {
+                  printf("Enter McstMode: 0-Ucst, 1-Mcst, 2=Mnbcst  :: ");
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input,"%bu",&mcstMode) >= 1)
+                    break;
+                  }
+                }while(mcstMode > 2);
+                cap = 0;
+              /*
+                {
+                  printf("Enter Cap or Plid Value for Test Packet (0~3, 4 = all caps): ");
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input,"%bu",&cap) < 5)  //[YM] add cap = 4 for random select cap 0~3
+                    break;
+                  }
+                }while(cap > 4); 
+              */
+                  if(!gHpgpHalCB.diagModeEnb)
+                {
+                  printf("Enter number of frames:  N-NumOfFrames :: ");
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input,"%lu",&numFrames) >= 1)
+                    break;
+                  }
+                }
+                else
+                {
+                  numFrames = 1;
+                }
+              
+                printf("Enter delay (unit of 64 timer ticks)    :: ");
+                while (getline(input, sizeof(input)) > 0)
+                {
+                  if(sscanf(input,"%lu",&delay) >= 1)
+                  break;
+                }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 29  
+
+              
+                // Construct Test Packet
+                // fill tx test params structure
+                testParams.numFrames      = numFrames;
+                if(!testParams.numFrames)
+                {
+                  testParams.contMode = 1;
+                }
+                else
+                {
+                  testParams.contMode = 0;
+                }
+                testParams.dbc            = dbc;
+                testParams.pattern        = pattern;
+                testParams.frmLen         = 100;  //Not important here
+                testParams.lenTestMode    = VARY_LEN;
+                testParams.roboTestMode   = 0;  //Not important here
+                testParams.frmType        = 1;
+                  testParams.altFrmTypeTest = 0;
+                  testParams.altMcstTest    = 0;
+                if (cap == 4)
+                {
+                testParams.plid           = 0;  //[YM] temporary set cap to 0, cap value will be changed in sequence
+                testParams.altPlidTest    = 1;
+                }
+                else
+                {
+                testParams.plid           = cap;
+                testParams.altPlidTest    = 0;    
+                }
+                testParams.stdModeSel     = 1;  // Not important here
+                testParams.mcstMode       = mcstMode;
+                testParams.offsetDW       = 0;
+                testParams.descLen        = HYBRII_CELLBUF_SIZE;
+                  testParams.secTestMode    = UNENCRYPTED;
+                testParams.eks            = HPGP_UNENCRYPTED_EKS;
+                  testParams.altOffsetDescLenTest = 0;
+                testParams.delay          = delay;
+                testParams.plcMultiPktTest = 1;  // Not important here
+                
+                }
+                else if (rts == 1)
+                {
+                  do
+                {
+                  printf("Enter TestMode: 0- Tx RTS, 1-Tx CTS  :: ");
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input,"%bu",&cts) >= 1)
+                    break;
+                  }
+                }while(cts > 1);
+                
+                  do
+                {
+                  printf("Enter McstMode: 0-Ucst, 1-Mcst, 2=Mnbcst  :: ");
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input,"%bu",&mcstMode) >= 1)
+                    break;
+                  }
+                }while(mcstMode > 2);
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 30  
+
+                cap = 0;
+              
+                  if(!gHpgpHalCB.diagModeEnb)
+                {
+                  printf("Enter number of frames:  N-NumOfFrames :: ");
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input,"%lu",&numFrames) >= 1)
+                    break;
+                  }
+                }
+                else
+                {
+                  numFrames = 1;
+                }
+              
+                printf("Enter delay (unit of 64 timer ticks)    :: ");
+                while (getline(input, sizeof(input)) > 0)
+                {
+                  if(sscanf(input,"%lu",&delay) >= 1)
+                  break;
+                }
+              
+                // Construct Test Packet
+                // fill tx test params structure
+                testParams.numFrames      = numFrames;
+                if(!testParams.numFrames)
+                {
+                  testParams.contMode = 1;
+                }
+                else
+                {
+                  testParams.contMode = 0;
+                }
+                testParams.dbc            = 0;
+                testParams.pattern        = 0;
+                testParams.dt_av          = 3;
+                testParams.frmLen         = 100;  //Not important here
+                testParams.lenTestMode    = FIXED_LEN;
+                testParams.roboTestMode   = 0;  //Not important here
+                if (cts == 1)
+                  testParams.frmType        = HPGP_HW_FRMTYPE_CTS;
+                else
+                    testParams.frmType        = HPGP_HW_FRMTYPE_RTS;  
+                  testParams.altFrmTypeTest = 0;
+                  testParams.altMcstTest    = 0;
+                if (cap == 4)
+                {
+                testParams.plid           = 0;  //[YM] temporary set cap to 0, cap value will be changed in sequence
+                testParams.altPlidTest    = 1;
+                }
+                else
+                {
+                testParams.plid           = cap;
+                testParams.altPlidTest    = 0;    
+                }
+                testParams.stdModeSel     = 1;  // Not important here
+                testParams.mcstMode       = mcstMode;
+                testParams.offsetDW       = 0;
+                testParams.descLen        = HYBRII_CELLBUF_SIZE;
+                  testParams.secTestMode    = UNENCRYPTED;
+                testParams.eks            = HPGP_UNENCRYPTED_EKS;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 31  
+
+                  testParams.altOffsetDescLenTest = 0;
+                testParams.delay          = delay;
+                testParams.plcMultiPktTest = 0;  // Not important here  
+                }
+                else if (rsof == 1)
+                {
+                
+                  do
+                {
+                  printf("Enter McstMode: 0-Ucst, 1-Mcst, 2=Mnbcst  :: ");
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input,"%bu",&mcstMode) >= 1)
+                    break;
+                  }
+                }while(mcstMode > 2);
+                cap = 0;
+              
+                  if(!gHpgpHalCB.diagModeEnb)
+                {
+                  printf("Enter number of frames:  N-NumOfFrames :: ");
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input,"%lu",&numFrames) >= 1)
+                    break;
+                  }
+                }
+                else
+                {
+                  numFrames = 1;
+                }
+              
+                printf("Enter delay (unit of 64 timer ticks)    :: ");
+                while (getline(input, sizeof(input)) > 0)
+                {
+                  if(sscanf(input,"%lu",&delay) >= 1)
+                  break;
+                }
+              
+                // Construct Test Packet
+                // fill tx test params structure
+                testParams.numFrames      = numFrames;
+                if(!testParams.numFrames)
+                {
+                  testParams.contMode = 1;
+                }
+                else
+                {
+                  testParams.contMode = 0;
+                }
+                
+                testParams.dbc            = 0;
+                testParams.pattern        = 0;
+                testParams.dt_av          = 5;  //RSOF
+                testParams.frmLen         = 100;  //Not important here
+                testParams.lenTestMode    = FIXED_LEN;
+                testParams.roboTestMode   = 0;  //Not important here
+                //if (cts == 1)
+                  //testParams.frmType        = HPGP_HW_FRMTYPE_CTS;
+                //else
+                  //  testParams.frmType        = HPGP_HW_FRMTYPE_RTS;
+                
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 32  
+
+                  testParams.altFrmTypeTest = 0;
+                  testParams.altMcstTest    = 0;
+                if (cap == 4)
+                {
+                testParams.plid           = 0;  //[YM] temporary set cap to 0, cap value will be changed in sequence
+                testParams.altPlidTest    = 1;
+                }
+                else
+                {
+                testParams.plid           = cap;
+                testParams.altPlidTest    = 0;    
+                }
+                testParams.stdModeSel     = 1;  // Not important here
+                testParams.mcstMode       = mcstMode;
+                testParams.offsetDW       = 0;
+                testParams.descLen        = HYBRII_CELLBUF_SIZE;
+                  testParams.secTestMode    = UNENCRYPTED;
+                testParams.eks            = HPGP_UNENCRYPTED_EKS;
+                  testParams.altOffsetDescLenTest = 0;
+                testParams.delay          = delay;
+                testParams.plcMultiPktTest = 0;  // Not important here  
+                }
+                else
+              #endif  //MPER    
+1903   1        {    //regular SOF packet
+1904   2        do
+1905   2        {
+1906   3          #ifdef ER_TEST
+                      printf("Enter FrameLen  : 1 to %u -Fixed Len  :: ", ER_PACKET_LIMIT);
+              #else
+1909   3              printf("Enter FrameLen  : 1 to 1536-Fixed Len  :: ");
+1910   3      #endif
+1911   3          while (getline(input, sizeof(input)) > 0)
+1912   3          {
+1913   4            if(sscanf(input,"%u",&frmLen) >= 1)
+1914   4            break;
+1915   4          }
+1916   3      #ifdef ER_TEST
+                  }while (frmLen<1 || frmLen> ER_PACKET_LIMIT);
+              #else
+1919   3          }while (frmLen<1 || frmLen>1530);
+1920   2      #endif
+1921   2      
+1922   2      #ifndef MPER
+1923   2        do
+1924   2        {
+1925   3          printf("Enter McstMode: 0-Ucst, 1-Mcst, 2=Mnbcst  :: ");
+1926   3          while (getline(input, sizeof(input)) > 0)
+1927   3          {
+1928   4            if(sscanf(input,"%bu",&mcstMode) >= 1)
+1929   4            break;
+1930   4          }
+1931   3        }while(mcstMode > 2);
+1932   2      #endif
+1933   2      
+1934   2        if( (frmLen > miniRoboFrmLenMax) && (frmLen <= stdRoboFrmLenMax))
+1935   2        {
+1936   3          printf("Select Std RoboMode : 0-HSRobo, 1- StdRobo :: ");
+1937   3          while (getline(input, sizeof(input)) > 0)
+1938   3          {
+1939   4            if(sscanf(input,"%bu",&stdModeSel) >= 1)
+1940   4            break;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 33  
+
+1941   4          }     
+1942   3        }
+1943   2      
+1944   2        {
+1945   3          printf("Enter Cap or Plid Value for Test Packet (0~3, 4 = all caps): ");
+1946   3          while (getline(input, sizeof(input)) > 0)
+1947   3          {
+1948   4            if(sscanf(input,"%bu",&cap) < 5)  //[YM] add cap = 4 for random select cap 0~3
+1949   4            break;
+1950   4          }
+1951   3        }while(cap > 4);
+1952   2      
+1953   2        if(!gHpgpHalCB.diagModeEnb)
+1954   2        {
+1955   3          printf("Enter number of frames:  N-NumOfFrames :: ");
+1956   3          while (getline(input, sizeof(input)) > 0)
+1957   3          {
+1958   4            if(sscanf(input,"%lu",&numFrames) >= 1)
+1959   4            break;
+1960   4          }
+1961   3        }
+1962   2        else
+1963   2        {
+1964   3          numFrames = 1;
+1965   3        }
+1966   2      #ifdef Packet_grouping0
+                  // [YM] New control command for multiple packets in-queue testing 
+                  {
+                  printf("For multiple packets in-queue testing: N-NumOfFrames in queue before Tx (1 ~ 8)::");
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input,"%bu",&plcMultiPktTest) > 0)
+                          {
+                              if (plcMultiPktTest > 8)
+                        plcMultiPktTest = 8;
+                              //printf(" plcMultiPktTest = %bu\n", plcMultiPktTest);
+                        break;
+                          }
+                    //plcMultiPktTest = 1;   //[YM] Multiple packet transmission is not supported for Hybrii_B
+                  }
+                }
+              #endif
+1983   2        printf("Enter delay (unit of 64 timer ticks)    :: ");
+1984   2        while (getline(input, sizeof(input)) > 0)
+1985   2        {
+1986   3          if(sscanf(input,"%lu",&delay) >= 1)
+1987   3          break;
+1988   3        }
+1989   2      
+1990   2        // fill tx test params structure
+1991   2        testParams.numFrames      = numFrames;
+1992   2        if(!testParams.numFrames)
+1993   2        {
+1994   3          testParams.contMode = 1;
+1995   3        }
+1996   2        else
+1997   2        {
+1998   3          testParams.contMode = 0;
+1999   3        }
+2000   2        testParams.frmLen         = frmLen;
+2001   2        testParams.lenTestMode    = FIXED_LEN;
+2002   2        testParams.roboTestMode   = roboTestMode;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 34  
+
+2003   2        testParams.frmType        = 1;
+2004   2          testParams.altFrmTypeTest = 0;
+2005   2          testParams.altMcstTest    = 0;
+2006   2        if (cap == 4)
+2007   2        {
+2008   3        testParams.plid           = 0;  //[YM] temporary set cap to 0, cap value will be changed in sequence
+2009   3        testParams.altPlidTest    = 1;
+2010   3        }
+2011   2        else
+2012   2        {
+2013   3        testParams.plid           = cap;
+2014   3        testParams.altPlidTest    = 0;    
+2015   3        }
+2016   2        testParams.stdModeSel     = stdModeSel;
+2017   2      #ifndef MPER
+2018   2        testParams.mcstMode       = mcstMode;
+2019   2      #else
+                  testParams.mcstMode       = 0;  //default set as unicast
+              #endif
+2022   2        testParams.offsetDW       = 0;
+2023   2        testParams.descLen        = HYBRII_CELLBUF_SIZE;
+2024   2          testParams.secTestMode    = UNENCRYPTED;
+2025   2        testParams.eks            = HPGP_UNENCRYPTED_EKS;
+2026   2          testParams.altOffsetDescLenTest = 0;
+2027   2        testParams.delay          = delay;
+2028   2        testParams.plcMultiPktTest = 1;
+2029   2        // Trigger the tx test
+2030   2      #ifdef Packet_grouping0
+                if (plcMultiPktTest > 1)
+                {
+                    gHpgpHalCB.plcMultiPktTest = plcMultiPktTest;  //[YM] Enable multiple packet queueing for Tx test   
+                }
+              #endif  
+2036   2          //printf(" (A) gHpgpHalCB.plcMultiPktTest = %bu\n", gHpgpHalCB.plcMultiPktTest);
+2037   2          }  
+2038   1        HHT_SimulateTx(&testParams);
+2039   1        //gHpgpHalCB.plcMultiPktTest = 0;  
+2040   1      }
+*** WARNING C280 IN LINE 1585 OF src\hhal_tst.c: 'pattern': unreferenced local variable
+*** WARNING C280 IN LINE 1585 OF src\hhal_tst.c: 'cts': unreferenced local variable
+2041          
+2042                                                       
+2043          void HHT_TestMemoryTables()
+2044          {
+2045   1        uAesCpuCmdStatReg   aesCpuCmd;
+2046   1          eStatus             status;
+2047   1          u8                  input[10];
+2048   1        u8                  patternWr;
+2049   1        u8                  patternRd;
+2050   1        u8                  patternCmp;
+2051   1        u16                 patternWr16;
+2052   1        u16                 patternCmp16;
+2053   1          u16                 patternRd16;
+2054   1        u32                 patternWr32;
+2055   1        u32                 patternCmp32;
+2056   1          u32                 patternRd32;
+2057   1        u16                 i;
+2058   1      
+2059   1          u8  testMode;
+2060   1          
+2061   1        do
+2062   1        {
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 35  
+
+2063   2          printf("Enter the test: 0-DumpTables, 1-Walking 1s write readback test");
+2064   2          while (getline(input, sizeof(input)) > 0)
+2065   2          {
+2066   3            if(sscanf(input, "%bu", &testMode) >= 1)
+2067   3            break;
+2068   3          }
+2069   2        }while (testMode>1);
+2070   1      
+2071   1          status = STATUS_SUCCESS;
+2072   1      
+2073   1          if(testMode == 0)
+2074   1          {
+2075   2              printf("SSN Table :: \n");
+2076   2          for( i=0 ; i<1024 ; i++)
+2077   2          {
+2078   3            hal_common_reg_32_write(PLC_SSNMEMADDR_REG,(u32)i);
+2079   3                  patternRd32 = hal_common_reg_32_read(PLC_SSNMEMDATA_REG);
+2080   3            if((i & 0x0007) == 0)
+2081   3            {
+2082   4              printf("\n");
+2083   4              printf("[0x%04X] : ", i);
+2084   4            }
+2085   3            printf("0x%08lX ,", patternRd32 );
+2086   3          
+2087   3          }
+2088   2              printf("\n");
+2089   2              printf("\nPPEK Addr LUT :: \n");
+2090   2      
+2091   2          aesCpuCmd.reg = ReadU32Reg(PLC_AESCPUCMDSTAT_REG);
+2092   2          aesCpuCmd.s.cpuTblReq = 1;
+2093   2          WriteU32Reg(PLC_AESCPUCMDSTAT_REG,aesCpuCmd.reg);
+2094   2          for(i=0;i<256;i++)  
+2095   2          {
+2096   3            hal_common_reg_32_write(PLC_AESLUTADDR_REG,(u32)i);
+2097   3            patternRd32 = hal_common_reg_32_read(PLC_AESLUTDATA_REG);
+2098   3                  printf("[0x%04X] : ", i);
+2099   3                  printf("0x%08lX \n", patternRd32 );
+2100   3          }
+2101   2          printf("\n");
+2102   2      
+2103   2              printf("\nAes Key Table :: \n");
+2104   2          for(i=0;i<1024;i++) 
+2105   2          {
+2106   3            hal_common_reg_32_write(PLC_AESKEYLUTADDR_REG,(u32)i);
+2107   3            patternRd32 = hal_common_reg_32_read(PLC_AESKEYLUTDATA_REG);
+2108   3            if((i & 0x0007) == 0)
+2109   3            {
+2110   4              printf("\n");
+2111   4              printf("[0x%04X] : ", i);
+2112   4            }
+2113   3            printf("0x%08lX ,", patternRd32 );
+2114   3              }
+2115   2              printf("\n");
+2116   2          // Release CPU Lock on AES LUT
+2117   2          aesCpuCmd.reg = ReadU32Reg(PLC_AESCPUCMDSTAT_REG);
+2118   2              aesCpuCmd.s.cpuTblGnt = 0;
+2119   2          aesCpuCmd.s.cpuTblReq = 0;
+2120   2          WriteU32Reg(PLC_AESCPUCMDSTAT_REG, aesCpuCmd.reg);
+2121   2              return;
+2122   2          }
+2123   1          // SSN memory Write - Readback verify
+2124   1        patternWr16 = 0x01;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 36  
+
+2125   1        for(i=0;i<1024;i++) 
+2126   1        {
+2127   2          hal_common_reg_32_write(PLC_SSNMEMADDR_REG,(u32)i);
+2128   2          hal_common_reg_32_write(PLC_SSNMEMDATA_REG,patternWr16);
+2129   2              patternWr16 = _irol_(patternWr16,1);
+2130   2        }
+2131   1        patternCmp16 = 0x01;
+2132   1        for(i=0;i<1024;i++) 
+2133   1        {
+2134   2          hal_common_reg_32_write(PLC_SSNMEMADDR_REG,(u32)i);
+2135   2          patternRd16 = hal_common_reg_32_read(PLC_SSNMEMDATA_REG);
+2136   2          if(patternCmp16 != patternRd16)
+2137   2          {
+2138   3            printf("HHT_TestAesTables : SSN Addr 0x%02X mismatch: Wrote 0x%04X & Readback 0x%04X\n", i, patternCmp1
+             -6, patternRd16);
+2139   3                  status = STATUS_FAILURE;
+2140   3          }
+2141   2          patternCmp16 = _irol_(patternCmp16,1);
+2142   2        }
+2143   1          if (status == STATUS_FAILURE)
+2144   1          printf("HHT_TestAesTables : SSN RW was failed\n");
+2145   1        else if (status == STATUS_SUCCESS)
+2146   1          printf("HHT_TestAesTables : SSN RW was done\n");
+2147   1        
+2148   1        // Wait for Cpu Aes Lut access grant.
+2149   1        aesCpuCmd.reg = ReadU32Reg(PLC_AESCPUCMDSTAT_REG);
+2150   1        aesCpuCmd.s.cpuTblReq = 1;
+2151   1        WriteU32Reg(PLC_AESCPUCMDSTAT_REG,aesCpuCmd.reg);
+2152   1      /*
+2153   1        CHAL_DelayTicks(100);
+2154   1        aesCpuCmd.reg = ReadU32Reg(PLC_AESCPUCMDSTAT_REG);
+2155   1        if(!aesCpuCmd.s.cpuTblGnt)
+2156   1        {
+2157   1              printf("Access request to AES Tables denied.\n");
+2158   1              status = STATUS_FAILURE;
+2159   1          return ;
+2160   1        }
+2161   1      */
+2162   1          // PPEK Addr LUT Write - Readback verify
+2163   1          patternWr = 0x01;
+2164   1        for(i=0;i<256;i++)  
+2165   1        {
+2166   2          hal_common_reg_32_write(PLC_AESLUTADDR_REG,(u32)i);
+2167   2          hal_common_reg_32_write(PLC_AESLUTDATA_REG,patternWr);
+2168   2              patternWr = _crol_(patternWr,1);
+2169   2        }
+2170   1        patternCmp = 0x01;
+2171   1        for(i=0;i<256;i++)  
+2172   1        {
+2173   2          hal_common_reg_32_write(PLC_AESLUTADDR_REG,(u32)i);
+2174   2          patternRd = hal_common_reg_32_read(PLC_AESLUTDATA_REG);
+2175   2          if(patternCmp != patternRd)
+2176   2          {
+2177   3            printf("HHT_TestAesTables : AES LUT Data 0x%02X mismatch: Wrote 0x%08lX & Readback 0x%08lX\n", i, patte
+             -rnCmp, patternRd);
+2178   3                  status = STATUS_FAILURE;
+2179   3          }
+2180   2          patternCmp = _crol_(patternCmp,1);
+2181   2        }
+2182   1          if (status == STATUS_FAILURE)
+2183   1          printf("HHT_TestAesTables : AES LUT (PPEK) RW was failed\n");
+2184   1        else if (status == STATUS_SUCCESS)
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 37  
+
+2185   1          printf("HHT_TestAesTables : AES LUT (PPEK) RW was done\n");
+2186   1      
+2187   1        
+2188   1        
+2189   1          // AES Key LUT Write - Readback verify
+2190   1        patternWr32 = 0x01;
+2191   1        for(i=0;i<1024;i++) 
+2192   1        {
+2193   2          hal_common_reg_32_write(PLC_AESKEYLUTADDR_REG,(u32)i);
+2194   2          hal_common_reg_32_write(PLC_AESKEYLUTDATA_REG,(patternWr32));
+2195   2              patternWr32 = _lrol_(patternWr32,1);
+2196   2        }
+2197   1        patternCmp32 = 0x01;
+2198   1        for(i=0;i<1024;i++) 
+2199   1        {
+2200   2          hal_common_reg_32_write(PLC_AESKEYLUTADDR_REG,(u32)i);
+2201   2          patternRd32 = hal_common_reg_32_read(PLC_AESKEYLUTDATA_REG);
+2202   2          if(patternCmp32 != patternRd32)
+2203   2          {
+2204   3            printf("HHT_TestAesTables : AES Key LUT Data 0x%02X mismatch: Wrote 0x%08lX & Readback 0x%08lX\n", i, p
+             -atternCmp32, patternRd32);
+2205   3                  status = STATUS_FAILURE;
+2206   3          }
+2207   2          patternCmp32 = _lrol_(patternCmp32,1);       
+2208   2        }
+2209   1          if (status == STATUS_FAILURE)
+2210   1          printf("HHT_TestAesTables : AES LUT (AES KEY) RW was failed\n");
+2211   1        else if (status == STATUS_SUCCESS)
+2212   1          printf("HHT_TestAesTables : AES LUT (AES KEY) RW was done\n");
+2213   1      
+2214   1      
+2215   1        
+2216   1        // Release CPU Lock on AES LUT
+2217   1        aesCpuCmd.reg = ReadU32Reg(PLC_AESCPUCMDSTAT_REG);
+2218   1          aesCpuCmd.s.cpuTblGnt = 0;
+2219   1        aesCpuCmd.s.cpuTblReq = 0;
+2220   1        WriteU32Reg(PLC_AESCPUCMDSTAT_REG, aesCpuCmd.reg);
+2221   1          if(status == STATUS_SUCCESS)
+2222   1          {
+2223   2              printf(" Test Passed : Walking 1s write-readback test passed for SSN Table, PPEK Addr LUT, AES Key
+             - LUT\n");
+2224   2          }
+2225   1      }
+2226          
+2227          
+2228          void HHT_SetDiagMode()
+2229          {
+2230   1        eRegFlag diagModeFlag;
+2231   1        eRegFlag sackDisableFlag;
+2232   1        u8 diagMode;
+2233   1        u8 sackDisable;
+2234   1      
+2235   1        printf("Set Diag Mode : 1 - Set , 0 - Clear\n");
+2236   1        scanf("%bd", &diagMode);
+2237   1        diagModeFlag =  diagMode ? REG_FLAG_SET : REG_FLAG_CLR;
+2238   1        HHAL_SetDiagMode(diagModeFlag);
+2239   1      
+2240   1        if(diagMode)
+2241   1        {
+2242   2          printf("Disable Sack  : 1 - Disable , 0 - Enable\n");
+2243   2          scanf("%bd", &sackDisable);
+2244   2          sackDisableFlag = sackDisable ? REG_FLAG_SET: REG_FLAG_CLR;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 38  
+
+2245   2          HHAL_SetDiagModeNoSack(sackDisableFlag);
+2246   2        }
+2247   1      }
+2248          
+2249          
+2250          void HHT_SetKey()
+2251          {
+2252   1          u8  secMode;
+2253   1          u8  defKeyNum;
+2254   1          u8  eks;    
+2255   1          u8  ppeks;
+2256   1        u8  input[10];
+2257   1      
+2258   1        do
+2259   1        {
+2260   2          printf("Select key type:  0-NEK, 1-PPEK, 2-AllKeys :: ");
+2261   2          while (getline(input, sizeof(input)) > 0)
+2262   2          {
+2263   3            if(sscanf(input, "%bu", &secMode) >= 1)
+2264   3            break;
+2265   3          }
+2266   2        }while (secMode>2);
+2267   1          if(secMode == 0)     // NEK
+2268   1          {
+2269   2          do
+2270   2          {
+2271   3            printf("Select eks:  0 to 7 :: ");
+2272   3            while (getline(input, sizeof(input)) > 0)
+2273   3            {
+2274   4              if(sscanf(input, "%bu", &eks) >= 1)
+2275   4              break;
+2276   4            }
+2277   3          }while (eks>7);
+2278   2          do
+2279   2          {
+2280   3            printf("Select def Key:  0 to 9 :: ");
+2281   3            while (getline(input, sizeof(input)) > 0)
+2282   3            {
+2283   4              if(sscanf(input, "%bu", &defKeyNum) >= 1)
+2284   4              break;
+2285   4            }
+2286   3          }while (defKeyNum>9);  
+2287   2              HHAL_AddNEK(eks, gDefKey[defKeyNum]);
+2288   2          }
+2289   1          else if(secMode == 1)      //ppek
+2290   1          {
+2291   2          do
+2292   2          {                                                                                
+2293   3            printf("Select ppeks:  0 or 1 :: ");
+2294   3            while (getline(input, sizeof(input)) > 0)
+2295   3            {
+2296   4              if(sscanf(input, "%bu", &ppeks) >= 1)
+2297   4              break;
+2298   4            }
+2299   3          }while (ppeks!=0 && ppeks!=1);
+2300   2          do
+2301   2          {
+2302   3            printf("Select def Key:  0 to 9 :: ");
+2303   3            while (getline(input, sizeof(input)) > 0)
+2304   3            {
+2305   4              if(sscanf(input, "%bu", &defKeyNum) >= 1)
+2306   4              break;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 39  
+
+2307   4            }
+2308   3          }while (defKeyNum>9); 
+2309   2              HHAL_AddPPEK(ppeks+8, gDefKey[defKeyNum], gHpgpHalCB.remoteTei);
+2310   2          }
+2311   1          else
+2312   1          {
+2313   2              // set all NEKs
+2314   2              for( eks=0 ; eks<=7 ; eks++ )
+2315   2              {
+2316   3                  HHAL_AddNEK(eks, gDefKey[eks]);
+2317   3              }
+2318   2              // set two PPEKs
+2319   2              HHAL_AddPPEK(eks, gDefKey[eks], gHpgpHalCB.remoteTei);
+2320   2              eks++;
+2321   2              HHAL_AddPPEK(eks, gDefKey[eks], gHpgpHalCB.remoteTei);
+2322   2          }
+2323   1      }
+2324          
+2325          void HHT_SetDefEks()
+2326          {
+2327   1          u8  input[10];
+2328   1        printf("Select def eks:  0 to 9 or F:: ");
+2329   1          do
+2330   1          {
+2331   2            while (getline(input, sizeof(input)) > 0)
+2332   2            {
+2333   3              if(sscanf(input, "%bx", &gNekEks) >= 1)
+2334   3              break;
+2335   3            }
+2336   2          }while (gNekEks>9 && gNekEks != 0X0F); 
+2337   1          printf("Default eks: %bx \n", gNekEks);
+2338   1      }
+2339          void HHT_SetRoboMode()
+2340          {
+2341   1          eRegFlag             enbRoboMdPgm;
+2342   1          ePlcPhyRxRoboMod     roboMd;
+2343   1          u8                   plcNumPBs;   
+2344   1          char                 input[10];
+2345   1      
+2346   1          printf("Enable RxRoboMode Register: 0-Disable, 1-Enable :: ");
+2347   1        while (getline(input, sizeof(input)) > 0)
+2348   1        {
+2349   2          if(sscanf(input, "%bu", &enbRoboMdPgm) >= 1)
+2350   2          break;
+2351   2        }
+2352   1      
+2353   1          if(enbRoboMdPgm)
+2354   1          {
+2355   2          do
+2356   2          {
+2357   3            printf("Select robo mode:  0-Mini, 1-Std, 2-HS          :: ");
+2358   3            while (getline(input, sizeof(input)) > 0)
+2359   3            {
+2360   4              if(sscanf(input, "%bu", &roboMd) >= 1)
+2361   4              break;
+2362   4            }
+2363   3          }while (roboMd > 2);   
+2364   2      
+2365   2              if( roboMd  == 2)
+2366   2              {
+2367   3            do
+2368   3            {
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 40  
+
+2369   4              printf("Select num PBs:  1-1PB, 2-2PB, 3-3PB            :: ");
+2370   4              while (getline(input, sizeof(input)) > 0)
+2371   4              {
+2372   5                if(sscanf(input, "%bu", &plcNumPBs) >= 1)
+2373   5                break;
+2374   5              }
+2375   4            }while (!plcNumPBs || plcNumPBs > 3);
+2376   3              }
+2377   2          }
+2378   1          HHAL_PhyPgmRoboMd(enbRoboMdPgm, roboMd, plcNumPBs-1);
+2379   1      }
+2380          
+2381          
+2382          void HHT_AddrCfg()
+2383          {
+2384   1          u8              tei;
+2385   1          u8              remoteTei;
+2386   1          u8              snid;
+2387   1          u8              input[10];
+2388   1      
+2389   1          printf("Cur SNID  = 0x%bX, Cur TEI = 0x%bX, Rem TEI = 0x%bX\n", HHAL_GetSnid(), HHAL_GetTei(), gHpgpHa
+             -lCB.remoteTei );    
+2390   1          
+2391   1        do
+2392   1        {
+2393   2          printf("Enter new SNID :: 0x"); 
+2394   2          while (getline(input, sizeof(input)) > 0)
+2395   2          {
+2396   3            if(sscanf(input, "%bx", &snid) >= 1)
+2397   3            break;
+2398   3          }
+2399   2        }while (snid > 15);
+2400   1          
+2401   1        do
+2402   1        {
+2403   2          printf("Enter new TEI  :: 0x"); 
+2404   2          while (getline(input, sizeof(input)) > 0)
+2405   2          {
+2406   3            if(sscanf(input, "%bx", &tei) >= 1)
+2407   3            break;
+2408   3          }
+2409   2        }while (tei > 0xFE); 
+2410   1      
+2411   1        do
+2412   1        {
+2413   2          printf("Enter remote TEI  :: 0x"); 
+2414   2          while (getline(input, sizeof(input)) > 0)
+2415   2          {
+2416   3            if(sscanf(input, "%bx", &remoteTei) >= 1)
+2417   3            break;
+2418   3          }
+2419   2        }while (remoteTei > 0xFE);   
+2420   1      
+2421   1          HHAL_SetTei(tei);
+2422   1          gHpgpHalCB.remoteTei = remoteTei;
+2423   1          HHAL_SetSnid(snid);
+2424   1      }
+2425          
+2426          
+2427          void HHT_DevCfg()
+2428          {
+2429   1          eDevMode        devMode;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 41  
+
+2430   1          eLineMode       lineMode;
+2431   1          uPlcDevMode     plcDevMode;
+2432   1          u8              input[10];
+2433   1      
+2434   1          plcDevMode.mode = HHAL_GetPlcDevMode();       
+2435   1      
+2436   1        do
+2437   1        {
+2438   2          printf("Cur DevMode  = %bd, Enter New DevMode  0-CCO, 1-STA :: ", plcDevMode.s.isSta);
+2439   2          while (getline(input, sizeof(input)) > 0)
+2440   2          {
+2441   3            if(sscanf(input, "%bu", &devMode) >= 1)
+2442   3            break;
+2443   3          }
+2444   2        }while (devMode > 2);     
+2445   1        do
+2446   1        {
+2447   2          printf("Cur LineMode = %bd, Enter New LineMode 0-AC,  1-DC  :: ", plcDevMode.s.isDc);
+2448   2          while (getline(input, sizeof(input)) > 0)
+2449   2          {
+2450   3            if(sscanf(input, "%bu", &lineMode) >= 1)
+2451   3            break;
+2452   3          }
+2453   2        }while (lineMode > 2); 
+2454   1          HHAL_SetDevMode(devMode, lineMode); 
+2455   1          HHAL_SetDefAddrConfig();
+2456   1      }
+2457          
+2458          
+2459          void HHAL_CmdHelp()
+2460          {
+2461   1          printf("HAL Test Commands:\n"
+2462   1                 "p memTest  - HPGP Regs Write-ReadBack test\n"
+2463   1                 "p xmitTest - Basic Data transmit test\n"
+2464   1                 "p cpTest   - CPs Req/Rel test\n"
+2465   1                 "p tblTest  - Test SSN, PPEKAddr, AesKey tables\n"
+2466   1                 "p memDump  - Memory Dump\n"
+2467   1                 "p diag     - Set Diag Mode\n"
+2468   1                 "p cBcn     - Send one Central Bcn\n"
+2469   1                 "p tx       - Advanced Tx Tests\n"
+2470   1                 "p rxcfg    - Program Rx Addr\n"
+2471   1                 "p devMode  - Config Device Mode\n"
+2472   1                 "p addr     - Config Address\n"
+2473   1                 "p key      - Key update\n"
+2474   1                 "p eks      - Set default eks\n"
+2475   1                 "p robo     - Program Rx Robo Mode\n"
+2476   1                 "p scan     - Set STA scan mode\n"
+2477   1                 "p stat     - Display statistics\n"
+2478   1                 "p rstStat  - Reset statistics\n"
+2479   1      #ifdef Flash_Config      
+                         "p wcfg     - Write Config Data to flash\n"
+                         "p scfg     - FW Write Config Data to flash\n"
+                         "p rcfg     - Read Config Data from flash to ram \n"
+              #endif       
+2484   1      //           "p txmap    - Set Carrier and Spectral Masks\n"
+2485   1      //TODO Enable this when required           "p (no)sniff- Turn off/on sniffer mode\n"
+2486   1      #ifdef SNIFFER
+2487   1             "p (no)swsniff - Turn off/on eth-plc sniffer mode\n"
+2488   1             "p (no)bridge  - Turn off/on eth-plc bridge mode\n"
+2489   1      #endif
+2490   1                 "p demo str <color>      - Display GVC in a color\n"
+2491   1                 "p (no)led-demo  - Disable/Enable LED demo feature\n"
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 42  
+
+2492   1                 "p txpowermode   - Transmission Power mode\n"
+2493   1      //#ifdef ER_TEST
+2494   1            "p erenable      - Enable Extended Range mode\n"
+2495   1            "p erdisable     - Disable Extended Range mode\n"
+2496   1      //#endif  //ER_TEST
+2497   1            "p dbcenable      - Enable DBC Mode\n"
+2498   1            "p dbcdisable     - Disable DBC Mode\n"
+2499   1                 "\n");
+2500   1          return;
+2501   1      }
+2502          
+2503          bool led_demo = FALSE;
+2504          
+2505          void setLatency(u8 *cmdBuf)
+2506          {
+2507   1          u8 TCCIterarion;
+2508   1          if(sscanf(cmdBuf, "%bu", &TCCIterarion) >= 1)
+2509   1          {
+2510   2           
+2511   2           WriteU8Reg(0x485, TCC_REG_485_486_val[TCCIterarion - 1][0]);
+2512   2           WriteU8Reg(0x486, TCC_REG_485_486_val[TCCIterarion - 1][1]);
+2513   2           set_plc_paramter(PLC_PHYLATENCY_SEL,  TX_RXLatency_TCC[TCCIterarion - 1]); 
+2514   2          } 
+2515   1      }
+2516          
+2517          #ifdef ETH_BRDG_DEBUG
+              void printDebug()
+              {
+                  uCapTxQStatusReg capTxQStat;
+                  sHpgpHalCB *hhalCb;     
+                       
+                  hhalCb = &gHpgpHalCB;
+              
+                printf("numTxFrms = 0x%lX\n", numTxFrms);
+                printf("numTxDoneInts = 0x%lX\n", numTxDoneInts);
+                printf("numPlcPendingRet = 0x%lX\n", numPlcPendingRet);
+                printf("numForcePlcTxDone = 0x%lX\n", numForcePlcTxDone);
+                printf("numTxFrms (reg 0xE94) = 0x%08lX\n", rtocl(ReadU32Reg(PLC_TxCount)));
+                printf("numTxDoneInts from reg 0xE74 = 0x%08lX\n", rtocl(ReadU32Reg(0xe74)));
+                  capTxQStat.reg = ReadU32Reg(PLC_QDSTATUS_REG);
+                  printf("TX CAP=0X%lX\n",capTxQStat.reg);
+                  printf("# of free CPs = %bu\n", CHAL_GetFreeCPCnt());           
+                  printf("\nReg[0xEF0] (PLC State machine Wclk) = 0x%08lX\n", hal_common_reg_32_read(PLC_SMSHADOW1_REG))
+             -;
+                  printf("Reg[0xEF4] (PLC State machine Rclk) = 0x%08lX\n", hal_common_reg_32_read(PLC_SMSHADOW2_REG));
+                  printf("Reg[0xE9C] (CP_PLCEth_Status):  0x%08lX\n", hal_common_reg_32_read(CP_PLC_ETH_STATUS));
+                  printf("Reg[0xD10] (Plc_SM_Hang_Interrupts):  0x%08lX\n", hal_common_reg_32_read(PLC_SM_HANG_INT));
+                  printf("Reg[0xDE0] (ETH Free CP Cnt):  0x%08lX\n", hal_common_reg_32_read(ETHMAC_TXFREECPCNT_REG));
+                  printf("Reg[0xE6C] (ETH TX QUEUE Cnt):  0x%08lX\n", hal_common_reg_32_read(ETHMAC_TXQDESCCNT_REG));
+                  printf("\nFrame Counters:\n");
+              #ifdef HYBRII_ETH 
+                  printf("ETH->PLC:  ETH HW RX frame count=%lu, ethRxFrameCnt=%lu, plcTxFrameCnt=%lu, plcTxWriteFail=%lu
+             -\n",rtocl(EHAL_ReadEthStatReg(1)), ethRxFrameCnt,plcTxFrameCnt, plcTxWriteFail);
+                  printf("PLC->ETH:  plcRxFrameCnt=%lu, ethTxFrameCnt=%lu, ETH HW TX frame count=%lu, ethTxWriteFail=%lu
+             -\n", plcRxFrameCnt, ethTxFrameCnt, rtocl(EHAL_ReadEthStatReg(0x81)),ethTxWriteFail);
+                
+                datapath_queue_depth(HOST_DATA_QUEUE);
+                datapath_queue_depth(PLC_DATA_QUEUE);
+              
+                  printf("numEthTxDoneInts = %lu, oldNumEthTxDoneInts = %lu, numEthTxFrames=%lu, ethTxDone=%bu, ETH HW T
+             -X frame count=%lu\n", 
+                          numEthTxDoneInts,oldNumEthTxDoneInts,ethTxFrameCnt, ethTxDone,  rtocl(EHAL_ReadEthStatReg(0x81
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 43  
+
+             -)));
+              #endif  
+                
+                  printf("\nCP Counters:\n");
+                  printf("ETH->PLC: numPlcTxCp=%lu(0x%lX), HW (Paul's debug) CP reg: 0x%08lX\n", numPlcTxCp, numPlcTxCp,
+             - hal_common_reg_32_read(0xDCC));
+                  printf("PLC->ETH: numEthTxCp=%lu, numEthTxCpReleased=%lu\n", numEthTxCp, numEthTxCpReleased);
+                  printf("Stats from Rx Interrupt handler:\n");
+                  printf("TotalRxFrameCnt=%lu (PLC Rx+ETH Rx = %lu), TotalRxCpCnt=%lu (PLC Rx+ETH R=%lu) \n", TotalRxFra
+             -meCnt, ethTxFrameCnt+ethRxFrameCnt, 
+                          TotalRxCpCnt, numPlcTxCp+numEthTxCp);
+                  hal_common_display_qc_error_stats();
+              }
+              
+              void clearDebug()
+              {
+                  numTxFrms=0;
+                  numTxDoneInts=0;
+                  numPlcPendingRet=0;
+                  numForcePlcTxDone=0;
+                  WriteU32Reg(PLC_TxCount,0);
+                  ethRxFrameCnt = 0;
+                  ethTxFrameCnt = 0;
+                  plcTxFrameCnt = 0;
+                  plcRxFrameCnt = 0;
+                
+              #ifdef HYBRII_ETH
+                  EHAL_Clear_ethHWStat();
+              #endif
+                  numEthTxDoneInts=0;
+                  oldNumEthTxDoneInts=0;
+                  ethTxWriteFail=0;
+                  numPlcTxCp=0;
+                  numEthTxCp=0;
+                  numEthTxCpReleased=0;
+                  plcTxWriteFail=0;
+                  TotalRxCpCnt=0;
+                  TotalRxFrameCnt=0;
+              }
+              #endif  //ETH_BRDG_DEBUG
+2587          
+2588          #ifdef ASSOC_TEST
+              
+              void hhal_set_prom (bool sniff_en)
+              {
+                  uPlcStatusReg  plcStatus;
+                  
+                  if (sniff_en)
+                  {
+                    //  printf("Enable \n");
+                  }
+                  else
+                  {
+                //   printf("Disable \n");
+                  }
+                  //printf("Sniffer Mode\n");
+                  plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+                  plcStatus.s.promiscModeEn  = sniff_en; 
+              //    plcStatus.s.snifferMode    = sniff_en;
+                  WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+              }
+              
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 44  
+
+              #endif
+2610          
+2611          void setfreq60()
+2612          {
+2613   1        
+2614   1        gHpgpHalCB.lineMode = LINE_MODE_DC;
+2615   1      #ifdef FREQ_DETECT
+2616   1        FREQDET_FreqSetting(FREQUENCY_60HZ);
+2617   1      #endif
+2618   1        HHAL_SetDevMode(gHpgpHalCB.devMode, gHpgpHalCB.lineMode); 
+2619   1        
+2620   1      
+2621   1      }
+2622          void HHAL_CmdHALProcess(char* CmdBuf)
+2623          {
+2624   1          u8  cmd[10];
+2625   1          u32 i;
+2626   1      
+2627   1          CmdBuf++;
+2628   1      
+2629   1        if (sscanf(CmdBuf, "%s", &cmd) < 1 || strcmp(cmd, "?") == 0)
+2630   1        {
+2631   2          HHAL_CmdHelp();
+2632   2              return;
+2633   2        }
+2634   1        if(strcmp(cmd, "xmitTest") == 0 || strcmp(cmd, "xmittest") == 0)
+2635   1        {
+2636   2          HHT_BasicTxMenu();    
+2637   2        }
+2638   1      //  else  if(strcmp(cmd, "rdc") == 0 || strcmp(cmd, "Rdc") == 0)
+2639   1      //  {
+2640   1      //    HHT_BasicTxMenu();    
+2641   1      //  } 
+2642   1        else  if (strcmp(cmd, "stat") == 0)
+2643   1        {
+2644   2          HHAL_DisplayPlcStat();
+2645   2        }
+2646   1          else  if (strcmp(cmd, "powersave") == 0)
+2647   1        {
+2648   2            //HHAL_EnablePowerSave();
+2649   2        }
+2650   1          
+2651   1        else if (strcmp(cmd, "rststat") == 0 || strcmp(cmd, "rstStat") == 0)
+2652   1        {
+2653   2          HHAL_ResetPlcStat();
+2654   2              HHAL_DisplayPlcStat();
+2655   2        }
+2656   1        else if (strcmp(cmd, "diag") == 0)
+2657   1        {
+2658   2          HHT_SetDiagMode();
+2659   2        }
+2660   1        else if(strcmp(cmd,"qd") == 0)
+2661   1        {
+2662   2      
+2663   2          printf ("host");
+2664   2           datapath_queue_depth(HOST_DATA_QUEUE);
+2665   2          printf ("plc");
+2666   2      
+2667   2          datapath_queue_depth(PLC_DATA_QUEUE);
+2668   2      
+2669   2          
+2670   2        }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 45  
+
+2671   1      #ifdef ASSOC_TEST
+                else if(strcmp(cmd,"assoc") == 0)
+                {
+                  LM_SendAssocReq();
+                }
+                else if(strcmp(cmd,"idReq") == 0)
+                {
+                  LM_SendIdentifyReq();
+                } 
+                else if(strcmp(cmd,"getkey") == 0)
+                {
+                  LM_SendGetKeyReq();
+                }
+              #endif
+2685   1        else if (strcmp(cmd, "cBcn") == 0)
+2686   1        {
+2687   2          HHT_SendBcn(BEACON_TYPE_CENTRAL);
+2688   2        }
+2689   1        else if (strcmp(cmd, "tx") == 0)
+2690   1        {
+2691   2              HHT_SimulateTxTestMenu();
+2692   2        }
+2693   1        else if (strcmp(cmd, "devMode") == 0 || strcmp(cmd, "devmode") == 0)
+2694   1        {
+2695   2          HHT_DevCfg();
+2696   2        }
+2697   1      #ifdef UART_HOST_INTF 
+                else if(strcmp(cmd, "uartstat") == 0)
+                {
+                  FM_Printf(FM_USER,"\n******RX Stat***********\n");
+                  FM_Printf(FM_USER,"Rx Count %u\n",uartRxControl.rxCount);
+                  FM_Printf(FM_USER,"Rx Ready %bu\n",uartRxControl.rxReady);
+                  FM_Printf(FM_USER,"Rx CP %bu\n",uartRxControl.rxSwDesc.cpCount);
+                  #ifndef UART_RAW
+                  FM_Printf(FM_USER,"Rx CRC %u\n",uartRxControl.crcRx);
+                  FM_Printf(FM_USER,"Rx Good Frame Count %lu\n",uartRxControl.goodRxFrmCnt);
+                  FM_Printf(FM_USER,"Rx Drop Count %u\n",uartRxControl.rxDropCount);
+                  #endif
+                  FM_Printf(FM_USER,"Rx Expected Count %u\n",uartRxControl.rxExpectedCount);
+                  FM_Printf(FM_USER,"\n*******TX Stat**********\n");
+                  FM_Printf(FM_USER,"Tx Pending Count %u\n",uartTxControl.txCount);
+                #ifndef UART_RAW 
+                      FM_Printf(FM_USER,"Tx CRC %u\n",uartTxControl.crcTx);
+                #endif
+                }
+              #endif
+2717   1      #ifdef ASSOC_TEST
+                  else if (strcmp(cmd, "noprom") == 0)
+                  {
+                      hhal_set_prom(0);
+                  }
+                  else if (strcmp(cmd, "prom") == 0)
+                  {
+                      hhal_set_prom(1);
+                  }
+              #endif
+2727   1          else if (strcmp(cmd, "setfreq60") == 0)
+2728   1        {
+2729   2          setfreq60();
+2730   2      
+2731   2        }
+2732   1        else if (strcmp(cmd, "addr") == 0)
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 46  
+
+2733   1        {
+2734   2          HHT_AddrCfg();
+2735   2        }
+2736   1        else if (strcmp(cmd, "txCfg") == 0 || strcmp(cmd, "txcfg") == 0)
+2737   1        {
+2738   2              HHAL_SetDevMode(DEV_MODE_STA, LINE_MODE_DC);
+2739   2              
+2740   2              HHT_DevCfg();
+2741   2              gHpgpHalCB.bcnInitDone = 1;
+2742   2              //WriteU8Reg(0xF06,0x06);
+2743   2          
+2744   2        }
+2745   1          else if (strcmp(cmd, "stopbcntx") == 0 || strcmp(cmd, "stopBcntx") == 0)
+2746   1          {
+2747   2              gHpgpHalCB.bcnInitDone = 0;
+2748   2          }
+2749   1          else if (strcmp(cmd, "startbcntx") == 0 || strcmp(cmd, "startBcntx") == 0)
+2750   1          {
+2751   2              gHpgpHalCB.bcnInitDone = 1;
+2752   2          }
+2753   1           else if (strcmp(cmd, "strtbcntx") == 0 || strcmp(cmd, "strtBcntx") == 0)
+2754   1          {
+2755   2              gHpgpHalCB.bcnInitDone = 1;
+2756   2          }
+2757   1      
+2758   1        else if (strcmp(cmd, "rxCfg") == 0 || strcmp(cmd, "rxcfg") == 0)
+2759   1        {
+2760   2              u8 remoteTei = HYBRII_DEFAULT_TEICCO; 
+2761   2          u8 selfTei   = HYBRII_DEFAULT_TEISTA;
+2762   2              
+2763   2              HHAL_SetTei(selfTei);
+2764   2              gHpgpHalCB.remoteTei = remoteTei;
+2765   2              gHpgpHalCB.bcnInitDone = 0;
+2766   2        }
+2767   1          else if (strcmp(cmd, "tcc") == 0) 
+2768   1           {
+2769   2                  setLatency(CmdBuf+sizeof("tcc"));
+2770   2           }  
+2771   1          else if (strcmp(cmd, "key") == 0 ) 
+2772   1          {
+2773   2              HHT_SetKey();
+2774   2          }
+2775   1          else if (strcmp(cmd, "eks") == 0 ) 
+2776   1          {
+2777   2              HHT_SetDefEks();
+2778   2          }
+2779   1          else if (strcmp(cmd, "tblTest") == 0 || strcmp(cmd, "tbltest") == 0) 
+2780   1          {
+2781   2              HHT_TestMemoryTables();
+2782   2          }
+2783   1        else if (strcmp(cmd, "robo") == 0)
+2784   1        {
+2785   2          HHT_SetRoboMode();
+2786   2        }
+2787   1      //  else if (strcmp(cmd, "txmap") == 0 ) 
+2788   1      //    {
+2789   1      //        HHT_SetTxMap();
+2790   1      //    }
+2791   1      #ifdef _LED_DEMO_
+                else if (strcmp(cmd, "demo") == 0)
+                {
+                      HHT_LedDemoTxMenu(CmdBuf+1+ strlen("demo"));
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 47  
+
+                  }
+                  else if (strcmp(cmd, "led-demo") == 0)
+                  {       
+                       led_demo = TRUE;
+                  }
+                  else if (strcmp(cmd, "noled-demo") == 0)
+                  {       
+                       led_demo = FALSE;
+                  }
+                  else if (strcmp(cmd, "led") == 0)
+                  {       
+                       init_led_board();
+                       led_control(TRUE, BLUE, FALSE, 7);
+              
+                  }
+              #endif  
+2811   1          else  if (strcmp(cmd, "scan") == 0)
+2812   1          {
+2813   2              //HHAL_SetDefDevConfig(DEVMODE_STA, LINEMODE_DC);
+2814   2              HHAL_SetSWStatReqScanFlag(REG_FLAG_SET);
+2815   2              HHT_DevCfg(); 
+2816   2          }
+2817   1          else  if (strcmp(cmd, "set") == 0)
+2818   1          {
+2819   2              var1 = 6000;
+2820   2          }
+2821   1           else  if (strcmp(cmd, "deb") == 0)
+2822   1          {
+2823   2              for(i =0; i < cnt5;i++)
+2824   2              {
+2825   3      //            printf("\n x= %lu",testArr[i]); 
+2826   3              }
+2827   2          }
+2828   1           else  if (strcmp(cmd, "miss") == 0)
+2829   1          {
+2830   2             printf("\n misscnt = %lu", gHpgpHalCB.bcnmisscnt); 
+2831   2           /*  for(i =0; i < cnt;i++)
+2832   2             {
+2833   2              printf("\n bts = %lu", missarr[i]);
+2834   2             }*/
+2835   2             printf("\n debugcnt = %lu", debugcnt); 
+2836   2              printf("\n gsnid = %lu", gsnid); 
+2837   2               printf("\n nwsel = %bu",  gHpgpHalCB.nwSelected); 
+2838   2                printf("\n scanenb = %bu",  gHpgpHalCB.scanEnb);
+2839   2                printf("\n pbcscorr = %bu",  gpbcscorrect);
+2840   2                printf("\n gvaid = %bu",  gvalid);
+2841   2                  printf("\n devmode = %bu",gHpgpHalCB.devMode);
+2842   2              
+2843   2              
+2844   2               
+2845   2             
+2846   2             
+2847   2       
+2848   2          }    
+2849   1          else  if (strcmp(cmd, "sniff") == 0)
+2850   1          {
+2851   2              hhal_tst_sniff_cfg(TRUE); 
+2852   2          }
+2853   1          else  if (strcmp(cmd, "nosniff") == 0)
+2854   1          {
+2855   2              hhal_tst_sniff_cfg(FALSE); 
+2856   2          }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 48  
+
+2857   1      #ifdef SNIFFER
+2858   1        else  if (strcmp(cmd, "swsniff") == 0)
+2859   1          {
+2860   2               hostIntf = HOST_INTF_ETH;
+2861   2               eth_plc_bridge = 1;
+2862   2           eth_plc_sniffer = 1;
+2863   2          }
+2864   1          else  if (strcmp(cmd, "noswsniff") == 0)
+2865   1          {
+2866   2           hostIntf = HOST_INTF_NO;
+2867   2           eth_plc_sniffer = 0;
+2868   2           printf("Warnnig: eth-plc bridge is ON, if not needed turn OFF\n");
+2869   2          }
+2870   1        else  if (strcmp(cmd, "bridge") == 0)
+2871   1          {
+2872   2               eth_plc_bridge = 1;
+2873   2          }
+2874   1          else  if (strcmp(cmd, "nobridge") == 0)
+2875   1          {
+2876   2           eth_plc_bridge = 0;
+2877   2          }
+2878   1      #endif
+2879   1          else  if (strcmp(cmd, "txpowermode") == 0)
+2880   1          {
+2881   2               update_powermode(0);
+2882   2          }
+2883   1           else  if (strcmp(cmd, "rxpowermode") == 0)
+2884   1          {
+2885   2               update_powermode(1);
+2886   2          }
+2887   1         
+2888   1         else  if (strcmp(cmd, "Shortrange") == 0)
+2889   1          {
+2890   2              WriteU8Reg(0x48a, 0x90);
+2891   2              WriteU8Reg(0x48b, 0x01);
+2892   2              WriteU8Reg(0x484, 0x82);
+2893   2              WriteU8Reg(0x478, 0x61);
+2894   2          }
+2895   1            else  if (strcmp(cmd, "Longrange") == 0)
+2896   1          {
+2897   2      
+2898   2              WriteU8Reg(0x48a, 0xEA);
+2899   2              WriteU8Reg(0x48b, 0x00);
+2900   2              WriteU8Reg(0x484, 0x5A);
+2901   2              WriteU8Reg(0x478, 0x4b);
+2902   2              WriteU8Reg(0x483, 0x13);
+2903   2          
+2904   2          }
+2905   1        //Added by YM 0206-2014, for Extended Range Mode setting  
+2906   1      //#ifdef ER_TEST
+2907   1          else if (strcmp(cmd, "erenable") == 0)
+2908   1        {
+2909   2             WriteU8Reg(0x4F0, 0x80);
+2910   2        }
+2911   1        else if (strcmp(cmd, "erdisable") == 0)
+2912   1        {
+2913   2             WriteU8Reg(0x4F0, 0x0);
+2914   2        }
+2915   1      //#endif  //ER_TEST
+2916   1          // For DBC Test
+2917   1          else if (strcmp(cmd, "dbcenable") == 0)
+2918   1        {
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 49  
+
+2919   2            WriteU32Reg(PLC_DBC_PATTERN_REG, ctorl(0x80000000));
+2920   2        }
+2921   1        else if (strcmp(cmd, "dbcdisable") == 0)
+2922   1        {
+2923   2             WriteU32Reg(PLC_DBC_PATTERN_REG, 0x0);
+2924   2        }
+2925   1      #ifdef Flash_Config 
+                else if (strcmp(cmd, "wcfg") == 0)
+                {
+                     Program_Config_Data();
+                   Load_Config_Data(1, (u8 *)&sysConfig);
+                }
+                else if (strcmp(cmd, "rcfg") == 0)
+                {
+                     Load_Config_Data(0, (u8 *)&sysConfig);
+                }
+                else if (strcmp(cmd, "scfg") == 0)
+                {
+                     Load_Config_Data(1, (u8 *)&sysConfig);
+                }
+                else if (strcmp(cmd, "pcfg") == 0)
+                {
+                   unsigned int k=0;
+                   //for (k=0; k< 512; k++)
+                   //{
+                   //    printf("cfg[%u] = 0x%bx \n", k, (u8) (0xFF & *(&sysConfig.SeqNum[0]+k)));        
+                   //}
+                   for (k=0; k< 8; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.SeqNum[k]);
+                   }
+                   printf("\n");
+                   for (k=0; k< 8; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.systemName[k]);
+                   }
+                   printf("\n");
+                   for (k=0; k< 6; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.macAddress[k]);
+                   }
+                   printf("\n");
+                   printf("default NID ");
+                   for (k=0; k< 7; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.defaultNID[k]);
+                   }
+                   printf("\n");
+                   //for (k=0; k< 6; k++)
+                   {
+                       printf("STEI = %bx, DTEI = %bx", (u8) sysConfig.defaultSTEI, (u8) sysConfig.defaultDTEI);
+                   }
+                   printf("\n");
+                   for (k=0; k< 8; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.zigbeeAddr[k]);
+                   }
+                   printf("\n");
+                   //for (k=0; k< 8; k++)
+                   {
+                       printf("default channel = %bx ", (u8) sysConfig.defaultCH);
+                   }
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 50  
+
+                   printf("\n");
+                   printf("default LO leak reg 23,24 setting");
+                   {
+                       printf("Reg23 = %bx, Reg24 = %bx ", (u8) sysConfig.defaultLOLeak23, (u8) sysConfig.defaultLOLeak24)
+             -;
+                   }
+                   printf("\n");
+                   printf("Channel VCO calibration value\n");
+                   for (k=0; k< 16; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.VCOCal[k]);
+                   }
+                   printf("\n");
+                }
+                else if (strcmp(cmd, "ccfg") == 0)
+                {
+                   unsigned int k=0;
+              
+                   for (k=0; k< 512; k++)
+                   {
+                       printf("before clear: cfg[%u] = 0x%bx\n", k, *(&sysConfig.SeqNum[0]+k));
+                           *(&sysConfig.SeqNum[0]+k) = 0;
+                     printf("after clear: Cfg [%u] content = %bx\n", k, *(&sysConfig.SeqNum[0]+k));
+                           //printf("0x%X Addr 0x%X\n"  sysConfig,  sysConfig);
+                   }
+                }
+              #endif  //Flash_Config  
+3007   1      #ifdef ETH_BRDG_DEBUG
+                  else if (strcmp(cmd, "debug") == 0)
+                  {
+                      // toggle the debug flag
+                      myDebugFlag = !myDebugFlag;
+                      printf("\n Debug flag is %s\n", myDebugFlag ? "ON":"OFF");
+                }
+                  else if (strcmp(cmd, "debug1") == 0)
+                  {
+                      // toggle the debug flag
+                      myDebugFlag1 = !myDebugFlag1;
+                      printf("\n Debug flag 1 is %s\n", myDebugFlag1 ? "ON":"OFF");
+                  }
+                else  if (strcmp(cmd, "1") == 0)
+                  {
+                   printDebug();
+                  }
+                  else  if (strcmp(cmd, "2") == 0)
+                  {
+                   clearDebug();
+                  }
+              #endif
+3029   1          else  if (strcmp(cmd, "version") == 0)
+3030   1          {
+3031   2              FM_Printf(FM_USER, "VERSION: %s\n",get_Version());
+3032   2          }
+3033   1      #ifdef PROD_TEST  
+3034   1          else  if (strcmp(cmd, "test") == 0)
+3035   1          {
+3036   2              testCmd = 1;
+3037   2          }
+3038   1      #endif  
+3039   1          else  if (strcmp(cmd, "debug") == 0)
+3040   1          {
+3041   2              FM_setdebug(1);
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 51  
+
+3042   2          }
+3043   1          else  if (strcmp(cmd, "nodebug") == 0)
+3044   1          {
+3045   2              FM_setdebug(0);
+3046   2          }
+3047   1          else
+3048   1          {
+3049   2              HHAL_CmdHelp();
+3050   2          }  
+3051   1      }   
+3052          
+3053          void updateStatisticData(sSwFrmDesc* pPlcRxFrmSwDesc)
+3054          {
+3055   1        u16                tmpFrmLen;
+3056   1          u8                 rxSeqNum;
+3057   1          u8                 curMissFrmCnt;
+3058   1        u8                 frmStart;
+3059   1        u8                 frmData;
+3060   1        u8                 bCorruptFrame;
+3061   1          u8                 bDemoMode;
+3062   1          u8                 bDuplicateFrame;
+3063   1        u8                 i;
+3064   1        u8                 offset;
+3065   1        u16                tmpPayloadLen;
+3066   1      #ifdef MEM_PROTECTION
+                u8           cp_localBuf[HYBRII_CELLBUF_SIZE];  // local CP buffer
+              #endif
+3069   1      
+3070   1      
+3071   1        tmpFrmLen       = 0;   
+3072   1        frmData         = 0;
+3073   1        bCorruptFrame   = 0;
+3074   1          bDemoMode       = 0;
+3075   1          bDuplicateFrame = 0;
+3076   1        tmpPayloadLen   = 0;
+3077   1      
+3078   1        frmStart =  (pPlcRxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_MSDU) ? 0 : 4;
+3079   1      
+3080   1        // check desc cnt before each looping -- tbd
+3081   1        for( i=0 ; i< pPlcRxFrmSwDesc->cpCount ; i++ )
+3082   1        {
+3083   2          u8 j;
+3084   2          u8 descLen;
+3085   2      //    volatile u8 xdata * cellAddr;
+3086   2          u8 * cellAddr;
+3087   2      
+3088   2          offset   = 0;
+3089   2          descLen  = (pPlcRxFrmSwDesc->frmLen-tmpFrmLen) < HYBRII_CELLBUF_SIZE ? (pPlcRxFrmSwDesc->frmLen - tmpFrm
+             -Len) : HYBRII_CELLBUF_SIZE;
+3090   2      #ifdef MEM_PROTECTION
+                  // copy cp to local buf
+                  if (HHAL_CP_Get_Copy(pPlcRxFrmSwDesc->cpDesc[i].cp, &cp_localBuf[0], HYBRII_CELLBUF_SIZE) == STATUS_FAIL
+             -URE)
+                  {
+                    printf("updateStatisticData: Failed to make a copy of CP %bu (cpCount=%bu). Continue with next CP\n",
+                      i, pPlcRxFrmSwDesc->cpCount);
+                    continue;
+                  }
+                  cellAddr = &cp_localBuf[0];
+              #else
+3100   2          cellAddr = CHAL_GetAccessToCP(pPlcRxFrmSwDesc->cpArr[i].cp);
+3101   2      #endif
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 52  
+
+3102   2      //    CP_displayLocalBuf(cellAddr);
+3103   2                
+3104   2                
+3105   2              if (i==0) 
+3106   2              {
+3107   3            offset = frmStart;  
+3108   3                  rxSeqNum =  cellAddr[offset];   
+3109   3                  
+3110   3      #if  PLC_DATA_FIXED_PATTERN // Alternating frame bytes test           
+3111   3                  if (rxSeqNum & 0x01)
+3112   3                  {
+3113   4                      frmData   = 0xAA;
+3114   4                  }
+3115   3                  else
+3116   3                  {
+3117   4                      frmData   = 0x55;
+3118   4                  }
+3119   3      #else
+                          // Start frame data from seq num.
+                          frmData   = (u8)(gHpgpHalCB.TxSeqNum+1);
+              #endif
+3123   3      #if 0
+                    FM_Printf(FM_LINFO,"Frame#%lu: , SeqNum=%bu, CP#1=%bu, FCCSErrCnt = %lu, ICVErrCnt = %lu\n", gHpgpHalCB
+             -.halStats.TotalRxGoodFrmCnt, rxSeqNum, pPlcRxFrmSwDesc->cpDesc[i].cp, 
+                                    hal_common_reg_32_read(PLC_FCCSERRCNT_REG),hal_common_reg_32_read(PLC_ICVERRCNT_REG));
+                    FM_Printf(FM_LINFO,"frmType=%bu, stei=%bu:, snid=%bu, clst=%bu, mcstMode=%bu, CPCnt=%bu, lqi,rssi=%bu,%
+             -bu\n", pPlcRxFrmSwDesc->frmType, pPlcRxFrmSwDesc->frmInfo.plc.stei,
+                        pPlcRxFrmSwDesc->frmInfo.plc.snid, pPlcRxFrmSwDesc->frmInfo.plc.clst, pPlcRxFrmSwDesc->frmInfo.plc.mc
+             -stMode, CHAL_GetFreeCPCnt(), 
+                        pPlcRxFrmSwDesc->frmInfo.plc.lqi, pPlcRxFrmSwDesc->frmInfo.plc.rssi);
+              #endif
+3130   3                 // compute miss frm count 
+3131   3                  if (gHpgpHalCB.halStats.TotalRxGoodFrmCnt - gHpgpHalCB.halStats.RxGoodBcnCnt != 1)
+3132   3                  {
+3133   4                      if((gHpgpHalCB.halStats.PrevRxSeqNum+1) % 256 != rxSeqNum &&   \
+3134   4                pPlcRxFrmSwDesc->frmInfo.plc.mcstMode != HPGP_UCST)   // could be a retransmission
+3135   4                      {
+3136   5                           curMissFrmCnt = ((gHpgpHalCB.halStats.PrevRxSeqNum+1) % 256 > rxSeqNum) ?
+3137   5                                              (rxSeqNum - 0) + (255 - (gHpgpHalCB.halStats.PrevRxSeqNum+1)) : rx
+             -SeqNum - (gHpgpHalCB.halStats.PrevRxSeqNum + 1) % 256;
+3138   5      
+3139   5                 gHpgpHalCB.halStats.TotalRxMissCnt += curMissFrmCnt;
+3140   5                          // crossed miss threshold
+3141   5                          if(curMissFrmCnt >= 2)
+3142   5                          {
+3143   6                              FM_Printf(FM_LINFO,"CurMissCnt=%bu: , CurSeqNum=%bu\n, TotalMissCnt=%lu",  curMiss
+             -FrmCnt, rxSeqNum, gHpgpHalCB.halStats.TotalRxMissCnt);
+3144   6                              FM_Printf(FM_LINFO,"FCCSErrCnt=%lu, ICVErrCnt=%lu, PbcsRxErrCnt=%lu, AddrFiltErrCn
+             -t=%lu\n\n", hal_common_reg_32_read(PLC_FCCSERRCNT_REG),
+3145   6                        hal_common_reg_32_read(PLC_ICVERRCNT_REG), hal_common_reg_32_read(PLC_PBCSRXERRCNT_REG), hal_comm
+             -on_reg_32_read(PLC_ADDRFILTERERRCNT_REG));
+3146   6                          }
+3147   5                      }
+3148   4      
+3149   4                      // check for duplicate frame ie., retransmission- first byte is  seqNum
+3150   4                      if (gHpgpHalCB.halStats.PrevRxSeqNum == rxSeqNum )
+3151   4                      {
+3152   5                          gHpgpHalCB.halStats.DuplicateRxCnt++;
+3153   5      #ifdef MPER         
+                        gHpgpHalCB.halStats.TotalRxBytesCnt -= pPlcRxFrmSwDesc->frmLen;
+              #endif
+3156   5                          if(!pPlcRxFrmSwDesc->frmInfo.plc.mcstMode)
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 53  
+
+3157   5                          {
+3158   6      //                        gHpgpHalCB.halStats.DuplicateRxCnt++;
+3159   6                              bDuplicateFrame = 1;
+3160   6                          }
+3161   5                          // if repeated seqNum for mcst/bcst this is a corrupt frame
+3162   5                          else
+3163   5                          {
+3164   6                   u8   mode =  pPlcRxFrmSwDesc->frmInfo.plc.mcstMode;
+3165   6                   u8   prevRxSN = gHpgpHalCB.halStats.PrevRxSeqNum;
+3166   6      //            FM_Printf(FM_MINFO,"mcst mode=%bd, rxSeqNum=%d  PrevRx=%d\n", mode, rxSeqNum, prevRxSN);
+3167   6      
+3168   6                               bCorruptFrame   = 1;
+3169   6                               bDuplicateFrame = 1;
+3170   6                          }
+3171   5                      }                 
+3172   4                  }                        
+3173   3                  gHpgpHalCB.halStats.PrevRxSeqNum = rxSeqNum;
+3174   3                  offset                 += 1;
+3175   3              } 
+3176   2      
+3177   2      #ifdef _LED_DEMO_
+                      // Demo Mode Command frame interpetation
+                      if(!bDuplicateFrame)
+                      {
+                          bDemoMode = HHT_DemoModeRx(&cellAddr[offset]);
+                      }
+                      else
+                      {
+                          return;
+                      }
+              #endif
+3188   2              if(!bDemoMode)
+3189   2              {
+3190   3            u8  flag = 0;
+3191   3      
+3192   3            for( j=offset ; j<descLen ; j++)
+3193   3            {            
+3194   4      #if  PLC_BCNDATA_FIXED_PATTERN
+                      if( cellAddr[j]!= 0xBB)
+                      {
+                         bCorruptFrame = 1;
+                         if (flag == 0)
+                         {
+                         //printf("#1 cellAddr[%bu] = %02bx\n", j, cellAddr[j]);
+                         flag = 1;
+                         }
+                      }
+              #elif PLC_DATA_FIXED_PATTERN
+3205   4              if( cellAddr[j] != frmData)
+3206   4              {
+3207   5                 bCorruptFrame = 1;
+3208   5                 if (flag == 0)
+3209   5                 {
+3210   6                 //printf("#2 cellAddr[%bu] = %02bx\n", j, cellAddr[j]);
+3211   6                 flag = 1;
+3212   6                 }
+3213   5              }
+3214   4                      frmData     = _cror_(frmData, 1);
+3215   4      #else
+                      if( cellAddr[j]!= frmData++)
+                      {
+                         bCorruptFrame = 1;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 54  
+
+                         if (flag == 0)
+                         {
+                         //printf("#3 cellAddr[%bu] = %02bx\n", j, cellAddr[j]);
+                         flag = 1;
+                         }
+                      }
+              #endif                                         
+3226   4            } 
+3227   3             }
+3228   2      #if 0
+                    if (bCorruptFrame)
+                     {
+                          FM_Printf(FM_MINFO,"CP[%bu] = %bu :\n", i, pPlcRxFrmSwDesc->cpDesc[i].cp);
+                    for( j=0 ; j<descLen ; j++) 
+                    {
+                      FM_Printf(FM_MINFO,"0x%02bX ", cellAddr[j]);
+                    }
+                    FM_Printf(FM_MINFO,"\n");
+                      }//FM_Printf(FM_LINFO,"\n");
+              #endif    
+3239   2          tmpFrmLen+=descLen;
+3240   2          tmpPayloadLen += (descLen - offset);          
+3241   2        }
+3242   1      #if 0
+                if (bCorruptFrame)
+                {
+                      gHpgpHalCB.halStats.CorruptFrmCnt++;
+                  printf("Received Corrupt Frame; SeqNum=%bu, ssn=%u, FrmLen=%u,  FCCSErrCnt=%lu, ICVErrCnt=%lu, AddrFiltE
+             -rr=%lu \n\n", rxSeqNum, pPlcRxFrmSwDesc->frmInfo.plc.ssn, 
+                    pPlcRxFrmSwDesc->frmLen, hal_common_reg_32_read(PLC_FCCSERRCNT_REG), hal_common_reg_32_read(PLC_ICVERRC
+             -NT_REG), hal_common_reg_32_read(PLC_ADDRFILTERERRCNT_REG));
+                }
+                  else
+                  {
+                      if(((gHpgpHalCB.halStats.TotalRxGoodFrmCnt - gHpgpHalCB.halStats.RxGoodBcnCnt) & (u32)(0xFF)) == 0
+             -)
+                      {  
+                          printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b
+             -\b\b\b");
+                          printf("Sent %ld, Received %ld HPGP frames.", gHpgpHalCB.halStats.CurTxTestFrmCnt, gHpgpHalCB.
+             -halStats.TotalRxGoodFrmCnt - gHpgpHalCB.halStats.RxGoodBcnCnt);
+                      }
+                  }  
+              #endif
+3258   1      }
+3259          
+3260          //============ Process Rx Functions , Int Handlers
+3261          
+3262          
+3263          void HHT_ProcessPlcMacFrame(sSwFrmDesc* pPlcRxFrmSwDesc)  
+3264          {
+3265   1        u16                tmpFrmLen;
+3266   1      //    u8                 rxSeqNum;
+3267   1      //    u8                 curMissFrmCnt;
+3268   1      //  u8                 frmStart;
+3269   1        u8                 frmData;
+3270   1        u8                 bCorruptFrame;
+3271   1          u8                 bDemoMode;
+3272   1          u8                 bDuplicateFrame;
+3273   1      //  u8                 cp;
+3274   1        u8                 i;
+3275   1      //  u8                 offset;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 55  
+
+3276   1        u16                tmpPayloadLen;
+3277   1      
+3278   1        tmpFrmLen       = 0;   
+3279   1        frmData         = 0;
+3280   1        bCorruptFrame   = 0;
+3281   1          bDemoMode       = 0;
+3282   1          bDuplicateFrame = 0;
+3283   1        tmpPayloadLen   = 0;
+3284   1      
+3285   1      
+3286   1      #if 0
+                frmStart =  (pPlcRxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_MSDU) ? 0 : 4;
+              
+                // check desc cnt before each looping -- tbd
+                for( i=0 ; i< pPlcRxFrmSwDesc->cpCnt ; i++ )
+                {
+                  u8 j;
+                  u8 descLen;
+                  volatile u8 xdata * cellAddr;
+                  u16 tmpIndx;
+              
+                  offset   = 0;
+                  descLen  = (pPlcRxFrmSwDesc->frmLen-tmpFrmLen) < HYBRII_CELLBUF_SIZE ? (pPlcRxFrmSwDesc->frmLen-tmpFrmLe
+             -n):HYBRII_CELLBUF_SIZE;
+                  cellAddr = CHAL_GetAccessToCP(pPlcRxFrmSwDesc->cpDesc[i].cp);
+              #if 0
+                      if(i==0) 
+                      {
+                    offset = frmStart;  
+                          rxSeqNum =  cellAddr[offset];   
+                          
+              #if  PLC_DATA_FIXED_PATTERN // Alternating frame bytes test           
+                          if(rxSeqNum & 0x01)
+                          {
+                              frmData   = 0xAA;
+                          }
+                          else
+                          {
+                              frmData   = 0x55;
+                          }
+              #else
+                          // Start frame data from seq num.
+                          frmData   = (u8)(gHpgpHalCB.TxSeqNum+1);
+              #endif
+                    FM_Printf(FM_LINFO,"Frame#%lu: , SeqNum=%bu, CP#1=%bu, FCCSErrCnt = %lu, ICVErrCnt = %lu\n", gHpgpHalCB
+             -.halStats.TotalRxGoodFrmCnt, rxSeqNum, pPlcRxFrmSwDesc->cpDesc[i].cp, hal_common_reg_32_read(PLC_FCCSERRCNT_REG),hal_com
+             -mon_reg_32_read(PLC_ICVERRCNT_REG));
+                    FM_Printf(FM_LINFO,"frmType=%bu, stei=%bu:, snid=%bu, clst=%bu, mcstMode=%bu, CPCnt=%bu, lqi,rssi=%bu,%
+             -bu\n", pPlcRxFrmSwDesc->frmType, pPlcRxFrmSwDesc->frmInfo.plc.stei, pPlcRxFrmSwDesc->frmInfo.plc.snid, pPlcRxFrmSwDesc->
+             -frmInfo.plc.clst, pPlcRxFrmSwDesc->frmInfo.plc.mcstMode, CHAL_GetFreeCPCnt(), pPlcRxFrmSwDesc->frmInfo.plc.lqi, pPlcRxFr
+             -mSwDesc->frmInfo.plc.rssi);
+              
+                         // compute miss frm count 
+                          if(gHpgpHalCB.halStats.TotalRxGoodFrmCnt - gHpgpHalCB.halStats.RxGoodBcnCnt != 1)
+                          {
+                              if(gHpgpHalCB.halStats.PrevRxSeqNum+1 != rxSeqNum &&   \
+                        pPlcRxFrmSwDesc->frmInfo.plc.mcstMode != HPGP_UCST)   // could be a retransmission
+                              {
+                                  curMissFrmCnt = ((gHpgpHalCB.halStats.PrevRxSeqNum+1) > rxSeqNum) ?
+                                                      (rxSeqNum - 0) + (255 - gHpgpHalCB.halStats.PrevRxSeqNum):
+                                                       rxSeqNum - (gHpgpHalCB.halStats.PrevRxSeqNum + 1);
+                         gHpgpHalCB.halStats.TotalRxMissCnt += curMissFrmCnt;
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 56  
+
+                                  // crossed miss threshold
+                                  if(curMissFrmCnt >= 2)
+                                  {
+                                      FM_Printf(FM_LINFO,"CurMissCnt=%bu: , CurSeqNum=%bu\n, TotalMissCnt=%lu",  curMiss
+             -FrmCnt, rxSeqNum, gHpgpHalCB.halStats.TotalRxMissCnt);
+                                      FM_Printf(FM_LINFO,"FCCSErrCnt=%lu, ICVErrCnt=%lu, PbcsRxErrCnt=%lu, AddrFiltErrCn
+             -t=%lu\n\n", hal_common_reg_32_read(PLC_FCCSERRCNT_REG),hal_common_reg_32_read(PLC_ICVERRCNT_REG), hal_common_reg_32_read
+             -(PLC_PBCSRXERRCNT_REG), hal_common_reg_32_read(PLC_ADDRFILTERERRCNT_REG));
+                                  }
+                              }
+                              // check for duplicate frame ie., retransmission- first byte is  seqNum
+                              if(gHpgpHalCB.halStats.PrevRxSeqNum == rxSeqNum )
+                              {
+                                  if(!pPlcRxFrmSwDesc->frmInfo.plc.mcstMode)
+                                  {
+                                      gHpgpHalCB.halStats.DuplicateRxCnt++;
+                                      bDuplicateFrame = 1;
+                                  }
+                                  // if repeated seqNum for mcst/bcst this is a corrupt frame
+                                  else
+                                  {
+                                       bCorruptFrame   = 1;
+                                       bDuplicateFrame = 1;
+                                       gHpgpHalCB.halStats.DuplicateRxCnt++;
+                                  }
+                              }                 
+                          }                        
+                          gHpgpHalCB.halStats.PrevRxSeqNum = rxSeqNum;
+                          offset                 += 1;
+                      } 
+              #endif
+              
+                      // Demo Mode Command frame interpetation
+                      if(!bDuplicateFrame)
+                      {
+                          bDemoMode = HHT_DemoModeRx(&cellAddr[offset]);
+                      }
+              
+                      if(!bDemoMode)
+                      {
+                    for( j=offset ; j<descLen ; j++)
+                    {            
+              #if  PLC_BCNDATA_FIXED_PATTERN
+                      if( cellAddr[j]!= 0xBB)
+                      {
+                         bCorruptFrame = 1; 
+                      }
+              #elif PLC_DATA_FIXED_PATTERN
+                      if( cellAddr[j]!= frmData)
+                      {
+                         bCorruptFrame = 1;
+                      }
+                              frmData     = _cror_(frmData, 1);
+              #else
+                      if( cellAddr[j]!= frmData++)
+                      {
+                         bCorruptFrame = 1;
+                      }
+              #endif                                         
+                    } 
+                      }    
+                     if(bCorruptFrame)
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 57  
+
+                      {
+                          FM_Printf(FM_MINFO,"CP[%bu] = %bu :\n", i, pPlcRxFrmSwDesc->cpDesc[i].cp);
+                    for( j=0 ; j<descLen ; j++) 
+                    {
+                      FM_Printf(FM_MINFO,"0x%02bX ", cellAddr[j]);
+                    }
+                    FM_Printf(FM_MINFO,"\n");
+                      }//FM_Printf(FM_LINFO,"\n");
+                  tmpFrmLen+=descLen;
+                  tmpPayloadLen += (descLen - offset);          
+                }
+              #else
+3403   1      
+3404   1      
+3405   1      #ifdef PROD_TEST
+3406   1        if ((gHpgpHalCB.prodTestDevType == DEV_REF ) && (gHpgpHalCB.prodTestIsPLCTxTestActive))
+3407   1      #endif
+3408   1        {
+3409   2          updateStatisticData(pPlcRxFrmSwDesc);
+3410   2        }
+3411   1      #endif
+3412   1      
+3413   1          for( i=0 ; i< pPlcRxFrmSwDesc->cpCount ; i++ )
+3414   1        {
+3415   2          CHAL_DecrementReleaseCPCnt(pPlcRxFrmSwDesc->cpArr[i].cp);
+3416   2        }
+3417   1      
+3418   1      #if  1
+3419   1        if(bCorruptFrame)
+3420   1        {
+3421   2              gHpgpHalCB.halStats.CorruptFrmCnt++;
+3422   2      //    printf("Received Corrupt Frame; SeqNum=%bu, ssn=%u, FrmLen=%u,  FCCSErrCnt=%lu, ICVErrCnt=%lu, AddrFil
+             -tErr=%lu \n\n", rxSeqNum, pPlcRxFrmSwDesc->frmInfo.plc.ssn, pPlcRxFrmSwDesc->frmLen, hal_common_reg_32_read(PLC_FCCSERRC
+             -NT_REG), hal_common_reg_32_read(PLC_ICVERRCNT_REG), hal_common_reg_32_read(PLC_ADDRFILTERERRCNT_REG));
+3423   2        }
+3424   1          else
+3425   1          {
+3426   2              if(((gHpgpHalCB.halStats.TotalRxGoodFrmCnt - gHpgpHalCB.halStats.RxGoodBcnCnt) & (u32)(0xFF)) == 0
+             -)
+3427   2              {  
+3428   3                  printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b
+             -\b\b\b");
+3429   3      #ifndef MPER      
+3430   3                    printf("Sent %ld, Received %ld HPGP frames.", gHpgpHalCB.halStats.CurTxTestFrmCnt, gHpgpHalC
+             -B.halStats.TotalRxGoodFrmCnt - gHpgpHalCB.halStats.RxGoodBcnCnt);
+3431   3      //#else
+3432   3      //            printf("Sent %ld, Received %ld HPGP frames.", gHpgpHalCB.halStats.CurTxTestFrmCnt, gHpgpHalC
+             -B.halStats.TotalRxGoodFrmCnt - gHpgpHalCB.halStats.RxGoodBcnCnt - gHpgpHalCB.halStats.DuplicateRxCnt);
+3433   3      #endif
+3434   3              }
+3435   2          }
+3436   1      #endif
+3437   1      }
+3438          
+3439          
+3440          
+3441          /*void HHAL_BPIntHandler1()
+3442          {
+3443             
+3444             
+3445            u32 NTB1, rolloverpulses; //, NTB2, bpst, bpst1 ;
+3446          
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 58  
+
+3447             // PrepareAndSendBcn();
+3448           
+3449             // printf("\n bpstdiff = %lu", ((oldgbpst - gbpst) * 40));
+3450             // oldgbpst = gbpst;
+3451            if(gHpgpHalCB.bPerAvgInitDone && gHpgpHalCB.bcnInitDone)
+3452            {
+3453               
+3454                //printf("\n b2");
+3455                //WriteU32Reg(PLC_BPST_REG, ctorl(gbpst));
+3456              //WriteU32Reg(PLC_SWBCNPERAVG_REG, ctorl(gPERavg)); 
+3457            
+3458               NTB1 = rtocl(ReadU32Reg(PLC_NTB_REG));
+3459              //bpst = rtocl(ReadU32Reg(PLC_BPST_REG));
+3460              //printf("\n gbpst = %lu\n",gbpst );
+3461              //printf("\n NTB2 = %lu\n",NTB1);
+3462              //printf("\n N1 = %lu",((gbpst - NTB1) * 40));
+3463                if(gRollOver)
+3464              {
+3465                gRollOver = 0;
+3466                //NTB1 = NTB1 + PLC_HPGPBPINT_OFFSET + 0xB478;
+3467                //printf("\n NTB1B = %lu",NTB1);
+3468                //if((NTB1 + PLC_HPGPBPINT_OFFSET) < gbpst)
+3469                      rolloverpulses = (0xffffffff - NTB1);
+3470                      if((gbpst + rolloverpulses) > BCN_PREPARATION_TIME)
+3471                {
+3472                  PrepareAndSendBcn();
+3473                }
+3474                else
+3475                {
+3476                    //printf("\n roll over");
+3477                             // printf("\n\n not enough time");
+3478                    //printf("\n bpst = %lu",gbpst);
+3479                    //printf("\n NTB1 = %lu",NTB1); 
+3480                }
+3481              }   
+3482              else if(gbpst > NTB1)
+3483              {
+3484                if((gbpst -  NTB1) > BCN_PREPARATION_TIME)
+3485                {
+3486                    
+3487                    PrepareAndSendBcn();
+3488                }
+3489                else
+3490                {
+3491                    gHpgpHalCB.BcnLateCnt++;
+3492                    //printf("\n\n not enough time");
+3493                  //  printf("\n bpst = %lu",gbpst);
+3494                  //  printf("\n NTB1 = %lu",NTB1); 
+3495                }
+3496              }
+3497              else
+3498                {
+3499                  //printf("\n late");
+3500                //    printf("\n bpst = %lu\n",gbpst);
+3501                  //  printf("\n NTB1 = %lu",NTB1);
+3502                    gHpgpHalCB.BcnLateCnt++;
+3503                } 
+3504                 
+3505            
+3506                
+3507            } 
+3508          
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 59  
+
+3509          
+3510           
+3511          }*/
+3512          
+3513          
+3514          void HHT_ProcessBcnHle(u8* bcn)
+3515          { 
+3516   1        sHybriiRxBcnHdr* pRxBcnHdr;
+3517   1        sFrmCtrlBlk*     pFrmCtrlBlk;
+3518   1          sHybriiRxBcn*    rxBcn;      
+3519   1          sBcnHdr*         pBcnHdr = 0;
+3520   1          sBeHdr*          pBeHdr = 0;
+3521   1      
+3522   1        rxBcn       = (sHybriiRxBcn*)bcn;
+3523   1          pRxBcnHdr   = (sHybriiRxBcnHdr*)bcn; 
+3524   1          pFrmCtrlBlk = (sFrmCtrlBlk*) (bcn + sizeof(sHybriiRxBcnHdr)) ;
+3525   1          pBcnHdr     = (sBcnHdr*) ((u8*)pFrmCtrlBlk + sizeof(sFrmCtrlBlk)); 
+3526   1          pBcnHdr->nid[NID_LEN-1] &= 0xFC;                          
+3527   1        if( ((pBcnHdr->bt == BEACON_TYPE_CENTRAL) || (pBcnHdr->bt == BEACON_TYPE_PROXY)) )             
+3528   1          {
+3529   2              if(gHpgpHalCB.scanEnb && !gHpgpHalCB.nwSelected)
+3530   2              {
+3531   3                  if(gHpgpHalCB.halStats.RxGoodBcnCnt >= PLC_BCNTST_SYNCTHRES ) 
+3532   3                  {                            
+3533   4                      HHAL_SetSnid(pFrmCtrlBlk->snid);                             
+3534   4                  }                    
+3535   3              }
+3536   2          }
+3537   1      }
+3538          
+3539          
+3540          void HHAL_DisplayPlcStat()
+3541          {
+3542   1          u16 outStandingDescCnt;
+3543   1      
+3544   1          u16 totalDesc      = PLC_TXQ_DEPTH + PLC_TXQ_DEPTH + PLC_TXQ_DEPTH + PLC_TXQ_DEPTH;
+3545   1          u16 freeDescCnt    =  (u16)(HHAL_GetPlcTxQFreeDescCnt(0) + HHAL_GetPlcTxQFreeDescCnt(1) + \
+3546   1                                HHAL_GetPlcTxQFreeDescCnt(2) + HHAL_GetPlcTxQFreeDescCnt(3));  
+3547   1          outStandingDescCnt = totalDesc - freeDescCnt;
+3548   1      
+3549   1          if(gHpgpHalCB.halStats.TotalRxGoodFrmCnt || gHpgpHalCB.halStats.RxErrBcnCnt)
+3550   1          {
+3551   2              printf("============ PLC Rx Statistics ==============\n");
+3552   2      #ifndef MPER    
+3553   2              printf("TotalRxGoodFrmCnt = %lu\n",gHpgpHalCB.halStats.TotalRxGoodFrmCnt);
+3554   2      #else
+                      printf("TotalRxGoodFrmCnt = %lu\n",gHpgpHalCB.halStats.TotalRxGoodFrmCnt - gHpgpHalCB.halStats.Dup
+             -licateRxCnt);
+              #endif
+3557   2              printf("TotalRxBytesCnt   = %lu\n",gHpgpHalCB.halStats.TotalRxBytesCnt);
+3558   2      #ifndef MPER
+3559   2              printf("RxGoodDataCnt     = %lu\n",gHpgpHalCB.halStats.RxGoodDataCnt);
+3560   2      #else
+                      printf("RxGoodDataCnt     = %lu\n",gHpgpHalCB.halStats.RxGoodDataCnt - gHpgpHalCB.halStats.Duplica
+             -teRxCnt);
+              #endif
+3563   2              printf("RxGoodBcnCnt      = %lu\n",gHpgpHalCB.halStats.RxGoodBcnCnt);
+3564   2              printf("RxGoodMgmtCnt     = %lu\n",gHpgpHalCB.halStats.RxGoodMgmtCnt);
+3565   2      #ifdef RTX51_TINY_OS
+3566   2              os_switch_task();
+3567   2      #else
+                      ISM_PollInt();
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 60  
+
+              #endif
+3570   2              printf("RxGoodSoundCnt    = %lu\n",gHpgpHalCB.halStats.RxGoodSoundCnt);
+3571   2      
+3572   2      #ifndef MPER
+3573   2              printf("TotalRxMissCnt    = %lu\n",gHpgpHalCB.halStats.TotalRxMissCnt);     
+3574   2              printf("DuplicateRxCnt    = %lu\n",gHpgpHalCB.halStats.DuplicateRxCnt); 
+3575   2      #endif
+3576   2              printf("BcnRxIntCnt       = %lu\n",gHpgpHalCB.halStats.BcnRxIntCnt);
+3577   2              printf("BcnSyncCnt        = %lu\n\n",gHpgpHalCB.halStats.BcnSyncCnt);
+3578   2          }
+3579   1      #ifdef RTX51_TINY_OS
+3580   1              os_switch_task();
+3581   1      #else
+                      ISM_PollInt();
+              #endif   
+3584   1          if(gHpgpHalCB.halStats.TotalTxFrmCnt)
+3585   1          {
+3586   2              printf("============ PLC Tx Statistics ==============\n");
+3587   2              printf("TotalTxFrmCnt     = %lu\n",gHpgpHalCB.halStats.TotalTxFrmCnt);
+3588   2              printf("TotalTxBytesCnt   = %lu\n",gHpgpHalCB.halStats.TotalTxBytesCnt);
+3589   2              printf("TxDataCnt         = %lu\n",gHpgpHalCB.halStats.TxDataCnt);
+3590   2              printf("TxBcnCnt          = %lu\n",gHpgpHalCB.halStats.TxBcnCnt);
+3591   2              printf("TxMgmtCnt         = %lu\n\n",gHpgpHalCB.halStats.TxMgmtCnt);
+3592   2          }
+3593   1      #ifdef RTX51_TINY_OS
+3594   1              os_switch_task();
+3595   1      #else
+                      ISM_PollInt();
+              #endif  
+3598   1          printf("============ PLC Err Statistics =============\n");
+3599   1          printf("AddrFilterErrCnt  = %lu\n",hal_common_reg_32_read(PLC_ADDRFILTERERRCNT_REG));
+3600   1      #ifndef MPER  
+3601   1          printf("FrameCtrlErrCnt   = %lu\n",hal_common_reg_32_read(PLC_FCCSERRCNT_REG)); 
+3602   1          printf("PBCSRxErrCnt      = %lu\n",hal_common_reg_32_read(PLC_PBCSRXERRCNT_REG));
+3603   1      #endif
+3604   1          printf("PBCSTxErrCnt      = %lu\n",hal_common_reg_32_read(PLC_PBCSTXERRCNT_REG));
+3605   1      #ifndef MPER
+3606   1          printf("ICVErrCnt         = %lu\n",hal_common_reg_32_read(PLC_ICVERRCNT_REG));
+3607   1      #endif
+3608   1      #ifdef RTX51_TINY_OS
+3609   1              os_switch_task();
+3610   1      #else
+                      ISM_PollInt();
+              #endif
+3613   1          printf("RxErrBcnCnt       = %lu\n",gHpgpHalCB.halStats.RxErrBcnCnt);
+3614   1          printf("PLCMpduDropCnt    = %lu\n",hal_common_reg_32_read(PLC_MPDUDROPCNT_REG));
+3615   1      #ifndef MPER  
+3616   1          printf("CorruptFrmCnt     = %lu\n",gHpgpHalCB.halStats.CorruptFrmCnt);
+3617   1      #endif
+3618   1          printf("MissSyncCnt       = %lu\n",gHpgpHalCB.halStats.MissSyncCnt);
+3619   1          printf("STAleadCCOCount   = %lu\n",gHpgpHalCB.halStats.STAleadCCOCount);
+3620   1          printf("STAlagCCOCount    = %lu\n",gHpgpHalCB.halStats.STAlagCCOCount);
+3621   1          ;
+3622   1      #ifdef RTX51_TINY_OS
+3623   1              os_switch_task();
+3624   1      #else
+                      ISM_PollInt();
+              #endif
+3627   1          printf("PendingTxDescCnt  = %u\n",outStandingDescCnt);
+3628   1          printf("PhyActRstCnt      = %bu\n",gHpgpHalCB.halStats.phyActHangRstCnt ); 
+3629   1          printf("macTxStuckCnt     = %u\n",gHpgpHalCB.halStats.macTxStuckCnt);
+3630   1          printf("macRxStuckCnt     = %u\n",gHpgpHalCB.halStats.macRxStuckCnt);
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 61  
+
+3631   1          printf("phyStuckCnt       = %bu\n",gHpgpHalCB.halStats.phyStuckCnt);
+3632   1      #ifdef RTX51_TINY_OS
+3633   1              os_switch_task();
+3634   1      #else
+                      ISM_PollInt();
+              #endif
+3637   1          printf("mpiRxStuckCnt     = %bu\n",gHpgpHalCB.halStats.mpiRxStuckCnt);
+3638   1          printf("smTxStuckCnt      = %bu\n",gHpgpHalCB.halStats.smTxStuckCnt);
+3639   1          printf("smRxStuckCnt      = %bu\n",gHpgpHalCB.halStats.smRxStuckCnt);
+3640   1          printf("macHangRecover1   = %bu\n",gHpgpHalCB.halStats.macHangRecover1);
+3641   1          printf("macHangRecover2   = %bu\n\n",gHpgpHalCB.halStats.macHangRecover2);
+3642   1      #ifdef RTX51_TINY_OS
+3643   1              os_switch_task();
+3644   1      #else
+                      ISM_PollInt();
+              #endif
+3647   1          printf("FreeCPCnt         = %bu\n",CHAL_GetFreeCPCnt());    
+3648   1          printf("TimerIntCnt       = %lu\n",gHalCB.timerIntCnt); 
+3649   1          printf("BPIntCnt          = %lu\n",gHpgpHalCB.halStats.bpIntCnt);
+3650   1          printf("BcnSentIntCnt     = %lu\n",gHpgpHalCB.halStats.BcnSentIntCnt);
+3651   1      #ifdef RTX51_TINY_OS
+3652   1              os_switch_task();
+3653   1      #else
+                      ISM_PollInt();
+              #endif
+3656   1          printf("BPIntGap          = %u\n",gHpgpHalCB.bpIntGap);
+3657   1          printf("SS1               = %lX\n",gHpgpHalCB.halStats.lastSs1);
+3658   1          printf("NTBB4             = %lX\n",gHpgpHalCB.lastNtbB4);
+3659   1          printf("NTBAft            = %lX\n",gHpgpHalCB.lastNtbAft);
+3660   1          printf("BPST              = %lX\n\n",gHpgpHalCB.lastBpst);
+3661   1      #ifdef RTX51_TINY_OS
+3662   1                  os_switch_task();
+3663   1      #else
+                          ISM_PollInt();
+              #endif
+3666   1      
+3667   1          printf("============  Q Controller Statistics =============\n");
+3668   1          printf("No 1st Desc             = %bu\n",gHalCB.qc_no_1st_desc);    
+3669   1          printf("Too many desc           = %bu\n",gHalCB.qc_too_many_desc);    
+3670   1          printf("No desc                 = %bu\n",gHalCB.qc_no_desc);    
+3671   1          printf("No grant (CPU Tx Q)     = %bu\n",gHalCB.qc_no_grant);
+3672   1      
+3673   1      #ifdef RTX51_TINY_OS
+3674   1              os_switch_task();
+3675   1      #else
+                      ISM_PollInt();
+              #endif
+3678   1          printf("No grant (free CP)      = %bu\n",gHalCB.cp_no_grant_free_cp);
+3679   1          printf("No grant (alloc CP)     = %d\n",gHalCB.cp_no_grant_alloc_cp);
+3680   1          printf("No grant (read CP mem)  = %d\n",gHalCB.cp_no_grant_read_cp);
+3681   1          printf("No grant (write CP mem) = %d\n\n",gHalCB.cp_no_grant_write_cp);
+3682   1      }
+3683          
+3684          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   9400    ----
+   CONSTANT SIZE    =   6256    ----
+   XDATA SIZE       =    172     408
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+C51 COMPILER V9.52.0.0   HHAL_TST                                                          01/10/2015 21:25:28 PAGE 62  
+
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  2 WARNING(S),  0 ERROR(S)

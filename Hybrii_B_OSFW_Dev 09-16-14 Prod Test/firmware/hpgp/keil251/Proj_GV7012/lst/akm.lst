@@ -1,0 +1,2191 @@
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE AKM
+OBJECT MODULE PLACED IN .\obj\akm.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\src\link\akm.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) I
+                    -NCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..\..\
+                    -src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\zigb
+                    -ee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\i
+                    -nc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\src;..
+                    -\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support;..\
+                    -..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,H
+                    -PGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,Hy
+                    -brii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,PR
+                    -OD_TEST) DEBUG PRINT(.\lst\akm.lst) TABS(2) OBJECT(.\obj\akm.obj)
+
+line level    source
+
+   1          /** ========================================================
+   2           *
+   3           *  @file akm.c
+   4           * 
+   5           *  @brief Authentication and Key Manager 
+   6           &*
+   7           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ==========================================================*/
+  11          
+  12          
+  13          #ifdef RTX51_TINY_OS
+  14          #include <rtx51tny.h>
+  15          #endif
+  16          #include <assert.h>
+  17          #include <stdlib.h>
+  18          #include <string.h>
+  19          #include "papdef.h"
+  20          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  23          #include "fm.h"
+  24          #include "list.h"
+  25          #include "timer.h"
+  26          #include "stm.h"
+  27          #include "hpgpdef.h"
+  28          #include "hpgpapi.h"
+  29          #include "pbkdf1.h"
+  30          #include "crc32.h"
+  31          #include "linkl.h"
+  32          #include "akm.h"
+  33          #include "mmsg.h"
+  34          #include "muxl.h"
+  35          #ifdef UKE
+              #include "Sha2.h"
+              #endif
+  38          #ifdef AUTH_AES
+  39          #include "aes.h"
+  40          #include "green.h"
+  41          #include "dmm.h"
+  42          
+  43          #endif
+  44          
+  45          #ifdef HPGP_HAL
+  46          #include "hal_hpgp.h"
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 2   
+
+  47          #endif
+  48          #include "hybrii_tasks.h"
+  49          #include "sys_common.h"
+  50          
+  51          #define MSG_PADDING_LEN(x) ( (x)&0xF ? 0x10 - ((x)&0xF) : 0)
+  52          /* PID(1 byte) + PRN(2 bytes) + PMN(1 byte) + RFLen(1 byte) */
+  53          #define HPGP_ENC_MM_TAIL_LEN   5     
+  54          //#define CRC_SIZE               4
+  55          /* Padding: RF (<=15 bytes) + Padding  (<=15 bytes) */
+  56          #define HPGP_ENC_MM_PAD_MAX    30    
+  57          
+  58          
+  59          #define HPGP_TIME_KEY          1000     /* 100 ms */
+  60          #define HPGP_MMTYPE_ALL        0xFFFF
+  61          
+  62          enum {
+  63              AKM_NEK_NO,
+  64              AKM_KEY_NEW_NEK,
+  65          };
+  66          #ifdef MULTIDEV
+              extern void HTM_ResetNsm(void);
+              extern u8 devNum;
+              #endif
+  70          #ifdef UKE
+              u8 *hashKey = NULL;
+              u8 genTek = 0;
+              #endif
+  74          
+  75          /* encryption protocol info */
+  76          typedef struct encProtoInfo
+  77          {
+  78              u8          pid;
+  79              u16         prn;
+  80              u8          pmn;
+  81          } __PACKED__ sEncProtoInfo, *psEncProtoInfo;
+  82          
+  83          
+  84          extern void LINKL_TimerHandler(u16 type, void *cookie);
+  85          
+  86          /* --------------------------
+  87           * Auth and Key  manager
+  88           * ------------------------- */
+  89          
+  90          void FillRandomNumber(u8 *buff, u16 len)
+  91          {
+  92   1          u16 i;
+  93   1      
+  94   1          for (i = 0; i < len; i++)
+  95   1          {
+  96   2              buff[i] = rand() & 0xFF;
+  97   2          }
+  98   1      }
+  99          
+ 100          
+ 101          void LINKL_FillHpgpHdr(sHpgpHdr *hpgpHdr, u8 tei, u8 *macAddr, u8 snid, u8 mnbc,
+ 102                                    u8 eks)
+ 103          {
+ 104   1          
+ 105   1          hpgpHdr->tei = tei;
+ 106   1          hpgpHdr->macAddr = macAddr;
+ 107   1          hpgpHdr->snid = snid;
+ 108   1      
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 3   
+
+ 109   1          hpgpHdr->mnbc = mnbc;
+ 110   1          hpgpHdr->eks = eks;
+ 111   1      
+ 112   1      }
+ 113          
+ 114          #ifdef UKE
+              
+              eStatus AKM_GenerateTek()
+              {
+              
+                  sLinkLayer *linkl = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sAkm  *akm = &linkl->akm;
+              
+                  u8 digest[32];
+                  
+                  sha256(digest, hashKey, HASH_KEY_LEN * 2 * 8);
+                  memcpy(akm->tek, digest, 16);
+                  DMM_Free(hashKey);
+                  hashKey = NULL;
+               //   FM_HexDump(FM_HINFO,"TEK: ",akm->tek,16);
+                  akm->tekPeks = 2;
+                  return STATUS_SUCCESS;
+              }
+              
+              
+              u8* AKM_GetTek()
+              {
+                  sLinkLayer *linkl = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+              
+              
+                  return (&linkl->akm.tek);
+              
+              }
+              
+              #endif
+ 144          
+ 145          eStatus GenerateKey(u8 *pwd, u8 pwdlen, u8 *key)
+ 146          {
+ 147   1          u8 salt[8] = {0x08, 0x85, 0x6D, 0xAF, 0x7C, 0xF5, 0x81, 0x85};
+ 148   1          /* FIXME: for test only */
+ 149   1          memcpy(key, salt, 8);
+ 150   1          return STATUS_SUCCESS;
+ 151   1      //    return pbkdf1(pwd, pwdlen, salt, 8, 1000, key, ENC_KEY_LEN);
+ 152   1      }
+*** WARNING C280 IN LINE 145 OF ..\..\src\link\akm.c: 'pwd': unreferenced local variable
+*** WARNING C280 IN LINE 145 OF ..\..\src\link\akm.c: 'pwdlen': unreferenced local variable
+ 153          
+ 154          
+ 155          u8 AKM_GetNewEks(sAkm *akm) 
+ 156          {
+ 157   1          akm->eks = 0;//(++(akm->eks))%0x8;
+ 158   1          return (akm->eks & 0x0F);
+ 159   1      }
+ 160          
+ 161          
+ 162          
+ 163          sDb *AKM_BuildEncPayload(sAkm *akm, u16 mmtype, void *param) 
+ 164          {
+ 165   1          u8           rfLen = 0;
+ 166   1          u8           padLen = 0;
+ 167   1          u16          buffLen = 0;
+ 168   1          u8           size = 0;
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 4   
+
+ 169   1          u8 crc2[4];// = {0x1a,0x21, 0xd5, 0x8b };// 0xD 5 5 3 0 8F } //
+ 170   1          u8          *pos = NULL;
+ 171   1          u32          crc = 0;
+ 172   1          u8          *crct;
+ 173   1          sDb         *db = NULL;
+ 174   1          sEth2Hdr    *ethII = NULL;
+ 175   1          sMmHdr      *mmh = NULL;
+ 176   1          sEncProtoInfo *tail = NULL;
+ 177   1          sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 178   1          sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+ 179   1      
+ 180   1          /* allocate a buffer for encrypted payload */
+ 181   1          if (((mmtype == MMTYPE_CM_GET_KEY_CNF) && (akm->keyType == KEY_TYPE_NEK)) ||
+ 182   1              ((mmtype == MMTYPE_CM_SET_KEY_REQ) && (akm->keyType == KEY_TYPE_NMK)))
+ 183   1          {
+ 184   2              size = ENC_KEY_LEN;
+ 185   2          }
+ 186   1          buffLen = HPGP_MM_HEADER_LEN + sizeof(uEncMgmtMsg) + size +
+ 187   1                    CRC_SIZE + HPGP_ENC_MM_TAIL_LEN + HPGP_ENC_MM_PAD_MAX;
+ 188   1          db = DB_Alloc(buffLen, 0);
+ 189   1          if (db == NULL)
+ 190   1          {
+ 191   2              FM_Printf(FM_ERROR, "DB alloc fail\n");
+ 192   2              return NULL;
+ 193   2          }
+ 194   1      
+ 195   1          /* may align the buffer on 128 bits (16 bytes) boundary */
+ 196   1          pos = db->buffDesc.dataptr;
+ 197   1          /* random filler */
+ 198   1          rfLen = rand() & 0xF;
+ 199   1          FillRandomNumber(pos, rfLen);
+ 200   1          pos += rfLen;
+ 201   1          /* ethernet header */
+ 202   1          ethII = (sEth2Hdr *)pos;
+ 203   1          memcpy(ethII->srcaddr, staInfo->macAddr, MAC_ADDR_LEN);
+ 204   1          memcpy(ethII->dstaddr, akm->peerMacAddr, MAC_ADDR_LEN);
+ 205   1          ethII->ethtype = HTONS(ETH_TYPE_HPGP);//SWAP_FIX;
+ 206   1          pos += sizeof(sEth2Hdr);  
+ 207   1          /* mgmt msg header */
+ 208   1          mmh = (sMmHdr *)pos; 
+ 209   1          mmh->mmv = 0x1;
+ 210   1          mmh->mmtype = cpu_to_le16(mmtype);//SWAP_FIX ;
+ 211   1          mmh->nfmi = 0;
+ 212   1          mmh->fnmi = 0;
+ 213   1          mmh->fmsn = 0;
+ 214   1          pos += sizeof(sMmHdr);
+ 215   1      
+ 216   1          switch(mmtype)
+ 217   1          {
+ 218   2              case MMTYPE_CM_GET_KEY_REQ:
+ 219   2              {
+ 220   3                  /* Get KEY REQ msg body */
+ 221   3                  sCmGetKeyReq *req = (sCmGetKeyReq *)pos;
+ 222   3                  req->reqType = 0;    /* direct */
+ 223   3                  req->reqKeyType = akm->keyType;
+ 224   3                  memcpy(req->myNonce, akm->myNonce, 4);
+ 225   3                  memcpy(req->nid, staInfo->nid, NID_LEN);
+ 226   3                  req->pid = akm->pid; 
+ 227   3                  req->prn = akm->prn;
+ 228   3                  req->pmn = akm->pmn; 
+ 229   3                  pos += sizeof(sCmGetKeyReq);
+ 230   3                  padLen = rfLen + HPGP_MM_HEADER_LEN + sizeof(sCmGetKeyReq) + size +
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 5   
+
+ 231   3                           CRC_SIZE + HPGP_ENC_MM_TAIL_LEN;
+ 232   3                  padLen = MSG_PADDING_LEN(padLen);
+ 233   3      #ifdef P8051
+ 234   3      //FM_Printf(FM_ERROR, "AKM: tx rf len = %bu, pad len = %bu.\n", rfLen, padLen);
+ 235   3      #else
+              //FM_Printf(FM_ERROR, "AKM: tx rf len = %d, pad len = %d.\n", rfLen, padLen);
+              #endif
+ 238   3                  break;
+ 239   3              }
+ 240   2              case MMTYPE_CM_GET_KEY_CNF:
+ 241   2              {
+ 242   3                  /* Get KEY CNF msg body */
+ 243   3                  sCmGetKeyCnf * cnf = (sCmGetKeyCnf *)pos;
+ 244   3                  cnf->result = 0;    /* key granted */
+ 245   3                  cnf->reqKeyType = akm->keyType;
+ 246   3                  memcpy(cnf->myNonce, akm->myNonce, 4);
+ 247   3                  memcpy(cnf->yourNonce, akm->yourNonce, 4);
+ 248   3                  memcpy(cnf->nid, staInfo->nid, NID_LEN);
+ 249   3                  cnf->pid = akm->pid; 
+ 250   3                  cnf->prn = akm->prn;
+ 251   3                  cnf->pmn = akm->pmn; 
+ 252   3                  cnf->eks = staInfo->nekEks;
+ 253   3                  pos += sizeof(sCmGetKeyCnf);
+ 254   3                  memcpy(pos, staInfo->nek, ENC_KEY_LEN);
+ 255   3                  pos += ENC_KEY_LEN;
+ 256   3                  padLen = rfLen + HPGP_MM_HEADER_LEN + sizeof(sCmGetKeyCnf) + size +
+ 257   3                           CRC_SIZE + HPGP_ENC_MM_TAIL_LEN;
+ 258   3                  padLen = MSG_PADDING_LEN(padLen);
+ 259   3                  break;
+ 260   3              }
+ 261   2      #ifdef UKE
+                  
+                      case MMTYPE_CM_SET_KEY_REQ:
+                      {
+                          /* Set KEY Req msg body */
+                          sCmSetKeyReq* req = (sCmSetKeyReq *)pos;
+                          req->keyType = akm->keyType;    /* key granted */
+                          memcpy(req->myNonce, akm->myNonce, 4);
+                          memcpy(req->yourNonce, akm->yourNonce, 4);
+                          memcpy(req->nid, staInfo->nid, NID_LEN);
+                          req->pid = akm->pid; 
+                          req->prn = akm->prn;
+                          req->pmn = akm->pmn; 
+                          req->ccoCap = staInfo->ccoScb->staCap.fields.ccoCap;
+                          req->newEks = PEKS_NMK;
+                          memcpy(req->pNewKey, staInfo->nmk, ENC_KEY_LEN);            
+                          pos += sizeof(sCmSetKeyReq);
+                          padLen = rfLen + HPGP_MM_HEADER_LEN + sizeof(sCmSetKeyReq) +
+                                   CRC_SIZE + HPGP_ENC_MM_TAIL_LEN;
+                          padLen = MSG_PADDING_LEN(padLen);
+                          break;
+                      }
+                      case MMTYPE_CM_SET_KEY_CNF:
+                      {
+                          /* Set KEY cnf msg body */
+                          sCmSetKeyCnf* cnf = (sCmSetKeyCnf*)pos;
+                          cnf->result= 0;    /* key granted */
+                          memcpy(cnf->myNonce, akm->myNonce, 4);
+                          memcpy(cnf->yourNonce, akm->yourNonce, 4);
+                          cnf->pid = akm->pid; 
+                          cnf->prn = akm->prn;
+                          cnf->pmn = akm->pmn; 
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 6   
+
+                          cnf->ccoCapability = staInfo->ccoScb->staCap.fields.ccoCap;
+                          pos += sizeof(sCmSetKeyCnf);
+                          padLen = rfLen + HPGP_MM_HEADER_LEN + sizeof(sCmSetKeyCnf) +
+                                   CRC_SIZE + HPGP_ENC_MM_TAIL_LEN;
+                          padLen = MSG_PADDING_LEN(padLen);
+                          break;
+                      }
+              #endif    
+ 301   2              default:
+ 302   2              {
+ 303   3              }
+ 304   2          }
+ 305   1          /* CRC */
+ 306   1          crc = chksum_crc32(db->buffDesc.dataptr + rfLen, 
+ 307   1                             pos - db->buffDesc.dataptr - rfLen);
+ 308   1      
+ 309   1          crct = (u8*)&crc;
+ 310   1      
+ 311   1          crc2[0] = crct[3];
+ 312   1      
+ 313   1          crc2[1] = crct[2];
+ 314   1      
+ 315   1          crc2[2] = crct[1];
+ 316   1      
+ 317   1          crc2[3] = crct[0];
+ 318   1      
+ 319   1      
+ 320   1          
+ 321   1          memcpy(pos, &crc2, sizeof(u32));  
+ 322   1          FM_Printf(FM_HINFO, "AKM:crc=0x%08x\n", crc);
+ 323   1          pos += CRC_SIZE;
+ 324   1          /* cm encrypted payload ind msg tail */
+ 325   1          tail = (sEncProtoInfo *)pos;
+ 326   1          tail->pid = akm->pid; 
+ 327   1          tail->prn = akm->prn;
+ 328   1          tail->pmn = akm->pmn; 
+ 329   1          pos += sizeof(sEncProtoInfo);
+ 330   1          /* padding */
+ 331   1          FillRandomNumber(pos, padLen);
+ 332   1          pos += padLen;
+ 333   1          *pos = rfLen;
+ 334   1          pos ++;
+ 335   1          db->buffDesc.datalen = pos - db->buffDesc.dataptr;
+ 336   1          akm->pad = rfLen + padLen;
+ 337   1          if(db->buffDesc.datalen % 16) 
+ 338   1          {
+ 339   2              FM_Printf(FM_ERROR, "Not aligned\n");
+ 340   2          }
+ 341   1          
+ 342   1          return db;
+ 343   1      }
+*** WARNING C280 IN LINE 163 OF ..\..\src\link\akm.c: 'param': unreferenced local variable
+ 344          
+ 345          extern sHomePlugCb HomePlug;
+ 346          eStatus AKM_SendEncPayloadInd(sAkm *akm, u16 mmType, sDb *db, 
+ 347                                        u8 peks, u8 avlnStatus)
+ 348          {
+ 349   1          u8          *pos = NULL;
+ 350   1          sCmEncryPayloadInd *ind = NULL;
+ 351   1          sHpgpHdr    *hpgpHdr = NULL;
+ 352   1          sEvent     xdata *event = NULL;
+ 353   1          eStatus     ret = STATUS_SUCCESS;
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 7   
+
+ 354   1      
+ 355   1          sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 356   1          sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+ 357   1        u16 size=0; 
+ 358   1      
+ 359   1        size = sizeof(sCmEncryPayloadInd) + db->buffDesc.datalen;
+ 360   1         // event =  EVENT_Alloc(sizeof(sCmEncryPayloadInd) + db->buffDesc.datalen, 
+ 361   1                             //  EVENT_HPGP_MSG_HEADROOM);//kiran stack optimization
+ 362   1      
+ 363   1        event = (sEvent *) DMM_Alloc(MGMT_POOL_ID,sizeof(sEvent) + size + EVENT_HPGP_MSG_HEADROOM);
+ 364   1        if(event == NULL)
+ 365   1          {
+ 366   2              FM_Printf(FM_ERROR, "EAllocErr\n");
+ 367   2              return STATUS_FAILURE;
+ 368   2          }
+ 369   1        else
+ 370   1        {
+ 371   2          memset(event, 0, sizeof(sEvent) + size + EVENT_HPGP_MSG_HEADROOM);
+ 372   2          event->buffDesc.buff = (u8 *)event + sizeof(sEvent);
+ 373   2          event->buffDesc.dataptr = event->buffDesc.buff + EVENT_HPGP_MSG_HEADROOM;
+ 374   2          event->buffDesc.datalen = 0;
+ 375   2          event->buffDesc.bufflen = size + EVENT_HPGP_MSG_HEADROOM;
+ 376   2          event->eventHdr.status = EVENT_STATUS_COMPLETE;
+ 377   2          SLINK_Init(&event->link);
+ 378   2        }
+ 379   1      
+ 380   1          event->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 381   1          event->eventHdr.type = EVENT_TYPE_CM_ENCRY_PAYLOAD_IND;
+ 382   1          
+ 383   1          LINKL_FillHpgpHdr((sHpgpHdr *)event->buffDesc.buff,
+ 384   1                          akm->peerTei,
+ 385   1                          akm->peerMacAddr,
+ 386   1                          staInfo->snid,
+ 387   1                          0,
+ 388   1                          HPGP_EKS_NONE);
+ 389   1      
+ 390   1          pos = event->buffDesc.dataptr;
+ 391   1          ind = (sCmEncryPayloadInd *)pos;
+ 392   1          ind->peks = peks;
+ 393   1          ind->pid = akm->pid; 
+ 394   1          ind->prn = akm->prn;
+ 395   1          ind->pmn = akm->pmn; 
+ 396   1          ind->avlnStatus = avlnStatus;
+ 397   1          memcpy(ind->iv, akm->nmkIv, ENC_IV_LEN);
+ 398   1          ind->len = cpu_to_le16(db->buffDesc.datalen - akm->pad 
+ 399   1                     - HPGP_ENC_MM_TAIL_LEN - CRC_SIZE);
+ 400   1      #ifdef P8051
+ 401   1      //FM_Printf(FM_ERROR, "AKM: tx msg len = %d, pad len = %bu.\n", ind->len, akm->pad);
+ 402   1      #else
+              //FM_Printf(FM_ERROR, "AKM: tx msg len = %d, pad len = %d.\n", ind->len, akm->pad);
+              #endif
+ 405   1      
+ 406   1          pos += sizeof(sCmEncryPayloadInd); 
+ 407   1          /*  encrypt of payload  done in HAL Task*/
+ 408   1      
+ 409   1        memcpy(pos, db->buffDesc.dataptr, db->buffDesc.datalen);
+ 410   1      
+ 411   1          pos += db->buffDesc.datalen; 
+ 412   1          event->buffDesc.datalen = pos - event->buffDesc.dataptr;
+ 413   1      
+ 414   1        assert((event->buffDesc.dataptr >= event->buffDesc.buff)&&
+ 416   1                 ((event->buffDesc.dataptr - event->buffDesc.buff + 
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 8   
+
+ 416   1                   event->buffDesc.datalen) <= event->buffDesc.bufflen));
+ 417   1      
+ 418   1          //ret = MUXL_TransmitMgmtMsg(HPGPCTRL_GetLayer(HP_LAYER_TYPE_MUX), event);
+ 419   1      
+ 420   1        //sMmHdr    *mmh = NULL;
+ 421   1          //sHpgpHdr *hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+ 422   1      
+ 423   1          if( event->eventHdr.eventClass != EVENT_CLASS_MSG)
+ 424   1          {
+ 425   2          EVENT_Free(event);
+ 426   2              return STATUS_FAILURE;
+ 427   2          }
+ 428   1      
+ 429   1          /* add the mgmt msg header */
+ 430   1          if(event->buffDesc.buff+sizeof(sMmHdr) > event->buffDesc.dataptr)
+ 431   1          {
+ 432   2              FM_Printf(FM_ERROR,"MUXL:event small\n");
+ 433   2          EVENT_Free(event);
+ 434   2              return STATUS_FAILURE;
+ 435   2          }
+ 436   1      
+ 437   1          if (((((sHpgpHdr *)event->buffDesc.buff)->mnbc)&&(event->buffDesc.datalen > HPGP_MNBC_PAYLOAD_MAX)) ||
+ 438   1               (event->buffDesc.datalen > HPGP_DATA_PAYLOAD_MAX))
+ 439   1          {
+ 440   2              /* perform the msg fragment */
+ 441   2              FM_Printf(FM_ERROR,"MUXL:need frag\n");
+ 442   2          }
+ 443   1      
+ 444   1          event->buffDesc.dataptr -= sizeof(sMmHdr);  
+ 445   1          event->buffDesc.datalen += sizeof(sMmHdr);  
+ 446   1         // mmh = (sMmHdr *) (event->buffDesc.dataptr);  
+ 447   1                
+ 448   1          //add mgmt msg header
+ 449   1          //fragment is not supported at present
+ 450   1          //  mmh->mmv = 0x1;
+ 451   1          //mmh->mmtype = cpu_to_le16(event->eventHdr.type);
+ 452   1          //mmh->nfmi = 0;
+ 453   1          //mmh->fnmi = 0;
+ 454   1          //mmh->fmsn = 0;
+ 455   1        ((sMmHdr *)(event->buffDesc.dataptr))->mmv = 0x1;
+ 456   1          ((sMmHdr *)(event->buffDesc.dataptr))->mmtype = cpu_to_le16(event->eventHdr.type);
+ 457   1        ((sMmHdr *)(event->buffDesc.dataptr))->nfmi = 0;
+ 458   1        ((sMmHdr *)(event->buffDesc.dataptr))->fnmi = 0;
+ 459   1        ((sMmHdr *)(event->buffDesc.dataptr))->fmsn = 0;
+ 460   1        
+ 461   1         // ret = HAL_Transmit(HOMEPLUG_GetHal(), event);
+ 462   1         ret = HAL_Transmit(&HomePlug.haLayer, event);
+ 463   1         
+ 464   1       
+ 465   1          /* note: the event is freed by MUXL if the TX is successful */
+ 466   1          if(ret == STATUS_FAILURE)
+ 467   1          {
+ 468   2              EVENT_Free(event);
+ 469   2          }
+ 470   1          
+ 471   1          return ret;
+ 472   1      }
+*** WARNING C280 IN LINE 346 OF ..\..\src\link\akm.c: 'mmType': unreferenced local variable
+ 473          
+ 474                 
+ 475          eStatus AKM_SendEncPayloadRsp(sAkm *akm, u8 result) 
+ 476          {
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 9   
+
+ 477   1         u8          *pos = NULL;
+ 478   1         sCmEncryPayloadRsp *rsp = NULL;
+ 479   1         sHpgpHdr    *hpgpHdr = NULL;
+ 480   1         sEvent    xdata  *event = NULL;
+ 481   1         eStatus     ret = STATUS_SUCCESS;
+ 482   1      
+ 483   1         sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 484   1         sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+ 485   1      
+ 486   1         //event =  EVENT_Alloc(sizeof(sCmEncryPayloadRsp), 
+ 487   1           //                   EVENT_HPGP_MSG_HEADROOM);
+ 488   1      
+ 489   1        event = (sEvent *) DMM_Alloc(MGMT_POOL_ID,sizeof(sEvent) + sizeof(sCmEncryPayloadRsp) + EVENT_HPGP_MSG_HE
+             -ADROOM);
+ 490   1        if(event == NULL)
+ 491   1          {
+ 492   2              FM_Printf(FM_ERROR, "EAllocErr\n");
+ 493   2              return STATUS_FAILURE;
+ 494   2          }
+ 495   1        else
+ 496   1        {
+ 497   2          memset(event, 0, sizeof(sEvent) + sizeof(sCmEncryPayloadRsp) + EVENT_HPGP_MSG_HEADROOM);
+ 498   2          event->buffDesc.buff = (u8 *)event + sizeof(sEvent);
+ 499   2          event->buffDesc.dataptr = event->buffDesc.buff + EVENT_HPGP_MSG_HEADROOM;
+ 500   2          event->buffDesc.datalen = 0;
+ 501   2          event->buffDesc.bufflen = sizeof(sCmEncryPayloadRsp) + EVENT_HPGP_MSG_HEADROOM;
+ 502   2          event->eventHdr.status = EVENT_STATUS_COMPLETE;
+ 503   2          SLINK_Init(&event->link);
+ 504   2        }
+ 505   1      
+ 506   1         event->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 507   1         event->eventHdr.type = EVENT_TYPE_CM_ENCRY_PAYLOAD_RSP;
+ 508   1         
+ 509   1         LINKL_FillHpgpHdr((sHpgpHdr *)event->buffDesc.buff,
+ 510   1                         akm->peerTei,
+ 511   1                         akm->peerMacAddr,
+ 512   1                         staInfo->snid,
+ 513   1                 0,
+ 514   1                 HPGP_EKS_NONE);
+ 515   1      
+ 516   1         pos = event->buffDesc.dataptr;
+ 517   1         rsp = (sCmEncryPayloadRsp*)pos;
+ 518   1         rsp->pid = akm->pid; 
+ 519   1         rsp->prn = akm->prn;
+ 520   1         rsp->result = result;
+ 521   1      
+ 522   1         pos += sizeof(sCmEncryPayloadInd); 
+ 523   1      
+ 524   1       
+ 525   1         assert((event->buffDesc.dataptr >= event->buffDesc.buff)&&
+ 527   1              ((event->buffDesc.dataptr - event->buffDesc.buff + 
+ 527   1              event->buffDesc.datalen) <= event->buffDesc.bufflen));
+ 528   1      
+ 529   1        if( event->eventHdr.eventClass != EVENT_CLASS_MSG)
+ 530   1        {
+ 531   2          DMM_Free((u8 *)event);//Kiran Stack Optimization
+ 532   2            return STATUS_FAILURE;
+ 533   2        }
+ 534   1      
+ 535   1        /* add the mgmt msg header */
+ 536   1        if(event->buffDesc.buff+sizeof(sMmHdr) > event->buffDesc.dataptr)
+ 537   1        {
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 10  
+
+ 538   2            FM_Printf(FM_ERROR,"MUXL: Databuff small\n");
+ 539   2            return STATUS_FAILURE;
+ 540   2        }
+ 541   1      
+ 542   1        if (((((sHpgpHdr *)event->buffDesc.buff)->mnbc)&&(event->buffDesc.datalen > HPGP_MNBC_PAYLOAD_MAX)) ||
+ 543   1             (event->buffDesc.datalen > HPGP_DATA_PAYLOAD_MAX))
+ 544   1        {
+ 545   2            /* perform the msg fragment */
+ 546   2            FM_Printf(FM_ERROR,"MUXL:need frag\n");
+ 547   2        }
+ 548   1      
+ 549   1        event->buffDesc.dataptr -= sizeof(sMmHdr);  
+ 550   1        event->buffDesc.datalen += sizeof(sMmHdr);  
+ 551   1      
+ 552   1        ((sMmHdr *)(event->buffDesc.dataptr))->mmv = 0x1;
+ 553   1        ((sMmHdr *)(event->buffDesc.dataptr))->mmtype = cpu_to_le16(event->eventHdr.type);
+ 554   1        ((sMmHdr *)(event->buffDesc.dataptr))->nfmi = 0;
+ 555   1        ((sMmHdr *)(event->buffDesc.dataptr))->fnmi = 0;
+ 556   1        ((sMmHdr *)(event->buffDesc.dataptr))->fmsn = 0;
+ 557   1      
+ 558   1        ret = HAL_Transmit(HOMEPLUG_GetHal(), event);
+ 559   1      
+ 560   1      
+ 561   1         /* note: the event is freed by MUXL if the TX is successful */
+ 562   1         if(ret == STATUS_FAILURE)
+ 563   1         {
+ 564   2             //EVENT_Free(event);
+ 565   2           DMM_Free((u8 *)event);//Kiran Stack Optimization
+ 566   2         }
+ 567   1         
+ 568   1         return ret;
+ 569   1      }
+ 570                        
+ 571          
+ 572          
+ 573          eStatus AKM_SendMgmtMsg(sAkm *akm, u16 mmType)
+ 574          {
+ 575   1          sDb    *db = NULL;
+ 576   1          u8 peks, avlnStatus;
+ 577   1          eStatus ret;
+ 578   1      
+ 579   1          /* encode CM_GET_KEY.REQ */
+ 580   1          db = AKM_BuildEncPayload(akm, mmType, NULL); 
+ 581   1      
+ 582   1        if (db == NULL)
+ 583   1        {
+ 584   2          return STATUS_FAILURE;
+ 585   2        }
+ 586   1      
+ 587   1          switch(mmType)
+ 588   1          {
+ 589   2              case MMTYPE_CM_GET_KEY_REQ:
+ 590   2              {
+ 591   3      #ifdef LOG_FLASH
+                          logEvent(MGMT_MSG, 0, EVENT_TYPE_CM_GET_KEY_REQ, NULL, 0);
+              #endif
+ 594   3                  FM_Printf(FM_MMSG, "AKM>>>CM_GET_KEY.REQ\n");
+ 595   3                  peks = PEKS_NMK;
+ 596   3                  avlnStatus =AVLN_STATUS_ASSOC_NO_PCO_CAP;
+ 597   3                  break;
+ 598   3              }
+ 599   2              case MMTYPE_CM_GET_KEY_CNF:
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 11  
+
+ 600   2              {
+ 601   3      #ifdef LOG_FLASH
+                          logEvent(MGMT_MSG, 0, EVENT_TYPE_CM_GET_KEY_CNF, NULL, 0);
+              #endif
+ 604   3                  FM_Printf(FM_MMSG, "AKM>>>CM_GET_KEY.CNF\n");
+ 605   3                  peks = PEKS_NMK;
+ 606   3                  avlnStatus =AVLN_STATUS_ASSOC_NO_PCO_CAP;
+ 607   3                  break;
+ 608   3              }
+ 609   2      #ifdef UKE
+                      case MMTYPE_CM_SET_KEY_REQ:
+                      {
+                          FM_Printf(FM_MMSG, "AKM>>>CM_SET_KEY.REQ\n");
+                          peks = akm->tekPeks;
+                          break;
+                      }
+                      case MMTYPE_CM_SET_KEY_CNF:
+                      {
+                          FM_Printf(FM_MMSG, "AKM>>>CM_SET_KEY.CNF\n");
+                          peks = PEKS_NMK;
+                          break;
+                      }
+              #endif    
+ 623   2              default:
+ 624   2              {
+ 625   3              }
+ 626   2          }
+ 627   1          
+ 628   1          ret = AKM_SendEncPayloadInd(akm, mmType, db, peks, avlnStatus); 
+ 629   1          /* free the db */
+ 630   1        DMM_Free((u8 *)db);// Kiran Stack optimization
+ 631   1          return ret;
+ 632   1      }
+ 633          #ifdef UKE
+              
+              eStatus AKM_SendUnEncMgmtMsg(sAkm *akm, u16 mmType)
+              {    
+                  u8          *pos = NULL;
+                  sCmGetKeyReq *req = NULL;
+                  sCmGetKeyCnf*cnf = NULL;
+                  sHpgpHdr    *hpgpHdr = NULL;
+                  sEvent      *event = NULL;
+                  u16 eventSize;
+                  eStatus     ret = STATUS_SUCCESS;
+              
+                  sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+              
+                  switch(mmType)
+                  {
+                      case EVENT_TYPE_CM_GET_KEY_REQ:
+                      {
+                          FM_Printf(FM_MMSG, "AKM>>>CM_GET_KEY.REQ-HASH\n");
+              
+                          
+                          eventSize = MAX(sizeof(sCmGetKeyReq), HPGP_DATA_PAYLOAD_MIN); 
+                                      
+                          event =  EVENT_MgmtAlloc(sizeof(sCmGetKeyReq) + HASH_KEY_LEN,
+                                 EVENT_HPGP_MSG_HEADROOM);
+                          if(event == NULL)
+                          {
+                              FM_Printf(FM_ERROR, "EAllocErr\n");
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 12  
+
+                              return STATUS_FAILURE;
+                          }
+                          event->eventHdr.eventClass = EVENT_CLASS_MSG;
+                          event->eventHdr.type = mmType;
+              
+                          LINKL_FillHpgpHdr((sHpgpHdr *)event->buffDesc.buff,
+                                          akm->peerTei,
+                                          akm->peerMacAddr,
+                                          staInfo->snid,
+                            0,
+                            HPGP_EKS_NONE);
+                          
+                          pos = event->buffDesc.dataptr;
+                          req = (sCmGetKeyReq *)pos;
+                          req->reqType = 0; // Direct
+                          req->reqKeyType = akm->keyType;
+                          memcpy(req->nid, staInfo->nid, NID_LEN);
+                          memcpy(req->myNonce, akm->myNonce, 4);
+                          req->pid = akm->pid; 
+                          req->prn = akm->prn;
+                          req->pmn = akm->pmn; 
+                          pos += sizeof(sCmGetKeyReq);
+                          // Generate hash key - 384 Len
+                          // Store 1st hash key
+                          FillRandomNumber(pos, HASH_KEY_LEN);
+                          memcpy(&hashKey[0], pos, HASH_KEY_LEN);
+                          
+                          
+                          FM_HexDump(FM_ERROR,"hashKeytx", hashKey, 20);
+                          
+                          pos += HASH_KEY_LEN;
+                          break;
+                      }
+                      case EVENT_TYPE_CM_GET_KEY_CNF:
+                      {            
+                          FM_Printf(FM_MMSG, "AKM>>>CM_GET_KEY.CNF-HASH\n");
+                      
+                          
+                          eventSize = MAX(sizeof(sCmGetKeyCnf), HPGP_DATA_PAYLOAD_MIN); 
+                          
+                          event =  EVENT_MgmtAlloc(sizeof(sCmGetKeyCnf) + HASH_KEY_LEN, EVENT_HPGP_MSG_HEADROOM);
+                          if(event == NULL)
+                          {
+                              FM_Printf(FM_ERROR, "EAllocErr\n");
+                              return STATUS_FAILURE;
+                          }
+              
+                      
+                      
+                          event->eventHdr.eventClass = EVENT_CLASS_MSG;
+                          event->eventHdr.type = mmType;
+              
+                          
+                          LINKL_FillHpgpHdr((sHpgpHdr *)event->buffDesc.buff,
+                                          akm->peerTei,
+                                          akm->peerMacAddr,
+                                          staInfo->snid,
+                                          0,
+                                          HPGP_EKS_NONE);
+              
+                          pos = event->buffDesc.dataptr;
+                          cnf = (sCmGetKeyCnf *)pos;
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 13  
+
+                          cnf->result = 0; // Key Confirm
+                          cnf->reqKeyType = akm->keyType;
+                          memcpy(cnf->nid, staInfo->nid, NID_LEN);
+                          memcpy(cnf->myNonce, akm->myNonce, 4);            
+                          memcpy(cnf->yourNonce, akm->yourNonce, 4);
+                          cnf->pid = akm->pid; 
+                          cnf->prn = akm->prn;
+                          cnf->pmn = akm->pmn;
+              #if 1
+              
+                          cnf->eks = akm->tekPeks;
+              
+              #else
+                          if(akm->eks < 2)
+                          {
+                              akm->eks = 2;
+                          }
+                          else
+                          {
+                              akm->eks++;
+                          }
+              
+              
+                          cnf->eks = akm->eks;
+              
+              #endif            
+                          
+                          pos += sizeof(sCmGetKeyCnf);
+                          // Generate hash key - 384 Len
+                          // Store 2nd hash key
+                          FillRandomNumber(pos, HASH_KEY_LEN);
+                          memcpy(&hashKey[HASH_KEY_LEN], pos, HASH_KEY_LEN);
+                          
+                         // FM_HexDump(FM_ERROR,"hashKeytx", &hashKey[HASH_KEY_LEN], 20);
+                          
+                          // Generate tek
+                          genTek = 1;
+                          pos += HASH_KEY_LEN;
+                          break;
+                      }
+                      default:
+                          return ret; 
+                          break;
+                        
+                  }
+              
+                  
+              
+                  //event->buffDesc.datalen = eventSize;
+              
+                  event->buffDesc.datalen = pos - event->buffDesc.dataptr;
+              
+                 // EVENT_Assert(event);//kiran stack optimization
+                assert((event->buffDesc.dataptr >= event->buffDesc.buff)&&
+                         ((event->buffDesc.dataptr - event->buffDesc.buff + 
+                           event->buffDesc.datalen) <= event->buffDesc.bufflen));
+                  
+                  ret = MUXL_TransmitMgmtMsg(HPGPCTRL_GetLayer(HP_LAYER_TYPE_MUX), event);
+                  /* note: the event is freed by MUXL if the TX is successful */
+                  if(ret == STATUS_FAILURE)
+                  {
+                      //EVENT_Free(event);
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 14  
+
+                      DMM_Free((u8 *)event);//KIran stack optimization
+                  }
+                  
+                  return ret;    
+              }
+              
+              #endif
+ 793          
+ 794          eStatus AKM_DeliverEvent(sAkm *akm, u16 eventType, uEventParam *eventParam)
+ 795          {
+ 796   1          sEvent       *event = NULL;
+ 797   1          sLinkLayer   *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 798   1          u8           *pos; 
+ 799   1      
+ 800   1          event = EVENT_Alloc(sizeof(uEventBody), 0);
+ 801   1          if(event == NULL)
+ 802   1          {
+ 803   2              FM_Printf(FM_ERROR, "AKM:EAllocErr\n");
+ 804   2              return STATUS_FAILURE;
+ 805   2          }
+ 806   1          event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+ 807   1          event->eventHdr.type = eventType;
+ 808   1      
+ 809   1          switch(eventType)
+ 810   1          {
+ 811   2              case EVENT_TYPE_AUTH_RSP:
+ 812   2              {
+ 813   3                  pos = event->buffDesc.dataptr;
+ 814   3                  memcpy(pos, &eventParam->authRsp, sizeof(eventParam->authRsp));
+ 815   3                  event->buffDesc.datalen = sizeof(eventParam->authRsp);
+ 816   3                  break;
+ 817   3              }
+ 818   2              case EVENT_TYPE_AUTH_IND:
+ 819   2              {
+ 820   3                  pos = event->buffDesc.dataptr;
+ 821   3                  memcpy(pos, &eventParam->authInd, sizeof(eventParam->authInd));
+ 822   3                  event->buffDesc.datalen = sizeof(eventParam->authInd);
+ 823   3                  break;
+ 824   3              }
+ 825   2              default:
+ 826   2              {
+ 827   3              }
+ 828   2          }
+ 829   1          
+ 830   1          /* deliver the event to the upper layer */
+ 831   1      #ifdef CALLBACK
+                  linkl->deliverEvent(linkl->eventcookie, event);
+              #else
+ 834   1          CTRLL_ReceiveEvent(linkl->eventcookie, event);
+ 835   1      #endif
+ 836   1          
+ 837   1          return STATUS_SUCCESS;
+ 838   1      }
+*** WARNING C280 IN LINE 794 OF ..\..\src\link\akm.c: 'akm': unreferenced local variable
+ 839          
+ 840          #ifdef UKE
+              
+              eStatus AKM_ProcGetKeyReq(sAkm *akm, sEvent *event)
+              {
+                  sCmGetKeyReq       *req = NULL;
+                  u8                 *pos = NULL;
+                  
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 15  
+
+                sHpgpHdr           *hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+                  eStatus             ret;
+                sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+                  
+                  pos = event->buffDesc.dataptr;
+                  req = (sCmGetKeyReq *)pos;
+              
+                  if ((req->pmn != 1) && (req->pmn != 0xFF)) {
+                      /* perform the basic verification */
+                      if( (akm->pid != req->pid) ||
+                          (akm->prn != req->prn) ||
+                          ((akm->pmn+1) != req->pmn) )
+                      {
+                          FM_Printf(FM_ERROR, "Unmatched pid\n");
+                          return STATUS_FAILURE;
+                      }
+                  }
+                          
+                  akm->pid = req->pid;
+                  akm->prn = req->prn;
+              
+              #if 0
+                  ukePeer = LinkL_GetUKEPeer(linkl);
+                     
+                  if ((ukePeer, hpgpHdr->macAddr, MAC_ADDR_LEN) ||
+                      (akm->pid != AUTH_PID_NMK_WITH_UKE))
+                  {
+                      return STATUS_FAILURE;
+                  }
+                  
+              #endif
+              
+                  akm->peerTei = hpgpHdr->tei;
+                  akm->peerMacAddr = hpgpHdr->macAddr;
+              
+                  if ((req->reqType == 0) &&(req->reqKeyType == KEY_TYPE_HASH_KEY))
+                  {
+                      akm->pmn = 2;
+                      akm->keyType = KEY_TYPE_HASH_KEY;
+                      memcpy(akm->yourNonce, req->myNonce, 4);
+                      FillRandomNumber(akm->myNonce, 4);
+                      pos += sizeof(sCmGetKeyReq);
+                      memcpy(&hashKey[0], pos, HASH_KEY_LEN);
+                      
+                      STM_StartTimer(akm->TekTimer, HPGP_TEK_LIFETIME);
+                                  
+                      /* Send CM_GET_KEY.CNF */
+                      ret = AKM_SendUnEncMgmtMsg(akm, MMTYPE_CM_GET_KEY_CNF); 
+                            
+                  }
+              
+                  return ret;
+              }
+              
+              #endif
+ 903          
+ 904          void AKM_SendAuthInd (sAkm *akm, u8 keyType, u8 status)
+ 905          {
+ 906   1      
+ 907   1        uEventParam eventParam;
+ 908   1          sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 16  
+
+ 909   1          sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+ 910   1      
+ 911   1      #ifdef UKE
+                  
+                  // Stop TEK life timer
+                  STM_StopTimer(akm->TekTimer);
+                 // rajan STM_FreeTimer(akm->TekTimer);
+                  // Make TEK invalid
+                  memset(akm->tek, 0, 16);
+              
+              #endif
+ 920   1      
+ 921   1          eventParam.authInd.keyType = keyType;
+ 922   1      
+ 923   1          eventParam.authInd.secMode  = staInfo->secMode;
+ 924   1      
+ 925   1          eventParam.authInd.result = status;
+ 926   1      
+ 927   1          if(keyType == KEY_TYPE_NMK)
+ 928   1          {
+ 929   2              LINKL_SetSecurityMode(linkl, SEC_MODE_SC);    
+ 930   2      
+ 931   2          }
+ 932   1      #ifdef UKE
+              
+                  if ((status == STATUS_FAILURE) &&
+                      (hashKey != NULL))
+                      
+                  {
+                      DMM_Free(hashKey);
+                      hashKey = NULL;
+                  }
+              
+              #endif
+ 943   1      
+ 944   1          AKM_DeliverEvent(akm, EVENT_TYPE_AUTH_IND, &eventParam);
+ 945   1      
+ 946   1      
+ 947   1      
+ 948   1      }
+ 949          
+ 950          eStatus AKM_ProcEncPayload(sAkm *akm, u16 mmType, sDb *db, sScb *scb) 
+ 951          {
+ 952   1          u8          *pos = NULL;
+ 953   1          sMmHdr      *mmh = NULL;
+ 954   1          sCmGetKeyReq * req = NULL;
+ 955   1          sCmSetKeyReq * setReq = NULL;
+ 956   1          sCmGetKeyCnf *cnf = NULL;
+ 957   1          sCmSetKeyCnf *setCnf = NULL;
+ 958   1          eStatus      ret = STATUS_FAILURE;
+ 959   1          sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 960   1          sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+ 961   1      
+ 962   1          db->buffDesc.dataptr += sizeof(sEth2Hdr);
+ 963   1          db->buffDesc.datalen -= sizeof(sEth2Hdr);
+ 964   1          mmh = (sMmHdr *) db->buffDesc.dataptr;
+ 965   1          
+ 966   1      
+ 967   1          if ((mmType != HPGP_MMTYPE_ALL) && (le16_to_cpu(mmh->mmtype) != mmType))
+ 968   1              return STATUS_FAILURE;
+ 969   1          
+ 970   1          db->buffDesc.dataptr += sizeof(sMmHdr);
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 17  
+
+ 971   1          db->buffDesc.datalen -= sizeof(sMmHdr);
+ 972   1          pos = db->buffDesc.dataptr;
+ 973   1          switch(le16_to_cpu(mmh->mmtype))
+ 974   1          {
+ 975   2              case MMTYPE_CM_GET_KEY_REQ:
+ 976   2              {
+ 977   3      #ifdef LOG_FLASH
+                          logEvent(MGMT_MSG, 0, EVENT_TYPE_CM_GET_KEY_REQ, &scb->tei, 1);
+              #endif
+ 980   3                  FM_Printf(FM_MMSG, "AKM<<<CM_GET_KEY.REQ\n");
+ 981   3                  /* Get KEY REQ msg body */
+ 982   3                  req = (sCmGetKeyReq *)pos;
+ 983   3                  if ((req->reqType == 0) &&(req->reqKeyType == KEY_TYPE_NEK))
+ 984   3                  {
+ 985   4                      /* TODO: check if the device is in CCo mode */
+ 986   4                     
+ 987   4                      
+ 988   4                      akm->pmn = 0xFF; 
+ 989   4                      akm->keyType = KEY_TYPE_NEK;
+ 990   4                      memcpy(akm->yourNonce, req->myNonce, 4);
+ 991   4                      FillRandomNumber(akm->myNonce, 4);
+ 992   4                      /* encode CM_GET_KEY.CNF */
+ 993   4                      ret = AKM_SendMgmtMsg(akm, MMTYPE_CM_GET_KEY_CNF); 
+ 994   4                      if ( (ret == STATUS_SUCCESS ) && scb)
+ 995   4                      {
+ 996   5                          scb->staStatus.fields.authStatus = 1; 
+ 997   5                          FM_Printf(FM_ERROR, "authStatus:%bu\n", 
+ 998   5                                      scb->staStatus.fields.authStatus);
+ 999   5                          /*TODO: call the nsm to broadcast */
+1000   5                      }
+1001   4                      else
+1002   4                      {
+1003   5                          FM_Printf(FM_ERROR, "authStatus failed:%bu\n", 
+1004   5                                      scb->staStatus.fields.authStatus);
+1005   5                      }
+1006   4                  }
+1007   3                  break;
+1008   3              }
+1009   2              case MMTYPE_CM_GET_KEY_CNF:
+1010   2              {
+1011   3                  sEvent * cpltEvent = EVENT_Alloc(0, EVENT_HPGP_CTRL_HEADROOM);
+1012   3      #ifdef LOG_FLASH
+                          logEvent(MGMT_MSG, 0, EVENT_TYPE_CM_GET_KEY_CNF, &scb->tei, 1);
+              #endif
+1015   3                  FM_Printf(FM_MMSG, "AKM<<<CM_GET_KEY.CNF\n");
+1016   3                  /* Get KEY CNF msg body */
+1017   3                  cnf = (sCmGetKeyCnf *)pos;
+1018   3                  if (cnf->result == 0)
+1019   3                  {
+1020   4                      if (cnf->reqKeyType == KEY_TYPE_NEK) 
+1021   4                      {
+1022   5      
+1023   5                                  
+1024   5                           if(memcmp(akm->myNonce, cnf->yourNonce, 4) != 0)
+1025   5                           {
+1026   6                               FM_Printf(FM_ERROR, "Unmatched nonce\n");
+1027   6                               break;
+1028   6      
+1029   6                           }
+1030   5                           staInfo->nekEks = cnf->eks; 
+1031   5                           pos += sizeof(sCmGetKeyCnf);
+1032   5                           memcpy(staInfo->nek, pos, ENC_KEY_LEN);
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 18  
+
+1033   5                           FM_Printf(FM_HINFO, "NEK EKS: %bu\n", staInfo->nekEks);
+1034   5                           FM_HexDump(FM_HINFO, "NEK:", staInfo->nek, ENC_KEY_LEN);
+1035   5      #ifdef HPGP_HAL
+1036   5                           /* set the NEK to the LMAC for the STA */
+1037   5                           HHAL_AddNEK(staInfo->nekEks, staInfo->nek);
+1038   5      #endif
+1039   5                           staInfo->staStatus.fields.authStatus = 1; 
+1040   5      
+1041   5      
+1042   5                           AKM_SendAuthInd(akm, KEY_TYPE_NEK, STATUS_SUCCESS);
+1043   5                           if(cpltEvent != NULL)
+1044   5                           {
+1045   6                               cpltEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1046   6                               cpltEvent->eventHdr.type = EVENT_TYPE_AUTH_CPLT;
+1047   6                               LINKL_SendEvent(linkl,cpltEvent);
+1048   6                           }                     
+1049   5      #ifdef MULTIDEV                 
+                                   if(devNum != 0)
+                                   {
+                                      sHaLayer *hal = HOMEPLUG_GetHal();
+                                      hal->macAddr[5] = hal->macAddr[5] + 1;
+                                      devNum--;
+                               
+                                      HTM_ResetNsm();
+                                   }
+              #endif
+1059   5                           ret = STATUS_SUCCESS;
+1060   5                      }
+1061   4                  }
+1062   3                  break;
+1063   3              }
+1064   2      #ifdef UKE
+                  
+                      case MMTYPE_CM_SET_KEY_REQ:
+                      {
+                                          
+                          FM_Printf(FM_MMSG, "AKM<<<CM_SET_KEY.REQ\n");
+                          /* Get KEY REQ msg body */
+                          setReq = (sCmSetKeyReq *)pos;
+                          if ((setReq->keyType == KEY_TYPE_NMK))
+                          {             
+                              akm->pid = AUTH_PID_NMK_WITH_UKE;
+                              akm->pmn = 0xFF; 
+                              akm->keyType = KEY_TYPE_NMK;
+                              memcpy(akm->yourNonce, setReq->myNonce, 4);
+                              FillRandomNumber(akm->myNonce, 4);
+                              /* encode CM_SET_KEY.CNF */
+                              ret = AKM_SendMgmtMsg(akm, MMTYPE_CM_SET_KEY_CNF); 
+                              if (ret == STATUS_SUCCESS )
+                              {
+                                  // Set NMK   
+                                  staInfo->nmkPeks = setReq->newEks;
+                                  memcpy(staInfo->nmk, setReq->pNewKey, ENC_KEY_LEN);                    
+                              }
+                              else
+                              {
+                                  FM_Printf(FM_ERROR, "Set NMK Failed\n");
+                              }
+                          }
+                          FM_HexDump(FM_HINFO, "NMK:", staInfo->nmk, ENC_KEY_LEN);
+                          //os_switch_task();
+                          // Send out get key req
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 19  
+
+              #if 0            
+                          akm->keyType = KEY_TYPE_NEK;
+                          akm->pid = AUTH_PID_NEW_STA; 
+                          akm->prn = rand() & 0xFFFF;
+                          akm->pmn = 1; 
+                          ret = AKM_SendMgmtMsg(akm, MMTYPE_CM_GET_KEY_REQ);
+                          /* start the key timer for a response */
+                          STM_StartTimer(akm->akmTimer, HPGP_TIME_KEY);
+                          akm->state = AKM_STATE_WAITFOR_GET_NEK_CNF;
+              #else
+              
+                          akm->state = AKM_STATE_READY;
+              
+                          AKM_SendAuthInd(akm, KEY_TYPE_NMK, STATUS_SUCCESS);
+                                               
+              
+              
+              #endif
+              
+              
+                          ret = STATUS_SUCCESS;
+                          break;
+                      }
+                      case MMTYPE_CM_SET_KEY_CNF:
+                      {
+                       
+                          FM_Printf(FM_MMSG, "AKM<<<CM_SET_KEY.CNF\n");
+              
+                          /* Get KEY CNF msg body */
+              
+                          setCnf = (sCmSetKeyCnf *)pos;
+              
+                          if(memcmp(akm->myNonce, setCnf->yourNonce, 4) != 0)
+                          {
+                              FM_Printf(FM_ERROR, "Unmatched nonce\n");
+                              break;
+              
+                          }
+                          else
+                          {
+                                
+                              ret = STATUS_SUCCESS;                    
+                              
+                              AKM_SendAuthInd(akm, KEY_TYPE_NMK, setCnf->result);
+                          }
+                          
+                          break;
+                      }
+              #endif    
+1144   2              default:
+1145   2              {
+1146   3              }
+1147   2          }
+1148   1          return ret;
+1149   1      }
+1150          
+1151          
+1152          
+1153          sDb *AKM_DecodeEncPayloadInd(sAkm *akm, sEvent *event) 
+1154          {
+1155   1          sCmEncryPayloadInd *ind = NULL;
+1156   1          sDb                *db = NULL;
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 20  
+
+1157   1        u8 crc2[4];
+1158   1          u8                 *pos = NULL;
+1159   1          u8                  rfLen = 0;
+1160   1          u32                 crc = 0;
+1161   1          u8              *crct;
+1162   1          sHpgpHdr           *hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+1163   1          sScb               * scb;
+1164   1          u8 ret;
+1165   1      #ifdef AUTH_AES
+1166   1      
+1167   1        sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1168   1        sStaInfo *staInfo = LINKL_GetStaInfo(linkl);
+1169   1      
+1170   1      #ifdef DELAY_HACK
+                  u8 XDATA  *decbuf;
+              #endif
+1173   1          u8 XDATA  iv[20];
+1174   1          AES_KEY   key;
+1175   1        
+1176   1      #ifdef DELAY_HACK
+                  decbuf = DMM_Alloc(256);
+                  if ((decbuf == NULL)){
+                    FM_Printf(FM_ERROR, "Can't alloc mem\n");
+                    return STATUS_FAILURE;
+                  }
+              #endif
+1183   1      #endif
+1184   1      
+1185   1          akm->peerTei = hpgpHdr->tei;
+1186   1          akm->peerMacAddr = hpgpHdr->macAddr;
+1187   1      
+1188   1          pos = event->buffDesc.dataptr;
+1189   1          ind = (sCmEncryPayloadInd *)pos;
+1190   1      
+1191   1          if ((ind->pmn != 1) && (ind->pmn != 0xFF)) {
+1192   2              /* perform the basic verification */
+1193   2              if( (akm->pid != ind->pid) ||
+1194   2                  (akm->prn != ind->prn) ||
+1195   2                  ((akm->pmn+1) != ind->pmn) )
+1196   2              {
+1197   3                  FM_Printf(FM_ERROR, "Unmatched prn\n");
+1198   3                  return NULL;
+1199   3              }
+1200   2          }
+1201   1          
+1202   1      
+1203   1          akm->peerTei = hpgpHdr->tei;
+1204   1          akm->peerMacAddr = hpgpHdr->macAddr;
+1205   1      
+1206   1          akm->pid = ind->pid;
+1207   1          akm->prn = ind->prn;
+1208   1          akm->pmn = ind->pmn; 
+1209   1      
+1210   1      
+1211   1          pos += sizeof(sCmEncryPayloadInd);
+1212   1          
+1213   1          db = DB_Alloc(le16_to_cpu(ind->len) + HPGP_ENC_MM_TAIL_LEN + CRC_SIZE  
+1214   1                        + HPGP_ENC_MM_PAD_MAX, 0); 
+1215   1          if (db == NULL)
+1216   1          {
+1217   2              FM_Printf(FM_ERROR, "Can't alloc db\n");
+1218   2              return NULL;
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 21  
+
+1219   2          }
+1220   1          /* TODO: decrypt the payload */
+1221   1      
+1222   1          db->buffDesc.datalen = event->buffDesc.datalen - sizeof(sCmEncryPayloadInd);
+1223   1      #ifdef AUTH_AES
+1224   1          if(ind->peks == KEY_TYPE_NMK)
+1225   1          {
+1226   2              //FM_Printf(FM_HINFO, "decode KEY_TYPE_NMK\n");
+1227   2              //AES_set_encrypt_key((unsigned char*)staInfo->nmk, 8*AES_BLOCK_SIZE, &key);
+1228   2              aes_set_key((unsigned char*)staInfo->nmk, AES_BLOCK_SIZE, &key );//kiran code optimization. Caller
+             - multiplies by 8 and called function divide by 8
+1229   2          //To reduce stack aes_set_key is directly called
+1230   2          }
+1231   1      #ifdef UKE  
+                  else
+                 // tek
+                  {
+                      scb = (sScb*)hpgpHdr->scb;
+                      //AES_set_encrypt_key(akm->tek, 8*AES_BLOCK_SIZE, &key);
+                  aes_set_key( akm->tek, AES_BLOCK_SIZE, key );//kiran code optimization. Caller multiplies by 8 and calle
+             -d function divide by 8
+                  //To reduce stack aes_set_key is directly called
+                  }
+              #endif
+1241   1        memcpy(iv, ind->iv, ENC_IV_LEN);
+1242   1      #ifdef DELAY_HACK
+                if(db->buffDesc.datalen > 256)
+                {
+                  FM_Printf(FM_ERROR, "Excess Buff len\n");
+                      return STATUS_FAILURE;
+                } 
+                  AES_cbc_encrypt((unsigned char*)pos, 
+                        (unsigned char*)decbuf, 
+                        db->buffDesc.datalen, 
+                        &key, 
+                        (unsigned char*)iv,
+                        AES_DECRYPT);
+                  
+                memcpy(db->buffDesc.dataptr, decbuf, db->buffDesc.datalen);
+                DMM_Free (decbuf);
+              #else
+1258   1          ret = AES_cbc_encrypt((unsigned char*)pos, 
+1259   1                  (unsigned char*)db->buffDesc.dataptr, 
+1260   1                  db->buffDesc.datalen, 
+1261   1                  &key, 
+1262   1                  (unsigned char*)iv,
+1263   1                  AES_DECRYPT);
+1264   1          if(ret != STATUS_SUCCESS)
+1265   1          {
+1266   2              //DB_Free(db);
+1267   2              DMM_Free((u8 *)db);// Kiran stack optimization
+1268   2              return NULL;
+1269   2          }
+1270   1      #endif  
+1271   1      #else
+                  memcpy(db->buffDesc.dataptr, pos, db->buffDesc.datalen);
+              #endif
+1274   1         
+1275   1          /* rf length */
+1276   1          rfLen = *(db->buffDesc.dataptr + db->buffDesc.datalen - 1);
+1277   1      
+1278   1      
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 22  
+
+1279   1          db->buffDesc.dataptr += rfLen;
+1280   1          db->buffDesc.datalen = le16_to_cpu(ind->len);
+1281   1      #ifdef P8051
+1282   1      //FM_Printf(FM_ERROR, "AKM: recv rf len = %bu, msg len = %bu.\n", rfLen, ind->len);
+1283   1      #else
+              //FM_Printf(FM_ERROR, "AKM: recv rf len = %d, msg len = %d.\n", rfLen, ind->len);
+              #endif
+1286   1          /* perform crc verification */
+1287   1          crc = chksum_crc32(db->buffDesc.dataptr, db->buffDesc.datalen);
+1288   1         crct = (u8*)&crc;
+1289   1      
+1290   1          crc2[0] = crct[3];
+1291   1          crc2[1] = crct[2];
+1292   1          crc2[2] = crct[1];
+1293   1          crc2[3] = crct[0];
+1294   1          pos = db->buffDesc.dataptr + db->buffDesc.datalen; 
+1295   1          if (memcmp(pos, &crc2, sizeof(u32))) 
+1296   1          {    
+1297   2              FM_Printf(FM_ERROR, "AKM:crc no match(tx:0x%08x,rx:0x%08x)\n", *(u32*)pos, crc);
+1298   2          }
+1299   1          return db;
+1300   1      }
+*** WARNING C280 IN LINE 1163 OF ..\..\src\link\akm.c: 'scb': unreferenced local variable
+1301          
+1302          
+1303          
+1304          u8 AKM_ProcReady(sAkm *akm, sEvent *event)
+1305          {
+1306   1          sDb *db = NULL;
+1307   1          sHpgpHdr *hpgpHdr = NULL;
+1308   1          u8  state = AKM_STATE_READY;
+1309   1          sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1310   1          sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+1311   1      
+1312   1      
+1313   1          if( event->eventHdr.eventClass == EVENT_CLASS_MSG)
+1314   1          {
+1315   2              switch(event->eventHdr.type)
+1316   2              {
+1317   3      
+1318   3                  case EVENT_TYPE_CM_ENCRY_PAYLOAD_RSP:
+1319   3                      
+1320   3                      //FM_Printf(FM_ERROR, "AKM:EVENT_TYPE_CM_ENCRY_PAYLOAD_RSP\n");
+1321   3      
+1322   3                      break;
+1323   3                      
+1324   3                  case EVENT_TYPE_CM_ENCRY_PAYLOAD_IND:
+1325   3                  {
+1326   4      //FM_Printf(FM_ERROR, "AKM: recv the Enc Payload Ind\n");
+1327   4                      /* decrpt the messsage */
+1328   4                      db = AKM_DecodeEncPayloadInd(akm, event);
+1329   4                      if (db != NULL)
+1330   4                      {
+1331   5                          hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+1332   5                          /* Process a request */
+1333   5                          AKM_ProcEncPayload(akm, HPGP_MMTYPE_ALL, db, hpgpHdr->scb);
+1334   5                          /* free the db */
+1335   5                         // DB_Free(db);
+1336   5                 DMM_Free((u8 *)db);// Kiran stack optimization
+1337   5                      }
+1338   4                      else
+1339   4                      {
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 23  
+
+1340   5                          //send EVENT_TYPE_CM_ENCRY_PAYLOAD_RSP with fail code
+1341   5                          AKM_SendEncPayloadRsp(akm, 1);
+1342   5                      }
+1343   4                      
+1344   4                     
+1345   4                      break;
+1346   4                   }
+1347   3      #ifdef UKE      
+                          case EVENT_TYPE_CM_GET_KEY_REQ:
+                          {                  
+              
+                              if ((staInfo->secMode != SEC_MODE_SC_ADD) &&
+                                  (staInfo->secMode != SEC_MODE_SC_JOIN))
+                              {
+              
+                                  FM_Printf(FM_ERROR, "CM_GET_KEY_REQ drop\n");
+                                  break;
+                              }
+                                  
+                              if(hashKey == NULL)
+                              {
+                                  hashKey = DMM_Alloc(768); // TODO release this memory
+                              }
+                              if(hashKey == NULL)
+                              {
+                                  FM_Printf(FM_ERROR, "Hash key alloc fail\n");
+                                  break;
+                              }
+                              
+              
+                              FM_Printf(FM_MMSG, "AKM<<<CM_GET_KEY.REQ-HASH\n");
+                  
+                              AKM_ProcGetKeyReq(akm, event);
+                           
+                              break;
+                          }
+              #endif      
+1377   3                  default:
+1378   3                  {
+1379   4                  }
+1380   3              }
+1381   2          }
+1382   1          else if( event->eventHdr.eventClass == EVENT_CLASS_CTRL)
+1383   1          {
+1384   2              switch(event->eventHdr.type)
+1385   2              {
+1386   3      #ifdef UKE
+                  
+                          case EVENT_TYPE_ASSOC_IND:
+                          {
+                              if(staInfo->secMode == SEC_MODE_SC_ADD)
+                              {
+                                  // UKE
+                                  
+                                  hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;                    
+              
+                                  if(hashKey == NULL)
+                                  {
+                                      hashKey = DMM_Alloc(768); // TODO release this memory
+                                  }
+                                  if(hashKey == NULL)
+                                  {
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 24  
+
+                                      FM_Printf(FM_ERROR, "Hash key alloc fail\n");
+                                      break;
+                                  }
+                                  /* start a new UKE authentication */                     
+              
+                                  akm->peerTei = ((sScb*)hpgpHdr->scb)->tei;
+                                  
+                                  akm->peerMacAddr = ((sScb*)hpgpHdr->scb)->macAddr;
+                                  
+                                  akm->keyType = KEY_TYPE_HASH_KEY;
+                                  akm->pid = AUTH_PID_NMK_WITH_UKE; 
+                                  akm->prn = rand() & 0xFFFF;
+                                  akm->pmn = 1; 
+                                  FillRandomNumber(akm->myNonce, 4);                
+                                 
+                                      // start UKE  timer
+                                      
+                                  STM_StartTimer(akm->TekTimer, HPGP_TEK_LIFETIME);
+                                      
+                                  /* send CM_GET_KEY.REQ */
+                                  AKM_SendUnEncMgmtMsg(akm, MMTYPE_CM_GET_KEY_REQ);
+                                  /* start the key timer for a response */
+                                  STM_StartTimer(akm->akmTimer, HPGP_TIME_KEY);
+                                  // UKE: Send out AKM get key req                    
+                                  //os_switch_task();
+                                  akm->txRetryCnt++;
+                                  state = AKM_STATE_WAITFOR_HASH_GET_CNF;
+                              }
+              
+                              break;
+                          }
+              #endif          
+1434   3                  case EVENT_TYPE_AUTH_REQ:
+1435   3                  {
+1436   4                      sAuthReq *authreq = (sAuthReq *)event->buffDesc.dataptr;
+1437   4      
+1438   4                      if( authreq->authType == AUTH_TYPE_NEK) 
+1439   4                      {
+1440   5                          /* start a new NEK authentication */ 
+1441   5                          akm->peerTei = staInfo->ccoScb->tei;
+1442   5                          akm->peerMacAddr = staInfo->ccoScb->macAddr;
+1443   5                          akm->keyType = KEY_TYPE_NEK;
+1444   5                          akm->pid = AUTH_PID_NEW_STA; 
+1445   5                          akm->prn = rand() & 0xFFFF;
+1446   5                          akm->pmn = 1; 
+1447   5                          FillRandomNumber(akm->myNonce, 4);
+1448   5                          FillRandomNumber(akm->nmkIv, ENC_IV_LEN);
+1449   5      
+1450   5                          /* send CM_GET_KEY.REQ */
+1451   5                          AKM_SendMgmtMsg(akm, MMTYPE_CM_GET_KEY_REQ);
+1452   5                          /* start the key timer for a response */
+1453   5                          STM_StartTimer(akm->akmTimer, HPGP_TIME_KEY);
+1454   5                          akm->txRetryCnt++;
+1455   5                          state = AKM_STATE_WAITFOR_GET_NEK_CNF;
+1456   5                      }
+1457   4                      break;
+1458   4                  }
+1459   3                  case EVENT_TYPE_AKM_STOP:
+1460   3                  {
+1461   4      #ifdef HPGP_HAL
+1462   4                      /* remvoe the NEK from the LMAC for the STA */
+1463   4                      HHAL_RemoveNEK(staInfo->nekEks);
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 25  
+
+1464   4      #endif
+1465   4                      state = AKM_STATE_INIT;
+1466   4                      break;
+1467   4                  }
+1468   3                  default:
+1469   3                  {
+1470   4                  }
+1471   3              }
+1472   2          }
+1473   1          return state;
+1474   1      }
+1475          
+1476          
+1477          
+1478          
+1479          void AKM_ProcEvent(sAkm *akm, sEvent *event)
+1480          {
+1481   1      
+1482   1          u8         *pos = NULL;
+1483   1          sDb        *db = NULL;
+1484   1          uEventParam eventParam;
+1485   1          sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1486   1          sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+1487   1          
+1488   1      #ifdef UKE
+                  if ((event->eventHdr.eventClass == EVENT_CLASS_CTRL) && 
+                      (event->eventHdr.type == EVENT_TYPE_TIMER_TEK_IND))
+                  {
+                      FM_Printf(FM_HINFO, "AKM:UKE Timeout\n");
+                      // Make tek invalid
+                      memset(akm->tek, 0, 16);
+                             
+                      if ((staInfo->secMode == SEC_MODE_SC_JOIN) ||
+                          (staInfo->secMode == SEC_MODE_SC_ADD))
+                      {
+                          staInfo->secMode = SEC_MODE_SC;
+                          AKM_SendAuthInd(akm, KEY_TYPE_NMK, STATUS_FAILURE);
+              
+                          akm->state = AKM_STATE_INIT;
+                          
+                      }
+              
+                      return;
+              
+                  }
+              
+              #endif
+1511   1       
+1512   1          switch(akm->state)
+1513   1          {
+1514   2              case AKM_STATE_INIT:
+1515   2              {
+1516   3                  if( (event->eventHdr.eventClass == EVENT_CLASS_CTRL) && 
+1517   3                      (event->eventHdr.type == EVENT_TYPE_AKM_START) )
+1518   3                  {
+1519   4                      pos = event->buffDesc.dataptr;
+1520   4                      akm->akmMode = *pos;
+1521   4                      pos++; 
+1522   4      #ifdef P8051
+1523   4      FM_Printf(FM_ERROR, "AKM:AKM_START(%bu,%bu)\n", akm->akmMode, *pos);
+1524   4      #else
+              FM_Printf(FM_ERROR, "AKM:AKM_START(%d)\n", *pos);
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 26  
+
+              #endif
+1527   4       
+1528   4                      akm->state = AKM_STATE_READY;
+1529   4                  }
+1530   3                  break;
+1531   3              }
+1532   2              case AKM_STATE_READY:
+1533   2              {
+1534   3                  akm->state = AKM_ProcReady(akm, event);
+1535   3                  break;
+1536   3              }
+1537   2              case AKM_STATE_WAITFOR_GET_NEK_CNF:
+1538   2              {
+1539   3                  if( event->eventHdr.eventClass == EVENT_CLASS_MSG)
+1540   3                  {
+1541   4                      if (event->eventHdr.type ==  EVENT_TYPE_CM_ENCRY_PAYLOAD_IND)
+1542   4                      {
+1543   5                          /* decrpt the messsage */
+1544   5                          db = AKM_DecodeEncPayloadInd(akm, event);
+1545   5                          if (db != NULL)
+1546   5                          {
+1547   6                              if (AKM_ProcEncPayload(akm, MMTYPE_CM_GET_KEY_CNF, db, NULL)
+1548   6                                      == STATUS_SUCCESS)
+1549   6                              {
+1550   7                                  STM_StopTimer(akm->akmTimer);
+1551   7                                  akm->txRetryCnt = 0;
+1552   7                                  eventParam.authRsp.authType = AUTH_TYPE_NEK;
+1553   7                                  eventParam.authRsp.result = STATUS_SUCCESS;
+1554   7                                  AKM_DeliverEvent(akm, EVENT_TYPE_AUTH_RSP, &eventParam);
+1555   7                                  akm->state = AKM_STATE_READY;
+1556   7                              }
+1557   6                              /* free the db */
+1558   6                              DB_Free(db);                     
+1559   6                          }
+1560   5                          else
+1561   5                          {
+1562   6                              //send EVENT_TYPE_CM_ENCRY_PAYLOAD_RSP with fail code    
+1563   6                              AKM_SendEncPayloadRsp(akm, 1);
+1564   6                          }
+1565   5                      }
+1566   4                  }
+1567   3                  else if( event->eventHdr.eventClass == EVENT_CLASS_CTRL)
+1568   3                  {
+1569   4                      if (event->eventHdr.type == EVENT_TYPE_TIMER_KEY_IND)
+1570   4                      {
+1571   5                          if( akm->txRetryCnt <= HPGP_TX_RETRY_MAX)
+1572   5                          {
+1573   6                              /* resend the message */
+1574   6                              AKM_SendMgmtMsg(akm, MMTYPE_CM_GET_KEY_REQ); 
+1575   6                              /* start the key timer for a response */
+1576   6                              STM_StartTimer(akm->akmTimer, HPGP_TIME_KEY);
+1577   6                              akm->txRetryCnt++;
+1578   6                              //stay in the same state
+1579   6                          }
+1580   5                          else
+1581   5                          {
+1582   6                              akm->txRetryCnt = 0;
+1583   6                              /* retry exhausted */
+1584   6                              eventParam.authRsp.authType = AUTH_TYPE_NEK;
+1585   6                              eventParam.authRsp.result = STATUS_FAILURE;
+1586   6                              /* deliver the event to the upper layer */
+1587   6                              AKM_DeliverEvent(akm, EVENT_TYPE_AUTH_RSP, &eventParam);
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 27  
+
+1588   6                          }
+1589   5                      }
+1590   4                  }
+1591   3                  break;
+1592   3              }
+1593   2      #ifdef UKE    
+                      case AKM_STATE_WAITFOR_HASH_GET_CNF:
+                      {
+                          if( event->eventHdr.eventClass == EVENT_CLASS_MSG)
+                          {
+                              if (event->eventHdr.type ==  EVENT_TYPE_CM_GET_KEY_CNF)
+                              {
+                                  sCmGetKeyCnf *cnf;
+                                  pos = event->buffDesc.dataptr;
+                                  FM_Printf(FM_MMSG, "AKM<<<CM_GET_KEY.CNF-HASH\n");
+                                  /* Get KEY CNF msg body */
+                                  cnf = (sCmGetKeyCnf *)pos;
+                                  if (cnf->result == 0)
+                                  {
+                                      if (cnf->reqKeyType == KEY_TYPE_HASH_KEY) 
+                                      {                 
+                                       
+                                           /* perform the basic verification */
+                                           if((akm->pid != cnf->pid) ||
+                                               (akm->prn != cnf->prn) ||
+                                               ((akm->pmn+1) != cnf->pmn) ||
+                                               (cnf->pmn == 0xFF))
+                                           {
+                                               FM_Printf(FM_ERROR, "Unmatched pmn\n");
+                                               break;
+                                           }
+                                       
+                                           if(memcmp(akm->myNonce, cnf->yourNonce, 4) != 0)
+                                           {
+                                               FM_Printf(FM_ERROR, "Unmatched nonce\n");
+                                               break;
+               
+                                           }
+                                           akm->txRetryCnt = 0;
+                                           STM_StopTimer(akm->akmTimer);
+                                           
+                                           memcpy(akm->yourNonce, cnf->myNonce, 4);
+                                           pos += sizeof(sCmGetKeyCnf);
+                                           memcpy(&hashKey[HASH_KEY_LEN], pos, HASH_KEY_LEN);
+                                           /* Generate TEK usinf Hash1 and Hash2 */
+                                           genTek = 1;
+                                           // TODO Send NMK using SET_KEY.REQ
+                                           /* send CM_SET_KEY.REQ */
+                                           akm->keyType = KEY_TYPE_NMK;
+                                           akm->pid = AUTH_PID_NMK_WITH_UKE;
+                                           akm->pmn = 3; 
+                                  
+                                           AKM_SendMgmtMsg(akm, MMTYPE_CM_SET_KEY_REQ);
+                                           /* start the key timer for a response */
+                                           STM_StartTimer(akm->akmTimer, HPGP_TIME_KEY);
+                                           akm->txRetryCnt++;
+                                           akm->state = AKM_STATE_WAITFOR_NMK_SET_CNF;
+                                      }
+                                  }
+                              }
+                          }
+                          else if( event->eventHdr.eventClass == EVENT_CLASS_CTRL)
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 28  
+
+                          {
+                              switch(event->eventHdr.type)
+                              {
+                                  case EVENT_TYPE_TIMER_KEY_IND:
+                                  {
+                                      if( akm->txRetryCnt <= HPGP_TX_RETRY_MAX)
+                                      {
+                                          /* resend the message */
+                                          AKM_SendUnEncMgmtMsg(akm, MMTYPE_CM_GET_KEY_REQ); 
+                                          /* start the key timer for a response */
+                                          STM_StartTimer(akm->akmTimer, HPGP_TIME_KEY);
+                                          akm->txRetryCnt++;
+                                          //stay in the same state
+                                      }
+                                      else
+                                      {
+                                          akm->txRetryCnt = 0;
+                                          /* retry exhausted */
+              
+                                          AKM_SendAuthInd(akm, KEY_TYPE_NMK, STATUS_FAILURE);
+                                                          
+              
+                                      }
+                                      break;
+                                  }
+                                  default:
+                                  {
+                                  }
+                              }
+                          }
+                          break;
+                      }
+                      case AKM_STATE_WAITFOR_NMK_SET_CNF:
+                      {            
+                          if( event->eventHdr.eventClass == EVENT_CLASS_MSG)
+                          {
+                              if (event->eventHdr.type ==  EVENT_TYPE_CM_ENCRY_PAYLOAD_IND)
+                              {
+                                  /* decrpt the messsage */
+                                  db = AKM_DecodeEncPayloadInd(akm, event);
+                                  if (db != NULL)
+                                  {
+                                   
+                                      if (AKM_ProcEncPayload(akm, MMTYPE_CM_SET_KEY_CNF, db, NULL)
+                                              == STATUS_SUCCESS)
+                                      {
+                                          STM_StopTimer(akm->akmTimer);
+                                         
+                                          akm->txRetryCnt = 0;
+              
+                                          akm->state = AKM_STATE_READY;                            
+              
+                                          AKM_SendAuthInd(akm, KEY_TYPE_NMK, STATUS_SUCCESS);
+                                          
+                                          
+                                      }
+                                      /* free the db */
+                                      DB_Free(db);
+                                  }
+                                  else
+                                  {
+                                      //send EVENT_TYPE_CM_ENCRY_PAYLOAD_RSP with fail code    
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 29  
+
+                                      AKM_SendEncPayloadRsp(akm, 1);
+                                  }
+                              }
+                          }
+                          else if( event->eventHdr.eventClass == EVENT_CLASS_CTRL)
+                          {
+                              switch(event->eventHdr.type)
+                              {
+                                  case EVENT_TYPE_TIMER_KEY_IND:
+                                  {
+                                      if( akm->txRetryCnt <= HPGP_TX_RETRY_MAX)
+                                      {
+                                          /* resend the message */
+                                          AKM_SendMgmtMsg(akm, MMTYPE_CM_SET_KEY_REQ); 
+                                          /* start the key timer for a response */
+                                          STM_StartTimer(akm->akmTimer, HPGP_TIME_KEY);
+                                          akm->txRetryCnt++;
+                                          //stay in the same state
+                                      }
+                                      else
+                                      {
+                                          akm->txRetryCnt = 0;
+                                          /* retry exhausted */
+              
+                                          AKM_SendAuthInd(akm, KEY_TYPE_NMK, STATUS_FAILURE);
+                                          
+                                      }
+                                      break;
+                                  }
+                                  default:
+                                  {
+                                  }
+                              }
+                          }
+                          break;
+                      }
+              #endif
+1749   2          
+1750   2              default:
+1751   2              {
+1752   3              }
+1753   2          }
+1754   1      }
+1755          
+1756          
+1757          
+1758          eStatus AKM_Start(sAkm *akm, u8 mode, u8 newNek )
+1759          {
+1760   1          sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1761   1          sEvent *event = NULL;
+1762   1          u8 *pos = NULL;
+1763   1          sStaInfo *staInfo = LINKL_GetStaInfo(linkl);
+1764   1      
+1765   1         
+1766   1          event = EVENT_Alloc(2, EVENT_HPGP_CTRL_HEADROOM);
+1767   1          if(event == NULL)
+1768   1          {
+1769   2              FM_Printf(FM_ERROR, "EAllocErr\n");
+1770   2              return STATUS_FAILURE;
+1771   2          }
+1772   1          event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1773   1          event->eventHdr.type = EVENT_TYPE_AKM_START;
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 30  
+
+1774   1          pos = event->buffDesc.dataptr;
+1775   1          *pos = mode; 
+1776   1          pos++;
+1777   1          *pos = newNek; 
+1778   1          event->buffDesc.datalen = 2;
+1779   1      //FM_Printf(FM_ERROR, "AKM: Start (%bu).\n", newNek);
+1780   1      
+1781   1          akm->state = AKM_STATE_READY;
+1782   1      
+1783   1          if (newNek && (linkl->mode == LINKL_STA_MODE_CCO))
+1784   1          {
+1785   2              u8 i;
+1786   2              u8          pwd[32];
+1787   2                 
+1788   2              for (i = 0; i < 32; i++)
+1789   2              {
+1790   3                  pwd[i] = rand() & 0xFF;
+1791   3              }
+1792   2              /* generate a NEK */            
+1793   2              GenerateKey(pwd, 32, staInfo->nek);
+1794   2              staInfo->nekEks = AKM_GetNewEks(&linkl->akm); 
+1795   2      #ifdef P8051
+1796   2      //                    FM_Printf(FM_HINFO, "AKM: NEK EKS: %bu.\n", staInfo->nekEks);
+1797   2      #else
+              //                    FM_Printf(FM_HINFO, "AKM: NEK EKS: %.2x.\n", staInfo->nekEks);
+              #endif
+1800   2              FM_HexDump(FM_HINFO, "AKM: NEK:", staInfo->nek, ENC_KEY_LEN);
+1801   2      #ifdef HPGP_HAL
+1802   2              /* set the NEK to the LMAC for the CCo */
+1803   2             HHAL_AddNEK(staInfo->nekEks, staInfo->nek);
+1804   2      #endif
+1805   2      
+1806   2          }  
+1807   1                      
+1808   1      
+1809   1          LINKL_SendEvent(linkl, event);
+1810   1          return STATUS_SUCCESS;
+1811   1      }
+1812          
+1813          
+1814          eStatus AKM_Stop(sAkm *akm)
+1815          {
+1816   1        
+1817   1          sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1818   1          sStaInfo    *staInfo = LINKL_GetStaInfo(linkl);
+1819   1        
+1820   1      #if 0
+              
+              
+                  sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sEvent *event = NULL;
+                  event = EVENT_Alloc(0, EVENT_HPGP_CTRL_HEADROOM);
+                  if(event == NULL)
+                  {
+                      FM_Printf(FM_ERROR, "EAllocErr\n");
+                      return STATUS_FAILURE;
+                  }
+                  event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                  event->eventHdr.type = EVENT_TYPE_AKM_STOP;
+                  LINKL_SendEvent(linkl, event);
+              
+              #else
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 31  
+
+1836   1        /* remvoe the NEK from the LMAC for the STA */
+1837   1        HHAL_RemoveNEK(staInfo->nekEks);
+1838   1      
+1839   1        akm->state = AKM_STATE_INIT;
+1840   1      
+1841   1      #endif
+1842   1        return STATUS_SUCCESS;
+1843   1      }
+1844          
+1845          
+1846          void LINKL_AkmTimerHandler(void* cookie)
+1847          {
+1848   1          sEvent *event = NULL;
+1849   1          sLinkLayer * linkl = (sLinkLayer *)cookie;
+1850   1      
+1851   1          /* Generate a time event */
+1852   1          event = EVENT_Alloc(0, EVENT_HPGP_CTRL_HEADROOM);
+1853   1          if(event == NULL)
+1854   1          {
+1855   2              FM_Printf(FM_ERROR, "EAllocErr\n");
+1856   2              return;
+1857   2          }
+1858   1          event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1859   1          event->eventHdr.type = EVENT_TYPE_TIMER_KEY_IND;
+1860   1          /* post the event to the event queue */
+1861   1          LINKL_SendEvent(linkl, event);
+1862   1      }
+1863              
+1864          
+1865          
+1866          eStatus AKM_Init(sAkm *akm)
+1867          {
+1868   1          sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1869   1      #ifdef CALLBACK
+                  akm->akmTimer = STM_AllocTimer(LINKL_TimerHandler,
+                                      EVENT_TYPE_TIMER_KEY_IND, linkl);
+              #else
+1873   1          akm->akmTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK, 
+1874   1                              EVENT_TYPE_TIMER_KEY_IND, linkl);
+1875   1      #endif
+1876   1          if(akm->akmTimer == STM_TIMER_INVALID_ID)
+1877   1          {
+1878   2              return STATUS_FAILURE;
+1879   2          }
+1880   1      #ifdef UKE  
+                  akm->TekTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK,
+                                      EVENT_TYPE_TIMER_TEK_IND, linkl);
+                  if(akm->TekTimer == STM_TIMER_INVALID_ID)
+                  {
+                      return STATUS_FAILURE;
+                  }
+              #endif
+1888   1      #ifdef AKM_PRINT
+              #ifdef P8051
+              FM_Printf(FM_ERROR, "AKM: akm timer id: %bu\n", akm->akmTimer);
+              #else
+              FM_Printf(FM_ERROR, "AKM: akm timer id: %d\n", akm->akmTimer);
+              #endif
+              #endif
+1895   1          akm->txRetryCnt = 0;
+1896   1      
+1897   1          srand(STM_GetTick());
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 32  
+
+1898   1      
+1899   1          chksum_crc32gentab ();
+1900   1      
+1901   1          akm->state = AKM_STATE_INIT;
+1902   1          return STATUS_SUCCESS;
+1903   1      }
+1904          
+1905          
+1906          
+1907          /** =========================================================
+1908           *
+1909           * Edit History
+1910           *
+1911           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/link/akm.c,v $
+1912           *
+1913           * $Log: akm.c,v $
+1914           * Revision 1.13  2014/09/05 09:28:18  ranjan
+1915           * 1. uppermac cco-sta switching feature fix
+1916           * 2. general stability fixes for many station associtions
+1917           * 3. changed mgmt memory pool for many STA support
+1918           *
+1919           * Revision 1.12  2014/08/25 07:37:34  kiran
+1920           * 1) RSSI & LQI support
+1921           * 2) Fixed Sync related issues
+1922           * 3) Fixed timer 0 timing drift for SDK
+1923           * 4) MMSG & Error Logging in Flash
+1924           *
+1925           * Revision 1.11  2014/07/22 10:03:52  kiran
+1926           * 1) SDK Supports Power Save
+1927           * 2) Uart_Driver.c cleanup
+1928           * 3) SDK app memory pool optimization
+1929           * 4) Prints from STM.c are commented
+1930           * 5) Print messages are trimmed as common no memory left in common
+1931           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+1932           *
+1933           * Revision 1.10  2014/07/05 09:16:27  prashant
+1934           * 100 Devices support- only association tested, memory adjustments
+1935           *
+1936           * Revision 1.9  2014/06/19 17:13:19  ranjan
+1937           * -uppermac fixes for lvnet and reset command for cco and sta mode
+1938           * -backup cco working
+1939           *
+1940           * Revision 1.8  2014/06/12 13:15:43  ranjan
+1941           * -separated bcn,mgmt,um event pools
+1942           * -fixed datapath issue due to previous checkin
+1943           * -work in progress. neighbour cco detection
+1944           *
+1945           * Revision 1.7  2014/06/11 13:17:47  kiran
+1946           * UART as host interface and peripheral interface supported.
+1947           *
+1948           * Revision 1.6  2014/05/28 10:58:59  prashant
+1949           * SDK folder structure changes, Uart changes, removed htm (UI) task
+1950           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+1951           *
+1952           * Revision 1.5  2014/05/12 08:09:57  prashant
+1953           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+1954           *
+1955           * Revision 1.4  2014/03/10 05:58:10  ranjan
+1956           * 1. added HomePlug BackupCCo feature. verified C&I test.(passed.) (bug 176)
+1957           *
+1958           * Revision 1.3  2014/02/27 10:42:47  prashant
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 33  
+
+1959           * Routing code added
+1960           *
+1961           * Revision 1.2  2014/01/10 17:17:53  yiming
+1962           * check in Rajan 1/8/2014 code release
+1963           *
+1964           * Revision 1.6  2014/01/08 10:53:54  ranjan
+1965           * Changes for LM OS support.
+1966           * New Datapath FrameTask
+1967           * LM and UM  datapath, feature verified.
+1968           *
+1969           * known issues : performance numbers needs revisit
+1970           *
+1971           * review : pending.
+1972           *
+1973           * Revision 1.5  2013/10/16 07:43:38  prashant
+1974           * Hybrii B Upper Mac compiling issues and QCA fix, added default eks code
+1975           *
+1976           * Revision 1.4  2013/09/04 14:51:01  yiming
+1977           * New changes for Hybrii_A code merge
+1978           *
+1979           * Revision 1.21  2013/07/12 08:56:36  ranjan
+1980           * -UKE Push Button Security Feature.
+1981           * Verified : DirectEntry Security Works.Datapath Works.
+1982           *                 command SetSecMode for UKE works.
+1983           * Added against bug-160
+1984           *
+1985           * Revision 1.20  2013/03/22 12:21:49  prashant
+1986           * default FM_MASK and FM_Printf modified for USER INFO
+1987           *
+1988           * Revision 1.19  2012/12/18 12:17:46  prashant
+1989           * Stability checkin
+1990           *
+1991           * Revision 1.18  2012/11/06 05:05:26  ranjan
+1992           * -moved AES encryption to Hal Task
+1993           * - verified link establishment is very stable
+1994           *
+1995           * Revision 1.17  2012/10/25 11:38:48  prashant
+1996           * Sniffer code added for MAC_SAP, Added new commands in MAC_SAP for sniffer, bridge,
+1997           *  hardware settings and peer information.
+1998           *
+1999           * Revision 1.16  2012/10/11 06:21:00  ranjan
+2000           * ChangeLog:
+2001           * 1. Added HPGP_MAC_SAP to support linux host data and command path.
+2002           *     define HPGP_MAC_SAP, NMA needs to be added in project.
+2003           *
+2004           * 2. Added 'p ping' command in htm.c . Feature is under AUTO_PING macro.
+2005           *
+2006           * 3. Extended  'p key' command to include PPEK support.
+2007           *
+2008           * verified :
+2009           *   1. Datapath ping works overnite after association,auth
+2010           *   2. HAL TEST project is intact
+2011           *
+2012           * Revision 1.15  2012/07/15 17:31:07  yuanhua
+2013           * (1)fixed a potential memory overwriting in MUXL (2)update prints for 8051.
+2014           *
+2015           * Revision 1.14  2012/07/08 18:42:20  yuanhua
+2016           * (1)fixed some issues when ctrl layer changes its state from the UCC to ACC. (2) added a event CNSM_STAR
+             -T.
+2017           *
+2018           * Revision 1.13  2012/06/30 23:36:26  yuanhua
+2019           * return the success status for LINKL_SendEvent() when RTX51 OS is used.
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 34  
+
+2020           *
+2021           * Revision 1.12  2012/06/05 07:25:59  yuanhua
+2022           * (1) add a scan call to the MAC during the network discovery. (2) add a tiny task in ISM for interrupt p
+             -olling (3) modify the frame receiving integration. (4) modify the tiny task in STM.
+2023           *
+2024           * Revision 1.11  2012/06/04 23:34:02  son
+2025           * Added RTX51 OS support
+2026           *
+2027           * Revision 1.10  2012/05/19 20:32:17  yuanhua
+2028           * added non-callback option for the protocol stack.
+2029           *
+2030           * Revision 1.9  2012/05/19 05:05:15  yuanhua
+2031           * optimized the timer handlers in CTRL and LINK layers.
+2032           *
+2033           * Revision 1.8  2012/05/17 05:05:58  yuanhua
+2034           * (1) added the option for timer w/o callback (2) added task id and name.
+2035           *
+2036           * Revision 1.7  2012/05/12 04:11:46  yuanhua
+2037           * (1) added list.h (2) changed the hal tx for the hw MAC implementation.
+2038           *
+2039           * Revision 1.6  2012/04/30 04:05:57  yuanhua
+2040           * (1) integrated the HAL mgmt Tx. (2) various updates
+2041           *
+2042           * Revision 1.5  2012/04/13 06:15:11  yuanhua
+2043           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+2044           *
+2045           * Revision 1.4  2012/03/11 17:02:24  yuanhua
+2046           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+2047           *
+2048           * Revision 1.3  2011/09/18 01:32:08  yuanhua
+2049           * designed the AKM for both STA and CCo.
+2050           *
+2051           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+2052           * migrate the firmware code from the greenchip to the hybrii.
+2053           *
+2054           * Revision 1.3  2011/07/22 18:51:04  yuanhua
+2055           * (1) added the hardware timer tick simulation (hts.h/hts.c) (2) Added semaphors for sync in simulation a
+             -nd defined macro for critical section (3) Fixed some bugs in list.h and CRM (4) Modified and fixed bugs in SHAL (5) Chan
+             -ged SNSM/CNSM and SNAM/CNAM for bug fix (6) Added debugging prints, and more.
+2056           *
+2057           * Revision 1.2  2011/07/02 22:09:01  yuanhua
+2058           * Implemented both SNAM and CNAM modules, including network join and leave procedures, systemm resource (
+             -such as TEI) allocation and release, TEI renew/release timers, and TEI reuse timer, etc.
+2059           *
+2060           * Revision 1.1  2011/05/28 06:31:19  kripa
+2061           * Combining corresponding STA and CCo modules.
+2062           *
+2063           * Revision 1.1  2011/05/06 19:10:12  kripa
+2064           * Adding link layer files to new source tree.
+2065           *
+2066           * Revision 1.1  2011/04/08 21:42:45  yuanhua
+2067           * Framework
+2068           *
+2069           *
+2070           * =========================================================*/
+2071          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   7173    ----
+   CONSTANT SIZE    =    837    ----
+C51 COMPILER V9.52.0.0   AKM                                                               12/02/2014 14:35:43 PAGE 35  
+
+   XDATA SIZE       =   ----     668
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  6 WARNING(S),  0 ERROR(S)

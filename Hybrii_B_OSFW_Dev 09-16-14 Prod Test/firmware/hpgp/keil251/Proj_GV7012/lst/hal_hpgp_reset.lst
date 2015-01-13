@@ -1,0 +1,671 @@
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HAL_HPGP_RESET
+OBJECT MODULE PLACED IN .\obj\hal_hpgp_reset.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\..\project\hal\src\hal_hpgp_reset.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWS
+                    -E INTVECTOR(0X2100) INCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl
+                    -;..\..\src\hal;..\..\src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\
+                    -hal\src;..\..\..\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\compone
+                    -nts\utilities\event\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\.
+                    -.\..\sampleapp\src;..\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\
+                    -..\..\app_support;..\..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPG
+                    -P,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NE
+                    -W_SYNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_
+                    -DETECT,SW_RECOVERY,PROD_TEST) DEBUG PRINT(.\lst\hal_hpgp_reset.lst) TABS(2) OBJECT(.\obj\hal_hpgp_reset.obj)
+
+line level    source
+
+   1          #include <stdio.h>
+   2          #include <string.h>
+   3          
+   4          #include "papdef.h"
+   5          #include "hal.h"
+   6          #include "hal_common.h"
+   7          #include "fm.h"
+   8          //#include "hal_hpgp.h"
+   9          //#include "hal_eth.h"
+  10          //#include "hal_tst.h"
+  11          #include "hal_reg.h"
+  12          #include "hpgpevt.h"
+  13          //#include "stm.h"
+  14          #include "hal_regs_def.h"
+  15          #include "hal_reg.h"
+  16          #include "hal_hpgp_reset.h"
+  17          #include "linkl.h"
+  18          #include "hpgpctrl.h"
+  19          #include "hybrii_tasks.h"
+  20          
+  21          extern u8 gHtmDefKey[10][16];
+  22          
+  23          extern eStatus CHAL_freeCP(u8 cp);
+  24          #ifdef Hybrii_B
+  25          
+  26          extern void* HPGPCTRL_GetLayer(u8 layer);
+  27          
+  28          void disable_plc_txrx()
+  29          {
+  30   1      
+  31   1        uPlcStatusReg         plcStatus;
+  32   1      
+  33   1          plcStatus.reg  = ReadU32Reg(PLC_STATUS_REG);// Disable Tx Rx
+  34   1          plcStatus.s.plcRxEnSwCtrl = 1 ;
+  35   1          plcStatus.s.nTxEn  = 1;
+  36   1          plcStatus.s.nRxEn = 1;
+  37   1          
+  38   1          WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+  39   1      
+  40   1      }
+  41          void enable_plc_txrx()
+  42          {
+  43   1        uPlcStatusReg     plcStatus;
+  44   1      
+  45   1        plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+  46   1        plcStatus.s.nTxEn  = 0;
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 2   
+
+  47   1      
+  48   1          
+  49   1        // below is sequence to re-enable RxEn
+  50   1        /*plcStatus.s.rxSoftReset = 1;
+  51   1        WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+  52   1        CHAL_DelayTicks(10);
+  53   1        plcStatus.s.rxSoftReset = 0; */
+  54   1      
+  55   1          plcStatus.s.nRxEn = 0;
+  56   1          //WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+  57   1          
+  58   1          plcStatus.s.plcRxEnSwCtrl = 0;
+  59   1          WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+  60   1      
+  61   1         
+  62   1      }
+  63          
+  64          
+  65          void plc_reset_tx()
+  66          {
+  67   1        uPlcStatusReg    plcStatus;
+  68   1          uhang_reset_reg reg_val;
+  69   1          sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+  70   1          sStaInfo *staInfo = LINKL_GetStaInfo(linkl);
+  71   1      //    u8 freecp;
+  72   1          
+  73   1        //u32 reg_val;
+  74   1          u32 hangIntRegRead;
+  75   1          u8                  cpNum;
+  76   1          u32 i,j;
+  77   1        u8 cmdqsize;
+  78   1        u8 capqsize;
+  79   1      
+  80   1        
+  81   1          hold_reset_phy_tx();
+  82   1        hold_reset_phy_rx();
+  83   1      
+  84   1         
+  85   1        
+  86   1          disable_plc_txrx();
+  87   1      
+  88   1        //hangIntRegRead = hal_common_reg_32_read(PLC_SM_HANG_INT);
+  89   1          //printf("\n intr b4= %lx\n",hangIntRegRead);
+  90   1        
+  91   1          purge_cmdQ();
+  92   1         
+  93   1          //freecp = CHAL_GetFreeCPCnt();
+  94   1          //printf("\n freecp1 = %bu",freecp);
+  95   1               
+  96   1          WriteU32Reg(PLC_HYBRII_RESET, ctorl(0x80000000));  
+  97   1          WriteU32Reg(PLC_HYBRII_RESET, ctorl(0x00000000)); 
+  98   1      
+  99   1          WriteU32Reg(PLC_HYBRII_RESET, ctorl(0x00000001));  
+ 100   1          WriteU32Reg(PLC_HYBRII_RESET, ctorl(0x00000000));  
+ 101   1      
+ 102   1           //WriteU32Reg(PLC_HYBRII_RESET, ctorl(0x00000001));  //bit 31
+ 103   1          // WriteU32Reg(PLC_HYBRII_RESET, ctorl(0x00000000));  //bit 31
+ 104   1      
+ 105   1           
+ 106   1      
+ 107   1         // freecp = CHAL_GetFreeCPCnt();
+ 108   1         // printf("\n freecp2 = %bu",freecp);  
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 3   
+
+ 109   1          plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+ 110   1         // printf("\n ready bit1 = %bu",plcStatus.s.plcTxQRdy );
+ 111   1          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 112   1          reg_val.s.txdma = 1;
+ 113   1          WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// reset txdma
+ 114   1          
+ 115   1          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 116   1          reg_val.s.mpitx = 1;
+ 117   1          WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// reset mpi Tx State Machine
+ 118   1      
+ 119   1          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 120   1        reg_val.s.mpirx = 1;
+ 121   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// reset mpiRx
+ 122   1      
+ 123   1          
+ 124   1          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 125   1          reg_val.s.csma = 1;
+ 126   1          WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// Reset CSMA   
+ 127   1         
+ 128   1      
+ 129   1        if(hal_common_reg_32_read(PLC_SM_HANG_INT) & PLC_AES_HANG)// reset aes if aes is hung
+ 130   1        {
+ 131   2        
+ 132   2          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 133   2          reg_val.s.aes = 1;
+ 134   2          WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// Reset AES 
+ 135   2      
+ 136   2          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 137   2          reg_val.s.aes = 0;
+ 138   2          WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// release AES from reset
+ 139   2      
+ 140   2        }
+ 141   1         
+ 142   1        //plc_reset_qcontroller();
+ 143   1      
+ 144   1          hangIntRegRead = hal_common_reg_32_read(PLC_SM_HANG_INT);
+ 145   1        
+ 146   1          if(hangIntRegRead & PLC_SEGMENT_HANG)// reset segment if aes is hung
+ 147   1          {
+ 148   2            reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 149   2            reg_val.s.seg_sm = 1;
+ 150   2            WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// reset segment state machine
+ 151   2            
+ 152   2            reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 153   2            reg_val.s.seg_sm = 0;
+ 154   2            WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release segment state machine from reset
+ 155   2          }
+ 156   1          
+ 157   1        if((hangIntRegRead & PLC_SOF_HANG) || (hangIntRegRead & PLC_BCN2_HANG)
+ 158   1                                 || (hangIntRegRead & PLC_BCN3_HANG) 
+ 159   1                                 || (hangIntRegRead & PLC_SOUND_HANG))        // if other flag is set then reset whole PLC
+ 160   1        {
+ 161   2        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 162   2        reg_val.s.warm = 1;
+ 163   2        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);
+ 164   2        
+ 165   2        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 166   2        reg_val.s.warm = 0;
+ 167   2        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);
+ 168   2      
+ 169   2        FM_Printf(FM_USER,"PLC_warm csma\n");
+ 170   2        }
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 4   
+
+ 171   1           
+ 172   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 173   1        reg_val.s.txdma = 0;
+ 174   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release txdma from reset state
+ 175   1      
+ 176   1          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 177   1        reg_val.s.mpitx = 0;
+ 178   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release mpi tx from reset state
+ 179   1      
+ 180   1          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 181   1        reg_val.s.mpirx = 0;
+ 182   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release mpiRx from reset
+ 183   1      
+ 184   1          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 185   1        reg_val.s.csma = 0;
+ 186   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// release csma from reset state
+ 187   1        
+ 188   1          set_plc_paramter(PLC_EIFS_SEL, PLC_EIFS_INIT_VALUE);// write eifs parameters
+ 189   1      
+ 190   1          enable_plc_txrx();
+ 191   1      
+ 192   1         
+ 193   1          //HHAL_Init();   
+ 194   1          
+ 195   1          release_reset_phy_tx();
+ 196   1        release_reset_phy_rx();
+ 197   1          
+ 198   1           //WriteU32Reg(PLC_HYBRII_RESET, ctorl(0x00000001));
+ 199   1          for (cpNum=0 ; cpNum<HYBRII_CPCOUNT_MAX ; cpNum++)
+ 200   1          {
+ 201   2               //for( cpUsageCnt=0 ; cpUsageCnt<HYBRII_CPUSAGECOUNT_MAX ; cpUsageCnt++)
+ 202   2               {
+ 203   3                  CHAL_DecrementReleaseCPCnt(cpNum);
+ 204   3               }
+ 205   2          }
+ 206   1            //HHAL_Init();   
+ 207   1           // WriteU32Reg(PLC_HYBRII_RESET, ctorl(0x00000100));  //bit 31
+ 208   1           //WriteU32Reg(PLC_HYBRII_RESET, ctorl(0x00000000));  //bit 31
+ 209   1      
+ 210   1           
+ 211   1          plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+ 212   1         // printf("\n ready bit = %bu",plcStatus.s.plcTxQRdy );
+ 213   1         // WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+ 214   1          hangIntRegRead = hal_common_reg_32_read(PLC_SM_HANG_INT);
+ 215   1          //printf("\n intr after1= %lx\n",hangIntRegRead);
+ 216   1          //HHAL_AddNEK(1, gHtmDefKey[1]); 
+ 217   1      
+ 218   1          HHAL_AddNEK(staInfo->nekEks, staInfo->nek);
+ 219   1          
+ 220   1      }
+*** WARNING C280 IN LINE 76 OF ..\..\..\project\hal\src\hal_hpgp_reset.c: 'i': unreferenced local variable
+*** WARNING C280 IN LINE 76 OF ..\..\..\project\hal\src\hal_hpgp_reset.c: 'j': unreferenced local variable
+*** WARNING C280 IN LINE 77 OF ..\..\..\project\hal\src\hal_hpgp_reset.c: 'cmdqsize': unreferenced local variable
+*** WARNING C280 IN LINE 78 OF ..\..\..\project\hal\src\hal_hpgp_reset.c: 'capqsize': unreferenced local variable
+ 221          
+ 222          
+ 223          
+ 224          void plc_reset_rx()
+ 225          {
+ 226   1        uhang_reset_reg reg_val;
+ 227   1      
+ 228   1           //hold_reset_phy_tx();
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 5   
+
+ 229   1        hold_reset_phy_rx();
+ 230   1      
+ 231   1         
+ 232   1          
+ 233   1          disable_plc_txrx();
+ 234   1        
+ 235   1        /*
+ 236   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 237   1        reg_val.s.free_cp = 1;
+ 238   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg); // free cp counter
+ 239   1      
+ 240   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 241   1        reg_val.s.free_cp = 0;
+ 242   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release cp counter from reset state
+ 243   1        */
+ 244   1            reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 245   1        reg_val.s.csma = 1;
+ 246   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// Reset CSMA  
+ 247   1      
+ 248   1          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 249   1        reg_val.s.mpirx = 1;
+ 250   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg); //set MPI rx
+ 251   1       
+ 252   1      
+ 253   1        //if(hal_common_reg_32_read(PLC_SM_HANG_INT) & PLC_AES_HANG)// reset aes if aes is hung
+ 254   1        {
+ 255   2        
+ 256   2          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 257   2          reg_val.s.aes = 1;
+ 258   2          WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// Reset AES 
+ 259   2      
+ 260   2           reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 261   2        reg_val.s.aes = 0;
+ 262   2        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// release AES from reset 
+ 263   2        
+ 264   2        }
+ 265   1      
+ 266   1          
+ 267   1      
+ 268   1           
+ 269   1      
+ 270   1        //plc_reset_qcontroller();
+ 271   1        
+ 272   1          reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 273   1        reg_val.s.mpirx = 0;
+ 274   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release mpi Rx from reset state
+ 275   1      
+ 276   1        
+ 277   1      
+ 278   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 279   1        reg_val.s.csma = 0;
+ 280   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// release csma from reset state
+ 281   1        
+ 282   1          set_plc_paramter(PLC_EIFS_SEL, PLC_EIFS_INIT_VALUE);// write eifs parameters
+ 283   1      
+ 284   1          enable_plc_txrx();
+ 285   1           //release_reset_phy_tx();
+ 286   1        release_reset_phy_rx();
+ 287   1      }
+ 288          
+ 289          void plc_reset_cold()// incomplete 
+ 290          {
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 6   
+
+ 291   1        uhang_reset_reg reg_val;
+ 292   1        
+ 293   1        disable_plc_txrx();
+ 294   1        
+ 295   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 296   1        reg_val.s.cold = 1;
+ 297   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);
+ 298   1        
+ 299   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 300   1        reg_val.s.cold = 0;
+ 301   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);
+ 302   1        // add whole plc init code here
+ 303   1        enable_plc_txrx();
+ 304   1      }
+ 305          
+ 306          void plc_reset_warm()
+ 307          {
+ 308   1        uhang_reset_reg reg_val;
+ 309   1        
+ 310   1        disable_plc_txrx();
+ 311   1        
+ 312   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 313   1        reg_val.s.warm = 1;
+ 314   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);
+ 315   1        
+ 316   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 317   1        reg_val.s.warm = 0;
+ 318   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);
+ 319   1        
+ 320   1        enable_plc_txrx();
+ 321   1      }
+ 322          
+ 323          void plc_reset_aes()
+ 324          {
+ 325   1        uhang_reset_reg reg_val;
+ 326   1        
+ 327   1        disable_plc_txrx();
+ 328   1        
+ 329   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 330   1        reg_val.s.aes = 1;
+ 331   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// Reset AES 
+ 332   1      
+ 333   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 334   1        reg_val.s.aes = 0;
+ 335   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// release AES from reset
+ 336   1        
+ 337   1        enable_plc_txrx();
+ 338   1      }
+ 339          
+ 340          void plc_reset_mpitx()
+ 341          {
+ 342   1        uhang_reset_reg reg_val;
+ 343   1        
+ 344   1        disable_plc_txrx();
+ 345   1        
+ 346   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 347   1        reg_val.s.mpitx = 1;
+ 348   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// reset mpiTx
+ 349   1        
+ 350   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 351   1        reg_val.s.mpitx = 0;
+ 352   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release mpiTx from reset
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 7   
+
+ 353   1      
+ 354   1        enable_plc_txrx();
+ 355   1      }
+ 356          
+ 357          void plc_reset_seg_sm()
+ 358          {
+ 359   1        uhang_reset_reg reg_val;
+ 360   1        
+ 361   1        disable_plc_txrx();
+ 362   1        
+ 363   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 364   1        reg_val.s.seg_sm = 1;
+ 365   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// reset segment state machine
+ 366   1        
+ 367   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 368   1        reg_val.s.seg_sm = 0;
+ 369   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release segment state machine from reset
+ 370   1        
+ 371   1        enable_plc_txrx();
+ 372   1      }
+ 373          
+ 374          void plc_reset_mpirx_cpuqd()
+ 375          {
+ 376   1        uhang_reset_reg reg_val;
+ 377   1        
+ 378   1          disable_plc_txrx();
+ 379   1        
+ 380   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 381   1          reg_val.s.q_controller = 1;
+ 382   1        reg_val.s.mpirx = 1;
+ 383   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// reset mpiRx
+ 384   1        
+ 385   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 386   1         
+ 387   1        reg_val.s.mpirx = 0;
+ 388   1           reg_val.s.q_controller = 0;
+ 389   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release mpiRx from reset
+ 390   1      
+ 391   1          enable_plc_txrx();
+ 392   1      }
+ 393          
+ 394          void plc_reset_txdma()
+ 395          {
+ 396   1        uhang_reset_reg reg_val;
+ 397   1        
+ 398   1          disable_plc_txrx();
+ 399   1        
+ 400   1        reg_val.reg= ReadU32Reg(PLC_HYBRII_RESET);
+ 401   1        reg_val.s.free_cp = 1;
+ 402   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg); // free cp counter
+ 403   1      
+ 404   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 405   1        reg_val.s.free_cp = 0;
+ 406   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release cp counter from reset state
+ 407   1        
+ 408   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 409   1        reg_val.s.txdma = 1;
+ 410   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// reset txdma
+ 411   1        
+ 412   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 413   1        reg_val.s.txdma = 0;
+ 414   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release txdma from reset
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 8   
+
+ 415   1      
+ 416   1        enable_plc_txrx();
+ 417   1      } 
+ 418          
+ 419          void plc_hung_monitor_init()
+ 420          {
+ 421   1        //u32 reg_val;
+ 422   1        //reg_val = hal_common_reg_32_read(PLC_SM_MAXCNT);
+ 423   1        hal_common_reg_32_write(PLC_SM_MAXCNT,0x800C0000);
+ 424   1      }
+ 425          
+ 426          void plc_reset_qcontroller()
+ 427          {
+ 428   1        uhang_reset_reg reg_val;
+ 429   1        
+ 430   1         // disable_plc_txrx();
+ 431   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 432   1        reg_val.s.q_controller = 1;
+ 433   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// reset q controller
+ 434   1        
+ 435   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 436   1        reg_val.s.q_controller = 0;
+ 437   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release q controller from reset
+ 438   1      
+ 439   1         // enable_plc_txrx();
+ 440   1      }
+ 441          
+ 442          void plc_reset_cp()
+ 443          {
+ 444   1        uhang_reset_reg reg_val;
+ 445   1          
+ 446   1        disable_plc_txrx();
+ 447   1        
+ 448   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 449   1        reg_val.s.cp = 1;
+ 450   1        WriteU32Reg(PLC_HYBRII_RESET,reg_val.reg);// reset cp
+ 451   1        
+ 452   1        reg_val.reg = ReadU32Reg(PLC_HYBRII_RESET);
+ 453   1        reg_val.s.cp = 0;
+ 454   1        WriteU32Reg(PLC_HYBRII_RESET, reg_val.reg);// release cp from reset
+ 455   1      
+ 456   1        enable_plc_txrx();
+ 457   1      }
+ 458          
+ 459          
+ 460          void purge_capQ_direct(u8 id)
+ 461          {
+ 462   1      
+ 463   1        u8  i, size;
+ 464   1        u32 dump;
+ 465   1        //uPlcTxPktQCAP_Write     cap_write;
+ 466   1        
+ 467   1        size = get_capQ_size(id);
+ 468   1        //cap_write.capw.Cap = id;
+ 469   1        hal_common_reg_32_write(PLC_CAP_REG, (u32)id);// selects required cap
+ 470   1      
+ 471   1        for(i=0;i<size;i++)
+ 472   1        {
+ 473   2          dump = ReadU32Reg(PLC_QUEUEWRITE_REG);
+ 474   2          dump = ReadU32Reg(PLC_QUEUEDATA_REG);
+ 475   2        printf("capq size 1 = %bu\n",get_capQ_size(1));
+ 476   2        printf("capq size 2 = %bu\n",get_capQ_size(2));
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 9   
+
+ 477   2        printf("capq size 3 = %bu\n",get_capQ_size(3));
+ 478   2        printf("capq size 0 = %bu\n",get_capQ_size(0));
+ 479   2      
+ 480   2        }
+ 481   1      
+ 482   1      }
+ 483          
+ 484          void purge_capQ(u8 id)// dangerous function. Unnecessory call may generate undesired effects
+ 485          {
+ 486   1      
+ 487   1        uTxFrmHwDesc      txfrmHwDesc;
+ 488   1        uPlcTxPktQCAP_Write     cap_write;
+ 489   1        u8            i,j,cmdq_count,cp_count;
+ 490   1        u32           dump;
+ 491   1        u16           frm_len;
+ 492   1        uTxCpDesc             txCpDesc;
+ 493   1      
+ 494   1        cap_write.capw.Cap = id;
+ 495   1        cmdq_count = get_cmdQ_size();
+ 496   1        //printf("cmd q count = %bu\n",cmdq_count);
+ 497   1        WriteU32Reg(PLC_CAP_REG, cap_write.reg);// selects required cap
+ 498   1        if(cmdq_count >0)
+ 499   1          {
+ 500   2            for(i=0;i<cmdq_count;i++)
+ 501   2            {
+ 502   3              dump = ReadU32Reg(PLC_QUEUEWRITE_REG);
+ 503   3              txfrmHwDesc.reg = ReadU32Reg(PLC_QUEUEDATA_REG);
+ 504   3              frm_len = (u16) (rtocl(txfrmHwDesc.reg) & (u32) 0x7ff);
+ 505   3              //printf("frm_len = %u\n",frm_len);
+ 506   3              cp_count = frm_len/128;
+ 507   3              if(frm_len > cp_count * 128)
+ 508   3              {
+ 509   4                cp_count += 1;
+ 510   4              }
+ 511   3                dump = ReadU32Reg(PLC_QUEUEWRITE_REG);
+ 512   3                gHpgpHalCB.plcTx10FC.reg = ReadU32Reg(PLC_QUEUEDATA_REG);
+ 513   3      
+ 514   3                dump = ReadU32Reg(PLC_QUEUEWRITE_REG);
+ 515   3                dump = ReadU32Reg(PLC_QUEUEDATA_REG);
+ 516   3      
+ 517   3                dump = ReadU32Reg(PLC_QUEUEWRITE_REG);
+ 518   3                dump = ReadU32Reg(PLC_QUEUEDATA_REG);
+ 519   3      
+ 520   3                dump = ReadU32Reg(PLC_QUEUEWRITE_REG);
+ 521   3                dump = ReadU32Reg(PLC_QUEUEDATA_REG);
+ 522   3      
+ 523   3                dump = ReadU32Reg(PLC_QUEUEWRITE_REG);
+ 524   3                dump = ReadU32Reg(PLC_QUEUEDATA_REG);
+ 525   3      
+ 526   3                for(j=0;j<cp_count;j++)
+ 527   3                {
+ 528   4      
+ 529   4                  dump = ReadU32Reg(PLC_QUEUEWRITE_REG);
+ 530   4                  txCpDesc.reg = ReadU32Reg(PLC_QUEUEDATA_REG);
+ 531   4                  CHAL_freeCP(txCpDesc.plc.cp);
+ 532   4                }
+ 533   3              
+ 534   3            }
+ 535   2          }
+ 536   1      }
+ 537          
+ 538          void purge_cmdQ()
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 10  
+
+ 539          {
+ 540   1        uTxCMDQueueWrite txCmdQueueWrite;
+ 541   1        u32 dump;
+ 542   1        u16 i,qsize;
+ 543   1        //txCmdQueueWrite.s.cap = 0;
+ 544   1      
+ 545   1        //WriteU32Reg(PLC_CMDQ_REG, txCmdQueueWrite.reg);
+ 546   1        qsize = get_cmdQ_size();
+ 547   1        if(qsize != 0)
+ 548   1          {
+ 549   2            for(i=0;i<qsize;i++)
+ 550   2            {
+ 551   3              dump = ReadU32Reg(PLC_CMDQ_REG);
+ 552   3              //dump = ReadU32Reg(PLC_QUEUEDATA_REG);
+ 553   3              txCmdQueueWrite.reg= hal_common_reg_32_read(PLC_QUEUEDATA_REG);
+ 554   3              printf("Cap val in CmdQ = %lx", txCmdQueueWrite.reg);
+ 555   3            }
+ 556   2          }
+ 557   1      
+ 558   1      }
+ 559          
+ 560          u8 get_capQ_size(u8 id)
+ 561          {
+ 562   1        //uPlcTxPktQCAP_Write   cap_write;
+ 563   1        u8 CapQueueStatus;
+ 564   1      
+ 565   1        //cap_write.capw.Cap = id;
+ 566   1        //cap_write.capw.CapRdy = 0;// to avoid any possible corruption or any unknown issues
+ 567   1        hal_common_reg_32_write(PLC_CAP_REG, (u32)id);// select required CAP from 0 to 3
+ 568   1        CapQueueStatus = ReadU8Reg(PLC_QDSTATUS_REG);
+ 569   1      
+ 570   1        return CapQueueStatus;
+ 571   1      }
+ 572          
+ 573          u8 get_cmdQ_size()
+ 574          {
+ 575   1      return ReadU8Reg(PLC_CMDQ_STAT_);
+ 576   1      }
+ 577          
+ 578          void hold_reset_phy_tx()
+ 579          {
+ 580   1        uphytx_reset tx_reset;
+ 581   1          tx_reset.reg  = ReadU32Reg(REG_PHY_TX_RESET);
+ 582   1        tx_reset.s.tx = 1;
+ 583   1        WriteU32Reg(REG_PHY_TX_RESET,tx_reset.reg);
+ 584   1      }
+ 585          
+ 586          void hold_reset_phy_rx()
+ 587          {
+ 588   1        uphyrx_reset rx_reset;
+ 589   1          rx_reset.reg  = ReadU32Reg(REG_PHY_RX_RESET);
+ 590   1        rx_reset.s.rx = 1;
+ 591   1        WriteU32Reg(REG_PHY_RX_RESET,rx_reset.reg);
+ 592   1      }
+ 593          
+ 594          void release_reset_phy_tx()
+ 595          {
+ 596   1        uphytx_reset tx_reset;
+ 597   1          tx_reset.reg  = ReadU32Reg(REG_PHY_TX_RESET);
+ 598   1        tx_reset.s.tx = 0;
+ 599   1        WriteU32Reg(REG_PHY_TX_RESET,tx_reset.reg);
+ 600   1      }
+C51 COMPILER V9.52.0.0   HAL_HPGP_RESET                                                    12/02/2014 14:35:44 PAGE 11  
+
+ 601          
+ 602          void release_reset_phy_rx()
+ 603          {
+ 604   1        uphyrx_reset rx_reset;
+ 605   1          rx_reset.reg  = ReadU32Reg(REG_PHY_RX_RESET);
+ 606   1        rx_reset.s.rx = 0;
+ 607   1        WriteU32Reg(REG_PHY_RX_RESET,rx_reset.reg);
+ 608   1      }
+ 609          
+ 610          
+ 611          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1906    ----
+   CONSTANT SIZE    =    113    ----
+   XDATA SIZE       =   ----     140
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  4 WARNING(S),  0 ERROR(S)

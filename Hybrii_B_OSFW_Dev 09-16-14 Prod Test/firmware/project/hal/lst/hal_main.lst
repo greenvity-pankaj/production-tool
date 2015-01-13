@@ -1,0 +1,813 @@
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HAL_MAIN
+OBJECT MODULE PLACED IN .\obj\hal_main.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE src\hal_main.C LARGE OPTIMIZE(9,SPEED) BROWSE INTVECTOR(0X2100) INCDIR(..\.
+                    -.\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\src\nma;..\..\hal;.
+                    -\src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;..\..\hpgp\src\rout
+                    -e;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\components\utilities\linkl
+                    -ist\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\sampleapp\inc;..\..\..
+                    -\components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC_SW_SYNC=1,inline,
+                    -HPGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_SPI_TX_CRC,HW_SPI_
+                    -RX_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND PRINT(.\lst\hal_ma
+                    -in.lst) TABS(2) OBJECT(.\obj\hal_main.obj)
+
+line level    source
+
+   1          /*
+   2          * $Id: hal_main.C,v 1.8 2014/09/02 21:41:16 son Exp $
+   3          *
+   4          * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/project/hal/src/hal_main.C,v $
+   5          *
+   6          * Description : Main program for Hardware Abstraction Layer test application.
+   7          *
+   8          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+   9          * All rights reserved.
+  10          *
+  11          * Purpose :
+  12          *     Defines uart driver functions, user interface module, and common reg read/write interface functions.
+  13          *
+  14          *
+  15          */
+  16          
+  17          
+  18          #ifdef RTX51_TINY_OS
+  19          #include <rtx51tny.h>
+  20          
+  21          #include "hybrii_tasks.h"
+  22          
+  23          
+  24          #include <stdlib.h>
+  25          #include <string.h>
+  26          
+  27          #endif
+  28          
+  29          
+  30          
+  31          #include <REG51.H>                /* special function register declarations   */
+  32                                            /* for the intended 8051 derivative         */
+  33          #include <stdio.h>
+  34          #include "hal_common.h"
+  35          #include "hal.h"
+  36          
+  37          #ifdef HYBRII_ZIGBEE
+              #include "mac_diag.h"
+              #endif
+  40          
+  41          #include "hal_hpgp.h"
+  42          #include "hpgpevt.h"
+  43          #include "hal_eth.h"
+  44          #include "hal_tst.h"
+  45          #include "frametask.h"
+  46          #include "fm.h"
+  47          #include "uart.h"
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 2   
+
+  48          #include "hal_spi.h"
+  49          #include "ism.h"
+  50          #include "utils.h"
+  51          #include "sys_common.h"
+  52          #ifdef UART_HOST_INTF 
+              #include "uart_driver.h"
+              #endif
+  55          #ifdef PROD_TEST
+  56          //#include "hal_tst.h"
+  57          #include "hal_prod_tst.h"
+  58          #endif
+  59          #define HYBRII_FW_VER_MAJOR     1
+  60          
+  61          #define HYBRII_FW_VER_MINOR     10
+  62          
+  63          #define HYBRII_FW_VER_MICRO     1
+  64          
+  65          //extern u8 opMode;
+  66          extern void HHT_SendBcn(u8 bcnType);
+  67          extern void clear_getchar(void);
+  68           
+  69          #ifdef FREQ_DETECT
+  70          
+  71          extern u32 PLC_DC_LINE_CYCLE_FREQENCY;
+  72           
+  73          
+  74          #endif
+  75          static char xdata CmdBuf[128];
+  76          
+  77          #ifdef UART_16550
+              u8 *baud_gen =  (u8 xdata *)UART_CLKDIV;
+              u8 *urxbuf   =  (u8 xdata *)UART_RXBUF;
+              u8 *utxbuf   =  (u8 xdata *)UART_TXBUF;
+              union_uart_linestatus *uart_linestatus = (u8 xdata *)UART_LINESTAT;
+              union_uart_modemctrl  *uart_modemctrl  = (u8 xdata *)UART_MODEMCTRL;
+              union_uart_linectrl   *uart_linectrl   = (u8 xdata *)UART_LINECTRL;
+              union_uart_fifoctrl   *uart_fifoctrl   = (u8 xdata *)UART_FIFOCTRL;
+              union_uart_intctrl    *uart_intctrl    = (u8 xdata *)UART_INTCTRL;
+              
+              void com_init()
+              {
+                  *baud_gen = BAUDRATE;
+                  uart_intctrl->intctrl     = 0x03;     //No interrupt; enable rx full and tx empty indicator
+                  uart_fifoctrl->fifoctrl   = 0x06;   //1-char depth tx/rx buffer, reset tx/rx buffer
+                  uart_linectrl->linectrl   = 0x03;   //word length = 8
+                  uart_modemctrl->modemctrl = 0x00;     //No loopback
+              }
+              
+              char _getkey()
+              {
+                  u8 a;
+                  do {
+                      while (((uart_linestatus->linestatus)&0x1) == 0) {
+              #if INT_POLL
+                          ISM_PollInt();
+              #elif CPU_TXQ_POLL
+                          CHAL_PollAndRcvCPUTxQ();
+              #endif
+                      }
+                      a = *urxbuf; 
+                  } while (a == 0x11);   //Keil sync char
+              
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 3   
+
+                  return(a);
+              }
+              
+              char _getchar()
+              {
+                  u8 a;
+              
+                  if (uart_linestatus->linestatus & 0x1) {
+                      a = *urxbuf;
+                      if (a != 0x11) {
+                          return (a);
+                      }
+                  }
+                  return (0);
+              }
+              
+              u8 poll_key()
+              {
+                  u8 k;
+                  // getkey
+                  char c = 0;
+              
+                  EA = 0;
+                  c = _getchar();
+                  if (c == 's' || c == 'S') {
+                     HHAL_DisplayPlcStat();  
+              #ifdef HYBRII_ETH
+                     EHAL_DisplayEthStat();  
+              #endif
+                  }
+                  EA = 1;
+                  return c;
+              }
+              
+              char putchar(char c)     //UART16550
+              {
+                  while (((uart_linestatus->linestatus)&0x40)==0);
+                  if (c=='\n') {
+                      *utxbuf = '\r';
+                      while (((uart_linestatus->linestatus)&0x40)==0);
+                  }
+                  *utxbuf = c;
+              
+                  return(c);
+              }
+              
+              #else
+ 157          void com_init()
+ 158          {
+ 159   1      }
+ 160          
+ 161          #ifdef RTX51_TINY_OS
+ 162          
+ 163          char _getkey()
+ 164          
+ 165          {
+ 166   1          char c;
+ 167   1          do
+ 168   1          {
+ 169   2              while (RI == 0) {
+ 170   3      #ifdef RTX51_TINY_OS
+ 171   3                  os_switch_task();
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 4   
+
+ 172   3      #endif
+ 173   3              }
+ 174   2              RI = 0;
+ 175   2              c = SBUF;
+ 176   2          } while (c == 0x11);    // Ignore 0x11 - XOn sync signal from Keil
+ 177   1          return c;
+ 178   1      }
+ 179          
+ 180          #else
+              
+              
+              char _getkey()
+              {
+                  char c;
+                  do
+                  {
+                      while (RI == 0)
+                  {
+              #if INT_POLL
+                          ISM_PollInt();
+              /*
+              #ifndef HYBRII_FPGA
+              #ifndef HYBRII_ZIGBEE
+              
+                          HHAL_ProcessPlcTxDone();
+              
+              
+               
+                          HHAL_ProcessPlcTxDone();
+              
+              #endif
+              #endif
+              */
+              #elif CPU_TXQ_POLL
+                          CHAL_PollAndRcvCPUTxQ();
+              #endif
+                  }
+                      RI = 0;
+                      c = SBUF;
+                  } while (c == 0x11);    // Ignore 0x11 - XOn sync signal from Keil
+                  return c;
+              }                             
+              
+              #endif
+ 216          
+ 217          
+ 218          char _getchar()
+ 219          {
+ 220   1          char c;
+ 221   1        
+ 222   1        if ((RI != 0) && (SBUF != 0x11))
+ 223   1          {
+ 224   2              c = SBUF;
+ 225   2              RI = 0;
+ 226   2              return c;
+ 227   2          }
+ 228   1          RI = 0;
+ 229   1      
+ 230   1          return 0;
+ 231   1      }
+ 232          
+ 233          char putchar(char c)
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 5   
+
+ 234          {
+ 235   1          if (c == '\n')  
+ 236   1          {
+ 237   2              TI = 0;
+ 238   2              SBUF = '\r';        // output CR before LF
+ 239   2              while (TI == 0);
+ 240   2              TI = 0;
+ 241   2          }
+ 242   1          TI = 0;
+ 243   1          SBUF = c;        // output CR before LF
+ 244   1          while (TI == 0);
+ 245   1          TI = 0;
+ 246   1          return c;      
+ 247   1      }
+ 248          
+ 249          u8 poll_key()
+ 250          {
+ 251   1        // getkey
+ 252   1        char c = 0;
+ 253   1      
+ 254   1          EA = 0;
+ 255   1          if(RI!=0)
+ 256   1          {
+ 257   2              RI = 0;
+ 258   2              c = SBUF;
+ 259   2              if(c == 's' || c == 'S')
+ 260   2              {
+ 261   3                  HHAL_DisplayPlcStat();  
+ 262   3      #ifdef HYBRII_ETH
+ 263   3                  EHAL_DisplayEthStat();  
+ 264   3      #endif
+ 265   3              }
+ 266   2          }
+ 267   1          EA = 1;
+ 268   1        return c;
+ 269   1      }
+ 270          #endif
+ 271          
+ 272          int getline(char *s, int lim)
+ 273          {
+ 274   1          char *t;
+ 275   1          int c, len=lim;
+ 276   1      
+ 277   1          t = s;
+ 278   1          while (--lim>1 && (c=_getkey()) != '\r' && c != '\n')
+ 279   1        {
+ 280   2              *s++ = c;
+ 281   2          putchar(c);
+ 282   2          if(c=='\b')
+ 283   2          {
+ 284   3            s-=2;
+ 285   3            lim+=2;
+ 286   3            putchar(' ');
+ 287   3            putchar('\b');
+ 288   3          }
+ 289   2        }
+ 290   1          if (c == '\n' || c == '\r')
+ 291   1        {
+ 292   2          putchar('\n');
+ 293   2              *s++ = c;
+ 294   2        }
+ 295   1          else if (lim == 1) 
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 6   
+
+ 296   1        {
+ 297   2        *s++ = '\n';
+ 298   2        //fprintf(stderr, "WARNING. getline: Line too long, splitted.\n");
+ 299   2          }
+ 300   1          *s = '\0';
+ 301   1          return s - t;
+ 302   1      }
+ 303          
+ 304          
+ 305          
+ 306          
+ 307          void CmdGet()
+ 308          {
+ 309   1          char c;
+ 310   1          unsigned char idx = 0;
+ 311   1      
+ 312   1          while (1)
+ 313   1          {
+ 314   2              c = _getkey();
+ 315   2      
+ 316   2              switch (c)
+ 317   2              {
+ 318   3              case '\b':    // backspace
+ 319   3                  if (idx > 0)
+ 320   3                  {
+ 321   4                      printf("\b \b");
+ 322   4                      idx--;
+ 323   4                  }
+ 324   3                  break;
+ 325   3      
+ 326   3              case 0x1B:    // ESC
+ 327   3              case '`':
+ 328   3                  CmdBuf[0] = 0;
+ 329   3                  printf("\n");
+ 330   3                  return;
+ 331   3      
+ 332   3              case '\r':    // enter
+ 333   3              case '\n':
+ 334   3                  printf("\n");
+ 335   3                  while (idx < sizeof(CmdBuf))
+ 336   3                      CmdBuf[idx++] = 0;
+ 337   3                  return;
+ 338   3      
+ 339   3              default:
+ 340   3                  if (idx > sizeof(CmdBuf) - 2)
+ 341   3                  {
+ 342   4                      idx--;
+ 343   4                      putchar('\b');
+ 344   4                  }
+ 345   3                  putchar(c);
+ 346   3                  CmdBuf[idx++] = c;
+ 347   3              }
+ 348   2          }
+ 349   1      }
+ 350          
+ 351          
+ 352          void CmdRead(char* argCmdBuf)
+ 353          {
+ 354   1          u32  regAddr;          
+ 355   1        char regType;
+ 356   1      
+ 357   1          if (sscanf(argCmdBuf+1, "%c", &regType) < 1)
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 7   
+
+ 358   1              return;         
+ 359   1       
+ 360   1          // U32 reg read
+ 361   1        if(regType == 'w' || regType == 'W')                
+ 362   1        {                    
+ 363   2              if (sscanf(argCmdBuf+2, "%lx", &regAddr) < 1)
+ 364   2                  return;
+ 365   2          printf("    RegRd:  [0x%08lX] --> 0x%08lX\n\n", regAddr, hal_common_reg_32_read(regAddr));
+ 366   2        }
+ 367   1      
+ 368   1          // U8 reg read
+ 369   1        else if(regType == 'b' || regType == 'B')
+ 370   1        {   
+ 371   2              if (sscanf(argCmdBuf+2, "%lx", &regAddr) < 1)
+ 372   2                  return;
+ 373   2          printf("    RegRd:  [0x%08lX] --> 0x%02bX\n\n", regAddr, ReadU8Reg(regAddr));
+ 374   2        }
+ 375   1      
+ 376   1          // Ethernet reg read
+ 377   1        else if(regType == 'e' || regType == 'E')
+ 378   1        {                                     
+ 379   2              u8 macOrPhy;
+ 380   2              u8 byteRegAddr;
+ 381   2      
+ 382   2              if (sscanf(argCmdBuf+2, "%c", &macOrPhy) < 1)
+ 383   2                  return;
+ 384   2              if (sscanf(argCmdBuf+3, "%bx", &byteRegAddr) < 1)
+ 385   2                  return;
+ 386   2      //#ifdef HYBRII_ETH
+ 387   2              // Ethernet MAC reg read
+ 388   2              if(macOrPhy == 'm' || regType == 'M')
+ 389   2              {
+ 390   3            printf("    RegRd:  [0x%02bX] --> 0x%02bX\n\n", byteRegAddr, ReadU8Reg(ETHMAC_REGISTER_BASEADDR+byteReg
+             -Addr));
+ 391   3              }
+ 392   2      
+ 393   2              // Ethernet MAC Statistucs reg read
+ 394   2              else if(macOrPhy == 's' || regType == 'S')
+ 395   2              {       
+ 396   3      #ifdef HYBRII_ETH        
+ 397   3            printf("    RegRd:  [0x%02bX] --> %08lu\n\n", byteRegAddr, rtocl(EHAL_ReadEthStatReg(byteRegAddr)));   
+             -  
+ 398   3      #endif
+ 399   3              }
+ 400   2      
+ 401   2              // Ethernet PHY reg read
+ 402   2              else if(macOrPhy == 'p' || regType == 'P')
+ 403   2              {
+ 404   3                  u16 regData;
+ 405   3      #ifdef HYBRII_ETH     
+ 406   3                  if(EHAL_EthPhyRegOp(gEthHalCB.phyChipAddr, byteRegAddr&0x1F, &regData, RD) == STATUS_SUCCESS)
+ 407   3                  {
+ 408   4                      printf("    RegRd:  [0x%02bX] --> 0x%04X\n\n", byteRegAddr, rtocs(regData));       
+ 409   4                  }
+ 410   3                  else
+ 411   3      #endif        
+ 412   3                  {
+ 413   4                      printf (" Eth Phy Reg Read Err\n");
+ 414   4                  }                
+ 415   3              }
+ 416   2      //#endif
+ 417   2          }
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 8   
+
+ 418   1      }
+ 419          
+ 420          void CmdWrite(char* argCmdBuf)         
+ 421          {
+ 422   1          u32  regAddr;                 
+ 423   1        char regType;
+ 424   1      
+ 425   1          if (sscanf(argCmdBuf+1, "%c", &regType) < 1)
+ 426   1              return;    
+ 427   1       
+ 428   1          // U32 reg write
+ 429   1        if(regType == 'w' || regType == 'W')
+ 430   1        {
+ 431   2          u32 regData;
+ 432   2          if (sscanf(argCmdBuf+2, "%lx %lx", &regAddr, &regData) < 2)
+ 433   2            return;
+ 434   2          hal_common_reg_32_write(regAddr, regData);
+ 435   2          printf("    RegWr:  [0x%08lX] <-- 0x%08lX\n\n", regAddr, regData);
+ 436   2      
+ 437   2        }
+ 438   1          // U8 reg write
+ 439   1          else if(regType == 'b' || regType == 'B')
+ 440   1          {
+ 441   2              u8 regData;
+ 442   2              if (sscanf(argCmdBuf+2, "%lx %bx", &regAddr, &regData) < 2)
+ 443   2                  return;
+ 444   2              WriteU8Reg(regAddr, regData);
+ 445   2              printf("    RegWr:  [0x%08lX] <-- 0x%02bX\n\n", regAddr, regData);
+ 446   2          }
+ 447   1      //#ifdef HYBRII_ETH
+ 448   1      
+ 449   1          // Ethernet reg write
+ 450   1        else if(regType == 'e' || regType == 'E')
+ 451   1        {
+ 452   2          
+ 453   2              u8 macOrPhy;
+ 454   2              u8 byteRegAddr;
+ 455   2      
+ 456   2              if (sscanf(argCmdBuf+2, "%c", &macOrPhy) < 1)
+ 457   2                  return;
+ 458   2              if (sscanf(argCmdBuf+3, "%bx", &byteRegAddr) < 1)
+ 459   2                  return;
+ 460   2      
+ 461   2              // Ethernet MAC reg write
+ 462   2              if(macOrPhy == 'm' || regType == 'M')
+ 463   2              {
+ 464   3                  u8 regData;
+ 465   3                  if (sscanf(argCmdBuf+4, "%bx", &regData) < 1)
+ 466   3                      return;
+ 467   3                  WriteU8Reg(ETHMAC_REGISTER_BASEADDR+byteRegAddr, regData);
+ 468   3            printf("    RegWr:  [0x%02bX] <-- 0x%02bX\n\n", byteRegAddr, regData);
+ 469   3              }
+ 470   2      
+ 471   2              // Ethernet PHY reg read
+ 472   2              else if(macOrPhy == 'p' || regType == 'P')
+ 473   2              {
+ 474   3                  u16 regData;
+ 475   3                  if (sscanf(argCmdBuf+4, "%x", &regData) < 1)
+ 476   3                      return;
+ 477   3      #ifdef HYBRII_ETH   
+ 478   3                  if(EHAL_EthPhyRegOp(gEthHalCB.phyChipAddr, byteRegAddr&0x1F, &regData, WR) == STATUS_SUCCESS)
+ 479   3            {
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 9   
+
+ 480   4                printf("    RegWr:  [0x%02bX] <-- 0x%04X\n\n", byteRegAddr, regData);
+ 481   4            }
+ 482   3            else
+ 483   3      #endif        
+ 484   3            {
+ 485   4                printf (" Eth Phy Reg Write Err\n");
+ 486   4            }
+ 487   3                           
+ 488   3              }
+ 489   2          }    //*((unsigned char xdata *)reg_addr) = (unsigned char)reg_data; 
+ 490   1      //#endif  
+ 491   1      }
+ 492          #ifdef HYBRII_SPI
+ 493          void CmdSPI (char* argCmdBuf)        
+ 494          {
+ 495   1          u16  spi_addr;
+ 496   1          u16  spi_data;                 
+ 497   1        char action;
+ 498   1      
+ 499   1          if (sscanf(argCmdBuf+1, "%c", &action) < 1) {
+ 500   2              return;
+ 501   2          }    
+ 502   1       
+ 503   1        if (action == 'w' || action == 'W')
+ 504   1        {
+ 505   2          if (sscanf(argCmdBuf+2, "%x %x", &spi_addr, &spi_data) < 2)
+ 506   2              {
+ 507   3                  return;
+ 508   3              }
+ 509   2      
+ 510   2              mac_utils_spi_write(spi_addr, spi_data);
+ 511   2      
+ 512   2              printf("    SPI:  %03X --> [%02X]\n\n", spi_data, spi_addr);
+ 513   2        }
+ 514   1          else if (action == 'r' || action == 'R')
+ 515   1          {
+ 516   2              if (sscanf(argCmdBuf+2, "%x", &spi_addr) < 1) 
+ 517   2              {
+ 518   3                  return;
+ 519   3              }
+ 520   2      
+ 521   2              spi_data = mac_utils_spi_read(spi_addr);
+ 522   2      
+ 523   2              printf("    SPI:  %03X --> [%02X]\n\n", spi_data, spi_addr);
+ 524   2          }
+ 525   1      }
+ 526          #endif
+ 527          void CmdHelp()
+ 528          {
+ 529   1          u32 hwVer = hal_common_reg_32_read(HYBRII_VERSION_REG);
+ 530   1          printf
+ 531   1          (
+ 532   1        
+ 533   1          
+ 534   1              "  FW version     - V%bu.%bu.%bu\n"
+ 535   1            "  HW Version    - V0x%08lX\n\n"
+ 536   1              "  rb addr       -  Read  (8-bit)  from hex Reg \n"
+ 537   1              "  wb addr data  -  Write (8-bit)  to   hex Reg \n"
+ 538   1              "  sr addr       -  PHY SPI Read  (8-bit)  from hex Reg \n"
+ 539   1              "  sw addr data  -  PHY SPI Write (8-bit)  to   hex Reg \n"
+ 540   1              "  rw addr       -  Read  (32-bit) from hex Reg \n"
+ 541   1              "  ww addr data  -  Write (32-bit) to   hex Reg \n"
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 10  
+
+ 542   1          "  c cmd         -  Send cmd to Common HAL module\n"
+ 543   1          "  p cmd         -  Send cmd to HPGP HAL module\n"
+ 544   1          "  e cmd         -  Send cmd to ETH HAL module\n"
+ 545   1              "  i cmd         -  Send cmd to SPI HAL module\n"
+ 546   1              "  z<cmd>        -  Send cmd to Zigbee module\n"
+ 547   1              "\n",HYBRII_FW_VER_MAJOR, HYBRII_FW_VER_MINOR, HYBRII_FW_VER_MICRO, hwVer
+ 548   1          );
+ 549   1      }
+ 550          
+ 551          extern void ihal_ui_cmd_process(char* CmdBuf);
+ 552          
+ 553          void CmdRun()
+ 554          {
+ 555   1          char tmpCmdBuf[30];
+ 556   1      
+ 557   1        printf("> ");
+ 558   1          CmdGet();
+ 559   1      
+ 560   1          switch (CmdBuf[0])
+ 561   1          {
+ 562   2        case 't':
+ 563   2        case 'T':
+ 564   2          clear_getchar();
+ 565   2          break;
+ 566   2      
+ 567   2          case 'R':
+ 568   2          case 'r':
+ 569   2              CmdRead(CmdBuf);
+ 570   2              break;
+ 571   2      
+ 572   2          case 'S':
+ 573   2          case 's':
+ 574   2      #ifdef HYBRII_SPI
+ 575   2              CmdSPI(CmdBuf);
+ 576   2              break;
+ 577   2      #endif
+ 578   2          case 'W':
+ 579   2          case 'w':
+ 580   2              CmdWrite(CmdBuf);
+ 581   2              break;
+ 582   2      
+ 583   2        case 'C':
+ 584   2        case 'c':
+ 585   2          CHAL_CmdHALProcess(CmdBuf);
+ 586   2          break;
+ 587   2      
+ 588   2        case 'P':
+ 589   2        case 'p':
+ 590   2          HHAL_CmdHALProcess(CmdBuf);
+ 591   2          break;
+ 592   2      
+ 593   2        case 'E':
+ 594   2        case 'e':
+ 595   2          EHAL_CmdHALProcess(CmdBuf);
+ 596   2          break;        
+ 597   2      #ifdef HYBRII_SPI
+ 598   2          case 'I':
+ 599   2          case 'i':
+ 600   2              ihal_ui_cmd_process(CmdBuf);
+ 601   2              break;
+ 602   2      #endif
+ 603   2      
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 11  
+
+ 604   2        case 'x':
+ 605   2        case 'X':
+ 606   2          //sprintf(tmpCmdBuf, "rw d14");
+ 607   2          CmdRead(tmpCmdBuf);
+ 608   2          //printf("EX0 = %bu, EX1= %bu\n",EX0,EX1);
+ 609   2          break;
+ 610   2      
+ 611   2      #ifdef HYBRII_ZIGBEE
+                  case 'z':
+                      mac_diag_zb_cmd(CmdBuf);
+                      break;
+              #endif
+ 616   2      
+ 617   2        case 'd':
+ 618   2        case 'D':
+ 619   2          {
+ 620   3                  u32 ntb1,ntb2;
+ 621   3                  ntb1 = rtocl(ReadU32Reg(PLC_NTB_REG));
+ 622   3                  CHAL_DelayTicks(100);
+ 623   3                  ntb2 = rtocl(ReadU32Reg(PLC_NTB_REG));
+ 624   3            //printf("ntb before = %lX\n",ntb1);
+ 625   3            //printf("ntb after  = %lX\n",ntb2);
+ 626   3          }
+ 627   2              break;
+ 628   2              
+ 629   2        case 'b':
+ 630   2        case 'B':
+ 631   2              if(gHpgpHalCB.devMode == DEV_MODE_CCO)
+ 632   2          {
+ 633   3                   uBcnStatusReg bcnStatus;
+ 634   3      
+ 635   3                   HHT_SendBcn(BEACON_TYPE_CENTRAL);
+ 636   3                   do
+ 637   3                   {
+ 638   4                       bcnStatus.reg   = ReadU32Reg(PLC_BCNSTATUS_REG);
+ 639   4                   }while(bcnStatus.s.valid3);
+ 640   3                   printf("NTB = %lx\n", rtocl(ReadU32Reg(PLC_NTB_REG)));              
+ 641   3          }
+ 642   2              else
+ 643   2              {
+ 644   3                  printf("b:%lx, s:%lx\n", rtocl(ReadU32Reg(PLC_BPST_REG)),rtocl(ReadU32Reg(PLC_BCNSNAPSHOT1_REG
+             -)));
+ 645   3              }  
+ 646   2              break;  
+ 647   2                        
+ 648   2          case 0:
+ 649   2              break;
+ 650   2      
+ 651   2          default:
+ 652   2              CmdHelp();
+ 653   2          }
+ 654   1      }
+ 655          #ifdef RTX51_TINY_OS
+ 656          
+ 657          eStatus LHTM_Init()
+ 658          {
+ 659   1         
+ 660   1          os_create_task(HYBRII_TASK_ID_UI);
+ 661   1      
+ 662   1          return STATUS_SUCCESS;
+ 663   1      }
+ 664          
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 12  
+
+ 665          void LHTM_Task (void) _task_ HYBRII_TASK_ID_UI
+ 666          {
+ 667   1          while (1) {
+ 668   2              CmdRun();
+ 669   2          }
+ 670   1      }
+ 671          
+ 672          #endif
+ 673          
+ 674          #ifdef FREQ_DETECT
+ 675          void Read_FlashProfile()
+ 676          {
+ 677   1       
+ 678   1       //once flash reading works, read following from flash,right now we dont have flash reading module ready s
+             -o I just take following parameters
+ 679   1       
+ 680   1          gHpgpHalCB.lineMode = LINE_MODE_DC;     //it can ve AC or DC
+ 681   1          PLC_DC_LINE_CYCLE_FREQENCY =  DC_50HZ;
+ 682   1      
+ 683   1         
+ 684   1      }
+ 685          #endif
+ 686          
+ 687          #ifdef HYBRII_ZIGBEE
+              extern void mac_init(void);
+              #endif
+ 690          
+ 691          #ifdef RTX51_TINY_OS
+ 692          void green_main (void) _task_ HYBRII_TASK_ID_INIT
+ 693          #else
+              void main()
+              #endif
+ 696          { 
+ 697   1      
+ 698   1        CmdHelp();       
+ 699   1      #ifdef RTX51_TINY_OS
+ 700   1      #ifdef HYBRII_ZIGBEE
+                  STM_Init();
+              #endif
+ 703   1        LHTM_Init();
+ 704   1        frame_task_init();
+ 705   1      #endif  
+ 706   1          
+ 707   1          CHAL_InitHW();
+ 708   1        //HHAL_AFEInit();       
+ 709   1        HHAL_Init();   
+ 710   1          //init_led_board(); 
+ 711   1      #ifdef HYBRII_ETH 
+ 712   1        // PC - will look and verify 
+ 713   1        EHAL_Init();
+ 714   1      #endif
+ 715   1      #ifdef HYBRII_SPI
+ 716   1          // Son N will check with Jiedo - YM will followup
+ 717   1        hal_spi_init();
+ 718   1      #endif
+ 719   1      #ifdef HYBRII_ZIGBEE
+                  mac_init();
+                  mac_diag_init();
+              #endif
+ 723   1        #ifdef UART_HOST_INTF 
+                  UART_Init16550();
+                #endif
+C51 COMPILER V9.52.0.0   HAL_MAIN                                                          01/10/2015 21:25:25 PAGE 13  
+
+ 726   1      
+ 727   1      #ifdef FREQ_DETECT
+ 728   1          FREQDET_FreqDetectInit();
+ 729   1          Read_FlashProfile();
+ 730   1      #endif
+ 731   1      #ifdef PROD_TEST
+ 732   1        prodTest_init();
+ 733   1      #endif
+ 734   1      
+ 735   1        while (1)
+ 736   1        { 
+ 737   2      #ifdef RTX51_TINY_OS
+ 738   2      
+ 739   2      #if INT_POLL
+ 740   2          ISM_PollInt();
+ 741   2      #elif CPU_TXQ_POLL
+                  CHAL_PollAndRcvCPUTxQ();
+              #endif
+ 744   2             // CmdRun();
+ 745   2      
+ 746   2          //os_set_ready(HYBRII_TASK_ID_FRAME);
+ 747   2          os_switch_task();
+ 748   2      #else
+                  CmdRun();
+              
+              #endif //#ifdef RTX51_TINY_OS
+ 752   2          
+ 753   2        }
+ 754   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2778    ----
+   CONSTANT SIZE    =   1064    ----
+   XDATA SIZE       =    128      85
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,941 @@
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HOM
+OBJECT MODULE PLACED IN .\obj\hom.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\src\link\hom.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) I
+                    -NCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..\..\
+                    -src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\zigb
+                    -ee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\i
+                    -nc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\src;..
+                    -\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support;..\
+                    -..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,H
+                    -PGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,Hy
+                    -brii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,PR
+                    -OD_TEST) DEBUG PRINT(.\lst\hom.lst) TABS(2) OBJECT(.\obj\hom.obj)
+
+line level    source
+
+   1          /** =========================================================
+   2           *
+   3           *  @file chom.c
+   4           * 
+   5           *  @brief CCO Handover Manager 
+   6           *
+   7           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ===========================================================*/
+  11          
+  12          #include "papdef.h"
+  13          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  16          #include "hom.h"
+  17          #include "mmsg.h"
+  18          #include "crm.h"
+  19          #include "nsm.h"
+  20          #include "hpgpapi.h"
+  21          #include "linkl.h"
+  22          #include "fm.h"
+  23          #include "timer.h"
+  24          #include "stm.h"
+  25          #include "muxl.h"
+  26          #include <string.h>
+  27          #include "hybrii_tasks.h"
+  28          
+  29          #define HPGP_TIME_HO          2     //2 seconds
+  30          #define HPGP_HO_TYPE_SOFT     0x0
+  31          #define HPGP_HO_TYPE_HARD     0x1
+  32          
+  33          
+  34          extern void LINKL_TimerHandler(u16 type, void *cookie);
+  35          
+  36          #ifdef CCO_FUNC
+  37          /* ------------------------
+  38           * CCO handover manager
+  39           * --------------------- */
+  40          
+  41          eStatus CHOM_SendMgmtMsg(sChom *chom, u16 mmType, sScb *staScb)
+  42          {
+  43   1          eStatus           status = STATUS_FAILURE;
+  44   1          sEvent            *newEvent = NULL;
+  45   1          sHpgpHdr          *newHpgpHdr = NULL;
+  46   1          sCcHoReq          *ccHoReq = NULL;
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 2   
+
+  47   1          sCcHoStaInfo      *ccHoStaInfo = NULL;
+  48   1          u8                numSta = 0; 
+  49   1          sScb              *scbIter = NULL;
+  50   1          sStaInfo          *staInfo = NULL;
+  51   1          u8                *dataptr = NULL;
+  52   1          sCrm              *crm = NULL;
+  53   1          u8                i; 
+  54   1          u16               eventSize = 0;
+  55   1      
+  56   1          crm  = LINKL_GetCrm(chom->linkl);
+  57   1          staInfo =  LINKL_GetStaInfo(chom->linkl);
+  58   1      
+  59   1          switch(mmType)
+  60   1          {
+  61   2              case EVENT_TYPE_CC_HANDOVER_REQ:
+  62   2              {
+  63   3                  eventSize = MAX(HPGP_DATA_PAYLOAD_MIN, sizeof(sCcHoReq));
+  64   3                  newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+  65   3                  if(newEvent == NULL)
+  66   3                  {
+  67   4                      FM_Printf(FM_ERROR, "EAllocErr\n");
+  68   4                      return STATUS_FAILURE;
+  69   4                  }
+  70   3      
+  71   3                  newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+  72   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_HANDOVER_REQ;
+  73   3      
+  74   3                  newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+  75   3                  newHpgpHdr->tei = staScb->tei;
+  76   3                  newHpgpHdr->macAddr = staScb->macAddr;
+  77   3                  newHpgpHdr->snid = staInfo->snid;
+  78   3      
+  79   3                  ccHoReq = (sCcHoReq *)(newEvent->buffDesc.dataptr);
+  80   3                  ccHoReq->hoType = HPGP_HO_TYPE_HARD;
+  81   3                  ccHoReq->reason = staScb->hoReason;
+  82   3                  newEvent->buffDesc.datalen +=sizeof(sCcHoReq);
+  83   3                  FM_Printf(FM_MMSG, "CHOM:>>>CC_HANDOVER.REQ.\n");
+  84   3                  break;
+  85   3              }
+  86   2              case EVENT_TYPE_CC_HANDOVER_INFO_IND:
+  87   2              {
+  88   3                  numSta = CRM_GetScbNum(crm);
+  89   3                  eventSize = MAX(HPGP_DATA_PAYLOAD_MIN, 3+ (u16)(numSta*sizeof(sCcHoStaInfo))); 
+  90   3                  newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+  91   3                  if(newEvent == NULL)
+  92   3                  {
+  93   4                      FM_Printf(FM_ERROR, "EAllocErr\n");
+  94   4                      return STATUS_FAILURE;
+  95   4                  }
+  96   3      
+  97   3                  newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+  98   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_HANDOVER_INFO_IND;
+  99   3      
+ 100   3                  newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 101   3                  newHpgpHdr->tei = staScb->tei;
+ 102   3                  newHpgpHdr->macAddr = staScb->macAddr;
+ 103   3                  newHpgpHdr->snid = staInfo->snid;
+ 104   3      
+ 105   3                  dataptr = newEvent->buffDesc.dataptr;
+ 106   3                  *dataptr = 0;   //handover in progress
+ 107   3                  dataptr++;
+ 108   3                  *dataptr = 0;   //no backup CCo
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 3   
+
+ 109   3                  dataptr++;
+ 110   3                  *dataptr = numSta;  
+ 111   3                  dataptr++;
+ 112   3                  newEvent->buffDesc.datalen = 3;
+ 113   3      
+ 114   3                  while(numSta)
+ 115   3                  {
+ 116   4                      ccHoStaInfo = (sCcHoStaInfo *)dataptr;   
+ 117   4                      scbIter = CRM_GetNextScb(crm, scbIter); 
+ 118   4                      if(scbIter)
+ 119   4                      {
+ 120   5                          ccHoStaInfo->tei = scbIter->tei;
+ 121   5                          memcpy(ccHoStaInfo->macAddr, scbIter->macAddr, MAC_ADDR_LEN);
+ 122   5                          ccHoStaInfo->status = scbIter->staStatus.fields.authStatus;
+ 123   5                          //TODO: search the discovered sta list of the scb 
+ 124   5                          //to find the cco is in the list; Otherwise find the PCCO
+ 125   5                          for (i = 0; i < scbIter->numDiscSta; i++)
+ 126   5                          {
+ 127   6                
+ 128   6                          } 
+ 129   5                          ccHoStaInfo->ptei = 0; 
+ 130   5                          dataptr += sizeof(sCcHoStaInfo);
+ 131   5                          newEvent->buffDesc.datalen += sizeof(sCcHoStaInfo);
+ 132   5                          numSta--;
+ 133   5                      }
+ 134   4                      else
+ 135   4                      {
+ 136   5                          FM_Printf(FM_ERROR, "CHOM:error in CRM\n");
+ 137   5                          break;  //should not happen
+ 138   5                      }
+ 139   4                  }
+ 140   3                  newEvent->buffDesc.datalen = MAX(HPGP_DATA_PAYLOAD_MIN, newEvent->buffDesc.datalen);
+ 141   3                  FM_Printf(FM_MMSG, "CHOM:>>>CC_HANDOVER_INFO.IND\n");
+ 142   3                  break;
+ 143   3              }
+ 144   2              default:
+ 145   2              {
+ 146   3              }
+ 147   2          }
+ 148   1      
+ 149   1          EVENT_Assert(newEvent);
+ 150   1          //transmit CC_HANDOVER.REQ
+ 151   1          status = MUXL_TransmitMgmtMsg(HPGPCTRL_GetLayer(HP_LAYER_TYPE_MUX), newEvent);
+ 152   1          //the event is freed by MUXL if the TX is successful
+ 153   1          if(status == STATUS_FAILURE)
+ 154   1          {
+ 155   2              EVENT_Free(newEvent);
+ 156   2          }
+ 157   1          
+ 158   1          return status;
+ 159   1      }
+ 160          
+ 161          eStatus CHOM_SendHoRspEvent(sChom *chom, sScb* staScb, u8 result)
+ 162          {
+ 163   1          sEvent            *newEvent = NULL;
+ 164   1          sHpgpHdr          *newHpgpHdr = NULL;
+ 165   1          sCcoHoRspEvent    *ccoHoRspEvent = NULL;
+ 166   1          sLinkLayer        *linkl = chom->linkl;
+ 167   1      
+ 168   1          if(result == FALSE)
+ 169   1          {
+ 170   2              STM_FreeTimer(staScb->staTimer);
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 4   
+
+ 171   2              staScb->staTimer = STM_TIMER_INVALID_ID;
+ 172   2              staScb->txRetryCnt = 0; //reset
+ 173   2          }
+ 174   1      
+ 175   1          newEvent = EVENT_MgmtAlloc(sizeof(sCcoHoRspEvent), EVENT_HPGP_CTRL_HEADROOM);
+ 176   1          if(newEvent == NULL)
+ 177   1          {
+ 178   2              FM_Printf(FM_ERROR, "EAllocErr\n");
+ 179   2              return STATUS_FAILURE;
+ 180   2          }
+ 181   1      
+ 182   1          newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+ 183   1          newEvent->eventHdr.type = EVENT_TYPE_CCO_HO_RSP;
+ 184   1      
+ 185   1          newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 186   1          newHpgpHdr->scb = staScb;
+ 187   1          ccoHoRspEvent = (sCcoHoRspEvent *)(newEvent->buffDesc.dataptr);
+ 188   1          ccoHoRspEvent->reason = staScb->hoReason;
+ 189   1          ccoHoRspEvent->result = result;
+ 190   1          newEvent->buffDesc.datalen += sizeof(sCcoHoRspEvent);
+ 191   1      
+ 192   1          //LINKL_SendEvent(linkl, newEvent);
+ 193   1          SLIST_Put(&linkl->intEventQueue, &newEvent->link);
+ 194   1      
+ 195   1          return STATUS_SUCCESS;
+ 196   1      
+ 197   1      }
+ 198          
+ 199          void CHOM_ProcEvent(sChom *chom, sEvent *event)
+ 200          {
+ 201   1      //    sEvent            *newEvent = NULL;
+ 202   1      //    sScb     *scbIter = NULL;
+ 203   1      //    eStatus   status = STATUS_FAILURE;
+ 204   1          sCcHoCnf          *ccHoCnf = NULL;
+ 205   1          sCnsm             *cnsm = NULL;
+ 206   1          sCcoHoReqEvent    *ccoHoReqEvent = NULL;
+ 207   1          sHpgpHdr          *hpgpHdr = NULL;
+ 208   1          sScb              *staScb = NULL; 
+ 209   1      //    u8                *dataptr = NULL;
+ 210   1          hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+ 211   1          staScb = hpgpHdr->scb;
+ 212   1          
+ 213   1          cnsm =  LINKL_GetCnsm(chom->linkl);
+ 214   1      
+ 215   1          switch(staScb->homState)
+ 216   1          {
+ 217   2              case STA_HOM_STATE_IDLE:
+ 218   2              {
+ 219   3                  if(event->eventHdr.eventClass == EVENT_CLASS_CTRL)
+ 220   3                  {
+ 221   4                      switch(event->eventHdr.type)
+ 222   4                      {
+ 223   5                          case EVENT_TYPE_CCO_HO_REQ: 
+ 224   5                          {
+ 225   6                              //process events
+ 226   6      #ifdef POWERSAVE
+                          if (chom->linkl->hal->hhalCb->psAvln)
+                          {
+                              PSM_psAvln(FALSE);  // CCO to send Stop PS Flag = 1 to force all STAs to disable their PS
+                            chom->linkl->hal->hhalCb->disPsAvln = TRUE; // mark it so we can enable AVLN PS when we receive  CC
+             -_HANDOVER_CNF
+                          }
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 5   
+
+              #endif
+ 233   6                              ccoHoReqEvent = (sCcoHoReqEvent *)(event->buffDesc.dataptr);
+ 234   6                              staScb->hoReason = ccoHoReqEvent->reason;
+ 235   6      #ifdef CALLBACK
+                                      staScb->staTimer = STM_AllocTimer(LINKL_TimerHandler, 
+                                                             EVENT_TYPE_TIMER_HO_IND, staScb);
+              #else
+ 239   6                              staScb->staTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK,
+ 240   6                                                     EVENT_TYPE_TIMER_HO_IND, staScb);
+ 241   6      #endif
+ 242   6                              if(staScb->staTimer !=  STM_TIMER_INVALID_ID )
+ 243   6                              {
+ 244   7                                  CHOM_SendMgmtMsg(chom, EVENT_TYPE_CC_HANDOVER_REQ, staScb);
+ 245   7                                  //if whether or not transmission succeeds,  
+ 246   7                                  //always do the following
+ 247   7                                  staScb->staTimerType = STA_TIMER_TYPE_HO;
+ 248   7                                  STM_StartTimer(staScb->staTimer, HPGP_TIME_HO);
+ 249   7                                  staScb->txRetryCnt++;
+ 250   7                                  staScb->homState = STA_HOM_STATE_WAITFOR_CC_HO_CNF;
+ 251   7                              }
+ 252   6                              else
+ 253   6                              {
+ 254   7                                  //send negative CCO_HO_RSP event
+ 255   7                                  staScb->homState = STA_HOM_STATE_IDLE;
+ 256   7                                  CHOM_SendHoRspEvent(chom, staScb, FALSE);
+ 257   7                              }
+ 258   6                              break;
+ 259   6                          }
+ 260   5                          default:
+ 261   5                          {
+ 262   6                          }
+ 263   5                      }
+ 264   4                  }
+ 265   3                  else   //mgmt msg
+ 266   3                  {
+ 267   4                      //no one
+ 268   4                  }
+ 269   3                  break;
+ 270   3              }
+ 271   2              case STA_HOM_STATE_WAITFOR_CC_HO_CNF:
+ 272   2              {
+ 273   3                  //process events
+ 274   3      #ifdef POWERSAVE
+                    if (chom->linkl->hal->hhalCb->disPsAvln)
+                    {
+                      PSM_psAvln(TRUE); // turn AVLN PS mode back on
+                      chom->linkl->hal->hhalCb->disPsAvln = FALSE;
+                    }
+              #endif
+ 281   3                  if(event->eventHdr.eventClass == EVENT_CLASS_MSG)
+ 282   3                  {
+ 283   4                      switch(event->eventHdr.type)
+ 284   4                      {
+ 285   5                          case EVENT_TYPE_CC_HANDOVER_CNF:
+ 286   5                          {
+ 287   6                              FM_Printf(FM_MMSG, "CHOM:<<<CC_HANDOVER.CNF\n");
+ 288   6                              STM_StopTimer(staScb->staTimer);
+ 289   6                              ccHoCnf = (sCcHoCnf *)(event->buffDesc.dataptr);
+ 290   6                              if(ccHoCnf->result == 0x00)
+ 291   6                              {
+ 292   7                                  //accept
+ 293   7                                  CHOM_SendMgmtMsg(chom, 
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 6   
+
+ 294   7                                                   EVENT_TYPE_CC_HANDOVER_INFO_IND, 
+ 295   7                                                   staScb);
+ 296   7                                  //if whether or not transmission succeeds,  
+ 297   7                                  //always do the following
+ 298   7                                  staScb->staTimerType = STA_TIMER_TYPE_HO;
+ 299   7                                  STM_StartTimer(staScb->staTimer, HPGP_TIME_HO);
+ 300   7                                  staScb->txRetryCnt++;
+ 301   7      
+ 302   7                                  //set HOIP in the beacon
+ 303   7                                  CNSM_EnableHo(cnsm, TRUE);
+ 304   7                                  //TODO: call CNAM not to process CC_ASSOC.REQ
+ 305   7      
+ 306   7                                  staScb->homState = 
+ 307   7                                      STA_HOM_STATE_WAITFOR_CC_HO_INFO_RSP;
+ 308   7      
+ 309   7                                  CHOM_SendHoRspEvent(chom, staScb, TRUE);
+ 310   7                              }
+ 311   6                              else
+ 312   6                              {
+ 313   7                                  //TODO: the CCO may select another CCO if available
+ 314   7                                  //At present, send negative CCO_HO_RSP event
+ 315   7                                  staScb->homState = STA_HOM_STATE_IDLE;
+ 316   7                                  CHOM_SendHoRspEvent(chom, staScb, FALSE);
+ 317   7                              }
+ 318   6                              break;
+ 319   6                          }
+ 320   5                          default:
+ 321   5                          {
+ 322   6                          }
+ 323   5                      }
+ 324   4                  }
+ 325   3                  else   //control msg
+ 326   3                  {
+ 327   4                      switch(event->eventHdr.type)
+ 328   4                      {
+ 329   5                          case EVENT_TYPE_TIMER_HO_IND:  //ho timer expired
+ 330   5                          {
+ 331   6                              if( staScb->txRetryCnt <= HPGP_TX_RETRY_MAX)
+ 332   6                              {
+ 333   7                                  //resend the message
+ 334   7                                  CHOM_SendMgmtMsg(chom, EVENT_TYPE_CC_HANDOVER_REQ, staScb);
+ 335   7                                  STM_StartTimer(staScb->staTimer, HPGP_TIME_HO);
+ 336   7                                  staScb->txRetryCnt++;
+ 337   7                                  //stay in the same state
+ 338   7                              }
+ 339   6                              else
+ 340   6                              {
+ 341   7                                  //retry exhausted
+ 342   7                                  staScb->homState = STA_HOM_STATE_IDLE;
+ 343   7                                  CNSM_EnableHo(cnsm, FALSE);
+ 344   7                                  CHOM_SendHoRspEvent(chom, staScb, FALSE);
+ 345   7      /*
+ 346   7                                  STM_FreeTimer(staScb->staTimer);
+ 347   7                                  staScb->txRetryCnt = 0; //reset
+ 348   7      
+ 349   7                                  newEvent = EVENT_Alloc(1, 0);
+ 350   7                                  if(newEvent == NULL)
+ 351   7                                  {
+ 352   7                                      FM_Printf(FM_ERROR, "Cannot allocate an event.\n");
+ 353   7                                      break;
+ 354   7                                  }
+ 355   7                                  //send the negative CCO_ event
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 7   
+
+ 356   7      */
+ 357   7      #ifdef POWERSAVE
+                            if (chom->linkl->hal->hhalCb->disPsAvln)
+                            {
+                              PSM_psAvln(TRUE); // turn AVLN PS mode back on
+                              chom->linkl->hal->hhalCb->disPsAvln = FALSE;
+                            }
+              #endif
+ 364   7                              }
+ 365   6                                  
+ 366   6                              break;
+ 367   6                          }
+ 368   5                          default:
+ 369   5                          {
+ 370   6                          }
+ 371   5                      }
+ 372   4                  }
+ 373   3                  break;
+ 374   3              }
+ 375   2              case STA_HOM_STATE_WAITFOR_CC_HO_INFO_RSP:
+ 376   2              {
+ 377   3                  //process events
+ 378   3                  if(event->eventHdr.eventClass == EVENT_CLASS_MSG)
+ 379   3                  {
+ 380   4                      switch(event->eventHdr.type)
+ 381   4                      {
+ 382   5                          case EVENT_TYPE_CC_HANDOVER_INFO_RSP:
+ 383   5                          {
+ 384   6                              FM_Printf(FM_MMSG, "CHOM:<<<CC_HANDOVER_INFO.RSP\n");
+ 385   6                              STM_StopTimer(staScb->staTimer);
+ 386   6                              STM_FreeTimer(staScb->staTimer);
+ 387   6      
+ 388   6                              //Start the HO counter down                        
+ 389   6                              CNSM_StartHo(cnsm, staScb->tei);
+ 390   6      
+ 391   6                              staScb->homState = STA_HOM_STATE_IDLE;
+ 392   6      //                        CHOM_SendHoRspEvent(chom, staScb, TRUE);
+ 393   6                              break;
+ 394   6                          }
+ 395   5                          default:
+ 396   5                          {
+ 397   6                          }
+ 398   5                      }
+ 399   4                  }
+ 400   3                  else   //control msg
+ 401   3                  {
+ 402   4                      switch(event->eventHdr.type)
+ 403   4                      {
+ 404   5                          case EVENT_TYPE_TIMER_HO_IND:  //ho timer expired
+ 405   5                          {
+ 406   6                              if( staScb->txRetryCnt <= HPGP_TX_RETRY_MAX)
+ 407   6                              {
+ 408   7                                  //resend the message
+ 409   7                                  CHOM_SendMgmtMsg(chom, 
+ 410   7                                                   EVENT_TYPE_CC_HANDOVER_INFO_IND, 
+ 411   7                                                   staScb);
+ 412   7                                  STM_StartTimer(staScb->staTimer, HPGP_TIME_HO);
+ 413   7                                  staScb->txRetryCnt++;
+ 414   7                                  //stay in the same state
+ 415   7                              }
+ 416   6                              else
+ 417   6                              {
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 8   
+
+ 418   7                                  //retry exhausted
+ 419   7                                  staScb->homState = STA_HOM_STATE_IDLE;
+ 420   7                                  STM_FreeTimer(staScb->staTimer);
+ 421   7                                  staScb->txRetryCnt = 0; //reset
+ 422   7                                  CNSM_EnableHo(cnsm, FALSE);
+ 423   7      //                            CHOM_SendHoRspEvent(chom, staScb, FALSE);
+ 424   7                              }
+ 425   6                              break;
+ 426   6                          }
+ 427   5                          default:
+ 428   5                          {
+ 429   6                          }
+ 430   5                      }
+ 431   4                  }
+ 432   3                  break;
+ 433   3              }
+ 434   2              default:
+ 435   2              {
+ 436   3              }
+ 437   2          }
+ 438   1      }
+ 439          
+ 440          
+ 441          
+ 442          eStatus CHOM_Init(sChom *chom, sLinkLayer *linkl)
+ 443          {
+ 444   1          chom->linkl = linkl;
+ 445   1          chom->state = CHOM_STATE_READY;
+ 446   1          return STATUS_SUCCESS;
+ 447   1      }
+ 448          
+ 449          #endif /* CCO_FUNC */
+ 450          
+ 451          
+ 452          #ifdef STA_FUNC
+ 453          
+ 454          /* -------------------
+ 455           * STA handover manager
+ 456           * --------------------- */
+ 457          void LINKL_HoTimerHandler(void* cookie)
+ 458          {
+ 459   1          sEvent *event = NULL;
+ 460   1          sLinkLayer * linkl = (sLinkLayer *)cookie;
+ 461   1          //Generate a time event
+ 462   1          event = EVENT_Alloc(EVENT_DEFAULT_SIZE, EVENT_HPGP_CTRL_HEADROOM);
+ 463   1          if(event == NULL)
+ 464   1          {
+ 465   2              FM_Printf(FM_ERROR, "EAllocErr\n");
+ 466   2              return;
+ 467   2          }
+ 468   1          event->eventHdr.type = EVENT_TYPE_TIMER_HO_IND;
+ 469   1          //post the event to the event queue
+ 470   1          LINKL_SendEvent(linkl, event);
+ 471   1      }
+ 472          
+ 473          
+ 474          eStatus SHOM_SendMgmtMsg(sShom *shom, u16 mmType)
+ 475          {
+ 476   1          eStatus           status = STATUS_FAILURE;
+ 477   1          sEvent            *newEvent = NULL;
+ 478   1          sHpgpHdr          *newHpgpHdr = NULL;
+ 479   1          sCcHoCnf          *ccHoCnf = NULL;
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 9   
+
+ 480   1          sStaInfo          *staInfo = NULL;
+ 481   1          u16               eventSize = 0;
+ 482   1      
+ 483   1          staInfo =  LINKL_GetStaInfo(shom->linkl);
+ 484   1          switch(mmType)
+ 485   1          {
+ 486   2              case EVENT_TYPE_CC_HANDOVER_CNF:
+ 487   2              {
+ 488   3                  eventSize = MAX(HPGP_DATA_PAYLOAD_MIN, sizeof(sCcHoCnf));
+ 489   3                  newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+ 490   3                  if(newEvent == NULL)
+ 491   3                  {
+ 492   4                      FM_Printf(FM_ERROR, "EAllocErr\n");
+ 493   4                      return STATUS_FAILURE;
+ 494   4                  }
+ 495   3                  newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 496   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_HANDOVER_CNF;
+ 497   3      
+ 498   3                  newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 499   3                  newHpgpHdr->tei = staInfo->ccoScb->tei;
+ 500   3                  newHpgpHdr->macAddr = staInfo->ccoScb->macAddr;
+ 501   3                  newHpgpHdr->snid = staInfo->snid;
+ 502   3      
+ 503   3                  ccHoCnf = (sCcHoCnf *)(newEvent->buffDesc.dataptr);
+ 504   3                  ccHoCnf->result = shom->hoResult;
+ 505   3                  newEvent->buffDesc.datalen = eventSize;
+ 506   3                  FM_Printf(FM_MMSG, "SHOM:>>>CC_HANDOVER.CNF(tei: %d)\n",
+ 507   3                                      newHpgpHdr->tei);
+ 508   3                  break;
+ 509   3              }
+ 510   2              case EVENT_TYPE_CC_HANDOVER_INFO_RSP:
+ 511   2              {
+ 512   3                  newEvent = EVENT_MgmtAlloc(HPGP_DATA_PAYLOAD_MIN, EVENT_HPGP_MSG_HEADROOM);
+ 513   3                  if(newEvent == NULL)
+ 514   3                  {
+ 515   4                      FM_Printf(FM_ERROR, "EAllocErr\n");
+ 516   4                      return STATUS_FAILURE;
+ 517   4                  }
+ 518   3                  newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+ 519   3                  newEvent->eventHdr.type = EVENT_TYPE_CC_HANDOVER_INFO_RSP;
+ 520   3      
+ 521   3                  newHpgpHdr = (sHpgpHdr *)newEvent->buffDesc.buff;
+ 522   3                  newHpgpHdr->tei = staInfo->ccoScb->tei;
+ 523   3                  newHpgpHdr->macAddr = staInfo->ccoScb->macAddr;
+ 524   3                  newHpgpHdr->snid = staInfo->snid;
+ 525   3                  newEvent->buffDesc.datalen = HPGP_DATA_PAYLOAD_MIN;
+ 526   3      
+ 527   3                  FM_Printf(FM_MMSG, "SHOM:>>>CC_HANDOVER_INFO.RSP(tei: %d)\n",
+ 528   3                                      newHpgpHdr->tei);
+ 529   3                  break;
+ 530   3              }
+ 531   2              default:
+ 532   2              {
+ 533   3              }
+ 534   2          }
+ 535   1      
+ 536   1          EVENT_Assert(newEvent);
+ 537   1      
+ 538   1          //transmit CC_HANDOVER.REQ
+ 539   1          status = MUXL_TransmitMgmtMsg(HPGPCTRL_GetLayer(HP_LAYER_TYPE_MUX), newEvent);
+ 540   1          //the event is freed by MUXL if the TX is successful
+ 541   1          if(status == STATUS_FAILURE)
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 10  
+
+ 542   1          {
+ 543   2              EVENT_Free(newEvent);
+ 544   2          }
+ 545   1          
+ 546   1          return status;
+ 547   1      }
+ 548          
+ 549          
+ 550          void SHOM_ProcEvent(sShom *shom, sEvent *event)
+ 551          {
+ 552   1          sCcHoStaInfo      *ccHoStaInfo = NULL;
+ 553   1          u8                *dataptr = NULL;
+ 554   1          u8                 numSta = 0; 
+ 555   1          u8                 rsc = 0xFF; 
+ 556   1          u8                 backupCco = 0x0; 
+ 557   1          sCrm              *crm = NULL;
+ 558   1          sCcHoReq          *ccHoReq = NULL;
+ 559   1          sScb              *scb = NULL;
+ 560   1          sScb              *nextscb = NULL;
+ 561   1          sLinkLayer        *linkl = NULL;
+ 562   1          sStaInfo          *staInfo =  NULL;
+ 563   1      
+ 564   1          linkl = shom->linkl;
+ 565   1          staInfo = LINKL_GetStaInfo(linkl);
+ 566   1          crm  = LINKL_GetCrm(linkl);
+ 567   1      
+ 568   1          if(shom->state != SHOM_STATE_IDLE)
+ 569   1          {
+ 570   2              return;
+ 571   2          }
+ 572   1      
+ 573   1          if( event->eventHdr.eventClass == EVENT_CLASS_MSG)
+ 574   1          {
+ 575   2              switch(event->eventHdr.type)
+ 576   2              {
+ 577   3                  case EVENT_TYPE_CC_HANDOVER_REQ:
+ 578   3                  {
+ 579   4                      FM_Printf(FM_MMSG, "SHOM:<<<CC_HANDOVER.REQ\n");
+ 580   4                      //process events
+ 581   4                      ccHoReq = (sCcHoReq *)(event->buffDesc.dataptr);
+ 582   4                      if( ccHoReq->hoType == HPGP_HO_TYPE_SOFT)
+ 583   4                      {
+ 584   5                          shom->hoResult = 0x01;   //reject soft handover
+ 585   5                      }
+ 586   4                      else //hard handover
+ 587   4                      {
+ 588   5                          //TODO: check my capability
+ 589   5                          shom->hoResult = 0x00;   //accept
+ 590   5                          if(ccHoReq->reason == HPGP_HO_REASON_CCO_APPT)
+ 591   5                          {
+ 592   6                              //I shall become the user-appointed CCO
+ 593   6                              staInfo->staStatus.fields.apptCcoStatus = 1; 
+ 594   6                          }
+ 595   5                      }
+ 596   4      /*
+ 597   4                      shom->hoTimer = STM_AllocTimer(LINKL_HoTimerHandler, linkLayer);
+ 598   4                      if(shom->hoTimer == STM_TIMER_ID_NULL)
+ 599   4                      {
+ 600   4                          staInfo->staStatus.fields.apptCcoStatus = 0; 
+ 601   4                          shom->hoResult = 0x02;   //reject soft/hard handover
+ 602   4                      }
+ 603   4      */
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 11  
+
+ 604   4      
+ 605   4                      SHOM_SendMgmtMsg(shom, EVENT_TYPE_CC_HANDOVER_CNF);
+ 606   4      
+ 607   4                      //if whether or not transmission succeeds,  
+ 608   4                      //always do the following
+ 609   4                      if (shom->hoResult == 0x00)
+ 610   4                      {   //accept
+ 611   5                          shom->txRetryCnt = 0;
+ 612   5                      //stay in the idle state as the CCO may not
+ 613   5                      //send handover info indication
+ 614   5                      //STM_StartTimer(shom->hoTimer, HPGP_TIME_HO);
+ 615   5                      //shom->state = SHOM_STATE_WAITFOR_HO_INFO_IND;
+ 616   5                      }
+ 617   4                      break;
+ 618   4                  }
+ 619   3                  case EVENT_TYPE_CC_HANDOVER_INFO_IND:
+ 620   3                  {
+ 621   4                      FM_Printf(FM_MMSG, "SHOM:<<<CC_HANDOVER_INFO.IND\n");
+ 622   4                      //In case of CC Handover Info Ind retransmission
+ 623   4                      //we do not process it, but send a response
+ 624   4                      if(!shom->hoReady) 
+ 625   4                      {
+ 626   5                          shom->hoReady = 1;
+ 627   5                          dataptr = event->buffDesc.dataptr;
+ 628   5                          rsc = *dataptr;
+ 629   5                          dataptr++;
+ 630   5                          backupCco = *dataptr;
+ 631   5                          dataptr++;
+ 632   5                          numSta = *dataptr;
+ 633   5                          dataptr++;
+ 634   5                          if(numSta > CRM_SCB_MAX)
+ 635   5                          {
+ 636   6                              break;
+ 637   6                          }
+ 638   5                          
+ 639   5                          //free all SCBs in the TEI MAP, except for the sta and CCo
+ 640   5                          scb = NULL;
+ 641   5                          scb = CRM_GetNextScb(crm, scb);
+ 642   5                          while(scb)
+ 643   5                          {
+ 644   6                              nextscb = CRM_GetNextScb(crm, scb);
+ 645   6                              if( (scb->tei != staInfo->staScb->tei)&&
+ 646   6                                  (scb->tei != staInfo->ccoScb->tei) )
+ 647   6                              {
+ 648   7                                  CRM_FreeScb(crm, scb);
+ 649   7                              }
+ 650   6                              scb = nextscb;
+ 651   6                          }
+ 652   5      
+ 653   5                          while(numSta)
+ 654   5                          {
+ 655   6                              ccHoStaInfo = (sCcHoStaInfo *)dataptr;   
+ 656   6                              scb = CRM_AddScb(crm, ccHoStaInfo->tei); 
+ 657   6                              if( scb && (scb->tei != staInfo->staScb->tei))
+ 658   6                              {
+ 659   7                                  //allocate a tei lease timer for the STA
+ 660   7      #ifdef CALLBACK
+                                          scb->teiTimer = STM_AllocTimer(LINKL_TimerHandler,
+                                                              EVENT_TYPE_TIMER_TEI_IND, scb);
+              #else
+ 664   7                                  scb->teiTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK, 
+ 665   7                                                      EVENT_TYPE_TIMER_TEI_IND, scb);
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 12  
+
+ 666   7      #endif
+ 667   7                                  if(scb->teiTimer != STM_TIMER_INVALID_ID)
+ 668   7                                  {
+ 669   8                                      memcpy(scb->macAddr, ccHoStaInfo->macAddr, 
+ 670   8                                                 MAC_ADDR_LEN);
+ 671   8                                      scb->staStatus.fields.authStatus = 
+ 672   8                                                     ccHoStaInfo->status; 
+ 673   8                                      scb->ptei = ccHoStaInfo->ptei; 
+ 674   8      
+ 675   8                                      scb->namState = STA_NAM_STATE_CONN;
+ 676   8                                      scb->homState = STA_HOM_STATE_IDLE;
+ 677   8                                  }
+ 678   7                                  else
+ 679   7                                  {
+ 680   8                                      FM_Printf(FM_ERROR, "SHOM:can't alloc a TEI timer for HO\n");
+ 681   8                                      break;
+ 682   8                                  }
+ 683   7                              }
+ 684   6                              else if(scb == NULL)
+ 685   6                              {
+ 686   7                                  FM_Printf(FM_ERROR, "SHOM:can't alloc a SCB for HO\n");
+ 687   7                                  break;  //should not happen
+ 688   7                              }
+ 689   6                              dataptr += sizeof(sCcHoStaInfo);   
+ 690   6                              numSta--;
+ 691   6                          }
+ 692   5                      } //end of if shom->hoReady
+ 693   4                      //send the positive response
+ 694   4                      SHOM_SendMgmtMsg(shom, EVENT_TYPE_CC_HANDOVER_INFO_RSP);
+ 695   4                  }
+ 696   3                  default:
+ 697   3                  {
+ 698   4                  }
+ 699   3              }
+ 700   2          }
+ 701   1      #if 0
+                          else //control msg
+                          {
+                              if(event->eventHdr.type == EVENT_TYPE_TIMER_HO_IND)  //ho timer expired
+                              {
+                                  if( shom->txRetryCnt <= HPGP_TX_RETRY_MAX)
+                                  {
+                                      //resend the message
+                                      SHOM_SendMgmtMsg(shom, EVENT_TYPE_CC_HANDOVER_CNF);
+                                      STM_StartTimer(shom->hoTimer, HPGP_TIME_HO);
+                                      shom->txRetryCnt++;
+                                      //stay in the same state
+                                  }
+                                  else
+                                  {
+                                      //retry exhausted
+                                      staInfo->staStatus.fields.apptCcoStatus = 0; 
+                                      STM_FreeTimer(shom->hoTimer);
+                                      shom->txRetryCnt = 0; //reset
+                                      //back to the idle state
+                                      shom->state = SHOM_STATE_IDLE;
+                                          
+                                  }
+                              }
+                          }
+              #endif
+ 727   1      
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 13  
+
+ 728   1      }
+ 729          
+ 730          
+ 731          void SHOM_Start(sShom *shom)
+ 732          {
+ 733   1          shom->state = SHOM_STATE_IDLE;
+ 734   1          shom->hoReady = 0; 
+ 735   1      }
+ 736          
+ 737          
+ 738          void SHOM_Stop(sShom *shom)
+ 739          {
+ 740   1          shom->state = SNAM_STATE_INIT;
+ 741   1          shom->hoReady = 0; 
+ 742   1      }
+ 743          
+ 744          
+ 745          eStatus SHOM_Init(sShom *shom, sLinkLayer *linkl)
+ 746          {
+ 747   1          shom->linkl = linkl;
+ 748   1          shom->state = SNAM_STATE_INIT;
+ 749   1          shom->hoReady = 0; 
+ 750   1      
+ 751   1      
+ 752   1          return STATUS_SUCCESS;
+ 753   1      }
+ 754          
+ 755          
+ 756          #endif /* STA_FUNC */
+ 757          
+ 758          /** =========================================================
+ 759           *
+ 760           * Edit History
+ 761           *
+ 762           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/link/hom.c,v $
+ 763           *
+ 764           * $Log: hom.c,v $
+ 765           * Revision 1.10  2014/07/22 10:03:52  kiran
+ 766           * 1) SDK Supports Power Save
+ 767           * 2) Uart_Driver.c cleanup
+ 768           * 3) SDK app memory pool optimization
+ 769           * 4) Prints from STM.c are commented
+ 770           * 5) Print messages are trimmed as common no memory left in common
+ 771           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+ 772           *
+ 773           * Revision 1.9  2014/07/05 09:16:27  prashant
+ 774           * 100 Devices support- only association tested, memory adjustments
+ 775           *
+ 776           * Revision 1.8  2014/06/12 13:15:43  ranjan
+ 777           * -separated bcn,mgmt,um event pools
+ 778           * -fixed datapath issue due to previous checkin
+ 779           * -work in progress. neighbour cco detection
+ 780           *
+ 781           * Revision 1.7  2014/06/11 13:17:47  kiran
+ 782           * UART as host interface and peripheral interface supported.
+ 783           *
+ 784           * Revision 1.6  2014/05/28 10:58:59  prashant
+ 785           * SDK folder structure changes, Uart changes, removed htm (UI) task
+ 786           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+ 787           *
+ 788           * Revision 1.5  2014/05/13 20:05:46  tri
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 14  
+
+ 789           * more PS
+ 790           *
+ 791           * Revision 1.4  2014/05/12 08:09:57  prashant
+ 792           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+ 793           *
+ 794           * Revision 1.3  2014/02/27 10:42:47  prashant
+ 795           * Routing code added
+ 796           *
+ 797           * Revision 1.2  2014/02/26 23:16:02  tri
+ 798           * more PS code
+ 799           *
+ 800           * Revision 1.1  2013/12/18 17:05:23  yiming
+ 801           * no message
+ 802           *
+ 803           * Revision 1.1  2013/12/17 21:47:56  yiming
+ 804           * no message
+ 805           *
+ 806           * Revision 1.4  2013/09/04 14:51:01  yiming
+ 807           * New changes for Hybrii_A code merge
+ 808           *
+ 809           * Revision 1.9  2013/03/22 12:21:49  prashant
+ 810           * default FM_MASK and FM_Printf modified for USER INFO
+ 811           *
+ 812           * Revision 1.8  2012/05/19 05:05:15  yuanhua
+ 813           * optimized the timer handlers in CTRL and LINK layers.
+ 814           *
+ 815           * Revision 1.7  2012/05/17 05:05:58  yuanhua
+ 816           * (1) added the option for timer w/o callback (2) added task id and name.
+ 817           *
+ 818           * Revision 1.6  2012/05/01 04:51:09  yuanhua
+ 819           * added compiler flags STA_FUNC and CCO_FUNC in link and ctrl layers.
+ 820           *
+ 821           * Revision 1.5  2012/04/30 04:05:57  yuanhua
+ 822           * (1) integrated the HAL mgmt Tx. (2) various updates
+ 823           *
+ 824           * Revision 1.4  2012/04/13 06:15:11  yuanhua
+ 825           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+ 826           *
+ 827           * Revision 1.3  2012/03/11 17:02:24  yuanhua
+ 828           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+ 829           *
+ 830           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+ 831           * migrate the firmware code from the greenchip to the hybrii.
+ 832           *
+ 833           * Revision 1.8  2011/08/09 22:45:44  yuanhua
+ 834           * changed to event structure, seperating HPGP-related events from the general event defination so that th
+             -e general event could be used for other purposes than the HPGP.
+ 835           *
+ 836           * Revision 1.7  2011/08/08 22:05:41  yuanhua
+ 837           * user-selected CCo handover fix
+ 838           *
+ 839           * Revision 1.6  2011/08/05 17:06:29  yuanhua
+ 840           * (1) added an internal queue in Link Layer for communication btw modules within Link Layer (2) Fixed bug
+             -s in CCo Handover. Now, CCo handover could be triggered by auto CCo selection, CCo handover messages work fine (3) Made 
+             -some modifications in SHAL.
+ 841           *
+ 842           * Revision 1.5  2011/07/30 02:43:35  yuanhua
+ 843           * (1) Split the beacon process into two parts: one requiring an immdiate response, the other tolerating t
+             -he delay (2) Changed the API btw the MUX and SHAL for packet reception (3) Fixed bugs in various modules. Now, multiple 
+             -STAs could successfully associate/leave the CCo
+ 844           *
+C51 COMPILER V9.52.0.0   HOM                                                               12/02/2014 14:35:43 PAGE 15  
+
+ 845           * Revision 1.4  2011/07/16 17:11:23  yuanhua
+ 846           * (1)Implemented SHOM and CHOM modules, including handover procedure, SCB resource updating for HO (2) Up
+             -date SNAM and CNAM modules to support uer-appointed CCo handover (3) Made the SCB resources to support the TEI MAP for t
+             -he STA mode and management of associated STA resources (e.g. TEI) (4) Modified SNSM and CNSM to perform all types of han
+             -dover switch (CCo handover to the new STA, STA taking over the CCo, STA switching to the new CCo)
+ 847           *
+ 848           * Revision 1.2  2011/06/24 14:33:18  yuanhua
+ 849           * (1) Changed event structure (2) Implemented SNSM, including the state machines in network discovery and
+             - connection states, becaon process, discover process, and handover detection (3) Integrated the HPGP and SHAL
+ 850           *
+ 851           * Revision 1.1  2011/05/28 06:31:19  kripa
+ 852           * Combining corresponding STA and CCo modules.
+ 853           *
+ 854           * Revision 1.1  2011/05/06 19:10:12  kripa
+ 855           * Adding link layer files to new source tree.
+ 856           *
+ 857           * Revision 1.2  2011/04/23 19:48:45  kripa
+ 858           * Fixing stm.h and event.h inclusion, using relative paths to avoid conflict with windows system header f
+             -iles.
+ 859           *
+ 860           * Revision 1.1  2011/04/08 21:42:45  yuanhua
+ 861           * Framework
+ 862           *
+ 863           *
+ 864           * =========================================================*/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3479    ----
+   CONSTANT SIZE    =    337    ----
+   XDATA SIZE       =   ----     145
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<asmv1:assembly xsi:schemaLocation="urn:schemas-microsoft-com:asm.v1 assembly.adaptive.xsd" manifestVersion="1.0" xmlns:asmv1="urn:schemas-microsoft-com:asm.v1" xmlns="urn:schemas-microsoft-com:asm.v2" xmlns:asmv2="urn:schemas-microsoft-com:asm.v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:co.v1="urn:schemas-microsoft-com:clickonce.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3" xmlns:dsig="http://www.w3.org/2000/09/xmldsig#" xmlns:co.v2="urn:schemas-microsoft-com:clickonce.v2">
+  <asmv1:assemblyIdentity name="ProductionTool.exe" version="1.0.0.3" publicKeyToken="96a2e69883b0c4fc" language="neutral" processorArchitecture="msil" type="win32" />
+  <application />
+  <entryPoint>
+    <assemblyIdentity name="ProductionTool" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
+    <commandLine file="ProductionTool.exe" parameters="" />
+  </entryPoint>
+  <trustInfo>
+    <security>
+      <applicationRequestMinimum>
+        <PermissionSet Unrestricted="true" ID="Custom" SameSite="site" />
+        <defaultAssemblyRequest permissionSetReference="Custom" />
+      </applicationRequestMinimum>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <!--
+          UAC Manifest Options
+          If you want to change the Windows User Account Control level replace the 
+          requestedExecutionLevel node with one of the following.
+
+        <requestedExecutionLevel  level="asInvoker" uiAccess="false" />
+        <requestedExecutionLevel  level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel  level="highestAvailable" uiAccess="false" />
+
+         If you want to utilize File and Registry Virtualization for backward 
+         compatibility then delete the requestedExecutionLevel node.
+    -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <dependency>
+    <dependentOS>
+      <osVersionInfo>
+        <os majorVersion="5" minorVersion="1" buildNumber="2600" servicePackMajor="0" />
+      </osVersionInfo>
+    </dependentOS>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="preRequisite" allowDelayedBinding="true">
+      <assemblyIdentity name="Microsoft.Windows.CommonLanguageRuntime" version="4.0.30319.0" />
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="ProductionTool.exe" size="121344">
+      <assemblyIdentity name="ProductionTool" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>MLt9M/6AtElETE9+MVE2qkaju6921MIXp+pYWKIdaow=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <file name="ProductionTool.exe.config" size="186">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>h0UeIdteCM29dGVw07LmHp593fPbh0IN11GyN3f2uRA=</dsig:DigestValue>
+    </hash>
+  </file>
+<publisherIdentity name="CN=GREENVITYEXTRA\Greenvity Extra" issuerKeyHash="8a25a5bef7b3947b7510877a54c6964a4dab4771" /><Signature Id="StrongNameSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>GR2eis+u7ONIQCMqzmqwU4AErjVaNu5wOgtW4+vEySM=</DigestValue></Reference></SignedInfo><SignatureValue>qnTA7oZs2jlMYj34NDFjitSzIAu15iK2Kn1qejjtiMTYlDf4yO/0VkU30HiQzBExp0e/krVMJaFByxzauslmpLAPicAfcg6XntjJBqsWuP7kqmI9t4kwrz2Syo26l/SaePdpgdfBjhnRDCFkbCQNYM1GfWKwBZt5SdP4ng7Fh/g=</SignatureValue><KeyInfo Id="StrongNameKeyInfo"><KeyValue><RSAKeyValue><Modulus>wQJe5OsevXit576QSH/0wuYmPLFA6cZ53Oa38FxW2EbL1GtDyhXIxyK5oSWNh4fk9VPVK8jQeANkH2nnRCLHCxuFfCGdodMXK9PIcabRHPhqoYdkQRmdCPCf5hQ1AiGn13DJhuEFa4ZtzoD6NMMSrxZEkvtsASNR5mj9DqG5A+s=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><msrel:RelData xmlns:msrel="http://schemas.microsoft.com/windows/rel/2005/reldata"><r:license xmlns:r="urn:mpeg:mpeg21:2003:01-REL-R-NS" xmlns:as="http://schemas.microsoft.com/windows/pki/2005/Authenticode"><r:grant><as:ManifestInformation Hash="23c9c4ebe3560b3a70ee365a35ae048053b06ace2a234048e3ecaecf8a9e1d19" Description="" Url=""><as:assemblyIdentity name="ProductionTool.exe" version="1.0.0.3" publicKeyToken="96a2e69883b0c4fc" language="neutral" processorArchitecture="msil" type="win32" /></as:ManifestInformation><as:SignedBy /><as:AuthenticodePublisher><as:X509SubjectName>CN=GREENVITYEXTRA\Greenvity Extra</as:X509SubjectName></as:AuthenticodePublisher></r:grant><r:issuer><Signature Id="AuthenticodeSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>ABjUiIK5K+PRxTBU+CfOIJk6rFnAS2TqV5OpvfFer7k=</DigestValue></Reference></SignedInfo><SignatureValue>T1IdeHUj0v60OJEBXgmP/r+BZGXIPtVsxxSJKCPrnjP910Md7wKhLxqttxCz52RQWOe2lEXdb547aZoz94cc7KA2wQvPnvIfcrVMuNcJKD9nGewu0eiSrIQRBm2welcSP/vyk9nav/hT/k6kxMBlKKSqC6ddLXegn4J/1+LN3U8=</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>wQJe5OsevXit576QSH/0wuYmPLFA6cZ53Oa38FxW2EbL1GtDyhXIxyK5oSWNh4fk9VPVK8jQeANkH2nnRCLHCxuFfCGdodMXK9PIcabRHPhqoYdkQRmdCPCf5hQ1AiGn13DJhuEFa4ZtzoD6NMMSrxZEkvtsASNR5mj9DqG5A+s=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>MIICETCCAXqgAwIBAgIQWTnhYsaTaIdPNRRRHrqnvzANBgkqhkiG9w0BAQsFADBHMUUwQwYDVQQDHjwARwBSAEUARQBOAFYASQBUAFkARQBYAFQAUgBBAFwARwByAGUAZQBuAHYAaQB0AHkAIABFAHgAdAByAGEwHhcNMTUwMTEwMTI0ODA4WhcNMTYwMTEwMTg0ODA4WjBHMUUwQwYDVQQDHjwARwBSAEUARQBOAFYASQBUAFkARQBYAFQAUgBBAFwARwByAGUAZQBuAHYAaQB0AHkAIABFAHgAdAByAGEwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAMECXuTrHr14ree+kEh/9MLmJjyxQOnGedzmt/BcVthGy9RrQ8oVyMciuaEljYeH5PVT1SvI0HgDZB9p50QixwsbhXwhnaHTFyvTyHGm0Rz4aqGHZEEZnQjwn+YUNQIhp9dwyYbhBWuGbc6A+jTDEq8WRJL7bAEjUeZo/Q6huQPrAgMBAAEwDQYJKoZIhvcNAQELBQADgYEAG0DIL/OBZ4tVN30XTTXBtmzvShnNtXWmd7Sk3p65TWvZkCCBB+5uljHspkK0vR2YwR2mVqEvGIzx63FTY3VVv8mDl7XnSOf2T9lf58sUo8y3C0yzmuxcr4PrZNQrTk2/OouoiH3YGaywU4QH2yLgNyxGD9RAZvFVWXl2grLXSZ4=</X509Certificate></X509Data></KeyInfo></Signature></r:issuer></r:license></msrel:RelData></KeyInfo></Signature></asmv1:assembly>

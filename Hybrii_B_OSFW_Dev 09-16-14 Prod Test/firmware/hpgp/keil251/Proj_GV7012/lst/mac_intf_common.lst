@@ -1,0 +1,610 @@
+C51 COMPILER V9.52.0.0   MAC_INTF_COMMON                                                   12/02/2014 14:35:42 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MAC_INTF_COMMON
+OBJECT MODULE PLACED IN .\obj\mac_intf_common.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\src\sap\mac_intf_common.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTO
+                    -R(0X2100) INCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src
+                    -\hal;..\..\src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..
+                    -\..\..\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilit
+                    -ies\event\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampl
+                    -eapp\src;..\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_
+                    -support;..\..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC
+                    -,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,
+                    -HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_
+                    -RECOVERY,PROD_TEST) DEBUG PRINT(.\lst\mac_intf_common.lst) TABS(2) OBJECT(.\obj\mac_intf_common.obj)
+
+line level    source
+
+   1          /*******************************************************************************
+   2           *
+   3           * File:       hybrii_mac_intf.c
+   4           * Contact:    pankaj_razdan@greenvity.com
+   5           *
+   6           * Description: Host Interface to Zigbee MAC (802.15.4)
+   7           *
+   8           * Copyright (c) 2011 by Greenvity Communication.
+   9           *
+  10           ******************************************************************************/
+  11          #include <string.h>
+  12          #include <stdio.h>
+  13          #include "hal_common.h"
+  14          #include "fm.h"
+  15          
+  16          #include "papdef.h"
+  17          #include "mac_intf_common.h"
+  18          #include "mac_msgs.h"
+  19          #include "hpgp_mac_intf.h"
+  20          #include "zigbee_sap.h"
+  21          
+  22          #ifdef HYBRII_ZIGBEE
+              #include "mac_const.h"
+              #include "zigbee_mac_sap_def.h"
+              #include "zb_usr_mac_sap.h"
+              #endif
+  27          /* Buffer, which holds frame received from the peer entity Host/Hybrii
+  28            * Note :- This buffer can be used for ethernet/HPGP frames 
+  29            */
+  30          u8 xdata ufrm[MAX_HOST_CMD_LENGTH];
+  31          
+  32          /* This API is called to handle Control Frames
+  33           * @Parameters 
+  34           * p_frm - pointer to the frame received from the Host interface
+  35           * frm_len - length of the Hybrii frame
+  36           */ 
+  37          void mac_intf_control_frm_handler(hostHdr_t *pHostHdr, u16 frm_len)
+  38          {
+  39   1      //  params_t p;
+  40   1      
+  41   1      #if 0 
+                if(p_frm[3] == IEEE802_15_4_MAC_ID)
+                {
+                  zmac_intf_downlink_primitives_handler(&p, p_frm, frm_len);
+                }
+                else 
+C51 COMPILER V9.52.0.0   MAC_INTF_COMMON                                                   12/02/2014 14:35:42 PAGE 2   
+
+              #endif
+  48   1      
+  49   1          if(pHostHdr->protocol == HPGP_MAC_ID)
+  50   1        {
+  51   2          hmac_intf_downlink_primitives_handler(pHostHdr, frm_len);
+  52   2        }
+  53   1        else
+  54   1        {
+  55   2          return; //error
+  56   2        }
+  57   1      
+  58   1      }
+  59          
+  60          /* This API parses frame received from the Host interface and calls corresponding primitive handlers 
+  61           * @Parameters
+  62           * p_frm - pointer to the frame received from the Host interface
+  63           * frm_len - length of the Hybrii frame
+  64           */
+  65          void GV701x_CmdSend(hostHdr_t *pHostHdr, u16 frm_len) //TBD - make it static
+  66          {
+  67   1        /* Verify CRC */
+  68   1      /*
+  69   1        if(!zmac_hostIf_verify_crc(p_frm, frm_len))
+  70   1        {
+  71   1          //Do not process corrupt packet
+  72   1          return;
+  73   1        }
+  74   1      */  
+  75   1        if(pHostHdr->type== CONTROL_FRM_ID || pHostHdr->type == MGMT_FRM_ID)
+  76   1        {
+  77   2          if(pHostHdr->protocol == HPGP_MAC_ID)
+  78   2            {
+  79   3              hmac_intf_downlink_primitives_handler(pHostHdr, frm_len);
+  80   3            }
+  81   2      #ifdef HYBRII_ZIGBEE    
+                  else if(pHostHdr->protocol == IEEE802_15_4_MAC_ID)
+                  {
+                    zb_mac_sap_parser(pHostHdr);    
+                  }
+              #endif
+  87   2        }
+  88   1        
+  89   1        return; // error
+  90   1      }
+  91          
+  92          
+  93          /* Utility APIs */
+  94          
+  95          /* This API extracts all primitive TLVs from frame received, and stores all fields in the params_t. 
+  96           * @Parameters
+  97           * p - parameter structure to store TLV value fields of the primitive
+  98           * p_frm - pointer to the Hybrii frame
+  99           * frm_len - length of the Hybrii frame
+ 100           * le - Boolean for checking Endiannes
+ 101           * Note :- All parameters in the Hybrii frame are in little endian format
+ 102           */
+ 103          #if 0
+              bool zmac_hostIf_get_tlvs (params_t *p, u8 *p_frm, u8 frm_len, bool le)
+              {
+                u8 idx = 0;
+              
+                while (idx + 2 < frm_len)
+C51 COMPILER V9.52.0.0   MAC_INTF_COMMON                                                   12/02/2014 14:35:42 PAGE 3   
+
+                {
+                  /* Skip type and length fields of TLV */
+                  idx += 2;
+                  /* Identify TLV type */
+                  switch (p_frm[idx-2])
+                  {
+                    /* Single byte Data Type */
+                    case DEST_ADDR_MODE:
+                        case SRC_ADDR_MODE: 
+                          case TX_OPTIONS:  
+                          case LOGICAL_CHANNEL: 
+                          case CHANNEL_PAGE:        
+                          case MSDU_HANDLE:     
+                          case CAPABILITY_INFO: 
+                          case COORD_ADDR_MODE: 
+                    case PRIVM_STATUS:  
+                          case DISSOCIATE_REASON: 
+                          case TX_INDIRECT:
+                          case PIB_ATTRIBUTE:   
+                          case PIB_ATTRIBUTE_INDEX: 
+                          case SCAN_TYPE: 
+                          case BEACON_ORDER:
+                          case SUPER_FRAME_ORDER: 
+                          case PAN_COORDINATOR: 
+                          case BLE_ID:    
+                          case COORD_REALIGNMENT: 
+                          case MPDU_LINK_QUALITY:   
+                          case DSN_ID:    
+                          case BSN_ID:  
+                          case PAN_ADDR_SPEC: 
+                          case MSDU_LENGTH: 
+                          case RESULT_LIST_SIZE:    
+                          case LOSS_REASON: 
+                          case SET_DEFAULT_PIB:
+                          case ASSOCIATED_MEMBER: 
+                          case PEND_ADDRESS:  
+                    case DEFER_PERMIT:
+                    case SCAN_DURATION:           
+                    {
+                      p->byte_data[p->idx_b++] = p_frm[idx];
+                      break;
+                    }       
+                    
+                    /* Two bytes Data Type */     
+                          case DEST_PAN_ID:       
+                          case SRC_PAN_ID:
+                    case COOR_PAN_ID: 
+                    case ASSOC_SHORT_ADDR:  
+                    case PIB_ATTRIBUTE_LENGTH:        
+                    {
+                      if (le)
+                      {
+                        memcpy((u8 *)&p->short_data[p->idx_s++], 
+                              &p_frm[idx], sizeof (u16));
+                      }
+                      else
+                      {
+                        rev_memcpy((u8 *)&p->short_data[p->idx_s++], 
+                            &p_frm[idx], sizeof (u16));
+                      }
+                      break;
+                    } 
+C51 COMPILER V9.52.0.0   MAC_INTF_COMMON                                                   12/02/2014 14:35:42 PAGE 4   
+
+              
+                    /* Four bytes Data Type */      
+                          case SCAN_CHANNELS:         
+                          case TX_ONTIME:           
+                          case RX_ONDURATION:         
+                          case START_TIME:  
+                    case TIME_STAMP:  
+                    case UNSCANNED_CHANNELS:          
+                    {
+                      if (le)
+                      {       
+                        memcpy((u8 *)&p->word_data[p->idx_w++], 
+                              &p_frm[idx], sizeof (u32));
+                      }
+                      else
+                      {
+                        rev_memcpy((u8 *)&p->word_data[p->idx_w++], 
+                            &p_frm[idx], sizeof (u32));
+                      }
+                      break;
+                    }   
+              
+                    
+                    /* Address type Data Type */
+                          case DEST_ADDR:         
+                          case SRC_ADDR:  
+                    case COOR_ADDR:   
+                    case DEVICE_ADDR:
+                    case ORPHAN_ADDRESS:  
+                    {
+                      if (le)
+                      {
+                        memcpy((u8 *)&p->address_data[p->idx_a++], 
+                            &p_frm[idx], sizeof (addr_t));
+                      }
+                      else
+                      {         
+                        rev_memcpy((u8 *)&p->address_data[p->idx_a++], 
+                            &p_frm[idx], sizeof (addr_t));
+                      }
+                      break;
+                    }
+              
+                    /* Security type data type */
+                          case BEACON_SECURITY: 
+                    case SECURITY_ID: 
+                    case COORD_REALIGNMENT_SECURITY:        
+                    {
+                      if (le)
+                      {
+                        memcpy((u8 *)&p->security_data[p->idx_sec++], 
+                              (u8 *)&p_frm[idx], sizeof (sec_t));
+                      }
+                      else
+                      {
+                        rev_memcpy((u8 *)&p->security_data[p->idx_sec++], 
+                            (u8 *)&p_frm[idx], sizeof (sec_t));
+                      }
+                      break;
+                    }   
+                    
+                          case PAN_DESCRIPTOR:
+C51 COMPILER V9.52.0.0   MAC_INTF_COMMON                                                   12/02/2014 14:35:42 PAGE 5   
+
+                    {
+                      if (le)
+                      {
+                        zmac_hostIf_copy_pan_descriptor (
+                          &p->pand, 
+                          (pand_t *)&p_frm[idx]);
+                      }
+                      else
+                      { 
+              #if 0       
+                        zmac_hostIf_convert_pand_endianess (
+                          &p->pand, 
+                          (pand_t *)&p_frm[idx]);
+              #endif
+                      }
+                      p->idx_p++; 
+                      break;
+                    }   
+                  
+                    
+                          case PIB_ATTRIBUTE_VALUE: 
+                    /* Address List */
+                          case ADDR_LIST:
+                    { 
+                      p->len1 =  p_frm[idx-1];
+                      
+                      if (le)
+                      {
+                        p->ptr1 = &p_frm[idx];
+                      }
+                      else
+                      {
+                        p->ptr1 = &p_frm[idx];
+                      }
+                      break;
+                          } 
+              
+                    /* SDU filed */
+                          case MSDU_ID:
+                    {
+                      if (le)
+                      {
+                        p->ptr2 = &p_frm[idx];
+                      }
+                      else
+                      {
+                        p->ptr2 = &p_frm[idx];
+                      }
+                      break;
+                          }
+                      
+                    default:
+                      return FALSE;
+                  }
+                  idx += p_frm[idx-1];
+                };
+              
+                return TRUE;
+              }
+              #endif
+ 293          #if 1
+ 294          void zmac_hostIf_convert_pand_endianess (pand_t *p_dst, pand_t *p_src)
+C51 COMPILER V9.52.0.0   MAC_INTF_COMMON                                                   12/02/2014 14:35:42 PAGE 6   
+
+ 295          {
+ 296   1        p_dst->coor_addr_mode = p_src->coor_addr_mode;
+ 297   1        rev_memcpy((u8 *)&p_dst->coor_pan_id,
+ 298   1              (u8 *)&p_src->coor_pan_id, sizeof (u16));
+ 299   1        rev_memcpy((u8 *)&p_dst->coor_addr,
+ 300   1              (u8 *)&p_src->coor_addr, sizeof (addr_t));
+ 301   1        rev_memcpy((u8 *)&p_dst->chan, 
+ 302   1              (u8 *)&p_dst->chan, sizeof (chan_t));
+ 303   1        rev_memcpy((u8 *)&p_dst->super_frm_spec, 
+ 304   1              (u8 *)&p_src->super_frm_spec, sizeof (u16));
+ 305   1        p_dst->gts_permit = p_src->gts_permit;
+ 306   1        p_dst->link_quality = p_src->link_quality;
+ 307   1        rev_memcpy((u8 *)&p_dst->timestamp, 
+ 308   1              (u8 *)&p_dst->timestamp, sizeof (u32)); 
+ 309   1        p_dst->sec_failure = p_src->sec_failure;
+ 310   1        rev_memcpy((u8 *)&p_dst->sec, 
+ 311   1              (u8 *)&p_src->sec, sizeof (sec_t));
+ 312   1      }
+ 313          
+ 314          void zmac_hostIf_copy_pan_descriptor (pand_t *p_dst, pand_t *p_src)
+ 315          {
+ 316   1        p_dst->coor_addr_mode = p_src->coor_addr_mode;
+ 317   1        memcpy((u8 *)&p_dst->coor_pan_id,
+ 318   1              (u8 *)&p_src->coor_pan_id, sizeof (u16));
+ 319   1        memcpy((u8 *)&p_dst->coor_addr,
+ 320   1              (u8 *)&p_src->coor_addr, sizeof (addr_t));
+ 321   1        memcpy((u8 *)&p_dst->chan, 
+ 322   1              (u8 *)&p_dst->chan, sizeof (chan_t));
+ 323   1        memcpy((u8 *)&p_dst->super_frm_spec, 
+ 324   1              (u8 *)&p_src->super_frm_spec, sizeof (u16));
+ 325   1        p_dst->gts_permit = p_src->gts_permit;
+ 326   1        p_dst->link_quality = p_src->link_quality;
+ 327   1        memcpy((u8 *)&p_dst->timestamp, 
+ 328   1              (u8 *)&p_dst->timestamp, sizeof (u32)); 
+ 329   1        p_dst->sec_failure = p_src->sec_failure;
+ 330   1        memcpy((u8 *)&p_dst->sec, 
+ 331   1              (u8 *)&p_src->sec, sizeof (sec_t));
+ 332   1      }
+ 333          
+ 334          #endif
+ 335          
+ 336          /* API returs TRUE if the current processor is Little Endian */
+ 337          static u16 var = 0xcafe;
+ 338          
+ 339          INLINE bool is_little_endian (void)
+ 340          {
+ 341   1        //u16 var = 0xcafe;
+ 342   1      
+ 343   1        if ((((u8 *)&var)[0] == 0xfe) && (((u8 *)&var)[1] == 0xca))
+ 344   1        {
+ 345   2          return TRUE;
+ 346   2        }
+ 347   1        return FALSE;
+ 348   1      }
+ 349          
+ 350          /* API to reset frame buffer */
+ 351          INLINE void zmac_hostIf_reset_frm (void)
+ 352          {
+ 353   1        memset (ufrm, 0x00, MAX_HOST_CMD_LENGTH);
+ 354   1      }
+ 355          
+ 356          /* API to set Hybrii frame header 
+C51 COMPILER V9.52.0.0   MAC_INTF_COMMON                                                   12/02/2014 14:35:42 PAGE 7   
+
+ 357           *  @Parameters 
+ 358           *  frm_type - Hybrii frame type
+ 359           *  protocol - Protocol for which current frame belongs
+ 360           */
+ 361          INLINE void zmac_hostIf_form_hdr (u8 frm_type, u8 protocol)
+ 362          {
+ 363   1        hostHdr_t *pHostHdr = (hostHdr_t*)ufrm;
+ 364   1        
+ 365   1        pHostHdr->type = frm_type;
+ 366   1        /* Length will be added later when payload is added */
+ 367   1        pHostHdr->length = 0;
+ 368   1        pHostHdr->protocol = protocol;
+ 369   1      }
+ 370          
+ 371          
+ 372          /* API to set TLV field in the frame 
+ 373          *  @Parameters 
+ 374          *  P_idx - pointer to the index field
+ 375          *  Type - TLV type field
+ 376          *  length - TLV length field
+ 377          *  p_value - void pointer to TLV value field
+ 378          */
+ 379          #if 0
+              void zmac_hostIf_set_tlv (u16 *p_idx, u8 type, u16 length, void *p_value)
+              #else
+ 382          void zmac_hostIf_set_tlv (u16 *p_idx, u16 length, void *p_value)
+ 383          #endif
+ 384          {
+ 385   1      //  u8 k;
+ 386   1        /* Check if we can accomodate new field */
+ 387   1        if (*p_idx+length > MAX_HOST_CMD_LENGTH)
+ 388   1        {
+ 389   2          // This should not happen
+ 390   2          //while (0); // TBD assert
+ 391   2        }
+ 392   1      #if 0 
+              //  ufrm[(*p_idx)++] = type;
+              //  ufrm[(*p_idx)++] = length;
+              
+                /* All Values should be sent in little endian format, other than variable length byte stream  */
+                if (!is_little_endian () ||  
+                  (type == ADDR_LIST) ||
+                  (type == MSDU_ID))
+                {
+                  /* PAN Descriptor has multiple fields hence need to convert endianess separately */
+                  if (type == PAN_DESCRIPTOR)
+                  {
+                    zmac_hostIf_copy_pan_descriptor (
+                      (pand_t *)&ufrm[*p_idx], 
+                      (pand_t *)p_value);
+                  }
+                  else
+                  { 
+                    memcpy (&ufrm[*p_idx], (u8 *)p_value, length);
+                  }   
+                }
+                else
+                {
+                
+                  /* PAN Descriptor has multiple fields hence need to convert endianess separately */
+                  if (type == PAN_DESCRIPTOR)
+                  {
+C51 COMPILER V9.52.0.0   MAC_INTF_COMMON                                                   12/02/2014 14:35:42 PAGE 8   
+
+                    zmac_hostIf_convert_pand_endianess (
+                      (pand_t *)&ufrm[*p_idx], 
+                      (pand_t *)p_value);
+                  }
+                  else
+                  {
+                    rev_memcpy (&ufrm[*p_idx], (u8 *)p_value, length);
+                  }
+                }
+              
+              #endif
+ 430   1          if (!is_little_endian ())   
+ 431   1        {   
+ 432   2            memcpy (&ufrm[*p_idx], (u8 *)p_value, length);  
+ 433   2        }
+ 434   1        else
+ 435   1        {   
+ 436   2            rev_memcpy (&ufrm[*p_idx], (u8 *)p_value, length);
+ 437   2        }
+ 438   1        *p_idx += length;
+ 439   1      }
+ 440          
+ 441          /* API to Calculate CRC and also sets it in the frame 
+ 442          *  @Parameters 
+ 443          * p_frm - pointer to the Hybrii frame
+ 444          * frm_len - length of the Hybrii frame
+ 445          */
+ 446          
+ 447          void zmac_hostIf_set_crc (u8 *p_frm, u16 *p_len)
+ 448          {
+ 449   1        u8 i;
+ 450   1        u16 crc = 0;
+ 451   1        u16 tb = 0;
+ 452   1        bool is_even;
+ 453   1      
+ 454   1        /* Frame length can be even or odd */
+ 455   1        is_even = (*p_len % 2)? FALSE : TRUE;
+ 456   1          
+ 457   1        for (i = 0; i < (is_even ? *p_len : *p_len - 1); i = i + MAC_IF_CRC_LENGTH)
+ 458   1        {
+ 459   2        //  crc = *((u16 *)&p_frm[i]) ^ crc;
+ 460   2          memcpy ((u8 *)&tb, &p_frm[i], MAC_IF_CRC_LENGTH);
+ 461   2          crc = tb ^ crc;
+ 462   2        }
+ 463   1        
+ 464   1        /* even case of odd length, get crc of last byte */
+ 465   1        if (!is_even)
+ 466   1        {
+ 467   2          tb = p_frm[*p_len-1];
+ 468   2          crc = tb ^ crc;
+ 469   2        }
+ 470   1      
+ 471   1      //  *((u16 *)&p_frm[*p_len]) = crc;
+ 472   1        memcpy((u8 *)&p_frm[*p_len], (u8 *)&crc, sizeof (crc));
+ 473   1        *p_len += MAC_IF_CRC_LENGTH;
+ 474   1      }
+ 475          
+ 476          /* API to Get CRC of whole frame 
+ 477          *  @Parameters 
+ 478          * p_frm - pointer to the Hybrii frame
+ 479          * frm_len - length of the Hybrii frame
+ 480          */
+C51 COMPILER V9.52.0.0   MAC_INTF_COMMON                                                   12/02/2014 14:35:42 PAGE 9   
+
+ 481          u16 zmac_hostIf_get_crc (u8 *p_frm, u16 frm_len)
+ 482          {
+ 483   1        u8 i;
+ 484   1        u16 crc = 0;
+ 485   1        u16 tb = 0;
+ 486   1        bool is_even;
+ 487   1      
+ 488   1        /* Frame length can be even or odd */
+ 489   1        is_even = (frm_len % 2)? FALSE : TRUE;
+ 490   1          
+ 491   1        for (i = 0; i < (is_even ? frm_len : frm_len - 1); i = i + MAC_IF_CRC_LENGTH)
+ 492   1        {
+ 493   2        //  crc = *((u16 *)&p_frm[i]) ^ crc;
+ 494   2          memcpy ((u8 *)&tb, &p_frm[i], MAC_IF_CRC_LENGTH);
+ 495   2          crc = tb ^ crc;
+ 496   2        }
+ 497   1        /* even case of odd length, get crc of last byte */
+ 498   1        if (!is_even)
+ 499   1        {
+ 500   2          tb = p_frm[frm_len-1];
+ 501   2          crc = tb ^ crc;
+ 502   2        }
+ 503   1      
+ 504   1        return crc;
+ 505   1      }
+ 506          
+ 507          /* API verifies calculates CRC and verifies it with frame CRC 
+ 508          *  @Parameters 
+ 509          * p_frm - pointer to the Hybrii frame
+ 510          * frm_len - length of the Hybrii frame
+ 511          */
+ 512          #if 0
+              bool zmac_hostIf_verify_crc (u8 *p_frm, u16 frm_len)
+              {
+                u16 crc = 0, frm_crc;
+              
+                /* Get CRC of the received frame */
+                crc = zmac_hostIf_get_crc (p_frm, frm_len - MAC_IF_CRC_LENGTH);
+              
+              #if 0
+                if (crc != ((u16 *)&p_frm[len - MAC_IF_CRC_LENGTH])[0])
+              #else
+                frm_crc = 0;
+                memcpy ((u8 *)&frm_crc, &p_frm[frm_len - MAC_IF_CRC_LENGTH], sizeof (u16));
+              
+                /* Verify received crc and calculate crc */
+                if (crc != frm_crc)
+              #endif
+                {
+                  /* CRC matching failed */
+                  return FALSE;
+                }
+              
+                /* CRC success */
+                return TRUE;
+              }
+              #endif
+ 538          
+ 539          /* API copies count number of bytes data from src to dst  
+ 540          *  @Parameters 
+ 541          * p_frm - pointer to the Hybrii frame
+ 542          * frm_len - length of the Hybrii frame
+C51 COMPILER V9.52.0.0   MAC_INTF_COMMON                                                   12/02/2014 14:35:42 PAGE 10  
+
+ 543          */
+ 544          void *rev_memcpy( u8 *p_dst, const u8 *p_src, unsigned int count )
+ 545          { 
+ 546   1          u8 i; 
+ 547   1       
+ 548   1          for (i = 0; i < count; ++i) 
+ 549   1        {
+ 550   2              p_dst[count-1-i] = p_src[i];
+ 551   2          }
+ 552   1        return 0;
+ 553   1      } 
+ 554          
+ 555          
+ 556          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1463    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    130      55
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

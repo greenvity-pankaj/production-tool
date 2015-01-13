@@ -1,0 +1,27 @@
+
+#Configuration for individual modules - where to send the messages and level filters
+##Maintain a new blank line at end of file, otherwise the parser won't work
+#TARGET
+# 2 = Send log messages to Syslog
+# 1 = Send log messages to Console
+# 0 = Do not print log messages
+
+#LOGMASK:
+# 0 = Emergency
+# 1 = Alert
+# 2 = Critical
+# 3 = Error
+# 4 = Warning
+# 5 = Notice
+# 6 = Informational
+# 7 = Debug
+
+
+[MSGLOG_RUNTIME_CONFIG]
+
+MSGLOG_TARGET_SREVER = 1 ; 
+MSGLOG_LOGMASK_SERVER = 7 ;
+
+MSGLOG_TARGET_GVSPI = 1 ; 
+MSGLOG_LOGMASK_GVSPI = 7 ;
+

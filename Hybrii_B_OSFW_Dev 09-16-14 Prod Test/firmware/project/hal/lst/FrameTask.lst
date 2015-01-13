@@ -1,0 +1,727 @@
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE FRAMETASK
+OBJECT MODULE PLACED IN .\obj\FrameTask.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\common\datapath\FrameTask.c LARGE OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0
+                    -X2100) INCDIR(..\..\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\s
+                    -rc\nma;..\..\hal;.\src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;.
+                    -.\..\hpgp\src\route;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\componen
+                    -ts\utilities\linklist\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\samp
+                    -leapp\inc;..\..\..\components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC
+                    -_SW_SYNC=1,inline,HPGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_
+                    -SPI_TX_CRC,HW_SPI_RX_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND 
+                    -PRINT(.\lst\FrameTask.lst) TABS(2) OBJECT(.\obj\FrameTask.obj)
+
+line level    source
+
+   1          //#include "sched.h"
+   2          //#include "event.h"
+   3          //#include "list.h"
+   4          //#include "hal_common.h"
+   5          //#ifndef HPGP_HAL_TEST
+   6          //#include "hpgpapi.h"
+   7          //#endif
+   8          
+   9          #ifdef RTX51_TINY_OS
+  10          #include <rtx51tny.h>
+  11          #endif
+  12          #include <stdio.h>
+  13          #include <string.h>
+  14          #include "fm.h"
+  15          
+  16          
+  17          #include "list.h"
+  18          #include "papdef.h"
+  19          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  22          #include "hpgpevt.h"
+  23          
+  24          #include "hpgpdef.h"
+  25          #include "hal_common.h"
+  26          #include "hal.h"
+  27          
+  28          #include "hal_hpgp.h"
+  29          #include "hal_eth.h"
+  30          #include "hal_spi.h"
+  31          
+  32          #ifndef HPGP_HAL_TEST
+              #include "hpgpapi.h"
+              #endif
+  35          #include "nma.h"
+  36          
+  37          //#include "h1msgs.h"
+  38          #include "frametask.h"
+  39          #include "dmm.h"
+  40          #include "datapath.h"
+  41          #ifdef NO_HOST
+              #include "gv701x_event.h"
+              #include "gv701x_aps.h"
+              #include "app_sup_layer.h"
+              #endif
+  46          
+  47          static sFrameTask frmTaskLayer;
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 2   
+
+  48          extern u8 sigDbg;
+  49          #ifdef ETH_BRDG_DEBUG
+              extern u32 ethRxFrameCnt;
+              extern u32 numPlcTxCp;
+              #endif
+  53          
+  54          #ifdef UART_HOST_INTF 
+              #include "uart_driver.h"
+              #endif
+  57          #include "hybrii_tasks.h"
+  58          #ifdef UM
+              
+              static sSlist  hostEventQ;
+              
+              
+              static eStatus  fwdAgent_HostTransmitEvent();
+              static eStatus fwdAgent_SendHostEvent(sEvent *event);
+              #endif
+  66          
+  67          extern sSwFrmDesc *datapath_getHeadDesc(queue_id_e id, u8 pop);
+  68          extern u8 opMode;
+  69          
+  70          void frame_task_init(void)
+  71          {
+  72   1      
+  73   1        
+  74   1      #ifdef RTX51_TINY_OS
+  75   1      
+  76   1        /*Create event queue for frame task events*/
+  77   1        SLIST_Init(&frmTaskLayer.eventQueue);
+  78   1      
+  79   1        /*Create semaphore for Frame task event queue*/
+  80   1      #ifndef P8051
+              #if defined(WIN32) || defined(_WIN32)
+                  frmTaskLayer->frmEvntSem = CreateSemaphore(
+                      NULL,           // default security attributes
+                      SEM_COUNT,      // initial count
+                      SEM_COUNT,      // maximum count
+                      NULL);          // unnamed semaphore
+                  if(frmTaskLayer->frmEvntSem == NULL)
+              #else
+                  if(sem_init(&frmTaskLayer->frmEvntSem, 0, SEM_COUNT))
+              #endif
+                  {
+                      status = STATUS_FAILURE;
+                  }
+              #endif  
+  95   1      
+  96   1         os_create_task(HYBRII_TASK_ID_FRAME);
+  97   1      #endif
+  98   1      
+  99   1      #ifdef UM
+                  SLIST_Init(&hostEventQ);  
+              #endif
+ 102   1          
+ 103   1        datapath_init();
+ 104   1      #ifdef NO_HOST
+                Aps_init();
+              #endif
+ 107   1        //FM_Printf(FM_HINFO,"\nFrame Task Init");
+ 108   1      }
+ 109          
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 3   
+
+ 110          
+ 111          
+ 112          bool fwdAgent_IsHostIdle()
+ 113          {
+ 114   1        
+ 115   1      #ifdef HYBRII_ETH
+ 116   1      
+ 117   1        if(hostIntf == HOST_INTF_ETH)
+ 118   1        {
+ 119   2      
+ 120   2          return (EHAL_IsTxReady());
+ 121   2        
+ 122   2        }
+ 123   1      #endif
+ 124   1      
+ 125   1      #ifdef HYBRII_SPI
+ 126   1      
+ 127   1        if(hostIntf == HOST_INTF_SPI)
+ 128   1        {
+ 129   2          return (hal_spi_isTxReady());
+ 130   2        }
+ 131   1      #endif   //HYBRII_SPI
+ 132   1      #ifdef UART_HOST_INTF //UART_16550
+                if(hostIntf == HOST_INTF_UART)
+                {
+                  return (hal_uart_isTxReady());
+                  
+                }
+              #endif  
+ 139   1        
+ 140   1        return FALSE;
+ 141   1        
+ 142   1        
+ 143   1      }
+ 144          
+ 145          u8 Frame_Proc()//void *cookie)
+ 146          {
+ 147   1        //  sEvent *event = NULL;
+ 148   1        //  sSlink *slink = NULL;
+ 149   1      //    eStatus status;
+ 150   1          u8 ret = 0;
+ 151   1       //   sFrameTask *frmtasklayer = (sFrameTask *)cookie;
+ 152   1      #ifdef POWERSAVE
+                  sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer);
+                sHaLayer    *hal;
+                sHpgpHalCB    *hhalCb;
+                sScb          *scb;
+              
+                hal = (sHaLayer*)HOMEPLUG_GetHal();
+                hhalCb = hal->hhalCb;
+                if( hhalCb->devMode == DEV_MODE_STA)
+                  scb = staInfo->staScb;
+                else scb = staInfo->ccoScb;
+              #endif
+ 165   1      
+ 166   1        //FM_Printf(FM_USER,"p\n");
+ 167   1      #if 0
+                  while(!SLIST_IsEmpty(&frmtasklayer->eventQueue) /*&&
+                        !(ret = SCHED_IsPreempted(&sFrameTask->task))*/)
+                  {
+                  FM_Printf(FM_USER,"\nFrame Queue");    
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 4   
+
+              #ifdef P8051
+              __CRIT_SECTION_BEGIN__
+              #else
+                  SEM_WAIT(&frmtasklayer->ctrlSem);
+              #endif
+              
+                      slink = SLIST_Pop(&frmtasklayer->eventQueue);
+              #ifdef P8051
+              __CRIT_SECTION_END__
+              #else
+                    SEM_POST(&frmtasklayer->ctrlSem);
+              #endif
+                      event = SLIST_GetEntry(slink, sEvent, link);
+              
+                      if (event->eventHdr.eventClass == EVENT_CLASS_CTRL)
+                      {
+                    FM_Printf(FM_USER,"\nEvnt");            
+              #ifdef HPGP_HAL_TEST
+                    CHAL_CpuTxQNemptyIntHandler();
+              #else
+                    CHAL_FrameRxIntHandler((void*)HOMEPLUG_GetHal());
+              #endif
+                      }
+                      else
+                      {
+                        event->eventHdr.status = EVENT_STATUS_COMPLETE;     
+                      }
+                  
+                      if(event->eventHdr.status == EVENT_STATUS_COMPLETE)
+                      {
+                          EVENT_Free(event);
+                      }
+                      
+                  }
+              #else
+ 207   1      
+ 208   1      #ifdef UM
+              
+                if (datapath_transmitMgmtPlc() == FALSE)    
+              #endif
+ 212   1      #ifdef POWERSAVE
+              //  if (scb->psState == PSM_PS_STATE_OFF)
+              //  {
+                  // if PS mode is on, no use transmitting here
+                  // because the chance of not being able to tx
+                  // is too great. We'll do the tx in BP Start interrupt
+                  datapath_transmitDataPlc(2);
+              //  }
+              #else
+ 221   1        datapath_transmitDataPlc();
+ 222   1      #endif
+ 223   1      
+ 224   1      #ifdef UM
+                  if(!SLIST_IsEmpty(&hostEventQ) || 
+                      (datapath_IsQueueEmpty(HOST_DATA_QUEUE) == FALSE))
+                {
+                  if (fwdAgent_IsHostIdle() == TRUE)
+                  {
+                    if (fwdAgent_HostTransmitEvent() == STATUS_FAILURE)
+                    {     
+                      if (datapath_IsQueueEmpty(HOST_DATA_QUEUE)
+                                  == TRUE)
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 5   
+
+                      {
+                        return ret;
+                      }  
+              
+                      
+                    //       FM_Printf(FM_USER, "h\n");
+                      datapath_transmitDataHost();
+                    }
+                  }
+                  else
+                  {
+                    if  ( (datapath_IsQueueEmpty(HOST_DATA_QUEUE)
+                                  == FALSE)
+                        )
+                    {
+              
+                      // Doubt : TNY OS doesn't allow TASK to re-schedule itself. its in VAIN
+                      
+                      os_set_ready(HYBRII_TASK_ID_FRAME);
+              
+              
+                    }
+                                  
+              
+                  }
+                }
+              #ifdef NO_HOST
+                if (datapath_IsQueueEmpty(APP_DATA_QUEUE) == FALSE)
+                {               
+                  sSwFrmDesc* tHostTxFrmSwDesc = NULL;  
+                    if((tHostTxFrmSwDesc =
+                     datapath_getHeadDesc(APP_DATA_QUEUE, 1)) != NULL)
+                    {
+                    tHostTxFrmSwDesc->txPort = PORT_APP;
+                    tHostTxFrmSwDesc->rxPort = PORT_PERIPHERAL;
+                    Aps_PostDataToQueue(tHostTxFrmSwDesc->rxPort, tHostTxFrmSwDesc);
+                    }   
+                }
+              #endif
+              #ifdef NO_HOST
+                Aps_Proc(NULL);   
+              #endif  
+              #else
+ 277   1      
+ 278   1        if (datapath_IsQueueEmpty(HOST_DATA_QUEUE) == FALSE)
+ 279   1        {
+ 280   2          if (fwdAgent_IsHostIdle() == TRUE)
+ 281   2          { 
+ 282   3      
+ 283   3            {     
+ 284   4              if (datapath_IsQueueEmpty(HOST_DATA_QUEUE)
+ 285   4                          == TRUE)
+ 286   4              {
+ 287   5                
+ 288   5                return ret;
+ 289   5              }  
+ 290   4      
+ 291   4              
+ 292   4              datapath_transmitDataHost();
+ 293   4            }
+ 294   3          }
+ 295   2          else
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 6   
+
+ 296   2          {
+ 297   3            
+ 298   3            if (datapath_IsQueueEmpty(HOST_DATA_QUEUE)
+ 299   3                          == FALSE)
+ 300   3            {
+ 301   4      
+ 302   4              os_set_ready(HYBRII_TASK_ID_FRAME);
+ 303   4      
+ 304   4      
+ 305   4            }
+ 306   3                          
+ 307   3      
+ 308   3          }
+ 309   2      
+ 310   2        }
+ 311   1      #endif
+ 312   1        
+ 313   1      #endif
+ 314   1      
+ 315   1          return ret;
+ 316   1      }
+ 317          
+ 318          
+ 319          #ifdef RTX51_TINY_OS
+ 320          void Frame_Task (void)  _task_ HYBRII_TASK_ID_FRAME
+ 321          {
+ 322   1         while (1) {
+ 323   2            //os_wait1(K_SIG);
+ 324   2              Frame_Proc();//&frmTaskLayer);
+ 325   2              os_switch_task();
+ 326   2          }
+ 327   1      }
+ 328          #endif
+ 329          
+ 330          #if 0
+               /* post an event into the frame task event queue */
+               eStatus FrameTask_PostEvent(enum eventType evttype, 
+                           u8 evntclass, void* data_ptr, u16 len)
+               {
+              
+               
+              #ifdef RTX51_TINY_OS
+              
+               #if 0
+                 sEvent * event= EVENT_Alloc(len, 0);
+              
+                 FM_Printf(FM_ERROR, "\nPost evnt");     
+                 if(event == NULL)
+                 {
+                   FM_Printf(FM_ERROR, "EAllocErr\n");
+                   return STATUS_FAILURE;
+                 }
+               
+                 event->eventHdr.eventClass = evntclass;
+                 event->eventHdr.type = evttype;
+                 //event->buffDesc.datalen = len;
+              
+                 //memcpy(event->buffDesc.dataptr , data, len);
+              
+                 /* enqueue the event to the frame task queue */
+                 SLIST_Put(&frmTaskLayer.eventQueue, &event->link);
+              #endif
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 7   
+
+              
+                 os_set_ready(HYBRII_TASK_ID_FRAME);
+              #else
+               
+                //Frame_Proc();//&frmTaskLayer);
+               
+               #endif
+                 return STATUS_SUCCESS;
+              }
+              #endif
+ 368          
+ 369          
+ 370          
+ 371          /*
+ 372              Forwarding Agent
+ 373          */
+ 374          void fwdAgent_queueToHost(sSwFrmDesc  *rxFrmSwDesc)
+ 375          {
+ 376   1      #if 0 //def UM
+              
+                u8 *cellAddr;
+                sEth2Hdr *ethhdr;
+              
+                cellAddr =
+                    CHAL_GetAccessToCP(rxFrmSwDesc->cpArr[0].cp);
+                ethhdr = (sEth2Hdr*)cellAddr;
+                // Drop frm if dest MAC not match with device MAC address
+                if(IS_GROUP(ethhdr->dstaddr))
+                {
+              
+                }
+                else if(memcmp(ethhdr->dstaddr, pHal->macAddr, MAC_ADDR_LEN) != 0)
+                {
+                  // Drop frm
+              #ifdef DEBUG_DATAPATH
+                  if(pktDbg)
+                  {
+                    FM_Printf(FM_MINFO, "DATA drop\n");
+                  }
+              #endif
+                  return ; //STATUS_FAILURE;
+                }
+              
+              #endif
+ 402   1      
+ 403   1        
+ 404   1        if ((hostDetected == FALSE) ||(datapath_queueToHost(rxFrmSwDesc,
+ 405   1                            rxFrmSwDesc->frmLen) == STATUS_FAILURE))
+ 406   1        {
+ 407   2              gHpgpHalCB.halStats.PtoHswDropCnt++;
+ 408   2          CHAL_FreeFrameCp(rxFrmSwDesc->cpArr, rxFrmSwDesc->cpCount);
+ 409   2      
+ 410   2        }
+ 411   1      
+ 412   1      
+ 413   1      }
+ 414            
+ 415          void fwdAgent_queueToPlc(sSwFrmDesc  *plcTxFrmSwDesc)
+ 416          {
+ 417   1      
+ 418   1      #ifdef ETH_BRDG_DEBUG
+                ethRxFrameCnt++;
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 8   
+
+                numPlcTxCp += plcTxFrmSwDesc->cpCount;
+              #endif
+ 422   1      
+ 423   1        
+ 424   1      //  FM_Printf(FM_USER, "pq\n");
+ 425   1        datapath_queue(PLC_DATA_QUEUE, plcTxFrmSwDesc);
+ 426   1      
+ 427   1      }
+ 428          
+ 429          
+ 430          void fwdAgent_handleData(sSwFrmDesc  *plcTxFrmSwDesc)
+ 431          {
+ 432   1        switch(plcTxFrmSwDesc->rxPort)
+ 433   1        {
+ 434   2      #ifndef NO_HOST 
+ 435   2          case PORT_HOST:
+ 436   2      #endif      
+ 437   2              case PORT_ETH:
+ 438   2          case PORT_SPI:        
+ 439   2            switch(plcTxFrmSwDesc->txPort)
+ 440   2            {
+ 441   3              case PORT_PLC:
+ 442   3                fwdAgent_queueToPlc(plcTxFrmSwDesc);          
+ 443   3              break;
+ 444   3      #ifdef NO_HOST
+                      case PORT_APP:
+                        Aps_PostDataToQueue(plcTxFrmSwDesc->rxPort, plcTxFrmSwDesc);
+                      break;        
+              #endif        
+ 449   3              default:
+ 450   3                          CHAL_FreeFrameCp(plcTxFrmSwDesc->cpArr, plcTxFrmSwDesc->cpCount);       
+ 451   3              break;
+ 452   3            }
+ 453   2          break;
+ 454   2      
+ 455   2          case PORT_PLC:
+ 456   2              switch(plcTxFrmSwDesc->txPort)
+ 457   2              {
+ 458   3      #ifndef NO_HOST 
+ 459   3              case PORT_HOST:
+ 460   3      #endif      
+ 461   3              case PORT_ETH:  
+ 462   3              case PORT_SPI:
+ 463   3                fwdAgent_queueToHost( plcTxFrmSwDesc);
+ 464   3                break;
+ 465   3      #ifdef NO_HOST        
+                      case PORT_APP:
+                              if(opMode == LOWER_MAC)
+                              {
+                                  CHAL_FreeFrameCp(plcTxFrmSwDesc->cpArr, plcTxFrmSwDesc->cpCount);
+                                  return;
+                              }
+                        Aps_PostDataToQueue(plcTxFrmSwDesc->rxPort, plcTxFrmSwDesc);
+                      break;        
+              #endif        
+ 475   3            default:
+ 476   3                      CHAL_FreeFrameCp(plcTxFrmSwDesc->cpArr, plcTxFrmSwDesc->cpCount);       
+ 477   3            break;
+ 478   3          }
+ 479   2          break;    
+ 480   2          case PORT_PERIPHERAL:
+ 481   2            switch(plcTxFrmSwDesc->txPort)
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 9   
+
+ 482   2            {
+ 483   3      #ifdef NO_HOST                  
+                      case PORT_APP:
+                        Aps_PostDataToQueue(plcTxFrmSwDesc->rxPort, plcTxFrmSwDesc);
+                      break;        
+              #endif        
+ 488   3              default:
+ 489   3                          CHAL_FreeFrameCp(plcTxFrmSwDesc->cpArr, plcTxFrmSwDesc->cpCount);       
+ 490   3              break;
+ 491   3            }
+ 492   2          break;        
+ 493   2      #ifdef NO_HOST
+                  case PORT_APP:
+                    switch(plcTxFrmSwDesc->txPort)
+                    {
+                      case PORT_PERIPHERAL:
+                      {
+                        u8 xdata          *cellAddr;  
+                        cellAddr = CHAL_GetAccessToCP(plcTxFrmSwDesc->cpArr[0].cp);
+                        fwdAgent_queueToHost( plcTxFrmSwDesc);
+                      }
+                      break;  
+                  case PORT_PLC:
+                    fwdAgent_queueToPlc(plcTxFrmSwDesc);
+                    break;
+                      default:
+                                  CHAL_FreeFrameCp(plcTxFrmSwDesc->cpArr, plcTxFrmSwDesc->cpCount);         
+                      break;
+                    }
+                    break;
+              #endif  
+ 513   2          case PORT_ZIGBEE:
+ 514   2            switch(plcTxFrmSwDesc->txPort)
+ 515   2            {
+ 516   3              case PORT_HOST:
+ 517   3                fwdAgent_queueToHost(plcTxFrmSwDesc);
+ 518   3                break;
+ 519   3              case PORT_PLC:
+ 520   3                fwdAgent_queueToPlc(plcTxFrmSwDesc);
+ 521   3                break;
+ 522   3              default:
+ 523   3                CHAL_FreeFrameCp(plcTxFrmSwDesc->cpArr, plcTxFrmSwDesc->cpCount);
+ 524   3                break;    
+ 525   3            }
+ 526   2            break;
+ 527   2            
+ 528   2      
+ 529   2          default:
+ 530   2                 CHAL_FreeFrameCp(plcTxFrmSwDesc->cpArr, plcTxFrmSwDesc->cpCount);    
+ 531   2          break;
+ 532   2        }
+ 533   1      }
+ 534          
+ 535          #ifdef UM
+              
+              
+              void fwdAgent_sendFrame(eHybriiPortNum dstPort,
+                              sEvent *event)
+              {
+              
+                if (event->eventHdr.eventClass != EVENT_CLASS_MGMT)
+                {
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 10  
+
+                  return; // This function forward only mgmt frames to ports    
+                }
+                
+                switch(dstPort)
+                {
+                  case PORT_PLC:
+                    MUXL_TransmitMgmtMsg(NULL, event);
+                    break;
+              
+                  case PORT_ZIGBEE:
+                    break;
+                  
+                  case PORT_HOST:
+                    SEND_HOST_EVENT(event);
+                    break;
+              
+                  default:
+                    break;
+                      
+              
+                }
+              
+                
+              }
+              
+              
+              
+              void fwdAgent_handleEvent(sEvent *event)
+              {
+                EVENT_Free(event);
+              }
+              
+              
+              void fwdAgent_sendEvent(eFwdAgentModule mod,
+                               sEvent *event)
+              {
+                if (event->eventHdr.eventClass != EVENT_CLASS_CTRL)
+                {
+              
+                  // This function only handles Control Event to System Modules
+                }
+                  
+              
+                switch(mod)
+                {
+                  case FWDAGENT_ZIGBEE_EVENT:
+              
+              #ifdef HYBRII_ZIGBEE
+              
+              //      zb_handleEvent(event);
+              
+              #endif
+              
+                    break;
+              
+                  case FWDAGENT_DATAPATH_EVENT:
+              
+                    fwdAgent_handleEvent(event);
+                    break;
+                  
+                  case FWDAGENT_HOST_EVENT:
+              #ifdef NO_HOST
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 11  
+
+                    Aps_PostRspEventToQueue(event);
+              #else
+                    fwdAgent_SendHostEvent(event);
+              #endif
+                    break;
+              
+                  case FWDAGENT_HOMEPLUG_EVENT:
+              #ifdef UM
+              
+                    CTRLL_ReceiveEvent(NULL, event);
+              #endif
+                    break;
+              
+                  default:
+                    EVENT_Free(event);
+                    break;
+              
+                }
+              
+                return;
+              }
+              
+              
+              
+              eStatus  fwdAgent_HostTransmitEvent()
+              {
+              
+                  sEvent *event = NULL;
+                  sSlink *slink = NULL;
+              
+                if(!SLIST_IsEmpty(&hostEventQ))
+                {
+                  
+                      slink = SLIST_Pop(&hostEventQ);
+                  
+                  event = SLIST_GetEntry(slink, sEvent, link);
+                  datapath_hostTransmitFrame(event->buffDesc.dataptr, 
+                               event->buffDesc.datalen);
+                  
+                  EVENT_Free(event);
+              
+                  return STATUS_SUCCESS;
+              
+                }
+              
+                return STATUS_FAILURE;
+              
+              }
+              
+              
+              
+              eStatus fwdAgent_SendHostEvent(sEvent *event) 
+              {
+                  /* post the event to the tx queue */
+                
+                if ((hostDetected == FALSE) &&
+                    (event->eventHdr.type != HOST_EVENT_FW_READY))
+                {
+                  EVENT_Free(event);
+                  return STATUS_FAILURE;
+                }
+              
+C51 COMPILER V9.52.0.0   FRAMETASK                                                         01/10/2015 21:25:28 PAGE 12  
+
+                  SLIST_Put(&hostEventQ, &event->link);
+              
+                  return STATUS_SUCCESS;
+              }
+              #endif
+ 673          
+ 674          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    360    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     12       7
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

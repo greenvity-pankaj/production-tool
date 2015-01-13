@@ -1,0 +1,1171 @@
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE EHAL_TST
+OBJECT MODULE PLACED IN .\obj\ehal_tst.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE src\ehal_tst.c LARGE OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..
+                    -\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\src\nma;..\..\hal;.\
+                    -src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;..\..\hpgp\src\route
+                    -;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\components\utilities\linkli
+                    -st\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\sampleapp\inc;..\..\..\
+                    -components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC_SW_SYNC=1,inline,H
+                    -PGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_SPI_TX_CRC,HW_SPI_R
+                    -X_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND PRINT(.\lst\ehal_ts
+                    -t.lst) TABS(2) OBJECT(.\obj\ehal_tst.obj)
+
+line level    source
+
+   1          /*
+   2          * $Id: ehal_tst.c,v 1.2 2014/01/10 17:10:31 yiming Exp $
+   3          *
+   4          * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/project/hal/src/ehal_tst.c,v $
+   5          *
+   6          * Description : ETH HAL Test module.
+   7          *
+   8          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+   9          * All rights reserved.
+  10          *
+  11          * Purpose :
+  12          *     Defines ETH Tx/Rx test functions.
+  13          *
+  14          *
+  15          */
+  16          
+  17          #include <stdio.h>
+  18          #include <string.h>
+  19          #include <intrins.h>
+  20          #include "fm.h"
+  21          #include "hal_common.h"
+  22          #include "hal.h"
+  23          #include "hal_eth.h"
+  24          #include "hal_tst.h"
+  25          #include "hal_cfg.h"
+  26          #include "hal_spi.h"
+  27          #include "hpgpdef.h"
+  28          
+  29          //#include "papdef.h"
+  30          //#include "crm.h"
+  31          #ifdef UM
+              #include "ctrll.h"
+              #include "linkl.h"
+              #endif
+  35          #include "hpgpapi.h"
+  36          //#include "event.h"
+  37          
+  38          
+  39          #if defined(UM) || defined(HPGP_HAL_TEST)
+  40          #include "mac_intf_common.h"
+  41          #endif
+  42          #ifdef AUTO_PING
+              #include "htm.h"
+              #endif
+  45          #include "utils.h"
+  46          
+  47          int getline(char *s, int lim);
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 2   
+
+  48          
+  49          #ifdef UM 
+              #ifdef LINK_STATUS
+              u16 linkTestCnt = 0;
+              static u8  bcAddr[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+              #endif
+              #endif
+  55          
+  56          #ifdef HYBRII_ETH
+  57          
+  58          extern sConnState  ConnState[MAX_NUM_STATIONS];
+  59          u8 ETH_TxRxTest = FALSE;
+  60          u8 ethDebugON = FALSE;
+  61          u8  myStation = UNDEFINED_STATION;
+  62          u8  numSlaves = 0;  // # of test stations
+  63          u8  stationType = UNDEFINED_STATION;
+  64          sEthSimTxTestParams testParams;
+  65          extern u8 gEthMacAddrDef[];
+  66          #ifndef HPGP_MAC_SAP
+  67          void EHT_SimulateTx(sEthSimTxTestParams* pTestParams)
+  68          {
+  69   1          u16             tmpFrmLen;
+  70   1          u16             minFrmLen;
+  71   1          u16             maxFrmLen;
+  72   1          u16             curFrmLen;
+  73   1          u8              curOffsetDW;
+  74   1          u8              curDescLen;
+  75   1          eStatus         status;
+  76   1          u8              i;
+  77   1          u8              j;
+  78   1          u8              quit;
+  79   1      
+  80   1          quit         = 0;
+  81   1          curOffsetDW  = 31;///0;
+  82   1          curDescLen   = 3;///HYBRII_DEFAULT_SNID;
+  83   1      
+  84   1          // Incremental/alternating length modes
+  85   1          if(pTestParams->frmLen == 0)
+  86   1          {
+  87   2              minFrmLen  = 60;//40;
+  88   2              maxFrmLen  = 1536;
+  89   2              curFrmLen = minFrmLen;
+  90   2              printf("\nStarting from len = %u\n",curFrmLen);
+  91   2          }
+  92   1          else
+  93   1          {
+  94   2              // fixed length test
+  95   2              curFrmLen = pTestParams->frmLen;
+  96   2          }
+  97   1      
+  98   1          curOffsetDW  = pTestParams->offsetDW;///0;
+  99   1          curDescLen   = pTestParams->descLen;///HYBRII_DEFAULT_SNID;
+ 100   1          gEthHalCB.CurTxTestFrmCnt = 0;
+ 101   1          gEthHalCB.CurTxTestBytesCnt = 0;
+ 102   1      
+ 103   1          //for each frame
+ 104   1          while(1)
+ 105   1          {
+ 106   2              sSwFrmDesc             ethTxFrmSwDesc;
+ 107   2              volatile sEth2Hdr*          pEth2Hdr;
+ 108   2              sEth2Hdr                    eth2Hdr;
+ 109   2              u8*                         ethHdrArr;
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 3   
+
+ 110   2              u8                          ethHdrLenSoFar;
+ 111   2              u8                          ethHdrLenCurCP;
+ 112   2      
+ 113   2              u8  frmData    = gEthHalCB.TotalTxFrmCnt;//0;
+ 114   2              tmpFrmLen      = 0;
+ 115   2              ethHdrLenSoFar = 0;
+ 116   2              ethTxFrmSwDesc.frmLen  = curFrmLen;
+ 117   2              ethTxFrmSwDesc.cpCount = 0;
+ 118   2      
+ 119   2              pEth2Hdr = &eth2Hdr;//(sEth2Hdr xdata*) (cellAddr + tmpOffsetByte);
+ 120   2              ethHdrArr = (u8*)pEth2Hdr;
+ 121   2              memset(pEth2Hdr->dstaddr, 0xFF, MAC_ADDR_LEN);
+ 122   2              memcpy(pEth2Hdr->srcaddr, gEthMacAddrDef, MAC_ADDR_LEN);
+ 123   2              pEth2Hdr->ethtype = htons(ETH_TYPE_ARP);
+ 124   2      
+ 125   2      
+ 126   2              // create cp descriptors
+ 127   2              //for( i=0 ; i<plcTxFrmSwDesc.cpCount ; i++)
+ 128   2      //      printf("pTestParams->frmLen: %d\n", pTestParams->frmLen);
+ 129   2              while(tmpFrmLen < curFrmLen)
+ 130   2              {
+ 131   3                  u8        cp;
+ 132   3                  volatile u8 xdata *       cellAddr;
+ 133   3                  u8        tmpOffsetDW;
+ 134   3                  u8        tmpOffsetByte;
+ 135   3                  u8        tmpDescLen;
+ 136   3                  u8        actualDescLen;
+ 137   3      
+ 138   3                  ethHdrLenCurCP = 0;
+ 139   3                  // Fetch CP
+ 140   3                  do
+ 141   3                  {
+ 142   4                      status = CHAL_RequestCP(&cp);
+ 143   4                      if(CHT_Poll() == 'q')
+ 144   4                      {
+ 145   5                          // Realease CPs fetched so far for current frame -- tbd
+ 146   5                          quit = 1;
+ 147   5                          break;
+ 148   5                      }
+ 149   4                  }while (status != STATUS_SUCCESS);
+ 150   3                  i = ethTxFrmSwDesc.cpCount;
+ 151   3                  // check for user initiated exit task
+ 152   3                  if(quit)
+ 153   3                  {
+ 154   4                      break;
+ 155   4                  }
+ 156   3      
+ 157   3                  tmpOffsetDW =      curOffsetDW; //
+ 158   3                  tmpDescLen  =      curDescLen; //
+ 159   3                  // test offset and desc len - only for first CPs
+ 160   3                  if(i==0 || i==1)
+ 161   3                  {
+ 162   4                      if(pTestParams->altOffsetDescLenTest)
+ 163   4                      {
+ 164   5                          curOffsetDW--;
+ 165   5                          curDescLen+=4;
+ 166   5      
+ 167   5                          //tmpOffsetDW =        pTestParams->offsetDW; // curOffsetDW; //
+ 168   5                          //tmpDescLen  =      pTestParams->descLen; //     curDescLen;  //
+ 169   5      
+ 170   5                          tmpOffsetDW =      curOffsetDW; //
+ 171   5                          tmpDescLen  =      curDescLen; //
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 4   
+
+ 172   5                          if(curOffsetDW == 0)
+ 173   5                          {
+ 174   6                              curOffsetDW  = pTestParams->offsetDW;///0;
+ 175   6                              curDescLen   = pTestParams->descLen;///HYBRII_DEFAULT_SNID;
+ 176   6                              printf("OffsetDW & DescLen resetting to %bu & %bu respectively.\n", 
+ 177   6                                      curOffsetDW, curDescLen);
+ 178   6                          }
+ 179   5                      }//printf("curOffsetDW = %bu, tempDescLen=%bu\n", tmpOffsetDW, tmpDescLen);
+ 180   4                  }
+ 181   3                  else
+ 182   3                  {
+ 183   4                      tmpOffsetDW = 0;
+ 184   4                      tmpDescLen  = HYBRII_CELLBUF_SIZE;
+ 185   4                  }
+ 186   3      
+ 187   3                  tmpOffsetByte = tmpOffsetDW << 2;
+ 188   3                  actualDescLen =  (curFrmLen-tmpFrmLen)>tmpDescLen?tmpDescLen:(curFrmLen-tmpFrmLen);
+ 189   3                  if((i==0 || i==1 ) && tmpOffsetDW != 0)
+ 190   3                  {
+ 191   4                      FM_Printf(FM_LINFO,"curFrmLen = %u, curOffsetDW = %bu, curDescLen=%bu, free CPCnt = %bu\n"
+             -, 
+ 192   4                          curFrmLen, tmpOffsetDW, actualDescLen, CHAL_GetFreeCPCnt());
+ 193   4                  }
+ 194   3      
+ 195   3                  FM_Printf(FM_LINFO, "curOffsetByte = %bu, curDescLen=%bu\n", tmpOffsetByte, actualDescLen);
+ 196   3      
+ 197   3                  // Fill Buffer with pattern
+ 198   3                  cellAddr = CHAL_GetAccessToCP(cp);
+ 199   3                  FM_Printf(FM_LINFO, "cp = %bu, cellAddr=%08lX\n", cp, (u32)cellAddr);
+ 200   3                  if(ethHdrLenSoFar < sizeof(sEth2Hdr))
+ 201   3                  {
+ 202   4                      ethHdrLenCurCP = actualDescLen > (sizeof(sEth2Hdr)-ethHdrLenSoFar) ? 
+ 203   4                          (sizeof(sEth2Hdr)-ethHdrLenSoFar) : actualDescLen;
+ 204   4                      //memcpy(cellAddr+tmpOffsetByte, ethHdrArr + ethHdrLenSoFar, ethHdrLenCurCP);
+ 205   4                      for( j=0 ; j<ethHdrLenCurCP ; j++)
+ 206   4                      {
+ 207   5                          cellAddr[j+tmpOffsetByte] = * ( ethHdrArr + ethHdrLenSoFar + j);
+ 208   5                          //WriteU8Reg(&cellAddr[j], * (u8*)( ethHdrArr + ethHdrLenSoFar + j ));
+ 209   5                      }
+ 210   4                      ethHdrLenSoFar += ethHdrLenCurCP;
+ 211   4                      tmpOffsetByte+=ethHdrLenCurCP;
+ 212   4                  }
+ 213   3                  if(ethHdrLenCurCP<actualDescLen)
+ 214   3                  {
+ 215   4                      for(j=tmpOffsetByte ; j<tmpOffsetByte+actualDescLen-ethHdrLenCurCP ; j++)
+ 216   4                      {
+ 217   5                          cellAddr[j] = ++frmData;
+ 218   5                          //WriteU8Reg(&cellAddr[j],frmData++);
+ 219   5                      }
+ 220   4                  }
+ 221   3                  ethTxFrmSwDesc.cpArr[i].offsetU32 = tmpOffsetDW;
+ 222   3                  ethTxFrmSwDesc.cpArr[i].len  = actualDescLen;
+ 223   3      
+ 224   3                  tmpFrmLen += ethTxFrmSwDesc.cpArr[i].len;
+ 225   3                  ethTxFrmSwDesc.cpArr[i].cp = cp;
+ 226   3                  ethTxFrmSwDesc.cpCount++;
+ 227   3              }
+ 228   2      
+ 229   2              // check for user initiated exit task
+ 230   2              if(quit)
+ 231   2              {
+ 232   3                  break;
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 5   
+
+ 233   3              }
+ 234   2              else//if(status == STATUS_SUCCESS)
+ 235   2              {
+ 236   3                  do
+ 237   3                  {
+ 238   4                      // write to
+ 239   4                      status = EHAL_EthTxQWrite(&ethTxFrmSwDesc);
+ 240   4      
+ 241   4                      // check for user initiated exit task from infinite loop
+ 242   4      //              if(CHT_Poll() == 'q')
+ 243   4      //              {
+ 244   4      //                  // if TxQWrite failed, release CPs for current frame -- tbd
+ 245   4      //                    quit = 1;
+ 246   4      //                  break;
+ 247   4      //              }
+ 248   4                  }while(status == STATUS_FAILURE);
+ 249   3      
+ 250   3                  gEthHalCB.CurTxTestFrmCnt++;
+ 251   3                  gEthHalCB.CurTxTestBytesCnt+= curFrmLen;
+ 252   3      
+ 253   3                  // check for incremental length
+ 254   3                  if(pTestParams->frmLen == 0)
+ 255   3                  {
+ 256   4                      curFrmLen++;
+ 257   4                      // restart inc len test
+ 258   4                      if(curFrmLen > maxFrmLen)
+ 259   4                      {
+ 260   5                          printf("\nCur Frame Len = %u, Starting over from len %u\n",curFrmLen-1,minFrmLen);
+ 261   5                          curFrmLen = minFrmLen;
+ 262   5                      }
+ 263   4                  }
+ 264   3              }
+ 265   2              if((gEthHalCB.CurTxTestFrmCnt & (u32)(0x3FF)) == 0)
+ 266   2              {
+ 267   3                  printf("Sent %lu ETH frames.\n", gEthHalCB.CurTxTestFrmCnt);
+ 268   3              }
+ 269   2              if(!pTestParams->contMode)
+ 270   2              {
+ 271   3                  pTestParams->numFrames--;
+ 272   3                  if(!pTestParams->numFrames)
+ 273   3                  {
+ 274   4                      quit = 1;
+ 275   4                      break;
+ 276   4                  }
+ 277   3              }
+ 278   2      
+ 279   2              if(!quit && pTestParams->delay != 0xFF)
+ 280   2              {
+ 281   3                  //u32 delay = pTestParams->delay<<6;
+ 282   3                  u32 delay64ticks = pTestParams->delay;
+ 283   3                  if(delay64ticks == 0)
+ 284   3                  {
+ 285   4                      u8 userInput = 0;
+ 286   4                      printf("press c to continue\n");
+ 287   4                      while(1)
+ 288   4                      {
+ 289   5                          userInput = CHT_Poll();
+ 290   5                          if( userInput == 'c' || userInput == 'C')
+ 291   5                          {
+ 292   6                              // exit delay loop and resume transmission
+ 293   6                              break;
+ 294   6                          }
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 6   
+
+ 295   5                          else    if( userInput == 'q' || userInput == 'Q')
+ 296   5                          {
+ 297   6                              // exit delay loop and quite transmission
+ 298   6                              quit = 1;
+ 299   6                              break;
+ 300   6                          }
+ 301   5                      }
+ 302   4                  }
+ 303   3                  else
+ 304   3                  while(delay64ticks--)
+ 305   3                  {
+ 306   4                      CHAL_DelayTicks(64);
+ 307   4                  }
+ 308   3      
+ 309   3              }
+ 310   2              // getkey
+ 311   2              if(quit )//|| CHAL_GetFreeCPCnt() < 116 || EHAL_GetEthTxQFreeDescCnt() < 60 )
+ 312   2              {
+ 313   3                  printf("Quit Tx: Free CP Cnt = %bu, curFrmLen = %u\n", CHAL_GetFreeCPCnt(), curFrmLen);
+ 314   3                  break;
+ 315   3              }
+ 316   2          } // while(1)
+ 317   1          printf("\nSent %lu ETH frames, %lu bytes.\n", 
+ 318   1                  gEthHalCB.CurTxTestFrmCnt, gEthHalCB.CurTxTestBytesCnt);
+ 319   1      }
+ 320          
+ 321          eStatus ETH_allocOneCP(u8 *cp)
+ 322          {
+ 323   1          u8  i =0;
+ 324   1          eStatus status;
+ 325   1      
+ 326   1          do
+ 327   1          {
+ 328   2              status = CHAL_RequestCP(cp);
+ 329   2              i++;
+ 330   2          }while ((status != STATUS_SUCCESS) && (++i < 10));
+ 331   1      
+ 332   1          if(status != STATUS_SUCCESS)
+ 333   1          {
+ 334   2              printf("EHT_allocOneCP: cannot allocate a CP. Exit !!!\n");
+ 335   2          }
+ 336   1          return(status);
+ 337   1      }
+ 338          
+ 339          eStatus ETH_alloc1stCP(u8 *srcaddr, u8 *dstaddr, sEthGCIHdr *pSrcGCIHdr, 
+ 340                                 sSwFrmDesc *pEthTxFrmSwDesc)
+ 341          {
+ 342   1          u8  cp;
+ 343   1          volatile sEth2Hdr   *pEth2Hdr;
+ 344   1          volatile u8 XDATA * cellAddr;
+ 345   1          volatile sEthGCIHdr *pGCIHdr;
+ 346   1      
+ 347   1          if (ETH_allocOneCP(&cp) == STATUS_FAILURE)
+ 348   1              return(STATUS_FAILURE);
+ 349   1      
+ 350   1          cellAddr = CHAL_GetAccessToCP(cp);
+ 351   1      
+ 352   1          // Fill MAC header
+ 353   1          pEth2Hdr = (sEth2Hdr *) cellAddr;
+ 354   1          memcpy(pEth2Hdr->srcaddr, srcaddr, MAC_ADDR_LEN);
+ 355   1          memcpy(pEth2Hdr->dstaddr, dstaddr, MAC_ADDR_LEN);
+ 356   1          pEth2Hdr->ethtype = ETH_TYPE_GREENVITY;
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 7   
+
+ 357   1      
+ 358   1          // Fill Greenvity header
+ 359   1          // remember that not all GCI fields are used by all commands
+ 360   1          pGCIHdr = (sEthGCIHdr *) (cellAddr + sizeof(sEth2Hdr));
+ 361   1          pGCIHdr->pktType = pSrcGCIHdr->pktType;
+ 362   1          pGCIHdr->testType = pSrcGCIHdr->testType;
+ 363   1          memcpy(pGCIHdr->slaveMACaddr, pSrcGCIHdr->slaveMACaddr, MAC_ADDR_LEN);
+ 364   1      
+ 365   1          // set up CP for xmit
+ 366   1          pEthTxFrmSwDesc->cpCount = 1;
+ 367   1          pEthTxFrmSwDesc->cpArr[0].offsetU32 = 0;
+ 368   1          // len of pkt is the same of len of 1st cp
+ 369   1          pEthTxFrmSwDesc->cpArr[0].len  = sizeof(sEth2Hdr) + sizeof(sEthGCIHdr);
+ 370   1          pEthTxFrmSwDesc->cpArr[0].cp = cp;
+ 371   1          return(STATUS_SUCCESS);
+ 372   1      }
+ 373          
+ 374          eStatus ETH_xmitCmdPkt(u8 *srcaddr, u8 *dstaddr, sEthGCIHdr *pSrcGCIHdr)
+ 375          {
+ 376   1          sSwFrmDesc ethTxFrmSwDesc;
+ 377   1          eStatus status;
+ 378   1          u8  i;
+ 379   1      
+ 380   1          // this is a command frame, a frame consists of only ETH and GCI headers, so only 1 cp is needed
+ 381   1          ethTxFrmSwDesc.frmLen = sizeof(sEth2Hdr) + sizeof(sEthGCIHdr);
+ 382   1          status = ETH_alloc1stCP(srcaddr, dstaddr, pSrcGCIHdr, &ethTxFrmSwDesc);
+ 383   1          if (status == STATUS_FAILURE)
+ 384   1          {
+ 385   2              printf("EHT_xmitCmdPkt: cannot allocate a CP. Packet type = %buExit !!!\n", 
+ 386   2                      pSrcGCIHdr->pktType);
+ 387   2              return(status);
+ 388   2          }
+ 389   1      
+ 390   1          // xmit the packet
+ 391   1          i = 0;
+ 392   1          do
+ 393   1          {
+ 394   2              status = EHAL_EthTxQWrite(&ethTxFrmSwDesc);
+ 395   2              if (status == STATUS_FAILURE)
+ 396   2              {
+ 397   3                  CHT_Poll();
+ 398   3                  i++;
+ 399   3              }
+ 400   2          }while((status == STATUS_FAILURE) && (++i < 10));
+ 401   1      
+ 402   1          if(status == STATUS_FAILURE)
+ 403   1          {
+ 404   2              u8 i;
+ 405   2      
+ 406   2         //     printf("EHT_xmitCmdPkt: cannot xmit a packet. Packet type = %buExit !!!\n", 
+ 407   2         //             pSrcGCIHdr->pktType);
+ 408   2              // free the CP and return
+ 409   2              for (i = 0; i < ethTxFrmSwDesc.cpCount; i++)
+ 410   2                  CHAL_DecrementReleaseCPCnt(ethTxFrmSwDesc.cpArr[i].cp);
+ 411   2          }
+ 412   1          return(status);
+ 413   1      }
+ 414          extern u8 gEthMacAddrBrdcast[];
+ 415          
+ 416          eStatus EHT_OpenConn(sConnState *pConnState, sEthSimTxTestParams *pTestParams)
+ 417          {
+ 418   1          sEthGCIHdr GCIHdr;
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 8   
+
+ 419   1          eStatus status;
+ 420   1          u16 i;
+ 421   1      
+ 422   1          memset(&GCIHdr, 0, sizeof(sEthGCIHdr));
+ 423   1          memcpy(pConnState->slaveMACaddr, pTestParams->slaveMACaddr, MAC_ADDR_LEN);
+ 424   1          memcpy(pConnState->myMACaddr, pTestParams->myMACaddr, MAC_ADDR_LEN);
+ 425   1          pConnState->numFrames = pTestParams->numFrames;
+ 426   1      
+ 427   1          memcpy(GCIHdr.slaveMACaddr, pTestParams->slaveMACaddr, MAC_ADDR_LEN);
+ 428   1          GCIHdr.pktType =  CMD_CONN_REQ_PKT;
+ 429   1          GCIHdr.testType =  pTestParams->testType;
+ 430   1          status = ETH_xmitCmdPkt(pTestParams->myMACaddr, gEthMacAddrBrdcast, &GCIHdr);
+ 431   1          if (status == STATUS_FAILURE)
+ 432   1              return(status);
+ 433   1      
+ 434   1          // wait for a ConnResp from the slave
+ 435   1          i = 0;
+ 436   1          do
+ 437   1          {
+ 438   2              // give the ETH RCV ISR a chance to be called
+ 439   2              CHT_Poll();
+ 440   2              i++;
+ 441   2          } while ((pConnState->state == GCI_STATE_CLOSED) && (i<10000));
+ 442   1      
+ 443   1          if (pConnState->state == GCI_STATE_CLOSED)
+ 444   1          {
+ 445   2        //      printf("EHT_estConn: Station %bx did not return a Conn Response from a CONNECT REQUEST.\n",
+ 446   2         //             pConnState->slaveMACaddr[MAC_ADDR_LEN-1]);
+ 447   2              memset(pConnState, 0, sizeof(sConnState));  // clear ConnState
+ 448   2              return(STATUS_FAILURE);
+ 449   2          }
+ 450   1      
+ 451   1          return(STATUS_SUCCESS);
+ 452   1      }
+ 453          
+ 454          eStatus EHT_CloseConn(sConnState *pConnState)
+ 455          {
+ 456   1          sEthGCIHdr GCIHdr;
+ 457   1          eStatus status;
+ 458   1          u16 i=0;
+ 459   1      
+ 460   1          if (pConnState->state != GCI_STATE_OPEN)
+ 461   1              return(STATUS_FAILURE);
+ 462   1      
+ 463   1          memset(&GCIHdr, 0, sizeof(sEthGCIHdr));
+ 464   1          GCIHdr.pktType =  CMD_DISCON_REQ_PKT;
+ 465   1          status = ETH_xmitCmdPkt(pConnState->myMACaddr, pConnState->slaveMACaddr, &GCIHdr);
+ 466   1          if (status == STATUS_FAILURE)
+ 467   1              return(status);
+ 468   1      
+ 469   1          // we just sent out a Disconnect request
+ 470   1          // wait for an ACK from the client
+ 471   1          do
+ 472   1          {
+ 473   2              CHT_Poll();
+ 474   2              i++;
+ 475   2          } while ((pConnState->state == GCI_STATE_OPEN) && (i< 10000));
+ 476   1          if (pConnState->state == GCI_STATE_OPEN)
+ 477   1          {
+ 478   2            //  printf("EHT_CloseConn: Station %bx did not return a DISCON ACK from a DISCON REQUEST. Exit !!!\n
+             -",
+ 479   2            //          pConnState->slaveMACaddr[MAC_ADDR_LEN-1]);
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 9   
+
+ 480   2              memset(pConnState, 0, sizeof(sConnState));  // clear ConnState
+ 481   2              return(STATUS_FAILURE);
+ 482   2          }
+ 483   1         // printf("\n\nMaster sent %ld ETH Data frames, received %ld ETH Data frames.\n"
+ 484   1         //        "Station %bu sent %ld ETH Data frames, received %ld ETH Data frames\n\n\n",
+ 485   1         //         pConnState->my_numPktTx, pConnState->my_numPktRx, pConnState->slaveMACaddr[5],
+ 486   1         //         pConnState->slave_numPktTx, pConnState->slave_numPktRx);
+ 487   1          memset(pConnState, 0, sizeof(sConnState));  // clear ConnState
+ 488   1      //  stationType = UNDEFINED_STATION;        // set it to unknown
+ 489   1          return(STATUS_SUCCESS);
+ 490   1      }
+ 491          
+ 492          eStatus EHT_xmitData(sConnState *pConnState, sEthSimTxTestParams *pTestParms)
+ 493          {
+ 494   1          u16             curFrmLen;
+ 495   1          u16             tmpFrmLen;
+ 496   1          u8              i, j;
+ 497   1          u8              quit=FALSE;
+ 498   1          u32             numFrames2xmit;
+ 499   1          u32             maxNumFrames2xmit;
+ 500   1          eStatus         status=STATUS_SUCCESS;
+ 501   1      
+ 502   1          curFrmLen = pTestParms->frmLen;
+ 503   1      
+ 504   1          // # of frames to xmit per iteration
+ 505   1          if (pTestParms->numFrames2xmit == 0)
+ 506   1              maxNumFrames2xmit = pTestParms->numFrames;
+ 507   1          else maxNumFrames2xmit = pTestParms->numFrames2xmit;
+ 508   1      
+ 509   1          for (numFrames2xmit = 0; numFrames2xmit < maxNumFrames2xmit; numFrames2xmit++)  // for each DATA frame
+ 510   1          {
+ 511   2              sSwFrmDesc             ethTxFrmSwDesc;
+ 512   2              u8                          frmData    =  '0';
+ 513   2              u8                          userInput=0;
+ 514   2      
+ 515   2              memset(&ethTxFrmSwDesc, 0, sizeof(sEthTxFrmSwDesc));
+ 516   2              tmpFrmLen      = 0;
+ 517   2              ethTxFrmSwDesc.frmLen  = curFrmLen;
+ 518   2              ethTxFrmSwDesc.cpCount = 0;
+ 519   2      
+ 520   2              while(tmpFrmLen < curFrmLen)        // for each CP in a DATA frame
+ 521   2              {
+ 522   3                  u8        tmpCpCount;
+ 523   3                  u8        tmpOffsetByte;
+ 524   3                  volatile u8 xdata *cellAddr;
+ 525   3                  u16       numBytes2Write;
+ 526   3                  volatile sEthGCIHdr GCIHdr;
+ 527   3      
+ 528   3                  tmpCpCount = ethTxFrmSwDesc.cpCount;
+ 529   3      
+ 530   3                  if (tmpCpCount == 0)
+ 531   3                  {
+ 532   4                      // first CP contains the ETH header and GCI header
+ 533   4                      // for DATA pkt, GCI header only contains the pktType
+ 534   4                      memset(&GCIHdr, 0, sizeof(sEthGCIHdr));
+ 535   4                      GCIHdr.pktType =  CMD_DATA_PKT;
+ 536   4      
+ 537   4                      // send a DATA pkt
+ 538   4                      status = ETH_alloc1stCP(pConnState->myMACaddr, pConnState->slaveMACaddr, 
+ 539   4                                              &GCIHdr, &ethTxFrmSwDesc);
+ 540   4                      if (status == STATUS_FAILURE)
+ 541   4                      {
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 10  
+
+ 542   5                          printf("EHT_xmitData: Cannot allocate 1st CP. Client's MAC address (last byte) %bx. Ex
+             -it !!!\n",
+ 543   5                              pConnState->slaveMACaddr[MAC_ADDR_LEN-1]);
+ 544   5                          return(status);
+ 545   5                      }
+ 546   4                      tmpOffsetByte = sizeof(sEth2Hdr) + sizeof(sEthGCIHdr);
+ 547   4                  } else
+ 548   3                  {
+ 549   4                      // subsequent CP contains only data
+ 550   4                      u8 cp;
+ 551   4      
+ 552   4                      status = ETH_allocOneCP(&cp);
+ 553   4                      if (status == STATUS_FAILURE)
+ 554   4                      {
+ 555   5                          printf("EHT_xmitData: Cannot allocate a CP. Client's MAC address (last byte) %bx. Exit
+             - !!!\n",
+ 556   5                                  pConnState->slaveMACaddr[MAC_ADDR_LEN-1]);
+ 557   5                          return(status);
+ 558   5                      }
+ 559   4                      ethTxFrmSwDesc.cpArr[tmpCpCount].offsetU32 = 0;
+ 560   4                      ethTxFrmSwDesc.cpArr[tmpCpCount].len  = 0;
+ 561   4                      ethTxFrmSwDesc.cpArr[tmpCpCount].cp = cp;
+ 562   4                      ethTxFrmSwDesc.cpCount++;
+ 563   4                      tmpOffsetByte = 0;
+ 564   4                  }
+ 565   3      
+ 566   3                  // fill frame with data
+ 567   3                  cellAddr = CHAL_GetAccessToCP(ethTxFrmSwDesc.cpArr[tmpCpCount].cp);
+ 568   3                  // # of bytes to write
+ 569   3                  numBytes2Write = (curFrmLen - tmpFrmLen) > HYBRII_CELLBUF_SIZE ? 
+ 570   3                                    HYBRII_CELLBUF_SIZE:(curFrmLen - tmpFrmLen);
+ 571   3      
+ 572   3                  // if 1st CP, minimal len is the headers
+ 573   3                  if (numBytes2Write < tmpOffsetByte)
+ 574   3                       numBytes2Write = tmpOffsetByte;
+ 575   3      
+ 576   3                  for(j=tmpOffsetByte; j<numBytes2Write; j++)
+ 577   3                  {
+ 578   4                      cellAddr[j] = frmData;
+ 579   4                      if (++frmData == 'z')
+ 580   4                          frmData = 'a';
+ 581   4                  }
+ 582   3                  ethTxFrmSwDesc.cpArr[tmpCpCount].len = numBytes2Write;
+ 583   3                  tmpFrmLen += numBytes2Write;
+ 584   3              } // while tmp..
+ 585   2      
+ 586   2              do
+ 587   2              {
+ 588   3                  // xmit the frame
+ 589   3                  status = EHAL_EthTxQWrite(&ethTxFrmSwDesc);
+ 590   3                  if (status == STATUS_FAILURE)
+ 591   3                  {
+ 592   4                      userInput = CHT_Poll();
+ 593   4                      i++;
+ 594   4                  }
+ 595   3              }while((status == STATUS_FAILURE) && (++i < 10));
+ 596   2              if(status == STATUS_FAILURE)
+ 597   2              {
+ 598   3                  printf("EHT_xmitData: cannot xmit a packet. Exit !!!\n");
+ 599   3                  return(STATUS_FAILURE);
+ 600   3              }
+ 601   2      
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 11  
+
+ 602   2              // the tx counter is only for DATA pkts
+ 603   2              pConnState->my_numPktTx++;
+ 604   2              if(((pConnState->my_numPktTx % 64) == 0) && (pConnState->my_numPktTx > 0))
+ 605   2              {
+ 606   3                  printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+ 607   3                         "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b");
+ 608   3                  if(pConnState->testType == HALF_DUPLEX_TEST)
+ 609   3                      printf("Sent %ld ETH Data frames", pConnState->my_numPktTx);
+ 610   3                  else
+ 611   3                      printf("Sent %ld Data frames, Rcvd %ld Data frames", 
+ 612   3                              pConnState->my_numPktTx, pConnState->my_numPktRx);
+ 613   3              }
+ 614   2      
+ 615   2              // If not continuous mode, decrement total # of pkts
+ 616   2              if(!pTestParms->contMode)
+ 617   2              {
+ 618   3                  pConnState->numFrames--;
+ 619   3                  if(!pConnState->numFrames)
+ 620   3                  {
+ 621   4                      quit = 1;
+ 622   4                  }
+ 623   3              }
+ 624   2      
+ 625   2              if(pTestParms->delay != 0xFF)
+ 626   2              {
+ 627   3                  u32 delay64ticks = pTestParms->delay;
+ 628   3                  if(delay64ticks == 0)
+ 629   3                  {
+ 630   4                      printf("press c to continue or q to quit\n");
+ 631   4                      while(1)
+ 632   4                      {
+ 633   5                          userInput = CHT_Poll();
+ 634   5                          if( userInput == 'c' || userInput == 'C')
+ 635   5                          {
+ 636   6                              // exit delay loop and resume transmission
+ 637   6                              break;
+ 638   6                          }
+ 639   5                          else    if( userInput == 'q' || userInput == 'Q')
+ 640   5                          {
+ 641   6                              // exit delay loop and quit transmission
+ 642   6                              quit = 1;
+ 643   6                              break;
+ 644   6                          }
+ 645   5                      }
+ 646   4                  }
+ 647   3                  else
+ 648   3                      while(delay64ticks--)
+ 649   3                      {
+ 650   4                          CHAL_DelayTicks(64);
+ 651   4                      }
+ 652   3              }
+ 653   2      
+ 654   2              // Check if user has typed 'q' for quit
+ 655   2              if (!userInput)
+ 656   2                  userInput = CHT_Poll();
+ 657   2              if( userInput == 'q' || userInput == 'Q')
+ 658   2                  // user wants to quit test
+ 659   2                  quit = 1;
+ 660   2      
+ 661   2              if (quit)
+ 662   2              {
+ 663   3                  // if quit, a DISCON REQ is sent
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 12  
+
+ 664   3                  return(EHT_CloseConn(pConnState));
+ 665   3              }
+ 666   2          } // for each frame...
+ 667   1          return(STATUS_SUCCESS);
+ 668   1      }
+ 669          
+ 670          void EHT_testTxRxStations(sEthSimTxTestParams *pTestParms)
+ 671          {
+ 672   1          u8  i, numStations, numClosedStations, numOpenStations=0;
+ 673   1          eStatus         status;
+ 674   1          sConnState *pConnState;
+ 675   1      
+ 676   1          memset(ConnState, 0, sizeof(sConnState)*MAX_NUM_STATIONS);
+ 677   1      
+ 678   1          numStations = pTestParms->numSlaves;
+ 679   1          // first, establish connections with all available stations
+ 680   1          for (i = 0; i < numStations; i++)
+ 681   1          {
+ 682   2              // assign individual MAC addr to each station
+ 683   2              pTestParms->slaveMACaddr[MAC_ADDR_LEN-1] = i;   
+ 684   2              status = EHT_OpenConn(&ConnState[i], pTestParms);
+ 685   2              if (status == STATUS_SUCCESS)
+ 686   2              {
+ 687   3                  printf("Station %bu is ready for the test\n", i);
+ 688   3                  numOpenStations++;
+ 689   3              }
+ 690   2          }
+ 691   1      
+ 692   1          if (!numOpenStations)
+ 693   1          {
+ 694   2              printf("No Test Station on the Network ! Exit\n");
+ 695   2              return;
+ 696   2          }
+ 697   1      
+ 698   1          // now xmit data to each slave station
+ 699   1          while (TRUE)
+ 700   1          {
+ 701   2              numClosedStations = 0;
+ 702   2              for (i = 0; i < numStations; i++)
+ 703   2              {
+ 704   3                  pConnState = &ConnState[i];
+ 705   3                  if (pConnState->state == GCI_STATE_CLOSED)
+ 706   3                  {
+ 707   4                      numClosedStations++;
+ 708   4                      continue;
+ 709   4                  }
+ 710   3      
+ 711   3                  status = EHT_xmitData(pConnState, pTestParms);
+ 712   3                  if (status == STATUS_FAILURE)
+ 713   3                      printf("Failed to xmit data to station %bu\n", i);
+ 714   3              }
+ 715   2      
+ 716   2              if (numClosedStations == numStations)
+ 717   2                  // all stations are done with test
+ 718   2                  break;
+ 719   2          }
+ 720   1      }
+ 721          
+ 722          void EHT_BasicTxRxMenu(u8 txrxtest)
+ 723          {
+ 724   1          // test mode variables
+ 725   1          u16             frmLen;
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 13  
+
+ 726   1          u32             numFrames;
+ 727   1          u32             numFrames2xmit;
+ 728   1          u8              alterDescLenNOffset;
+ 729   1          char            input[100];
+ 730   1          u8              testType;
+ 731   1          u8              numbytes;
+ 732   1          u8              MACaddr[MAC_ADDR_LEN];
+ 733   1          u32             delay;
+ 734   1          u8 defMasterMACaddr[MAC_ADDR_LEN] = {0x10, 0x10, 0x10, 0x10, 0x10, 0x01};
+ 735   1          u8 defSlaveMACaddr[MAC_ADDR_LEN] = {0x20, 0x20, 0x20, 0x20, 0x20, 0x00};
+ 736   1      
+ 737   1          if (txrxtest)
+ 738   1          {
+ 739   2              do
+ 740   2              {
+ 741   3                  printf("Enter number of test stations  : 1-%bu (default is 1)        :: ", MAX_NUM_STATIONS);
+ 742   3                  numbytes = getline(input, sizeof(input));
+ 743   3                  if (numbytes == 1)
+ 744   3                  {
+ 745   4                      // user hits <CR>: take the default value
+ 746   4                      numSlaves = 1;
+ 747   4                      break;
+ 748   4                  } else
+ 749   3                  {
+ 750   4                      sscanf(input,"%bu",&numSlaves);
+ 751   4                      printf("numslaves=%bu\n", numSlaves);
+ 752   4                      if((numSlaves >= 1) && (numSlaves <= MAX_NUM_STATIONS))
+ 753   4                      {
+ 754   5                          break;
+ 755   5                      }
+ 756   4                  }
+ 757   3              } while (TRUE);
+ 758   2              testParams.numSlaves = numSlaves;
+ 759   2          }
+ 760   1      
+ 761   1          if (txrxtest == 2)
+ 762   1          {
+ 763   2              // quick txrx test: set everything else default values
+ 764   2              testParams.testType  = FULL_DUPLEX_TEST;
+ 765   2              memcpy(testParams.myMACaddr, defMasterMACaddr, MAC_ADDR_LEN);
+ 766   2              memcpy(testParams.slaveMACaddr, defSlaveMACaddr, MAC_ADDR_LEN);
+ 767   2              testParams.frmLen = 1500;
+ 768   2              testParams.numFrames  = 2000;
+ 769   2              testParams.contMode = 0;
+ 770   2              testParams.numFrames2xmit = 100;
+ 771   2              testParams.delay = 50;
+ 772   2              printf("Quick Transmit/Receive Test's default values: \n");
+ 773   2              printf("    - Test method: Full Duplex\n");
+ 774   2              printf("    - Master MAC Address: %bx %bx %bx %bx %bx %bx\n",
+ 775   2                      testParams.myMACaddr[0], testParams.myMACaddr[1], testParams.myMACaddr[2], 
+ 776   2                      testParams.myMACaddr[3], testParams.myMACaddr[4], testParams.myMACaddr[5]);
+ 777   2              printf("    - Slave MAC Multicast Address: %bx %bx %bx %bx %bx \n",
+ 778   2                      testParams.slaveMACaddr[0], testParams.slaveMACaddr[1], testParams.slaveMACaddr[2], 
+ 779   2                      testParams.slaveMACaddr[3], testParams.slaveMACaddr[4]);
+ 780   2              printf("    - # of bytes per frame: %d\n", testParams.frmLen);
+ 781   2              printf("    - # of total frames to transmit: %ld\n", testParams.numFrames);
+ 782   2              printf("    - # of frames per iteration: %ld\n", testParams.numFrames2xmit);
+ 783   2              printf("    - Delay (in ticks) after each transmission: %ld\n", testParams.delay);
+ 784   2          }
+ 785   1      
+ 786   1          if (txrxtest == 1)
+ 787   1          {
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 14  
+
+ 788   2              do
+ 789   2              {
+ 790   3                  printf("Enter Test Type  : 1-Half Duplex, 2-Full Duplex (Default is Half-Duplex)        :: ");
+ 791   3                  numbytes = getline(input, sizeof(input));
+ 792   3                  if (numbytes == 1)
+ 793   3                  {
+ 794   4                      // user hits <CR>: take the default value
+ 795   4                      testType = HALF_DUPLEX_TEST;
+ 796   4                      break;
+ 797   4                  } else
+ 798   3                  {
+ 799   4                      if((sscanf(input,"%bx",&testType) == 1) && ((testType == HALF_DUPLEX_TEST) || 
+ 800   4                          (testType == FULL_DUPLEX_TEST)))
+ 801   4                      {
+ 802   5                          break;
+ 803   5                      }
+ 804   4                  }
+ 805   3              } while (TRUE);
+ 806   2              testParams.testType  = testType;
+ 807   2      
+ 808   2              do
+ 809   2              {
+ 810   3      
+ 811   3                  printf("Enter Master MAC address  : (Default is 0x10 0x10 0x10 0x10 0x10 0x01)        :: ");
+ 812   3                  if ((numbytes = getline(input, sizeof(input))) == 1)
+ 813   3                  {
+ 814   4                      // user hits <CR>: take the default value
+ 815   4                      memcpy(MACaddr, defMasterMACaddr, MAC_ADDR_LEN);
+ 816   4                      break;
+ 817   4                  } else
+ 818   3                  {
+ 819   4                      if (sscanf(input,"%bx %bx %bx %bx %bx %bx", &MACaddr[0], 
+ 820   4                              &MACaddr[1], &MACaddr[2], &MACaddr[3], &MACaddr[4], 
+ 821   4                              &MACaddr[5]) == MAC_ADDR_LEN)
+ 822   4                      {
+ 823   5                          break;
+ 824   5                      }
+ 825   4                  }
+ 826   3              } while (TRUE);
+ 827   2              memcpy(testParams.myMACaddr, MACaddr, MAC_ADDR_LEN);
+ 828   2      
+ 829   2              do
+ 830   2              {
+ 831   3      
+ 832   3                  printf("Enter Slave MAC multicast address (the first 5 bytes)  :",
+ 833   3                         "(Default is 0x20 0x20 0x20 0x20 0x20)        :: ");
+ 834   3                  if ((numbytes = getline(input, sizeof(input))) == 1)
+ 835   3                  {
+ 836   4                      // user hits <CR>: take the default value
+ 837   4                      memcpy(MACaddr, defSlaveMACaddr, MAC_ADDR_LEN);
+ 838   4                      break;
+ 839   4                  } else
+ 840   3                  {
+ 841   4                      if (sscanf(input,"%bx %bx %bx %bx %bx", &MACaddr[0], &MACaddr[1], &MACaddr[2], 
+ 842   4                                 &MACaddr[3], &MACaddr[4]) == (MAC_ADDR_LEN-1))
+ 843   4                      {
+ 844   5                          MACaddr[MAC_ADDR_LEN-1] = 0;
+ 845   5                          break;
+ 846   5                      }
+ 847   4                  }
+ 848   3              } while (TRUE);
+ 849   2              memcpy(testParams.slaveMACaddr, MACaddr, MAC_ADDR_LEN);
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 15  
+
+ 850   2      
+ 851   2              // Make sure that if master and slave have 
+ 852   2              // the same subnet then master's last byte MAC addr 
+ 853   2              // does not fall into the slave's range 
+ 854   2              // of addrs, ie. the last byte has to be
+ 855   2              // different. Otherwise, master's addr will 
+ 856   2              // be the same with one of slave's
+ 857   2              if (!memcmp(MACaddr, testParams.myMACaddr, MAC_ADDR_LEN-1))
+ 858   2              {
+ 859   3                  printf("Master's last bye=%bx, numSlaves=%bu\n", testParams.myMACaddr[MAC_ADDR_LEN-1], testPar
+             -ams.numSlaves);
+ 860   3                  if ((testParams.myMACaddr[MAC_ADDR_LEN-1] >= 0) && 
+ 861   3                      (testParams.myMACaddr[MAC_ADDR_LEN-1] < testParams.numSlaves))
+ 862   3                  {
+ 863   4                      testParams.myMACaddr[MAC_ADDR_LEN-1] =  testParams.numSlaves;
+ 864   4                      printf("Master's MAC address is in conflict with Slave's\n"
+ 865   4                             "Master's MAC address is changed to %bx %bx %bx %bx %bx %bx\n",
+ 866   4                             testParams.myMACaddr[0], testParams.myMACaddr[1], testParams.myMACaddr[2],
+ 867   4                             testParams.myMACaddr[3], testParams.myMACaddr[4], testParams.myMACaddr[5]);
+ 868   4                  }
+ 869   3              }                   
+ 870   2          } //if txrxtest == 1
+ 871   1      
+ 872   1          if ((txrxtest == 0) || (txrxtest == 1))
+ 873   1          {
+ 874   2              do
+ 875   2              {
+ 876   3                  printf("Enter FrameLen  : 0-IncLen, 40 to 1536-Fixed Len        :: ");
+ 877   3                  while (getline(input, sizeof(input)) > 0)
+ 878   3                  {
+ 879   4                      if(sscanf(input,"%d",&frmLen) >= 1)
+ 880   4                      break;
+ 881   4                  }
+ 882   3              }while (frmLen<40 && frmLen>1536);
+ 883   2      
+ 884   2              printf("Enter number of frames: 0-Continuous Mode, N-NumOfFrames :: ");
+ 885   2              while (getline(input, sizeof(input)) > 0)
+ 886   2              {
+ 887   3                  if(sscanf(input,"%ld",&numFrames) >= 1)
+ 888   3                  break;
+ 889   3              }
+ 890   2          }
+ 891   1      
+ 892   1          if (txrxtest == 1)
+ 893   1          {
+ 894   2              u32 limit;
+ 895   2      
+ 896   2              // if xmit continuously, we limit the #of frames to xmit each iteration to 10000
+ 897   2              if (!numFrames)
+ 898   2                  limit = 10000;
+ 899   2              else limit = numFrames;
+ 900   2      
+ 901   2              do
+ 902   2              {
+ 903   3                  printf("Enter number of frames to transmit each iteration  : 0-transmit ",
+ 904   3                         "the maximum, 1 to numofFrames-1 (Default is 1)        :: ");
+ 905   3                  numbytes = getline(input, sizeof(input));
+ 906   3                  if (numbytes == 1)
+ 907   3                  {
+ 908   4                      // user hits <CR>: take the default value
+ 909   4                      numFrames2xmit = 1;
+ 910   4                      break;
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 16  
+
+ 911   4                  } else sscanf(input,"%ld",&numFrames2xmit);
+ 912   3              } while (numFrames2xmit<0 || numFrames2xmit>limit);
+ 913   2              testParams.numFrames2xmit = numFrames2xmit;
+ 914   2          }
+ 915   1      
+ 916   1          if (txrxtest == 0)
+ 917   1          {
+ 918   2              // TXRX does not do the DescLen and Offset test
+ 919   2              do
+ 920   2              {
+ 921   3                  printf("DescLen & Offset Test Enable? : 0-Disable, 1-Enable      :: ");
+ 922   3                  while (getline(input, sizeof(input)) > 0)
+ 923   3                  {
+ 924   4                      if(sscanf(input,"%bd",&alterDescLenNOffset) >= 1)
+ 925   4                      break;
+ 926   4                  }
+ 927   3              }while(alterDescLenNOffset != 0 && alterDescLenNOffset!= 1);
+ 928   2          }
+ 929   1      
+ 930   1          if ((txrxtest == 0) || (txrxtest == 1))
+ 931   1          {
+ 932   2              // fill tx test params structure
+ 933   2              printf("Enter delay (unit of 64 timer ticks)    :: ");
+ 934   2              while (getline(input, sizeof(input)) > 0)
+ 935   2              {
+ 936   3                  if(sscanf(input,"%lu",&delay) >= 1)
+ 937   3                  break;
+ 938   3              }
+ 939   2              testParams.delay = delay;
+ 940   2      
+ 941   2              testParams.numFrames  = numFrames;
+ 942   2              if(!testParams.numFrames)
+ 943   2              {
+ 944   3                  testParams.contMode = 1;
+ 945   3              }
+ 946   2              else
+ 947   2              {
+ 948   3                  testParams.contMode = 0;
+ 949   3              }
+ 950   2      
+ 951   2              testParams.frmLen = frmLen;
+ 952   2              if (txrxtest == 0)
+ 953   2              {
+ 954   3                  testParams.altOffsetDescLenTest = alterDescLenNOffset;
+ 955   3      
+ 956   3                  if(alterDescLenNOffset)
+ 957   3                  {
+ 958   4                      testParams.offsetDW  = 31;
+ 959   4                      testParams.descLen   = 3;
+ 960   4                  }
+ 961   3                  else
+ 962   3                  {
+ 963   4                      testParams.offsetDW  = 0;
+ 964   4                      testParams.descLen   = HYBRII_CELLBUF_SIZE;
+ 965   4                  }
+ 966   3              }
+ 967   2          }
+ 968   1      
+ 969   1          if (txrxtest)
+ 970   1              // tx/rx test
+ 971   1              EHT_testTxRxStations(&testParams);
+ 972   1          else
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 17  
+
+ 973   1              // tx test
+ 974   1              EHT_SimulateTx(&testParams);
+ 975   1      }
+ 976          #endif
+ 977          #endif
+ 978          #ifdef DOTHIS
+              void testThis()
+              {
+                  eStatus status;
+                  u16 i, frmLen;
+                  u8 defMasterMACaddr[MAC_ADDR_LEN] = {0x10, 0x10, 0x10, 0x10, 0x10, 0x01};
+                  u8 defSlaveMACaddr[MAC_ADDR_LEN] = {0x20, 0x20, 0x20, 0x20, 0x20, 0x00};
+                  char            input[100];
+              
+                      do
+                      {
+                          printf("Enter FrameLen  : 0-IncLen, 40 to 1536-Fixed Len        :: ");
+                          while (getline(input, sizeof(input)) > 0)
+                          {
+                              if(sscanf(input,"%d",&frmLen) >= 1)
+                              break;
+                          }
+                      }while (frmLen<40 && frmLen>1536);
+              
+                      testParams.frmLen = frmLen;
+                      testParams.numSlaves = 1;
+                      testParams.testType  = FULL_DUPLEX_TEST;
+                      memcpy(testParams.myMACaddr, defMasterMACaddr, MAC_ADDR_LEN);
+                      memcpy(testParams.slaveMACaddr, defSlaveMACaddr, MAC_ADDR_LEN);
+                      testParams.numFrames  = 2000;
+                      testParams.contMode = 0;
+                      testParams.numFrames2xmit = 100;
+                      testParams.delay = 50;
+                      printf("Quick Transmit/Receive Test's default values: \n");
+                      printf("    - Test method: Full Duplex\n");
+                      printf("    - Master MAC Address: %bx %bx %bx %bx %bx %bx\n",
+                              testParams.myMACaddr[0], testParams.myMACaddr[1], 
+                              testParams.myMACaddr[2], testParams.myMACaddr[3], 
+                              testParams.myMACaddr[4], testParams.myMACaddr[5]);
+                      printf("    - Slave MAC Multicast Address: %bx %bx %bx %bx %bx \n",
+                              testParams.slaveMACaddr[0], testParams.slaveMACaddr[1], 
+                              testParams.slaveMACaddr[2], 
+                              testParams.slaveMACaddr[3], testParams.slaveMACaddr[4]);
+                      printf("    - # of bytes per frame: %d\n", testParams.frmLen);
+                      printf("    - # of total frames to transmit: %ld\n", testParams.numFrames);
+                      printf("    - # of frames per iteration: %ld\n", testParams.numFrames2xmit);
+                      printf("    - Delay (in ticks) after each transmission: %ld\n", testParams.delay);
+              
+              
+                      memcpy(ConnState[0].myMACaddr, testParams.myMACaddr, MAC_ADDR_LEN);
+                      memcpy(ConnState[0].slaveMACaddr, testParams.slaveMACaddr, MAC_ADDR_LEN);
+                      ConnState[0].testType == HALF_DUPLEX_TEST;
+                      ConnState[0].state = GCI_STATE_OPEN;
+                      ConnState[0].my_numPktTx = 0;
+                      ConnState[0].my_numPktRx = 0;
+              
+                      for (i = 0; i < testParams.numFrames; i++)
+                          status = EHT_xmitData(&ConnState[0], &testParams);
+              }
+              #endif
+1033          
+1034          
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 18  
+
+1035          #ifndef HPGP_MAC_SAP
+1036          void EHAL_CmdHALProcess(char* CmdBuf)
+1037          {
+1038   1      #ifdef HYBRII_ETH
+1039   1          u8  cmd[20];
+1040   1      
+1041   1          if (sscanf(CmdBuf+1, "%s", &cmd) < 1 || strcmp(cmd,"") == 0)
+1042   1          {
+1043   2              printf("HAL Test Commands:\n");
+1044   2              printf("e xmitTest              - Data transmit test\n");
+1045   2              printf("e xmitrcvTest/txrx      - Data transmit/receive test\n");
+1046   2              printf("e quicktxrxTest/qtxrx   - Data transmit/receive test\n");
+1047   2              printf("e stat                  - Display sw statistics\n");
+1048   2              printf("e rstStat               - Reset sw statistics\n");
+1049   2              printf("e hwstat                - Display hw statistics\n");
+1050   2              printf("e rsthwStat             - Reset hw statistics\n");
+1051   2              printf("e debug                 - Toggle debug flag\n\n");
+1052   2              return;
+1053   2          }
+1054   1      
+1055   1          if((strcmp(cmd, "xmitTest") == 0) || (strcmp(cmd, "tx") == 0))
+1056   1          {
+1057   2              EHT_BasicTxRxMenu(FALSE);
+1058   2          }
+1059   1          else if((strcmp(cmd, "xmitrcvTest") == 0) || (strcmp(cmd, "txrx") == 0))
+1060   1          {
+1061   2              EHT_BasicTxRxMenu(TRUE);
+1062   2          }
+1063   1          else if((strcmp(cmd, "quickxmitrcvTest") == 0) || (strcmp(cmd, "qtxrx") == 0))
+1064   1          {
+1065   2              EHT_BasicTxRxMenu(2);
+1066   2          }
+1067   1          else if (strcmp(cmd, "stat") == 0)
+1068   1          {
+1069   2              EHAL_DisplayEthStat();
+1070   2      
+1071   2          }
+1072   1          else if (strcmp(cmd, "rststat") == 0 || strcmp(cmd, "rstStat") == 0)
+1073   1          {
+1074   2              EHAL_ResetStat();
+1075   2          }
+1076   1          else  if (strcmp(cmd, "hwstat") == 0)
+1077   1          {
+1078   2               EHAL_Print_ethHWStat();
+1079   2          }
+1080   1          else  if (strcmp(cmd, "rsthwstat") == 0)
+1081   1          {
+1082   2               EHAL_Clear_ethHWStat();
+1083   2          }
+1084   1          else if (strcmp(cmd, "debug") == 0)
+1085   1          {
+1086   2              // toggle the debug flag
+1087   2              ethDebugON = !ethDebugON;
+1088   2              printf("\n Debug flag is %s\n", ethDebugON ? "ON":"OFF");
+1089   2          }
+1090   1      #ifdef DOTHIS
+                  else if (strcmp(cmd, "testthis") == 0)
+                  {
+                      testThis();
+                  }
+              #endif
+1096   1      #endif
+C51 COMPILER V9.52.0.0   EHAL_TST                                                          01/10/2015 21:25:26 PAGE 19  
+
+1097   1      }
+1098          
+1099          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   5458    ----
+   CONSTANT SIZE    =   2795    ----
+   XDATA SIZE       =     38     527
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

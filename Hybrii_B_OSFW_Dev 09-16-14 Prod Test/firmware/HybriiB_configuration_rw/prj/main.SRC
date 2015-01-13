@@ -1,0 +1,413 @@
+; .\main.SRC generated from: ..\src\main.c
+; COMPILER INVOKED BY:
+;        C:\Keil\C51\BIN\C51.EXE ..\src\main.c BROWSE INCDIR(..\src;C:\Keil\C51\INC;..\src) DEBUG OBJECTEXTEND PRINT(.\main.lst) SRC(.\main.SRC)
+
+$NOMOD51
+
+NAME	MAIN
+
+P0	DATA	080H
+P1	DATA	090H
+P2	DATA	0A0H
+BANKSEL	DATA	09FH
+P3	DATA	0B0H
+T0	BIT	0B0H.4
+AC	BIT	0D0H.6
+T1	BIT	0B0H.5
+EA	BIT	0A8H.7
+IE	DATA	0A8H
+RD	BIT	0B0H.7
+MEMCTRL	DATA	0F8H
+ES	BIT	0A8H.4
+IP	DATA	0B8H
+RI	BIT	098H.0
+INT0	BIT	0B0H.2
+CY	BIT	0D0H.7
+TI	BIT	098H.1
+INT1	BIT	0B0H.3
+PS	BIT	0B8H.4
+SP	DATA	081H
+OV	BIT	0D0H.2
+WR	BIT	0B0H.6
+SBUF	DATA	099H
+PCON	DATA	087H
+SCON	DATA	098H
+TMOD	DATA	089H
+TCON	DATA	088H
+IE0	BIT	088H.1
+IE1	BIT	088H.3
+B	DATA	0F0H
+ACC	DATA	0E0H
+ET0	BIT	0A8H.1
+ET1	BIT	0A8H.3
+TF0	BIT	088H.5
+TF1	BIT	088H.7
+CRLA_H	DATA	0F4H
+RB8	BIT	098H.2
+TH0	DATA	08CH
+EX0	BIT	0A8H.0
+IT0	BIT	088H.0
+TH1	DATA	08DH
+TB8	BIT	098H.3
+EX1	BIT	0A8H.2
+IT1	BIT	088H.2
+P	BIT	0D0H.0
+CRLA_L	DATA	0F3H
+SM0	BIT	098H.7
+TL0	DATA	08AH
+SM1	BIT	098H.6
+TL1	DATA	08BH
+SM2	BIT	098H.5
+CRSA_H	DATA	0F2H
+PT0	BIT	0B8H.1
+PT1	BIT	0B8H.3
+RS0	BIT	0D0H.3
+TR0	BIT	088H.4
+RS1	BIT	0D0H.4
+CRSA_L	DATA	0F1H
+TR1	BIT	088H.6
+PX0	BIT	0B8H.0
+PX1	BIT	0B8H.2
+DPH	DATA	083H
+DPL	DATA	082H
+REN	BIT	098H.4
+RXD	BIT	0B0H.0
+TXD	BIT	0B0H.1
+F0	BIT	0D0H.5
+PSW	DATA	0D0H
+?PR?main?MAIN        SEGMENT CODE 
+?PR?help_menu?MAIN   SEGMENT CODE 
+?CO?MAIN             SEGMENT CODE 
+?ID?main?MAIN        SEGMENT IDATA OVERLAYABLE 
+?XD?main?MAIN        SEGMENT XDATA OVERLAYABLE 
+	EXTRN	CODE (_printf)
+	EXTRN	DATA (?_printf?BYTE)
+	EXTRN	CODE (_Load_Config_Data)
+	EXTRN	CODE (ComInit)
+	EXTRN	CODE (Program_Config_Data)
+	EXTRN	CODE (?C_STARTUP)
+	EXTRN	CODE (?C?LSTKIDATA)
+	PUBLIC	help_menu
+	PUBLIC	main
+
+	RSEG  ?ID?main?MAIN
+       Temp?040:   DS   4
+
+	RSEG  ?ID?main?MAIN
+          c?041:   DS   1
+
+	RSEG  ?XD?main?MAIN
+ configData?042:   DS   512
+
+	RSEG  ?CO?MAIN
+?SC_0:
+	DB  00AH,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,000H
+
+?SC_47:
+	DB  00AH,'*' ,'*' ,' ' ,' ' ,' ' ,' ' ,' ' ,'G' ,'R' 
+	DB  'E' ,'E' ,'N' ,'V' ,'I' ,'T' ,'Y' ,' ' ,'C' ,'O' 
+	DB  'M' ,'M' ,'U' ,'N' ,'I' ,'C' ,'A' ,'T' ,'I' ,'O' 
+	DB  'N' ,'S' ,' ' ,'I' ,'N' ,'C' ,' ' ,' ' ,' ' ,' ' 
+	DB  ' ' ,' ' ,' ' ,' ' ,'*' ,'*' ,000H
+
+?SC_94:
+	DB  00AH,'*' ,'*' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' 
+	DB  ' ' ,' ' ,' ' ,'B' ,'o' ,'o' ,'t' ,' ' ,'l' ,'o' 
+	DB  'a' ,'d' ,'e' ,'r' ,' ' ,'V' ,'2' ,'.' ,'0' ,' ' 
+	DB  ' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' 
+	DB  ' ' ,' ' ,' ' ,' ' ,'*' ,'*' ,000H
+
+?SC_141:
+	DB  00AH,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,00AH,00AH,000H
+
+?SC_190:
+	DB  00AH,00AH,' ' ,'E' ,'n' ,'t' ,'e' ,'r' ,' ' ,'o' 
+	DB  'p' ,'t' ,'i' ,'o' ,'n' ,' ' ,'f' ,'o' ,'r' ,' ' 
+	DB  'p' ,'r' ,'o' ,'g' ,'r' ,'a' ,'m' ,'m' ,'i' ,'n' 
+	DB  'g' ,' ' ,'c' ,'o' ,'n' ,'f' ,'i' ,'g' ,'u' ,'r' 
+	DB  'a' ,'t' ,'i' ,'o' ,'n' ,' ' ,'d' ,'a' ,'t' ,'a' 
+	DB  00AH,000H
+
+?SC_242:
+	DB  00AH,' ' ,'C' ,'/' ,'c' ,':' ,' ' ,'P' ,'r' ,'o' 
+	DB  'g' ,'r' ,'a' ,'m' ,' ' ,'c' ,'o' ,'n' ,'f' ,'i' 
+	DB  'g' ,'u' ,'r' ,'a' ,'t' ,'i' ,'o' ,'n' ,' ' ,'d' 
+	DB  'a' ,'t' ,'a' ,000H
+
+?SC_276:
+	DB  00AH,' ' ,'G' ,'/' ,'g' ,':' ,' ' ,'L' ,'o' ,'a' 
+	DB  'd' ,' ' ,'c' ,'o' ,'n' ,'f' ,'i' ,'g' ,'u' ,'r' 
+	DB  'a' ,'t' ,'i' ,'o' ,'n' ,' ' ,'d' ,'a' ,'t' ,'a' 
+	DB  ' ' ,'i' ,'n' ,'t' ,'o' ,' ' ,'E' ,'R' ,'A' ,'M' 
+	DB  000H
+
+?SC_317:
+	DB  00AH,' ' ,'L' ,'/' ,'l' ,':' ,' ' ,'D' ,'u' ,'m' 
+	DB  'p' ,' ' ,'c' ,'o' ,'n' ,'f' ,'i' ,'g' ,'u' ,'r' 
+	DB  'a' ,'t' ,'i' ,'o' ,'n' ,' ' ,'d' ,'a' ,'t' ,'a' 
+	DB  ' ' ,'o' ,'n' ,'t' ,'o' ,' ' ,'t' ,'h' ,'e' ,' ' 
+	DB  't' ,'e' ,'r' ,'m' ,'i' ,'n' ,'a' ,'l' ,000H
+
+?SC_366:
+	DB  00AH,' ' ,'H' ,'/' ,'h' ,':' ,' ' ,'H' ,'e' ,'l' 
+	DB  'p' ,' ' ,'m' ,'e' ,'n' ,'u' ,00AH,00AH,' ' ,' ' 
+	DB  '?' ,000H
+
+; /*
+; * Description : 8051 bootloader main function
+; *
+; * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+; * All rights reserved.
+; *
+; * Author      : Peter Nguyen
+; * Release Date: 04/27/2013
+; * Purpose :
+; *     function main of bootloader project
+; *
+; * File: bootld_80251.c
+; */
+; 
+; //#include <stdafx.h>
+; #include <reg51.h>                  /* Include 251SB header file */	
+; 
+; #include <stdio.h>
+; #include <stdarg.h>
+; #include <string.h>
+; 
+; typedef unsigned char U8, u8;
+; typedef unsigned long U32, u32;
+; typedef unsigned int  U16, u16;
+; typedef unsigned short int ui8, UI8;
+; 
+; void help_menu();
+; 
+; #include "uart.h"
+; #include "sys_config_data_utils.h"
+; 
+; void main(void)
+
+	RSEG  ?PR?main?MAIN
+main:
+	USING	0
+			; SOURCE LINE # 32
+; {
+			; SOURCE LINE # 33
+; 	u32 idata Temp;
+; 	char idata c;
+; 	u8 xdata configData[512];
+; //	BANKSEL = 0;
+; 
+; 	ComInit();
+			; SOURCE LINE # 39
+	LCALL	ComInit
+; 
+; 	EA = 0;
+			; SOURCE LINE # 41
+	CLR  	EA
+; 	c = 0;
+			; SOURCE LINE # 42
+	CLR  	A
+	MOV  	R0,#LOW (c?041)
+	MOV  	@R0,A
+; 	Temp = 0;
+			; SOURCE LINE # 43
+	MOV  	R0,#LOW (Temp?040)
+	LCALL	?C?LSTKIDATA
+	DB   	00H
+	DB   	00H
+	DB   	00H
+	DB   	00H
+; 	printf("\n*********************************************");
+			; SOURCE LINE # 44
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_0)
+	MOV  	R1,#LOW (?SC_0)
+	LCALL	_printf
+; 	printf("\n**     GREENVITY COMMUNICATIONS INC        **");
+			; SOURCE LINE # 45
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_47)
+	MOV  	R1,#LOW (?SC_47)
+	LCALL	_printf
+; 	printf("\n**          Boot loader V2.0               **"); 
+			; SOURCE LINE # 46
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_94)
+	MOV  	R1,#LOW (?SC_94)
+	LCALL	_printf
+; 	printf("\n*********************************************\n\n");
+			; SOURCE LINE # 47
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_141)
+	MOV  	R1,#LOW (?SC_141)
+	LCALL	_printf
+; 	
+; 	help_menu();
+			; SOURCE LINE # 49
+	LCALL	help_menu
+?C0001:
+; 
+; 	while(1)
+			; SOURCE LINE # 51
+; 	{
+			; SOURCE LINE # 52
+; 		switch(c)
+			; SOURCE LINE # 53
+	MOV  	R0,#LOW (c?041)
+	MOV  	A,@R0
+	ADD  	A,#0B9H
+	JZ   	?C0007
+	DEC  	A
+	JZ   	?C0011
+	ADD  	A,#0FCH
+	JZ   	?C0009
+	ADD  	A,#0E9H
+	JZ   	?C0005
+	ADD  	A,#0FCH
+	JZ   	?C0007
+	DEC  	A
+	JZ   	?C0011
+	ADD  	A,#0FCH
+	JZ   	?C0009
+	ADD  	A,#029H
+	JNZ  	?C0012
+; 		{
+			; SOURCE LINE # 54
+; 		case ('c'):
+			; SOURCE LINE # 55
+; 		case ('C'):
+			; SOURCE LINE # 56
+?C0005:
+; 			Program_Config_Data();
+			; SOURCE LINE # 57
+	LCALL	Program_Config_Data
+; 			c = '1';
+			; SOURCE LINE # 58
+; 			break;
+			; SOURCE LINE # 59
+	SJMP 	?C0018
+; 		case ('g'):
+			; SOURCE LINE # 60
+; 		case ('G'):
+			; SOURCE LINE # 61
+?C0007:
+; 			Load_Config_Data(1, (u8 xdata *)&configData[0]);
+			; SOURCE LINE # 62
+	MOV  	R4,#HIGH (configData?042)
+	MOV  	R5,#LOW (configData?042)
+	MOV  	R7,#01H
+	LCALL	_Load_Config_Data
+; 			c = '1';
+			; SOURCE LINE # 63
+?C0016:
+; 			break;
+			; SOURCE LINE # 64
+	SJMP 	?C0018
+; 		case ('l'):
+			; SOURCE LINE # 65
+; 		case ('L'):
+			; SOURCE LINE # 66
+?C0009:
+; 			Load_Config_Data(0, (u8 xdata *)&configData[0]);
+			; SOURCE LINE # 67
+	MOV  	R4,#HIGH (configData?042)
+	MOV  	R5,#LOW (configData?042)
+	CLR  	A
+	MOV  	R7,A
+	LCALL	_Load_Config_Data
+; 			c = '1';
+			; SOURCE LINE # 68
+?C0017:
+; 			break;
+			; SOURCE LINE # 69
+	SJMP 	?C0018
+; 		case ('h'):
+			; SOURCE LINE # 70
+; 		case ('H'):
+			; SOURCE LINE # 71
+?C0011:
+; 			help_menu();
+			; SOURCE LINE # 72
+	LCALL	help_menu
+; 			c = '1';
+			; SOURCE LINE # 73
+?C0018:
+	MOV  	R0,#LOW (c?041)
+	MOV  	@R0,#031H
+; 			break;
+			; SOURCE LINE # 74
+	SJMP 	?C0001
+; 		default:
+			; SOURCE LINE # 75
+?C0012:
+; 			if (RI==1){
+			; SOURCE LINE # 76
+	JNB  	RI,?C0001
+; 				c = SBUF;
+			; SOURCE LINE # 77
+	MOV  	R0,#LOW (c?041)
+	MOV  	@R0,SBUF
+; 				RI = 0;
+			; SOURCE LINE # 78
+	CLR  	RI
+; 			}
+			; SOURCE LINE # 79
+; 			break;
+			; SOURCE LINE # 80
+	SJMP 	?C0001
+; END OF main
+
+; 		}
+; 	}
+; }
+; //================================================================
+; 
+; void help_menu()
+
+	RSEG  ?PR?help_menu?MAIN
+help_menu:
+	USING	0
+			; SOURCE LINE # 86
+; {
+			; SOURCE LINE # 87
+;     printf("\n\n Enter option for programming configuration data\n");
+			; SOURCE LINE # 88
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_190)
+	MOV  	R1,#LOW (?SC_190)
+	LCALL	_printf
+; 	printf("\n C/c: Program configuration data");
+			; SOURCE LINE # 89
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_242)
+	MOV  	R1,#LOW (?SC_242)
+	LCALL	_printf
+; 	printf("\n G/g: Load configuration data into ERAM");
+			; SOURCE LINE # 90
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_276)
+	MOV  	R1,#LOW (?SC_276)
+	LCALL	_printf
+; 	printf("\n L/l: Dump configuration data onto the terminal");
+			; SOURCE LINE # 91
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_317)
+	MOV  	R1,#LOW (?SC_317)
+	LCALL	_printf
+; 	printf("\n H/h: Help menu\n\n  ?");
+			; SOURCE LINE # 92
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_366)
+	MOV  	R1,#LOW (?SC_366)
+	LJMP 	_printf
+; END OF help_menu
+
+	END

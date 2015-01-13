@@ -1,0 +1,605 @@
+C51 COMPILER V9.52.0.0   HAL_PROD_TST                                                      01/10/2015 21:25:30 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE HAL_PROD_TST
+OBJECT MODULE PLACED IN .\obj\hal_prod_tst.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE src\hal_prod_tst.c LARGE OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(.
+                    -.\..\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\src\nma;..\..\ha
+                    -l;.\src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;..\..\hpgp\src\r
+                    -oute;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\components\utilities\li
+                    -nklist\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\sampleapp\inc;..\..
+                    -\..\components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC_SW_SYNC=1,inli
+                    -ne,HPGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_SPI_TX_CRC,HW_S
+                    -PI_RX_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND PRINT(.\lst\hal
+                    -_prod_tst.lst) TABS(2) OBJECT(.\obj\hal_prod_tst.obj)
+
+line level    source
+
+   1          #ifdef PROD_TEST
+   2          
+   3          #ifdef RTX51_TINY_OS
+   4          #include <rtx51tny.h>
+   5          #endif
+   6          #include <stdio.h>
+   7          #include <string.h>
+   8          #include <intrins.h>
+   9          #include "fm.h"
+  10          #include "papdef.h"
+  11          #include "hal_tst.h"
+  12          #include "hal_spi.h"
+  13          #include "hal_common.h"
+  14          #include "hal_prod_tst.h"
+  15          
+  16          
+  17          sToolCmdPrep prepProdCmd;
+  18          sDevUpEvnt prodTestDev;
+  19          txTestResults preTest_plcTxTestStats;
+  20          
+  21          u8 testCmd = 0;
+  22          
+  23          extern u8  volatile spi_tx_flag;
+  24          extern u8  checkSPITxDone();
+  25          extern u8 gDefKey[10][16];
+  26          
+  27          
+  28          void GV701x_Chip_Reset(void)
+  29          {
+  30   1        GV701x_GPIO_Config(WRITE_ONLY, CPU_GPIO_IO_PIN0);
+  31   1        GV701x_GPIO_Write(CPU_GPIO_WR_PIN0,1);
+  32   1      }
+  33          
+  34          
+  35          void fillBuffer(u8 *buff, u8 *bLen)
+  36          {
+  37   1        sPlcSimTxTestParams testParams;
+  38   1      
+  39   1        if (testCmd == 0)
+  40   1        {
+  41   2          return;
+  42   2        }
+  43   1      
+  44   1        if (testCmd == 1)
+  45   1        {
+  46   2          //
+  47   2          memset(&testParams, 0, sizeof(sPlcSimTxTestParams));
+C51 COMPILER V9.52.0.0   HAL_PROD_TST                                                      01/10/2015 21:25:30 PAGE 2   
+
+  48   2          testParams.frmType        = 1;
+  49   2          testParams.frmLen         = 100;
+  50   2          testParams.numFrames      = 1000;
+  51   2          testParams.mcstMode       = 2;  // bcast
+  52   2          testParams.plid           = 0;
+  53   2          testParams.delay          = 30;
+  54   2          testParams.descLen        = HYBRII_CELLBUF_SIZE;
+  55   2            testParams.secTestMode    = UNENCRYPTED;
+  56   2          testParams.eks            = HPGP_UNENCRYPTED_EKS;
+  57   2          testParams.stdModeSel     = 1;  // Not important here
+  58   2          testParams.lenTestMode    = FIXED_LEN;
+  59   2      
+  60   2          buff[0] = TOOL_CMD_PREPARE_DUT;
+  61   2          buff[1] = TEST_ID_PLC_TX;
+  62   2          memcpy(&buff[2], &testParams, sizeof(sPlcSimTxTestParams));
+  63   2          *bLen = sizeof(sPlcSimTxTestParams) + 2;
+  64   2          testCmd++;
+  65   2        } 
+  66   1        else if (testCmd == 2)
+  67   1        {
+  68   2          buff[0] = TOOL_CMD_START_TEST;
+  69   2          buff[1] = TEST_ID_PLC_TX;
+  70   2          *bLen = 2;
+  71   2          testCmd++;
+  72   2        }
+  73   1        else if (testCmd == 3)
+  74   1        {
+  75   2          buff[0] = TOOL_CMD_GET_RESULT;
+  76   2          buff[1] = TEST_ID_PLC_TX;
+  77   2          *bLen = 2;
+  78   2          testCmd = 0;
+  79   2        }
+  80   1      }
+  81          
+  82          void fill_Tool_header(u8 *buffer, u8 frmType, u16 size, u8 id){
+  83   1      
+  84   1        upHeader *frmHead = (upHeader *)buffer;
+  85   1      
+  86   1        /* Fill in the header */
+  87   1        frmHead->protocolID = PROD_TOOL_PROTOCOL;
+  88   1        frmHead->frm_type = frmType;        //frm type
+  89   1        frmHead->frm_length = cpu_to_le16(size);
+  90   1        frmHead->id = id;             //frm id
+  91   1      
+  92   1      }
+  93          
+  94          void prodTest_init()
+  95          {
+  96   1        upHeader *frmHead;
+  97   1        sDevUpEvnt *payload;
+  98   1        u8 spiTXBuf[sizeof(upHeader) + sizeof(sDevUpEvnt)];
+  99   1        u8 i = 0;
+ 100   1      
+ 101   1        memset(&spiTXBuf[0], 0, sizeof(upHeader) + sizeof(sDevUpEvnt));
+ 102   1      
+ 103   1      #ifdef TYPE_DUT
+                gHpgpHalCB.prodTestDevType = DEV_DUT;
+              #else
+ 106   1        gHpgpHalCB.prodTestDevType = DEV_REF;
+ 107   1      #endif
+ 108   1      
+ 109   1        /*--- configure EKS table ---*/
+C51 COMPILER V9.52.0.0   HAL_PROD_TST                                                      01/10/2015 21:25:30 PAGE 3   
+
+ 110   1        for(i = 0; i < 7; i++){
+ 111   2          HHAL_AddNEK(i, gDefKey[i]);
+ 112   2        }
+ 113   1          //printf("eks Table configured !\n");
+ 114   1        
+ 115   1        prodTestDev.devType = gHpgpHalCB.prodTestDevType;
+ 116   1        //printf("Device Type = %bu\n", prodTestDev.devType);
+ 117   1        fill_Tool_header(spiTXBuf, headerEvent, sizeof(sDevUpEvnt), EVENT_DEVICE_UP);
+ 118   1        
+ 119   1        frmHead = (upHeader *)spiTXBuf;
+ 120   1        payload = (sDevUpEvnt *)(frmHead + 1);
+ 121   1      
+ 122   1        /* Fill in the payload */
+ 123   1        payload->devType = gHpgpHalCB.prodTestDevType;
+ 124   1        for(i = 0; i < MAX_FW_VER_LEN; i++){
+ 125   2          payload->fwVer[i] = 1;
+ 126   2        }
+ 127   1        payload->bMapTests = cpu_to_le32(0x0F); // for now allow all possible tests
+ 128   1        gvspi_send(&spiTXBuf, sizeof(upHeader) + sizeof(sDevUpEvnt));
+ 129   1      
+ 130   1      }
+ 131          
+ 132          bool gvspi_send(u8 *spiTXBuff, u16 buffSize){
+ 133   1      
+ 134   1        if(hal_spi_tx_dma(spiTXBuff, buffSize) == false){
+ 135   2          printf("\n SPI TX not done !!\n");
+ 136   2          return FALSE;
+ 137   2        } else {
+ 138   2          return TRUE;
+ 139   2        }
+ 140   1      }
+ 141          void prodTestSendRespOrEvent(u8 frmType ,u8 cmdId, u8 status)
+ 142          {
+ 143   1        u8 spiTxBuf[sizeof(upHeader) + sizeof(status)];
+ 144   1      
+ 145   1        fill_Tool_header(spiTxBuf,frmType, 1,cmdId);  
+ 146   1      
+ 147   1        spiTxBuf[sizeof(upHeader)] = status;
+ 148   1      
+ 149   1        gvspi_send(spiTxBuf, sizeof(upHeader) + sizeof(status));
+ 150   1      }
+ 151          
+ 152          bool isProdTstCmd(u8 *pCpAddr, u8 cpLen, sprodTstCmd *pprodCmdTst)
+ 153          {
+ 154   1        u8  *tmpCharPtr;
+ 155   1      
+ 156   1        sEth2Hdr *eh = (sEth2Hdr *)pCpAddr;
+ 157   1        header *frmHead = (header *)(eh + 1);
+ 158   1        tmpCharPtr = (u8 *)(frmHead + 1);
+ 159   1      
+ 160   1        memset(pprodCmdTst, 0, sizeof(sprodTstCmd));
+ 161   1        //printf("cpLen = %bu\n", cpLen);
+ 162   1      
+ 163   1        if(frmHead->protocolID != PROD_TOOL_PROTOCOL){
+ 164   2          //printf("Not production tool frame !\n");
+ 165   2          return FALSE;
+ 166   2        }
+ 167   1          
+ 168   1        /*if ((cpLen <= 0) || (cpLen > MAX_PROD_TEST_CMD_LEN))
+ 169   1          return (FALSE);*/
+ 170   1      
+ 171   1        // cmd has format:
+C51 COMPILER V9.52.0.0   HAL_PROD_TST                                                      01/10/2015 21:25:30 PAGE 4   
+
+ 172   1        //    u8: cmd ID
+ 173   1        //    u8: test ID
+ 174   1        //    u8[]: parms (variable)
+ 175   1        pprodCmdTst->cmdId = tmpCharPtr[0];
+ 176   1        tmpCharPtr++;
+ 177   1        pprodCmdTst->testId = *tmpCharPtr;
+ 178   1        tmpCharPtr++;
+ 179   1        // extract the test variables
+ 180   1        pprodCmdTst->parms = tmpCharPtr;
+ 181   1      
+ 182   1      #if 0
+                if ((pprodCmdTst->cmdId < TOOL_CMD_PREPARE_DUT) || (pprodCmdTst->cmdId > TOOL_CMD_DEV_SEARCH))
+                {
+                  // not a valid cmd Id
+                  return(FALSE);
+                }
+              
+                if ((pprodCmdTst->testId < TEST_ID_PLC_TX) || (pprodCmdTst->testId > TEST_ID_PLC_RX))
+                {
+                  // not a valid test Id
+                  return(FALSE);
+                } 
+                if ((pprodCmdTst->testId == TOOL_CMD_PREPARE_DUT) || (pprodCmdTst->testId == TOOL_CMD_PREPARE_REF))
+                {
+                  // extract the test variables
+                  pprodCmdTst->parms = tmpCharPtr;
+                }     
+              #endif
+ 200   1        return(TRUE);
+ 201   1      }
+*** WARNING C280 IN LINE 152 OF src\hal_prod_tst.c: 'cpLen': unreferenced local variable
+ 202          
+ 203          void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
+ 204          {
+ 205   1        u8 spiTxBuf[ sizeof(upHeader) + sizeof(txTestResults)];
+ 206   1        upHeader *upH = (upHeader*)spiTxBuf;
+ 207   1        txTestResults *plxTxTestStats = (txTestResults *)(upH + 1);
+ 208   1        
+ 209   1        sPlcSimTxTestParams *pTestParams;
+ 210   1        memset(&spiTxBuf[0], 0x00, sizeof(upHeader) + sizeof(txTestResults));
+ 211   1      
+ 212   1        //printf("pprodTestCmd->cmdId = %bu \n", pprodTestCmd->cmdId);
+ 213   1        switch (pprodTestCmd->cmdId)
+ 214   1        {
+ 215   2          case TOOL_CMD_PREPARE_DUT:
+ 216   2          {
+ 217   3            pTestParams = (sPlcSimTxTestParams*)(pprodTestCmd->parms);
+ 218   3              
+ 219   3            // save test data to permanent struct (waiting for a Start Test cmd)
+ 220   3            //printf("PREPARE DUT test: \n");
+ 221   3            if (prodTestDev.devType != DEV_DUT)
+ 222   3            {
+ 223   4              prodTestSendRespOrEvent(headerResponse,TOOL_CMD_PREPARE_DUT_CNF,
+ 224   4                PRODTEST_STAT_INVALID_DEV);
+ 225   4              break;
+ 226   4            }
+ 227   3            
+ 228   3            memset(&prepProdCmd, 0, sizeof(sToolCmdPrep));
+ 229   3            prepProdCmd.cmdId = pprodTestCmd->cmdId;
+ 230   3            prepProdCmd.testId = pprodTestCmd->testId;
+ 231   3      
+ 232   3            if (prepProdCmd.testId == TEST_ID_PLC_TX){
+C51 COMPILER V9.52.0.0   HAL_PROD_TST                                                      01/10/2015 21:25:30 PAGE 5   
+
+ 233   4              memcpy(prepProdCmd.parms, pprodTestCmd->parms, 
+ 234   4                sizeof(sPlcSimTxTestParams));
+ 235   4            }
+ 236   3      
+ 237   3            //Assign erenable
+ 238   3            if (pTestParams->ermode == TRUE){
+ 239   4              WriteU8Reg(0x4F0, 0x80);
+ 240   4            } else {
+ 241   4              WriteU8Reg(0x4F0, 0x00);
+ 242   4            }
+ 243   3            
+ 244   3            //Assign txpowermode
+ 245   3            // 0 - Automotive or Low powermode
+ 246   3            if (0 == pTestParams->txpowermode){
+ 247   4              mac_utils_spi_write(0x34,0x08);
+ 248   4              mac_utils_spi_write(0x35,0x30);
+ 249   4            }
+ 250   3            
+ 251   3            // 1 - Normal powermode
+ 252   3            if (1 == pTestParams->txpowermode){
+ 253   4              mac_utils_spi_write(0x34,0x00);
+ 254   4              mac_utils_spi_write(0x35,0x00);
+ 255   4            }
+ 256   3            
+ 257   3            // 2 - High powermode     
+ 258   3            if (2 == pTestParams->txpowermode){
+ 259   4              mac_utils_spi_write(0x34,0x00);
+ 260   4              mac_utils_spi_write(0x35,0x0f);
+ 261   4            }
+ 262   3      
+ 263   3            memset(&gHpgpHalCB.halStats, 0, sizeof(shpgpHalStats));
+ 264   3      
+ 265   3            printf("PREPARE DUT test: %s\n", 
+ 266   3              (prepProdCmd.testId == TEST_ID_PLC_TX) ? "PLC Transmit Test":"PLC Receive Test");
+ 267   3      
+ 268   3            gHpgpHalCB.selfTei   = pTestParams->stei;
+ 269   3            gHpgpHalCB.remoteTei = pTestParams->dtei;
+ 270   3            gHpgpHalCB.snid    = pTestParams->snid;
+ 271   3      
+ 272   3            HHAL_SetTei(gHpgpHalCB.selfTei);
+ 273   3      
+ 274   3            HHAL_SetSnid(gHpgpHalCB.snid);
+ 275   3      
+ 276   3            // send back a CNF
+ 277   3            prodTestSendRespOrEvent(headerResponse, TOOL_CMD_PREPARE_DUT_CNF,
+ 278   3              PRODTEST_STAT_SUCCESS);
+ 279   3          }
+ 280   2      
+ 281   2            break;
+ 282   2            
+ 283   2          case TOOL_CMD_PREPARE_REF:
+ 284   2          {
+ 285   3            // save test data to permanent struct (waiting for a Start Test cmd)
+ 286   3      
+ 287   3            pTestParams = (sPlcSimTxTestParams*)pprodTestCmd->parms;
+ 288   3            
+ 289   3            //printf("PREPARE REFERENCE test: \n");
+ 290   3            if (prodTestDev.devType != DEV_REF)
+ 291   3            {
+ 292   4              prodTestSendRespOrEvent(headerResponse, TOOL_CMD_PREPARE_DUT_CNF, 
+ 293   4                PRODTEST_STAT_INVALID_DEV);
+ 294   4              break;
+C51 COMPILER V9.52.0.0   HAL_PROD_TST                                                      01/10/2015 21:25:30 PAGE 6   
+
+ 295   4            }
+ 296   3            memset(&prepProdCmd, 0, sizeof(sToolCmdPrep));
+ 297   3            prepProdCmd.cmdId = pprodTestCmd->cmdId;
+ 298   3            prepProdCmd.testId = pprodTestCmd->testId;
+ 299   3      
+ 300   3            
+ 301   3            if (prepProdCmd.testId == TEST_ID_PLC_RX){
+ 302   4              memcpy(prepProdCmd.parms, pprodTestCmd->parms, sizeof(sPlcSimTxTestParams));
+ 303   4            }
+ 304   3            
+ 305   3            //Assign erenable
+ 306   3            if (pTestParams->ermode == TRUE){
+ 307   4              WriteU8Reg(0x4F0, 0x80);
+ 308   4            } else {
+ 309   4              WriteU8Reg(0x4F0, 0x00);
+ 310   4            }
+ 311   3            
+ 312   3            //Assign txpowermode
+ 313   3            // 0 - Automotive or Low powermode
+ 314   3            if (0 == pTestParams->txpowermode){
+ 315   4              mac_utils_spi_write(0x34,0x08);
+ 316   4              mac_utils_spi_write(0x35,0x30);
+ 317   4            }
+ 318   3            
+ 319   3            // 1 - Normal powermode
+ 320   3            if (1 == pTestParams->txpowermode){
+ 321   4              mac_utils_spi_write(0x34,0x00);
+ 322   4              mac_utils_spi_write(0x35,0x00);
+ 323   4            }
+ 324   3            
+ 325   3            // 2 - High powermode     
+ 326   3            if (2 == pTestParams->txpowermode){
+ 327   4              mac_utils_spi_write(0x34,0x00);
+ 328   4              mac_utils_spi_write(0x35,0x0f);
+ 329   4            }
+ 330   3      
+ 331   3            memset(&gHpgpHalCB.halStats, 0, sizeof(shpgpHalStats));
+ 332   3            
+ 333   3            printf("PREPARE REFERENCE test: %s\n", 
+ 334   3              (prepProdCmd.testId == TEST_ID_PLC_TX) ? "PLC Transmit Test":"PLC Receive Test");
+ 335   3            
+ 336   3            gHpgpHalCB.selfTei   = pTestParams->stei;
+ 337   3            gHpgpHalCB.remoteTei = pTestParams->dtei;
+ 338   3            gHpgpHalCB.snid      = pTestParams->snid;
+ 339   3      
+ 340   3            HHAL_SetTei(gHpgpHalCB.selfTei);
+ 341   3      
+ 342   3            // this is done because when we communicate with qualcomm or other chip snid 
+ 343   3            //should be set once we receive bcn from cco and should not get set at power on 
+ 344   3            
+ 345   3            HHAL_SetSnid(gHpgpHalCB.snid); 
+ 346   3      
+ 347   3            // send back a CNF
+ 348   3            prodTestSendRespOrEvent(headerResponse, TOOL_CMD_PREPARE_REF_CNF, 
+ 349   3              PRODTEST_STAT_SUCCESS);
+ 350   3      
+ 351   3          }     
+ 352   2            break;
+ 353   2            
+ 354   2          case TOOL_CMD_START_TEST:
+ 355   2          {
+ 356   3            // start test in PrepareCmd struct.
+C51 COMPILER V9.52.0.0   HAL_PROD_TST                                                      01/10/2015 21:25:30 PAGE 7   
+
+ 357   3            if ((prepProdCmd.cmdId != TOOL_CMD_PREPARE_DUT) && 
+ 358   3              (prepProdCmd.cmdId != TOOL_CMD_PREPARE_REF))
+ 359   3              break;
+ 360   3      
+ 361   3            if (prepProdCmd.testId != pprodTestCmd->testId)
+ 362   3            {
+ 363   4              // the Start_Test's testid doesn't match with Prepare's TestId
+ 364   4              printf(" the Start_Test's testid doesn't match with Prepare's TestId \n");
+ 365   4              prodTestSendRespOrEvent(headerResponse, TOOL_CMD_START_TEST_CNF, 
+ 366   4                PRODTEST_STAT_INVALID_TEST);
+ 367   4              break;
+ 368   4            }
+ 369   3      
+ 370   3            prodTestSendRespOrEvent(headerResponse, TOOL_CMD_START_TEST_CNF, 
+ 371   3              PRODTEST_STAT_SUCCESS);
+ 372   3            
+ 373   3            memset(&preTest_plcTxTestStats, 0x00, sizeof(txTestResults));
+ 374   3      
+ 375   3            if (gHpgpHalCB.prodTestDevType == DEV_DUT)
+ 376   3            {
+ 377   4              if (prepProdCmd.testId == TEST_ID_PLC_TX)
+ 378   4              {
+ 379   5                // start DUT as transmitter
+ 380   5                printf("START test: %s\n", 
+ 381   5                  (prepProdCmd.testId == TEST_ID_PLC_TX) ? "PLC Transmit Test":"PLC Receive Test");
+ 382   5                
+ 383   5                pTestParams = (sPlcSimTxTestParams *)&prepProdCmd.parms;
+ 384   5                correctEndieness_sPlcSimTxTestParams(pTestParams);
+ 385   5      
+ 386   5                // save pre test params
+ 387   5                preTest_plcTxTestStats.AddrFilterErrCnt = 
+ 388   5                  hal_common_reg_32_read(PLC_ADDRFILTERERRCNT_REG);
+ 389   5                
+ 390   5                preTest_plcTxTestStats.FrameCtrlErrCnt = 
+ 391   5                  hal_common_reg_32_read(PLC_FCCSERRCNT_REG);
+ 392   5                
+ 393   5                preTest_plcTxTestStats.ICVErrCnt = 
+ 394   5                  hal_common_reg_32_read(PLC_ICVERRCNT_REG);
+ 395   5      
+ 396   5                HHT_SimulateTx((sPlcSimTxTestParams*)&(prepProdCmd.parms));
+ 397   5                while(spi_tx_flag)
+ 398   5                  {
+ 399   6                    checkSPITxDone();
+ 400   6                  }
+ 401   5                
+ 402   5                prodTestSendRespOrEvent(headerEvent, EVENT_TEST_DONE, 
+ 403   5                  PRODTEST_STAT_SUCCESS); // send TEST_DONE event
+ 404   5                  
+ 405   5                //printf("EVENT_TEST_DONE Sent !!\n");
+ 406   5              } 
+ 407   4              
+ 408   4              else if (prepProdCmd.testId == TEST_ID_PLC_RX)
+ 409   4              {
+ 410   5                // start DUT as receiver
+ 411   5                //printf("gHpgpHalCB.prodTestIsPLCTxTestActive  = 1 \n");
+ 412   5                gHpgpHalCB.prodTestIsPLCTxTestActive  = 1;  
+ 413   5              
+ 414   5              }
+ 415   4            }
+ 416   3      
+ 417   3            else  // for REF
+ 418   3            {
+C51 COMPILER V9.52.0.0   HAL_PROD_TST                                                      01/10/2015 21:25:30 PAGE 8   
+
+ 419   4              if (prepProdCmd.testId == TEST_ID_PLC_TX){
+ 420   5      
+ 421   5                //start REF as receiver
+ 422   5                //printf("gHpgpHalCB.prodTestIsPLCTxTestActive  = 1 \n");
+ 423   5                gHpgpHalCB.prodTestIsPLCTxTestActive  = 1;  
+ 424   5                break;
+ 425   5                
+ 426   5              } else if (prepProdCmd.testId == TEST_ID_PLC_RX){
+ 427   5              
+ 428   5                // start REF as transmitter
+ 429   5                printf("START test: %s\n", 
+ 430   5                  (prepProdCmd.testId == TEST_ID_PLC_TX) ? "PLC Transmit Test":"PLC Receive Test");
+ 431   5                pTestParams = (sPlcSimTxTestParams *) prepProdCmd.parms;
+ 432   5                correctEndieness_sPlcSimTxTestParams(pTestParams);
+ 433   5      
+ 434   5                // save pre test params
+ 435   5                preTest_plcTxTestStats.AddrFilterErrCnt = 
+ 436   5                  hal_common_reg_32_read(PLC_ADDRFILTERERRCNT_REG);
+ 437   5                preTest_plcTxTestStats.FrameCtrlErrCnt = 
+ 438   5                  hal_common_reg_32_read(PLC_FCCSERRCNT_REG);
+ 439   5                preTest_plcTxTestStats.ICVErrCnt = 
+ 440   5                  hal_common_reg_32_read(PLC_ICVERRCNT_REG);
+ 441   5      
+ 442   5                HHT_SimulateTx((sPlcSimTxTestParams*)&(prepProdCmd.parms));
+ 443   5                while(spi_tx_flag)
+ 444   5                  {
+ 445   6                    checkSPITxDone();
+ 446   6                  }
+ 447   5                
+ 448   5                prodTestSendRespOrEvent(headerEvent, EVENT_TEST_DONE, 
+ 449   5                  PRODTEST_STAT_SUCCESS); // send TEST_DONE event
+ 450   5                //printf("EVENT_TEST_DONE Sent !!\n");
+ 451   5              
+ 452   5              }
+ 453   4            }
+ 454   3          }
+ 455   2            break;
+ 456   2      
+ 457   2          case TOOL_CMD_STOP_TEST:
+ 458   2          {
+ 459   3            //printf("TOOL_CMD_STOP_TEST received !\n");
+ 460   3      
+ 461   3            if (prodTestDev.devType == DEV_REF)
+ 462   3            {
+ 463   4              gHpgpHalCB.prodTestIsPLCTxTestActive  = 0;
+ 464   4              //printf("gHpgpHalCB.prodTestIsPLCTxTestActive  = 0 \n");
+ 465   4              prodTestSendRespOrEvent(headerResponse, TOOL_CMD_STOP_TEST_CNF, 
+ 466   4                PRODTEST_STAT_SUCCESS);
+ 467   4            }
+ 468   3            else
+ 469   3            if (prodTestDev.devType == DEV_DUT)
+ 470   3            {
+ 471   4              gHpgpHalCB.prodTestIsPLCTxTestActive  = 0;
+ 472   4              //printf("gHpgpHalCB.prodTestIsPLCTxTestActive  = 0 \n");
+ 473   4              prodTestSendRespOrEvent(headerResponse, TOOL_CMD_STOP_TEST_CNF, 
+ 474   4                PRODTEST_STAT_SUCCESS);     
+ 475   4      
+ 476   4            }
+ 477   3          }
+ 478   2            break;
+ 479   2            
+ 480   2          case TOOL_CMD_GET_RESULT:
+C51 COMPILER V9.52.0.0   HAL_PROD_TST                                                      01/10/2015 21:25:30 PAGE 9   
+
+ 481   2          {
+ 482   3            // send to ARM9 the Tx Stats from last test
+ 483   3            //printf("\nGET RESULT test:\n");
+ 484   3            
+ 485   3            if (TEST_ID_PLC_TX == prepProdCmd.testId || 
+ 486   3              TEST_ID_PLC_RX == prepProdCmd.testId){
+ 487   4              
+ 488   4              fill_Tool_header((u8 *)upH, headerResponse, sizeof(txTestResults), 
+ 489   4                TOOL_CMD_GET_RESULT_CNF);
+ 490   4              copy_plcTxTestStats(plxTxTestStats);
+ 491   4              //printf("sizeof(txTestResults) = %u \n", sizeof(txTestResults));
+ 492   4            }
+ 493   3      
+ 494   3            printf("Sending results !\n");
+ 495   3            gvspi_send(spiTxBuf, sizeof(upHeader) + sizeof(txTestResults));
+ 496   3          }
+ 497   2          
+ 498   2            break;
+ 499   2            
+ 500   2          case TOOL_CMD_DEV_SEARCH:
+ 501   2      
+ 502   2            //printf("\n:TOOL_CMD_DEV_SEARCH:\n");
+ 503   2      
+ 504   2            
+ 505   2            prodTest_init();
+ 506   2          
+ 507   2            while(spi_tx_flag)
+ 508   2            {
+ 509   3              checkSPITxDone();
+ 510   3            }
+ 511   2            break;
+ 512   2      
+ 513   2          case TOOL_CMD_DEV_RESET:
+ 514   2      
+ 515   2            //printf("\n:TOOL_CMD_DEV_RESET:\n");
+ 516   2      
+ 517   2            prodTestSendRespOrEvent(headerResponse, TOOL_CMD_DEV_RESET_CNF, 
+ 518   2              PRODTEST_STAT_SUCCESS);
+ 519   2      
+ 520   2            //prodTest_init();
+ 521   2            //GV701x_Chip_Reset();
+ 522   2            break;
+ 523   2            
+ 524   2          default:
+ 525   2            // not a Prod Test command
+ 526   2            return;
+ 527   2        }
+ 528   1      }
+ 529          
+ 530          
+ 531          void copy_plcTxTestStats (txTestResults *stats){
+ 532   1      
+ 533   1        u32 AddrFilterErrCnt,FrameCtrlErrCnt,ICVErrCnt;
+ 534   1      
+ 535   1        stats->TotalRxGoodFrmCnt = cpu_to_le32(gHpgpHalCB.halStats.TotalRxGoodFrmCnt);
+ 536   1        stats->TotalRxBytesCnt   = cpu_to_le32(gHpgpHalCB.halStats.TotalRxBytesCnt);
+ 537   1        stats->RxGoodDataCnt     = cpu_to_le32(gHpgpHalCB.halStats.RxGoodDataCnt);
+ 538   1        stats->RxGoodMgmtCnt     = cpu_to_le32(gHpgpHalCB.halStats.RxGoodMgmtCnt);
+ 539   1        stats->DuplicateRxCnt    = cpu_to_le32(gHpgpHalCB.halStats.DuplicateRxCnt);
+ 540   1      
+ 541   1        AddrFilterErrCnt = (hal_common_reg_32_read(PLC_ADDRFILTERERRCNT_REG) - 
+ 542   1          preTest_plcTxTestStats.AddrFilterErrCnt);
+C51 COMPILER V9.52.0.0   HAL_PROD_TST                                                      01/10/2015 21:25:30 PAGE 10  
+
+ 543   1        FrameCtrlErrCnt = (hal_common_reg_32_read(PLC_FCCSERRCNT_REG) - 
+ 544   1          preTest_plcTxTestStats.FrameCtrlErrCnt);
+ 545   1        ICVErrCnt = (hal_common_reg_32_read(PLC_ICVERRCNT_REG) - 
+ 546   1          preTest_plcTxTestStats.ICVErrCnt);
+ 547   1        
+ 548   1        stats->AddrFilterErrCnt = cpu_to_le32(AddrFilterErrCnt);
+ 549   1        stats->FrameCtrlErrCnt  = cpu_to_le32(FrameCtrlErrCnt);
+ 550   1        stats->ICVErrCnt        = cpu_to_le32(ICVErrCnt); 
+ 551   1      
+ 552   1      }
+ 553          
+ 554          
+ 555          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2457    ----
+   CONSTANT SIZE    =    205    ----
+   XDATA SIZE       =     93     164
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)

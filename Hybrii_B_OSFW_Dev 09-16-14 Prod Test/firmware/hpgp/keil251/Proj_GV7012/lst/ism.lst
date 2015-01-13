@@ -1,0 +1,1635 @@
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE ISM
+OBJECT MODULE PLACED IN .\obj\ism.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\..\common\ism.c LARGE OMF2 OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) 
+                    -INCDIR(..\..\..\common\datapath;..\..\..\common\include;..\..\..\hal;..\..\src\crypto;..\..\src\ctrl;..\..\src\hal;..\..
+                    -\src\link;..\..\src\mux;..\..\src\nma;..\..\src\route;..\..\src\sap;..\..\src\test;..\..\..\project\hal\src;..\..\..\zig
+                    -bee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\
+                    -inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\sampleapp\src;.
+                    -.\..\..\..\sampleapp\inc;..\..\..\common;..\..\..\hpgp;..\..\src;..\..\..\..\components\hpgp\inc;..\..\..\app_support;..
+                    -\..\..\HybriiB_configuration_rw\src) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,
+                    -HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HYBRII_ETH,HPGP_MAC_SAP,NMA,HYBRII_SPI,NEW_SYNC,UM,HYBRII_B,H
+                    -ybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,AUTH_AES,PLC_TEST,B_ASICPLC,UART_HOST_INTF_,UART_RAW,MPER_,FREQ_DETECT,SW_RECOVERY,P
+                    -ROD_TEST) DEBUG PRINT(.\lst\ism.lst) TABS(2) OBJECT(.\obj\ism.obj)
+
+line level    source
+
+   1          /** ========================================================
+   2           *
+   3           * @file ism.c
+   4           * 
+   5           *  @brief Interrupt Service Manager
+   6           *
+   7           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * =========================================================*/
+  11          #ifdef RTX51_TINY_OS
+  12          #include <rtx51tny.h>
+  13          #include "hybrii_tasks.h"
+  14          #endif  //RTX51_TINY_OS
+  15          #include <stdio.h>
+  16          #include <string.h>
+  17          #include "papdef.h"
+  18          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  21          #include "ism.h"
+  22          #include "hal_common.h"
+  23          #include "hal.h"
+  24          #include "hal_reg.h"
+  25          #include "hal_hpgp_reset.h"
+  26          #ifndef CALLBACK
+  27          #include "hpgpapi.h"
+  28          #include "hal_hpgp.h"
+  29          #endif
+  30          #ifdef HYBRII_ETH
+  31          #include "hal_eth.h"
+  32          #endif
+  33          #ifdef HYBRII_SPI
+  34          #include "hal_spi.h"
+  35          #endif
+  36          #ifdef UM
+  37          #include "frametask.h"
+  38          #endif
+  39          #ifdef CCO_FUNC
+  40          #include "linkl.h"
+  41          #endif
+  42          #include "datapath.h"
+  43          #ifdef UM
+  44          #include "mac_intf_common.h"
+  45          #endif
+  46          #include "fm.h"
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 2   
+
+  47          #include "sys_common.h"
+  48          
+  49          #ifndef CALLBACK
+  50          extern void CHAL_FrameRxIntHandler(void *cookie);
+  51          extern void hal_hpgp_mac_monitoring (void);
+  52          extern void HHAL_BcnTxIntHandler(void *cookie);
+  53          extern void LINKL_BcnTxHandler(void* cookie);
+  54          extern void HHAL_Bcn3SentIntHandler();
+  55          #endif
+  56          #ifdef ETH_BRDG_DEBUG
+              extern u32 oldNumEthTxDoneInts;
+              #endif
+  59          #define BPST_THRESHOLD 47000000
+  60          u32 goldntb1;
+  61          #ifdef POWERSAVE
+              u32 goldntb10;
+              u32 goldntb2;
+              bool hiberClkOffSetFlag = FALSE;
+              u32 EarlyWakeBcnCnt = 0;
+              u32 tmpPsBpIntCnt = 0;     
+              u32 EarlyWBPnotEven = 0;
+              u32 EarlyWBPnotMOD = 0;
+              u8  EarlyWakeBpIntFlag = FALSE;
+              extern u32 bcnStartInt;
+              extern u32 bcnStartIntExitSleep;
+              extern u8 psDebug;
+              extern u32 earlywakeBPintCnt;
+              #endif
+  75          #ifdef LOG_FLASH
+              u32 lastITime = 0xFFFF;
+              u32 lastBtime = 0xFFFF;
+              #endif
+  79          #ifdef SW_RECOVERY
+  80          extern void Monitor_Hang();
+  81          #endif
+  82          
+  83          u8 discBcnTxCnt = 0;
+  84          /* external interrupt handler control block */
+  85          u8 gpio_int = 0;
+  86          static sIsm    Ism;
+  87          #ifdef LOG_FLASH
+              
+               u32 STM_GetTick();
+              #endif
+  91          /* TODO: need to check the hardware spec */
+  92          
+  93          void ISM_EnableCpuIrq(u8 irq)
+  94          {
+  95   1          if (irq >= CPU_INT_IRQ_ALL)
+  96   1              return;
+  97   1      
+  98   1          //Ism.cpuIntMask.reg |= (1L << irq);
+  99   1          switch(irq)
+ 100   1          {
+ 101   2              case CPU_INT_IRQ_TIME0:
+ 102   2                  Ism.cpuIntMask.s.timer0    = 1;
+ 103   2                  break;
+ 104   2              case CPU_INT_IRQ_WATCHDOG:
+ 105   2                  Ism.cpuIntMask.s.watchdog  = 1;
+ 106   2                  break;
+ 107   2              case CPU_INT_IRQ_UART:
+ 108   2                  Ism.cpuIntMask.s.uart0     = 1;
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 3   
+
+ 109   2                  break;
+ 110   2              case CPU_INT_IRQ_PIO:
+ 111   2                  Ism.cpuIntMask.s.pio       = 1;
+ 112   2                  break;
+ 113   2              case CPU_INT_IRQ_BTN:
+ 114   2                  Ism.cpuIntMask.s.btn       = 1;
+ 115   2                  break;
+ 116   2              case CPU_INT_IRQ_LCD:
+ 117   2                  Ism.cpuIntMask.s.lcd       = 1;
+ 118   2                  break;
+ 119   2              case CPU_INT_IRQ_DMA0:
+ 120   2                  Ism.cpuIntMask.s.dma0      = 1;
+ 121   2                  break;
+ 122   2              case CPU_INT_IRQ_DMA1:
+ 123   2                  Ism.cpuIntMask.s.dma1      = 1;
+ 124   2                  break;
+ 125   2              case CPU_INT_IRQ_UART_LITE:
+ 126   2                  Ism.cpuIntMask.s.uartLite  = 1;
+ 127   2                  break;
+ 128   2              case CPU_INT_IRQ_EXT0:
+ 129   2                  Ism.cpuIntMask.s.ext0      = 1;
+ 130   2                  break;
+ 131   2              case CPU_INT_IRQ_EXT1:
+ 132   2                  Ism.cpuIntMask.s.ext1      = 1;
+ 133   2                  break;
+ 134   2              case CPU_INT_IRQ_GLOBAL_EN:
+ 135   2                  Ism.cpuIntMask.s.globalIntEna = 1;
+ 136   2                  break;
+ 137   2              default:
+ 138   2                  return;
+ 139   2          }
+ 140   1          WriteU32Reg(INTIRQ_8051_REG, Ism.cpuIntMask.reg);
+ 141   1      }
+ 142          
+ 143          
+ 144          void ISM_DisableCpuIrq(u8 irq)
+ 145          {
+ 146   1          if (irq >= CPU_INT_IRQ_ALL)
+ 147   1              return;
+ 148   1      
+ 149   1          //Ism.cpuIntMask.reg &= ~(1L << irq);
+ 150   1          switch(irq)
+ 151   1          {
+ 152   2              case CPU_INT_IRQ_TIME0:
+ 153   2                  Ism.cpuIntMask.s.timer0    = 0;
+ 154   2                  break;
+ 155   2              case CPU_INT_IRQ_WATCHDOG:
+ 156   2                  Ism.cpuIntMask.s.watchdog  = 0;
+ 157   2                  break;
+ 158   2              case CPU_INT_IRQ_UART:
+ 159   2                  Ism.cpuIntMask.s.uart0     = 0;
+ 160   2                  break;
+ 161   2              case CPU_INT_IRQ_PIO:
+ 162   2                  Ism.cpuIntMask.s.pio       = 0;
+ 163   2                  break;
+ 164   2              case CPU_INT_IRQ_BTN:
+ 165   2                  Ism.cpuIntMask.s.btn       = 0;
+ 166   2                  break;
+ 167   2              case CPU_INT_IRQ_LCD:
+ 168   2                  Ism.cpuIntMask.s.lcd       = 0;
+ 169   2                  break;
+ 170   2              case CPU_INT_IRQ_DMA0:
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 4   
+
+ 171   2                  Ism.cpuIntMask.s.dma0      = 0;
+ 172   2                  break;
+ 173   2              case CPU_INT_IRQ_DMA1:
+ 174   2                  Ism.cpuIntMask.s.dma1      = 0;
+ 175   2                  break;
+ 176   2              case CPU_INT_IRQ_UART_LITE:
+ 177   2                  Ism.cpuIntMask.s.uartLite  = 0;
+ 178   2                  break;
+ 179   2              case CPU_INT_IRQ_EXT0:
+ 180   2                  Ism.cpuIntMask.s.ext0      = 0;
+ 181   2                  break;
+ 182   2              case CPU_INT_IRQ_EXT1:
+ 183   2                  Ism.cpuIntMask.s.ext1      = 0;
+ 184   2                  break;
+ 185   2              case CPU_INT_IRQ_GLOBAL_EN:
+ 186   2                  Ism.cpuIntMask.s.globalIntEna = 0;
+ 187   2                  break;
+ 188   2              default:
+ 189   2                  return;
+ 190   2          }
+ 191   1          WriteU32Reg(INTIRQ_8051_REG, Ism.cpuIntMask.reg);
+ 192   1      }
+ 193          
+ 194          
+ 195          
+ 196          
+ 197          
+ 198          void ISM_EnableMacIrq(u8 irq)
+ 199          {
+ 200   1          if (irq > MAC_INT_IRQ_ALL)
+ 201   1              return;
+ 202   1      
+ 203   1          if (irq == MAC_INT_IRQ_ALL)
+ 204   1          {
+ 205   2              /* enable all */
+ 206   2              // 3. Enable MAC Interrupts - routed through External Int 0
+ 207   2              Ism.macIntMask.reg   = 0;
+ 208   2              //intMacEnable.reg |= CPU_INTERRUPT_ALLINTSMASK;
+ 209   2              Ism.macIntMask.s.ethFreeCP      = 1;
+ 210   2              Ism.macIntMask.s.hpgpBP         = 1;
+ 211   2              Ism.macIntMask.s.cpuTxQNonEmpty = 1;
+ 212   2              Ism.macIntMask.s.plcBcn3Sent    = 1;
+ 213   2              Ism.macIntMask.s.plcBcnRx       = 1;
+ 214   2      //        Ism.macIntMask.s.hpgpBPSta      = 1;
+ 215   2              Ism.macIntMask.s.plcMedStatInt  = 1;
+ 216   2          }
+ 217   1          else if (irq < MAC_INT_IRQ_ALL)
+ 218   1          {
+ 219   2      //        Ism.macIntMask.reg |= (1L << irq);
+ 220   2              switch(irq)
+ 221   2              {
+ 222   3                  case MAC_INT_IRQ_PLC_MED_STAT:
+ 223   3                      Ism.macIntMask.s.plcMedStatInt  = 1;
+ 224   3                      break;
+ 225   3                  case MAC_INT_IRQ_HPGP_BP_STA:
+ 226   3      //                Ism.macIntMask.s.hpgpBPSta      = 1;
+ 227   3                      break;
+ 228   3      //            case MAC_INT_IRQ_ZIGBEE:
+ 229   3      //                Ism.macIntMask.s.zigbee         = 1;
+ 230   3      //                break;
+ 231   3                  case MAC_INT_IRQ_PLC_BCN_RX:
+ 232   3                      Ism.macIntMask.s.plcBcnRx       = 1;
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 5   
+
+ 233   3                      break;
+ 234   3                  case MAC_INT_IRQ_PLC_BCN3_SENT:
+ 235   3                      Ism.macIntMask.s.plcBcn3Sent    = 1;
+ 236   3                      break;
+ 237   3                  case MAC_INT_IRQ_PLC_BCN2_SENT:
+ 238   3                      Ism.macIntMask.s.plcBcn2Sent    = 1;
+ 239   3                      break;
+ 240   3                  case MAC_INT_IRQ_PLC_FRAME_VALID:
+ 241   3                      Ism.macIntMask.s.plcFrmValid    = 1;
+ 242   3                      break;
+ 243   3                  case MAC_INT_IRQ_CPU_TXQ_NONEMPTY:
+ 244   3                      Ism.macIntMask.s.cpuTxQNonEmpty = 1;
+ 245   3                      break;
+ 246   3                  case MAC_INT_IRQ_PLC_BCN_TX:
+ 247   3                      Ism.macIntMask.s.hpgpBP         = 1;
+ 248   3                      break;
+ 249   3                  case MAC_INT_IRQ_NEW_ETH_SA:
+ 250   3                      Ism.macIntMask.s.newEtherSA     = 1;
+ 251   3                      break;
+ 252   3                  case MAC_INT_IRQ_HOST_SPI:
+ 253   3                      Ism.macIntMask.s.hostSpiInt     = 1;
+ 254   3                      break;
+ 255   3                  case MAC_INT_IRQ_ETH_FREE_CP:
+ 256   3                      Ism.macIntMask.s.ethFreeCP      = 1;
+ 257   3                      break;
+ 258   3                  default:
+ 259   3                     return;
+ 260   3              } 
+ 261   2          }
+ 262   1              
+ 263   1          WriteU32Reg(CPU_INTENABLE_REG, Ism.macIntMask.reg);
+ 264   1      }
+ 265          
+ 266          
+ 267          void ISM_DisableMacIrq(u8 irq)
+ 268          {
+ 269   1          if (irq > MAC_INT_IRQ_ALL)
+ 270   1              return;
+ 271   1      
+ 272   1          if (irq == MAC_INT_IRQ_ALL)
+ 273   1          {
+ 274   2              /* disable all */
+ 275   2              Ism.macIntMask.reg   = 0;
+ 276   2          }
+ 277   1          else if (irq < MAC_INT_IRQ_ALL)
+ 278   1          {
+ 279   2      //        Ism.macIntMask.reg &= ~(1L << irq);
+ 280   2              switch(irq)
+ 281   2              {
+ 282   3                  case MAC_INT_IRQ_PLC_MED_STAT:
+ 283   3                      Ism.macIntMask.s.plcMedStatInt  = 0;
+ 284   3                      break;
+ 285   3                  case MAC_INT_IRQ_HPGP_BP_STA:
+ 286   3      //                Ism.macIntMask.s.hpgpBPSta      = 0;
+ 287   3                      break;
+ 288   3      //            case MAC_INT_IRQ_ZIGBEE:
+ 289   3      //                Ism.macIntMask.s.zigbee         = 0;
+ 290   3      //                break;
+ 291   3                  case MAC_INT_IRQ_PLC_BCN_RX:
+ 292   3                      Ism.macIntMask.s.plcBcnRx       = 0;
+ 293   3                      break;
+ 294   3                  case MAC_INT_IRQ_PLC_BCN3_SENT:
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 6   
+
+ 295   3                      Ism.macIntMask.s.plcBcn3Sent    = 0;
+ 296   3                      break;
+ 297   3                  case MAC_INT_IRQ_PLC_BCN2_SENT:
+ 298   3                      Ism.macIntMask.s.plcBcn2Sent    = 0;
+ 299   3                      break;
+ 300   3                  case MAC_INT_IRQ_PLC_FRAME_VALID:
+ 301   3                      Ism.macIntMask.s.plcFrmValid    = 0;
+ 302   3                      break;
+ 303   3                  case MAC_INT_IRQ_CPU_TXQ_NONEMPTY:
+ 304   3                      Ism.macIntMask.s.cpuTxQNonEmpty = 0;
+ 305   3                      break;
+ 306   3                  case MAC_INT_IRQ_PLC_BCN_TX:
+ 307   3                      Ism.macIntMask.s.hpgpBP         = 0;
+ 308   3                      break;
+ 309   3                  case MAC_INT_IRQ_NEW_ETH_SA:
+ 310   3                      Ism.macIntMask.s.newEtherSA     = 0;
+ 311   3                      break;
+ 312   3                  case MAC_INT_IRQ_HOST_SPI:
+ 313   3                      Ism.macIntMask.s.hostSpiInt     = 0;
+ 314   3                      break;
+ 315   3                  case MAC_INT_IRQ_ETH_FREE_CP:
+ 316   3                      Ism.macIntMask.s.ethFreeCP      = 0;
+ 317   3                      break;
+ 318   3                  default:
+ 319   3                     return;
+ 320   3              } 
+ 321   2          }
+ 322   1              
+ 323   1          WriteU32Reg(CPU_INTENABLE_REG, Ism.macIntMask.reg);
+ 324   1      }
+ 325          
+ 326          
+ 327          void ISM_EnableInterrupts()
+ 328          {
+ 329   1      #ifdef HAL_INT
+                  u8051InterruptReg   int8051Enable;
+              #ifdef P8051
+                  /* Set the interrupts to Lowlevel-triggered */
+                  IT0 = 0;                    
+                  IT1 = 0;
+              
+                  /* enable the external interrupt */
+                  EX1 = 1;
+              #endif
+                  ISM_EnableCpuIrq(CPU_INT_IRQ_EXT1);
+              
+                  /* enable the global interrupt */
+                  int8051Enable.reg = 0;
+                  int8051Enable.s.ext1 = 1;
+                  int8051Enable.s.globalIntEna = 1;
+                  WriteU32Reg(INTENA_8051_REG,int8051Enable.reg);
+              #endif
+ 347   1      
+ 348   1      #ifdef P8051
+ 349   1          /* start interrupt */
+ 350   1          EA  = 1;                    
+ 351   1      #endif
+ 352   1      #ifdef UM
+ 353   1      #ifdef UART_HOST_INTF 
+              {
+                u8051InterruptReg int8051Enable;
+                IT0 = 0;                    
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 7   
+
+                  IT1 = 0;
+                  /* enable the external interrupt */
+                  EX1 = 1;
+                EA  = 1;
+                ISM_EnableCpuIrq(CPU_INT_IRQ_UART);
+                int8051Enable.reg = 0;
+                 int8051Enable.s.uart0 = 1;
+                 int8051Enable.s.globalIntEna = 1;
+                 WriteU32Reg(INTENA_8051_REG,int8051Enable.reg);
+              }
+              #endif
+ 368   1      #endif
+ 369   1      }
+ 370                                     
+ 371          extern u32 gBPSTdelta;
+ 372          extern u8 gNegativeflag;
+ 373          extern u8 gPositiveflag;
+ 374          extern u8 firsttime;
+ 375          extern u32 goldbpst;
+ 376          extern u32 gavg;
+ 377          extern u8 zctrack;
+ 378          extern u8 zcFlag;
+ 379          extern u32 gbpst;
+ 380          extern u8 gRollOver;
+ 381          extern u32 zcCCONTBold;
+ 382          extern u32 gCCO_BTS;
+ 383          extern u32 gtimer2, gtimer1;
+ 384          extern u32 zcCCONTB_OLD;
+ 385          
+ 386          
+ 387          
+ 388          extern void LINKL_SendBcnLossInd(u8 type);
+ 389          #ifdef HAL_INT_HDL
+              /* external interrupt handler */
+              void ISM_Ext1Isr(void) __INTERRUPT2__
+              #else
+ 393          void ISM_PollInt(void) 
+ 394          #endif
+ 395          {
+ 396   1          //u32  intStatus;
+ 397   1      //    u32 delta, ntb1;
+ 398   1        
+ 399   1      #ifdef RTX51_TINY_OS
+ 400   1        
+ 401   1        u8 scheduleFrameTask = 0;
+ 402   1      #endif      
+ 403   1      
+ 404   1          uInterruptReg intStatus;
+ 405   1          uPlcMedInterruptReg PlcMedInterruptReg;
+ 406   1          u32           bankSelReg;
+ 407   1        u32 dbc_pattern;
+ 408   1          u32 postBpstdiff;
+ 409   1          u32 ntb1, diff;
+ 410   1      #ifdef LOG_FLASH
+                  u32 currITime;
+              #endif
+ 413   1      #ifndef HPGP_HAL_TEST
+ 414   1        sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 415   1      #endif
+ 416   1      #ifdef UM
+ 417   1        sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer);
+ 418   1      #endif
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 8   
+
+ 419   1      #ifdef POWERSAVE
+                sScb *scb;
+                u8 loopCnt=0;
+                u8 missBcnCnt = 0;
+              
+                  if (linkLayer->mode == LINKL_STA_MODE_CCO)
+                {
+                  // this station is CCO
+                  scb = staInfo->ccoScb;
+                }
+                else
+                {
+                  // this station is STA
+                  scb = staInfo->staScb;
+                }
+              #endif
+ 435   1      
+ 436   1          gHalCB.extIntCnt++;
+ 437   1      #ifdef LOG_FLASH
+                  currITime = STM_GetTick();
+                  if((lastITime + 6) < currITime)
+                  {
+                      sTime t;
+                      tickToTime(&t, lastITime);
+                      logEvent(ISM_ERROR, ISM_ENTRY_ERROR, 0, &t, sizeof(sTime));
+                  }
+                  lastITime = currITime;
+              #endif
+ 447   1           EA = 0;                             
+ 448   1          // Read interrupt status. 
+ 449   1          intStatus.reg = ReadU32Reg(CPU_INTSTATUS_REG);
+ 450   1      
+ 451   1          // Write back the value to clear the status
+ 452   1          WriteU32Reg(CPU_INTSTATUS_REG, intStatus.reg);
+ 453   1          PlcMedInterruptReg.reg = ReadU32Reg(PLC_MEDIUMINTSTATUS_REG);
+ 454   1          //  WriteU32Reg(PLC_MEDIUMINTSTATUS_REG, PlcMedInterruptReg.reg);
+ 455   1          EA = 1;
+ 456   1          // Save CP bank context
+ 457   1          bankSelReg = ReadU32Reg(CPU_PKTBUFBANKSEL_REG);
+ 458   1      
+ 459   1          // Process/Dispatch interrupts.
+ 460   1      #ifdef HYBRII_ZIGBEE
+                  //while(intStatus.reg)
+                  while(intStatus.reg || PlcMedInterruptReg.s.zcint ||  PlcMedInterruptReg.s.plcTxDoneint)
+              #else
+ 464   1          
+ 465   1      #ifdef POWERSAVE 
+                  while(intStatus.s.hpgpBP ||intStatus.s.PosthpgpBP||intStatus.s.ethFreeCP||intStatus.s.eth_txfifoRdDn||
+             -intStatus.s.spiRxDone||intStatus.s.spiTxDone||intStatus.s.newEtherSA||((!scheduleFrameTask) && intStatus.s.cpuTxQNonEmpt
+             -y)||intStatus.s.plcBcn2Sent||intStatus.s.plcBcn3Sent||intStatus.s.plcBcnRx || PlcMedInterruptReg.s.zcint|| PlcMedInterru
+             -ptReg.s.plcTxDoneint || PlcMedInterruptReg.s.earlywakeBP || PlcMedInterruptReg.s.bcnStart) 
+              #else
+ 468   1          //while(intStatus.s.hpgpBP ||intStatus.s.PosthpgpBP||intStatus.s.ethFreeCP||
+ 469   1        //    intStatus.s.eth_txfifoRdDn || intStatus.s.spiRxDone||intStatus.s.spiTxDone||intStatus.s.newEtherSA||
+             -intStatus.s.cpuTxQNonEmpty||intStatus.s.plcBcn2Sent||intStatus.s.plcBcn3Sent||intStatus.s.plcBcnRx || PlcMedInterruptReg
+             -.s.zcint ||  PlcMedInterruptReg.s.plcTxDoneint || PlcMedInterruptReg.s.DbcHoldInt || PlcMedInterruptReg.s.HP101Detect) 
+ 470   1          while(intStatus.s.hpgpBP ||intStatus.s.PosthpgpBP||intStatus.s.ethFreeCP||
+ 471   1            intStatus.s.eth_txfifoRdDn || intStatus.s.spiRxDone||intStatus.s.spiTxDone||intStatus.s.newEtherSA||((
+             -!scheduleFrameTask) && intStatus.s.cpuTxQNonEmpty)||intStatus.s.plcBcn2Sent||intStatus.s.plcBcn3Sent||intStatus.s.plcBcn
+             -Rx || PlcMedInterruptReg.s.zcint ||  PlcMedInterruptReg.s.plcTxDoneint) 
+ 472   1      #endif
+ 473   1      #endif // HYBRII_ZIGBEE
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 9   
+
+ 474   1          {
+ 475   2           
+ 476   2      #ifdef  HYBRII_HPGP
+ 477   2      //        HHAL_ProcessPlcTxDone();
+ 478   2      #endif
+ 479   2      
+ 480   2           if(PlcMedInterruptReg.s.zcint && gHpgpHalCB.bcnInitDone) //after 33.33 ms
+ 481   2         {
+ 482   3                  //WriteU32Reg(PLC_MEDIUMINTSTATUS_REG, PlcMedInterruptReg.reg);
+ 483   3             doSynchronization();
+ 484   3                 //printf("\n zc");
+ 485   3                 //gHpgpHalCB.bPerAvgInitDone = 1;
+ 486   3           }
+ 487   2      #ifdef FREQ_DETECT
+ 488   2          
+ 489   2          if((gHpgpHalCB.gFreqCB.freqDetected == FALSE)  && gHpgpHalCB.bcnInitDone)
+ 490   2          {
+ 491   3      
+ 492   3      #ifdef HPGP_HAL_TEST
+                      if(PlcMedInterruptReg.s.zcint && (gHpgpHalCB.devMode == DEV_MODE_CCO))
+                      {
+              
+              #else
+ 497   3              if(PlcMedInterruptReg.s.zcint && (linkLayer->mode == LINKL_STA_MODE_CCO))
+ 498   3              {                                             
+ 499   4      #endif
+ 500   4                  
+ 501   4                  
+ 502   4                  FREQDET_DetectFrequencyUsingZC();             
+ 503   4              }
+ 504   3          }
+ 505   2      #endif
+ 506   2      
+ 507   2        if (PlcMedInterruptReg.s.plcTxDoneint)
+ 508   2        {
+ 509   3          datapath_handlePlcTxDone();
+ 510   3      
+ 511   3          scheduleFrameTask = 1;
+ 512   3      
+ 513   3          //printf("td\n");
+ 514   3      
+ 515   3          WriteU32Reg(PLC_MEDIUMINTSTATUS_REG, ctorl(INT_STATUS_PLC_TXDONE));
+ 516   3      
+ 517   3        }
+ 518   2        
+ 519   2          if(PlcMedInterruptReg.s.zcint)
+ 520   2          {
+ 521   3              WriteU32Reg(PLC_MEDIUMINTSTATUS_REG, ctorl(INT_STATUS_ZC)); 
+ 522   3          }
+ 523   2      #if 0
+                  if (gHpgpHalCB.HP101Detection)
+                  {
+                     if(PlcMedInterruptReg.s.HP101Detect) 
+                     {
+                          WriteU32Reg(PLC_MEDIUMINTSTATUS_REG, ctorl(INT_STATUS_HP101DETECT)); 
+                    printf("HP101 is detected\n");
+                    // Set Global variables for HP101 and HP11 detection bit to 1, which shall be used in Tx VF field
+                     }
+                  }
+              
+                if (PlcMedInterruptReg.s.DbcHoldInt)
+                {
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 10  
+
+                        WriteU32Reg(PLC_MEDIUMINTSTATUS_REG, ctorl(INT_STATUS_DBC_HOLD));
+                    printf("DBC pattern is detected\n");
+                    // Set Global variables for DBC detection bit to 1, which will be used for packet flow control
+                    dbc_pattern = ReadU32Reg(PLC_DBC_PATTERN_REG);
+                    printf("DBC Pattern REG = %bX\n", dbc_pattern);
+                }
+              #endif  
+ 543   2      #if 0   // For Sound packet process
+                      // [YM] When Rx a sound packet, read RSSI value from RSSI FIFO and print it out for pass to a func
+             -tion for further process
+                      if(intStatus.s.plcMSoundRxInt)
+                      {
+                         //
+                         HHAL_RxSoundIntHandler();
+                      }
+              #endif  
+ 551   2      
+ 552   2      #ifdef HYBRII_HPGP
+ 553   2              if(intStatus.s.plcBcnRx)
+ 554   2              {  
+ 555   3      #ifdef HPGP_HAL_TEST
+                          //HHAL_BcnRxIntHandler();
+                          HAL_beaconRxHandler(NULL);
+              
+              #else
+ 560   3                  //HAL_BcnRxIntHandler(Ism.macIntCb[MAC_INT_IRQ_PLC_BCN_RX].cookie);
+ 561   3                  HAL_beaconRxHandler(Ism.macIntCb[MAC_INT_IRQ_PLC_BCN_RX].cookie);
+ 562   3      
+ 563   3      #endif
+ 564   3              }
+ 565   2      
+ 566   2              if(intStatus.s.hpgpBP )//|| intStatus.s.hpgpBPSta)
+ 567   2              {
+ 568   3      #ifdef LOG_FLASH
+                          u32 currBtime;
+              #endif
+ 571   3      #ifdef HPGP_HAL_TEST
+                           HHAL_BPIntHandler();
+               
+              #else
+ 575   3      #ifdef CCO_FUNC
+ 576   3      #ifdef LOG_FLASH
+              
+                           currBtime = STM_GetTick();
+                           if((lastBtime + 10) < currBtime)
+                           {
+                               sTime t;
+                               tickToTime(&t, lastBtime);
+                               logEvent(ISM_ERROR, BCN_TX_INT_ERROR, 0, &t, sizeof(sTime));
+                           }
+                           lastBtime = currBtime;
+              #endif
+ 587   3                   if (!LINKL_BcnUpdateActive())
+ 588   3                   {
+ 589   4                       //HHAL_BcnTxIntHandler();
+ 590   4                       HHAL_BPIntHandler();
+ 591   4                   }
+ 592   3      #endif  /* CCO_FUNC */
+ 593   3      #ifdef POWERSAVE
+                    if (EarlyWakeBpIntFlag)
+                    {
+              /*
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 11  
+
+                      if (psDebug)
+                        FM_Printf(FM_MMSG,"hpgp_Int: exit deep sleep. gHpgpHalCB.halStats.psBpIntCnt=%lu\n", gHpgpHalCB.halSt
+             -ats.psBpIntCnt);
+              */
+                      PSM_exit_deep_sleep_PS();
+                      EarlyWakeBpIntFlag = FALSE;
+                    }
+              #endif
+ 604   3       
+ 605   3      #endif //HPGP_HAL_TEST
+ 606   3       
+ 607   3               }
+ 608   2               if(intStatus.s.PosthpgpBP)
+ 609   2               {
+ 610   3                
+ 611   3                 // gavg = PLC_MAX_AC_BPLEN;
+ 612   3                   
+ 613   3                  ntb1 = rtocl(ReadU32Reg(PLC_NTB_REG));
+ 614   3                  postBpstdiff = (ntb1 - goldntb1) * 40;
+ 615   3                  goldntb1 = ntb1; 
+ 616   3                  //printf("\n diff = %lu",diff);
+ 617   3                  
+ 618   3                  if(zctrack)
+ 619   3      
+ 620   3                  {
+ 621   4                       // printf("\n gbpst =%lu", (gbpst*40));
+ 622   4                       // printf("\n ntb = %lu",  (rtocl(ReadU32Reg(PLC_NTB_REG)) * 40));
+ 623   4                        //printf("\n gavg = %lu",  (gavg * 40));
+ 624   4                      if(postBpstdiff > BPST_THRESHOLD) //this threshold should work for AC as well as DC
+ 625   4                      {
+ 626   5                          //printf("\n diff = %lu",diff);
+ 627   5                          gbpst =  rtocl(ReadU32Reg(PLC_ZCNTB_REG)) + MAC_PROCESSING_CLOCK;
+ 628   5                          gNegativeflag =0;
+ 629   5                          gBPSTdelta =0;
+ 630   5                          gPositiveflag =0;
+ 631   5                      } 
+ 632   4      
+ 633   4                        gBPSTdelta = gBPSTdelta / 8;
+ 634   4                       if(gNegativeflag)
+ 635   4                       {
+ 636   5                          gbpst += gavg - gBPSTdelta ;
+ 637   5                          //gNegativeflag = 0;
+ 638   5                       }
+ 639   4                       else  if(gPositiveflag)
+ 640   4                       {
+ 641   5                           gbpst += gavg + gBPSTdelta ;
+ 642   5                           //gPositiveflag = 0;
+ 643   5                       }
+ 644   4                       else
+ 645   4                       {
+ 646   5                          gbpst += gavg; 
+ 647   5                       } 
+ 648   4                     
+ 649   4                       WriteU32Reg(PLC_BPST_REG, ctorl(gbpst));
+ 650   4                  }
+ 651   3                  if((gHpgpHalCB.devMode == DEV_MODE_STA)&& gHpgpHalCB.syncComplete)
+ 652   3                  {
+ 653   4                      if(gHpgpHalCB.bcncnt == gHpgpHalCB.halStats.BcnRxIntCnt)
+ 654   4                      {
+ 655   5                         gHpgpHalCB.bcnmisscnt++; 
+ 656   5      #ifdef POWERSAVE
+                        if (scb->psState == PSM_PS_STATE_ON)
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 12  
+
+                        {
+                          missBcnCnt = scb->commAwd.numBp;
+                          
+                          if (missBcnCnt < 2)
+                            missBcnCnt = 2;                  
+                                }
+              
+              
+                         
+                        if (((scb->psState == PSM_PS_STATE_ON) && 
+                          ((gHpgpHalCB.bcnmisscnt % missBcnCnt) == 0)) ||
+                          ((scb->psState != PSM_PS_STATE_ON) &&
+                            (gHpgpHalCB.bcnmisscnt == 4)))
+              
+                        
+              #else
+ 674   5                /* 
+ 675   5                  we rescan if 4 consecutive beacon are missed
+ 676   5                      this threshold should be lower then backup cco thresholds
+ 677   5                      MAX_NO_BEACON_BACKUPCCO
+ 678   5                      
+ 679   5                */
+ 680   5                   
+ 681   5                         if(gHpgpHalCB.bcnmisscnt == 4)
+ 682   5      #endif
+ 683   5                         {
+ 684   6                 gHpgpHalCB.bcnmisscnt = 0;
+ 685   6      
+ 686   6      #ifdef MPER           
+                                    printf("\n Rescan");
+              #endif
+ 689   6      
+ 690   6                    gHpgpHalCB.syncComplete = 0;
+ 691   6      
+ 692   6      #ifndef HPGP_HAL_TEST                    
+ 693   6      {
+ 694   7                  sSnsm*       snsm = (sSnsm *)LINKL_GetSnsm(linkLayer);
+ 695   7      
+ 696   7                  snsm ->netScan = 1;
+ 697   7      //            gHpgpHalCB.nwSelected = 1
+ 698   7                  snsm ->netSync = 0;
+ 699   7      
+ 700   7                    HHAL_SetSWStatReqScanFlag(REG_FLAG_SET);
+ 701   7      }
+ 702   6      #endif
+ 703   6                 }
+ 704   5      #if 0 
+              
+                         if (gHpgpHalCB.bcnmisscnt > MAX_NO_BEACON_NW_DISCOVERY)
+                        {
+                                     // if(staInfo->lastUserAppCCOState == 0)
+                                      {
+                                        gHpgpHalCB.bcnmisscnt = 0;
+                                        //printf("\n MAX_NO_BEACON\n"); 
+              #ifdef LOG_FLASH
+                                      
+                                          logEvent(ISM_ERROR, BCN_LOSS, EVENT_TYPE_BCN_MISS_IND, NULL, 0);
+              #endif
+                                          LINKL_SendBcnLossInd(MAX_NO_BEACON_NW_DISCOVERY);
+                                      }
+                          //Host_SendIndication(HOST_EVENT_BCN_LOSS, NULL, 0);
+                        }
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 13  
+
+                         else if(gHpgpHalCB.bcnmisscnt > MAX_NO_BEACON_BACKUPCCO)
+                        {
+                            //if(staInfo->lastUserAppCCOState == 0)
+                                      {
+                                    LINKL_SendBcnLossInd(MAX_NO_BEACON_BACKUPCCO);
+                                      }
+                              //Host_SendIndication(HOST_EVENT_PRE_BCN_LOSS, NULL, 0);
+                        }
+                         
+              #endif          
+ 730   5      
+ 731   5                      }
+ 732   4                      gHpgpHalCB.bcncnt = gHpgpHalCB.halStats.BcnRxIntCnt;
+ 733   4                  }
+ 734   3               } 
+ 735   2      #endif
+ 736   2      
+ 737   2      #ifdef ETH_BRDG_DEBUG
+                      if(intStatus.s.ethFreeCP)
+                  {
+                    // this is the old ETH Tx Done interrupt. It's generated after HW
+                    // finishes copying the pkt to ETH FIFO
+                    //
+                    oldNumEthTxDoneInts++;
+                  }
+              #endif
+ 746   2               
+ 747   2      #ifdef SW_RECOVERY
+ 748   2               if(intStatus.s.plcSMHangInt)
+ 749   2              {
+ 750   3                  //if(gHpgpHalCB.devMode == DEV_MODE_CCO) // Kiran for testing of multi device
+ 751   3                  {
+ 752   4                      Monitor_Hang(); 
+ 753   4                  }
+ 754   3              }
+ 755   2      #endif
+ 756   2      
+ 757   2              if(intStatus.s.eth_txfifoRdDn)
+ 758   2              {
+ 759   3      #ifdef HYBRII_ETH
+ 760   3            // this is the new ETH Tx Done interrupt. It's generated after ETH
+ 761   3            // is done with transmitting the pkt.
+ 762   3                  // Release ETH Tx Complete CPs
+ 763   3                  EHAL_ReleaseEthTxCPIntHandler();
+ 764   3      
+ 765   3            scheduleFrameTask = 1;
+ 766   3      
+ 767   3      
+ 768   3      #endif
+ 769   3              }
+ 770   2      #ifdef HYBRII_SPI
+ 771   2              if(intStatus.s.spiRxDone)
+ 772   2              {
+ 773   3                  /* SPI Int Handler */
+ 774   3                  hal_spi_rx_done_handler();
+ 775   3              }
+ 776   2              if(intStatus.s.spiTxDone)
+ 777   2              {
+ 778   3                  /* SPI Int Handler */
+ 779   3                  hal_spi_tx_done_handler();
+ 780   3      
+ 781   3            scheduleFrameTask = 1;
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 14  
+
+ 782   3               }
+ 783   2      #endif
+ 784   2      
+ 785   2      //[YM] comment out the hpgpBp bit checking, it wil cause Bp tx counter mismatch
+ 786   2      
+ 787   2              if(intStatus.s.newEtherSA)
+ 788   2              {
+ 789   3                  // Read the EtherSA and invoke
+ 790   3                  // callback function in Bridge module.
+ 791   3              }
+ 792   2      #if CPU_TXQ_POLL
+              #else       
+ 794   2              if(intStatus.s.cpuTxQNonEmpty)
+ 795   2              {                  
+ 796   3      #ifdef HPGP_HAL_TEST
+                          CHAL_CpuTxQNemptyIntHandler();
+              #else
+ 799   3                  /* Frame Rx handler */
+ 800   3                  CHAL_FrameRxIntHandler(Ism.macIntCb[MAC_INT_IRQ_CPU_TXQ_NONEMPTY].cookie);
+ 801   3      #endif
+ 802   3            scheduleFrameTask = 1;
+ 803   3              }
+ 804   2      #endif 
+ 805   2      #ifdef HYBRII_HPGP     
+ 806   2              if(intStatus.s.plcBcn2Sent)
+ 807   2              {
+ 808   3                  // Call Discovery beacon Sent Int Handler
+ 809   3              }
+ 810   2              if(intStatus.s.plcBcn3Sent)
+ 811   2              {
+ 812   3                  // Call Central beacon Sent Int Handler
+ 813   3                  HHAL_Bcn3SentIntHandler();
+ 814   3                 /*if(zctrack)
+ 815   3                  {
+ 816   3                      gbpst = gavg + gbpst + MAC_PROCESSING_CLOCK ;// + 0x1BAFF;//1365 is bpsto
+ 817   3                       WriteU32Reg(PLC_BPST_REG, ctorl(gbpst));
+ 818   3                  } */
+ 819   3              }   
+ 820   2                 
+ 821   2              
+ 822   2      #endif 
+ 823   2      #ifdef HYBRII_ZIGBEE
+                      if (intStatus.s.zbPreBcnTxTime)
+                      {
+                          hal_zb_pre_bc_tx_time_handler();
+                      }
+              
+                      if (intStatus.s.zbBcnTxTime)
+                      {
+                          hal_zb_bc_tx_time_handler();
+                      }
+              
+                      if (intStatus.s.zbTxDone)
+                      {
+                          hal_zb_tx_done_handler();
+                      }
+                      
+                      if (intStatus.s.zbBcnTxDone)
+                      {
+                          hal_zb_bc_tx_done_hadler();
+                      }
+                      break;
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 15  
+
+              #endif
+ 845   2      
+ 846   2      #if 0   // For Sound packet process
+                      // [YM] When Rx a sound packet, read RSSI value from RSSI FIFO and print it out for pass to a func
+             -tion for further process
+                      if(intStatus.s.plcMSoundRxInt)
+                      {
+                         //
+                         HHAL_RxSoundIntHandler();
+                      }
+              #endif  
+ 854   2      
+ 855   2      #ifdef POWERSAVE
+                 // The order of polling is important: must poll for bpStartInt before EarlyWakeBpInt
+                   if(PlcMedInterruptReg.s.bcnStart)
+                 {
+                  u8 modVal;
+              
+                  WriteU32Reg(PLC_MEDIUMINTSTATUS_REG, ctorl(INT_STATUS_BCNSTART));
+              
+                  bcnStartInt++;
+                    gHpgpHalCB.halStats.psBpIntCnt++;
+              
+                      if(gHpgpHalCB.devMode == DEV_MODE_CCO)
+                    {
+                      scb->bpCnt++;
+                    }
+              
+              #ifdef PS_DEBUG
+                    if (psDebug)
+                      FM_Printf(FM_MMSG,"HPGP_INT: gHpgpHalCB.halStats.psBpIntCnt=%lu, scb->bpCnt=%d, \n", 
+                          gHpgpHalCB.halStats.psBpIntCnt, scb->bpCnt);
+              #endif
+                    if (scb)
+                    {
+                      if (scb->psState == PSM_PS_STATE_ON)
+                      {
+                        u8 awdCnt = 0;
+              
+              //          if (psDebug)
+              //            printf("hpgpBP INT:  gHpgpHalCB.halStats.psBpIntCnt=%lu, EarlyWakeBcnCnt=%lu\n", gHpgpHalCB.halSta
+             -ts.psBpIntCnt, EarlyWakeBcnCnt);
+              //          if (scb->bpCnt == (EarlyWakeBcnCnt+2))  // should be only + 1, but + 1 doesn't work, why ?
+                        if (scb->commAwd.awdTime & 0x80)
+                        {
+                          awdCnt = (scb->commAwd.awdTime & 0x0f);
+                        }
+                        if (EarlyWakeBcnCnt && (gHpgpHalCB.halStats.psBpIntCnt == (EarlyWakeBcnCnt + awdCnt + 1)))
+                        {
+                          // this is the BP right after the AWD BP
+              #ifdef PS_DEBUG
+                          if (psDebug)
+                            FM_Printf(FM_MMSG, "HPGP_INT: After AWD, enter deep sleep. gHpgpHalCB.halStats.psBpIntCnt=%lu, scb-
+             ->bpCnt=%d, numBp=%d,awdCnt=%bu\n", 
+                                gHpgpHalCB.halStats.psBpIntCnt, scb->bpCnt,  scb->commAwd.numBp, awdCnt);
+              #endif
+                          EarlyWakeBcnCnt = 0;
+                          PSM_enter_deep_sleep_PS();
+              #if 0
+                          WriteU32Reg(PLC_MEDIUMINTSTATUS_REG, ctorl(INT_STATUS_HIBERCLKOFF));
+                          hiberClkOffSetFlag = FALSE;
+                          EarlyWakeBcnCnt = 0;
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 16  
+
+                              PlcMedInterruptReg.reg = ReadU32Reg(PLC_MEDIUMINTSTATUS_REG);
+                            if(PlcMedInterruptReg.s.hiberClkOff)
+                            FM_Printf(FM_MMSG,"HPGP_INT: hiberClkOff is still ON after clearing it\n");
+                          tmpPsBpIntCnt = gHpgpHalCB.halStats.psBpIntCnt;
+              #endif
+                        }
+                        else
+                        {
+                          // only STA in PS mode and it's AWD should datapath_transmitDataPlc() be called
+                          datapath_transmitDataPlc(1);
+                        }
+                      }
+                      else if (scb->psState == PSM_PS_STATE_WAITING_ON)
+                      {
+                        sPsSchedule tmpCommAwd;
+              
+                        // this STA has been waiting for the right bp to start its AWD
+              #ifdef PS_DEBUG
+                        if (psDebug)
+                          FM_Printf(FM_MMSG,"HPGP_INT: scb->psState=WAITING_ON. gHpgpHalCB.halStats.psBpIntCnt=%lu, scb->bpCnt
+             -=%d, scb->commAwd.numBp=%d\n", 
+                              gHpgpHalCB.halStats.psBpIntCnt, scb->bpCnt,  scb->commAwd.numBp);
+              #endif
+                        PSM_cvrtPss_Awd(scb->pss, &tmpCommAwd); // for now, store PSS in tmp place so datapath_transmitDataPl
+             -c()
+                                            // can still tx
+                        if (!(scb->bpCnt % tmpCommAwd.numBp))
+                        {
+              #ifdef PS_DEBUG
+                          if (psDebug)
+                            FM_Printf(FM_MMSG,"HPGP_INT: Config PS HW for AWD. gHpgpHalCB.halStats.psBpIntCnt=%lu, scb->bpCnt=%
+             -d, scb->commAwd.numBp=%d\n", 
+                                gHpgpHalCB.halStats.psBpIntCnt, scb->bpCnt,  scb->commAwd.numBp);
+              #endif
+                          scb->psState = PSM_PS_STATE_ON;
+                          gHpgpHalCB.halStats.psBpIntCnt = scb->bpCnt;  // sync with CCO's bpCnt
+                          PSM_ConfigStaPsHW(scb->pss);  
+                            PSM_SetStaPsHW(TRUE);
+                          PSM_cvrtPss_Awd(scb->pss, &scb->commAwd); // convert PSS to usable format
+                          FM_Printf(FM_MMSG, "STA Power Saving Mode is now ON\n");
+                        }
+                      }  
+                    }
+              /*
+                  bcnStartInt++;
+                  if (EarlyWakeBpIntFlag)
+                  {
+                    if (psDebug)
+                      FM_Printf(FM_MMSG,"bcnStart_Int: exit deep sleep. gHpgpHalCB.halStats.psBpIntCnt=%lu\n", gHpgpHalCB.ha
+             -lStats.psBpIntCnt);
+                    PSM_exit_deep_sleep_PS();
+                    EarlyWakeBpIntFlag = FALSE;
+                    bcnStartIntExitSleep++;
+                  }
+              */
+                }
+              
+                   if(PlcMedInterruptReg.s.earlywakeBP)
+                 {
+                  u8 modVal;
+                    sEvent *newEvent = NULL;
+                  u32 ntb;
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 17  
+
+              
+                  earlywakeBPintCnt++;
+              #ifdef PS_DEBUG
+                  if (psDebug)
+                    FM_Printf(FM_MMSG,"earlywakeBP_Int: exit deep sleep. gHpgpHalCB.halStats.psBpIntCnt=%lu, scb->bpCnt=%d 
+             -\n", gHpgpHalCB.halStats.psBpIntCnt, scb->bpCnt);
+              #endif
+                  WriteU32Reg(PLC_MEDIUMINTSTATUS_REG, ctorl(INT_STATUS_EARLYWAKEUPBP));
+              
+                  if (gHpgpHalCB.devMode == DEV_MODE_CCO)
+                  {
+                    if ( !(scb->bpCnt % 2))
+                    {
+                      // bpCnt should be an odd # in this interrupt
+                      // if it's even, it means that it's 1 more than it should be
+                      // Need to change it to odd so STA can sync with CCO
+                        scb->bpCnt--;
+                      EarlyWBPnotEven++;
+              #ifdef PS_DEBUG
+                      if (psDebug)
+                        FM_Printf(FM_MMSG,"EARLY WAKEUP INT, CCO: changed bpCnt to ODD, new scb->bpCnt=%d\n", scb->bpCnt);
+              #endif
+                    }
+              
+                    // take care of the case when EarlyWakeBP interrupt occurs too early (usually 2 bps earlier)
+                    if (scb->commAwd.numBp)
+                    {
+                      modVal = (scb->bpCnt + 1) % scb->commAwd.numBp;
+                      if (modVal != 0)
+                      {
+                        EarlyWBPnotMOD++;
+              #ifdef PS_DEBUG
+                      if (psDebug)
+                          printf("CCO: NOT MOD with scb->commAwd.numBp=%d, gHpgpHalCB.halStats.psBpIntCnt=%lu, scb->bpCnt=%d, 
+             -modVal=%bu\n", 
+                              scb->commAwd.numBp, gHpgpHalCB.halStats.psBpIntCnt, scb->bpCnt, modVal);
+              #endif
+                          scb->bpCnt += scb->commAwd.numBp - modVal;
+                      }
+                    }
+                    EarlyWakeBcnCnt = scb->bpCnt;
+                  }
+                  if (gHpgpHalCB.devMode == DEV_MODE_STA)
+                  {
+                    if (!(gHpgpHalCB.halStats.psBpIntCnt % 2))
+                    {
+                      // bpCnt should be an odd # in this interrupt
+                      // if it's even, it means that it's 1 more than it should be
+                      // Need to change it to odd
+                        gHpgpHalCB.halStats.psBpIntCnt--;
+                      EarlyWBPnotEven++;
+              #ifdef PS_DEBUG
+                      if (psDebug)
+                        FM_Printf(FM_MMSG,"EARLY WAKEUP INT, STA: changed bpCnt to ODD, new gHpgpHalCB.halStats.psBpIntCnt=%l
+             -u\n", gHpgpHalCB.halStats.psBpIntCnt);
+              #endif
+                    }
+              
+                    // take care of the case when EarlyWakeBP interrupt occurs too early (usually 2 bps earlier)
+                    if (scb->commAwd.numBp)
+                    {
+                      modVal = (gHpgpHalCB.halStats.psBpIntCnt + 1) % scb->commAwd.numBp;
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 18  
+
+                      if (modVal != 0)
+                      {
+                        EarlyWBPnotMOD++;
+              #ifdef PS_DEBUG
+                        if (psDebug)
+                          printf("STAT: NOT MOD with scb->commAwd.numBp=%d, gHpgpHalCB.halStats.psBpIntCnt=%lu, scb->bpCnt=%d,
+             - modVal=%bu\n", 
+                              scb->commAwd.numBp, gHpgpHalCB.halStats.psBpIntCnt, scb->bpCnt, modVal);
+              #endif
+                          gHpgpHalCB.halStats.psBpIntCnt += scb->commAwd.numBp - modVal;
+                      }
+                    }
+                    EarlyWakeBcnCnt = gHpgpHalCB.halStats.psBpIntCnt;
+                  }
+              #ifdef PS_DEBUG
+                  if (psDebug)
+                    FM_Printf(FM_MMSG,"EARLY WAKEUP INT: final: EarlyWakeBcnCnt=%lu, gHpgpHalCB.halStats.psBpIntCnt=%lu, sc
+             -b->bpCnt=%d\n", 
+                        EarlyWakeBcnCnt, gHpgpHalCB.halStats.psBpIntCnt, scb->bpCnt);
+              #endif
+                  EarlyWakeBpIntFlag = TRUE;
+                  // now exit deep_sleep mode
+              //    PSM_exit_deep_sleep_PS();
+                }
+              
+              #ifdef POWERSAVE_NO 
+                   if(PlcMedInterruptReg.s.hiberClkOff)
+                 {
+                  if (scb && (scb->psState == PSM_PS_STATE_ON))
+                  {
+                    if (!hiberClkOffSetFlag &&  (gHpgpHalCB.halStats.psBpIntCnt > tmpPsBpIntCnt)) // HW problem: HiberClkOf
+             -f goes HI too fast, so wait for next BP to do this
+                    {
+              #ifdef PS_DEBUG
+                      if (psDebug)
+                            FM_Printf(FM_MMSG,"hiberClkOff int. is HI. Enter deep sleep. gHpgpHalCB.halStats.psBpIntCnt=%lu
+             -, scb->bpCnt=%d\n", gHpgpHalCB.halStats.psBpIntCnt, scb->bpCnt);
+              #endif
+                      hiberClkOffSetFlag = TRUE;
+                      PSM_enter_deep_sleep_PS();
+                    }
+                  }
+                   }
+                 else
+                 {
+                  if (scb && (scb->psState == PSM_PS_STATE_ON))
+                  {
+              #ifdef PS_DEBUG
+                    if (psDebug)
+                          FM_Printf(FM_MMSG,"hiberClkOff int. is LO. gHpgpHalCB.halStats.psBpIntCnt=%lu, scb->bpCnt=%d\n",
+             - gHpgpHalCB.halStats.psBpIntCnt, scb->bpCnt, gHpgpHalCB);
+              #endif
+                    
+                  }
+                 }
+              #endif
+              #endif //POWERSAVE
+1072   2      
+1073   2              EA = 0;
+1074   2              // Read interrupt status.
+1075   2              intStatus.reg = ReadU32Reg(CPU_INTSTATUS_REG);
+1076   2              // Write back the value to clear the status immediately
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 19  
+
+1077   2              WriteU32Reg(CPU_INTSTATUS_REG, intStatus.reg);
+1078   2              PlcMedInterruptReg.reg = ReadU32Reg(PLC_MEDIUMINTSTATUS_REG);
+1079   2          //if (intStatus.s.hpgpBP ||intStatus.s.PosthpgpBP||intStatus.s.ethFreeCP||intStatus.s.spiRxDone||intStat
+             -us.s.spiTxDone||intStatus.s.newEtherSA||intStatus.s.cpuTxQNonEmpty||intStatus.s.plcBcn2Sent||intStatus.s.plcBcn3Sent||in
+             -tStatus.s.plcBcnRx )
+1080   2            // printf(" intStatus.reg = %lx\n", intStatus.reg);
+1081   2              EA = 1;
+1082   2      
+1083   2      #ifdef POWERSAVE 
+                  loopCnt++;
+              #endif
+1086   2      
+1087   2          }
+1088   1      
+1089   1      
+1090   1        
+1091   1      #ifdef RTX51_TINY_OS
+1092   1      
+1093   1        if (scheduleFrameTask )
+1094   1        {
+1095   2      
+1096   2          //FM_Printf(FM_USER,"s\n");
+1097   2          os_set_ready(HYBRII_TASK_ID_FRAME);
+1098   2      
+1099   2        }
+1100   1      
+1101   1          
+1102   1      #endif  
+1103   1          // Restore cp bank context
+1104   1      #ifndef HYBRII_FPGA
+1105   1      #ifdef  HYBRII_HPGP
+1106   1      //    HHAL_ProcessPlcTxDone();
+1107   1        
+1108   1      #endif
+1109   1      #endif
+1110   1          
+1111   1          WriteU32Reg(CPU_PKTBUFBANKSEL_REG, bankSelReg);
+1112   1      #ifdef HYBRII_HPGP
+1113   1          hal_hpgp_mac_monitoring();    
+1114   1      #endif
+1115   1      
+1116   1          return;
+1117   1      
+1118   1      
+1119   1      }
+*** WARNING C280 IN LINE 407 OF ..\..\..\common\ism.c: 'dbc_pattern': unreferenced local variable
+*** WARNING C280 IN LINE 409 OF ..\..\..\common\ism.c: 'diff': unreferenced local variable
+1120          
+1121          #ifndef HAL_INT
+1122          void ISM_EnableIntPolling()
+1123          {
+1124   1      #ifndef RTX51_TINY_OS
+                  SCHED_Sched(&Ism.task);
+              #endif
+1127   1      }
+1128          #endif
+1129          
+1130          eStatus ISM_Init(void)
+1131          {
+1132   1          memset(&Ism, 0, sizeof(sIsm));
+1133   1      #ifndef HAL_INT
+1134   1      #ifdef RTX51_TINY_OS
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 20  
+
+1135   1          //os_create_task(HYBRII_TASK_ID_ISM_POLL);
+1136   1      #else
+                  SCHED_InitTask(&Ism.task, HYBRII_TASK_ID_ISM_POLL, "ISM",
+                                 HPGP_TASK_PRI_ISM, ISM_PollInt, &Ism);
+              #endif
+1140   1      #endif
+1141   1          return STATUS_SUCCESS;
+1142   1      }
+1143          
+1144          eStatus ISM_RegisterIntHandler( eMacIntIrq intIrq,
+1145                                           void (*intHdlr)(void XDATA *cookie),
+1146                                           void* cookie)
+1147          {
+1148   1          intHdlr = intHdlr;
+1149   1      
+1150   1          if(intIrq < MAC_INT_IRQ_ALL)
+1151   1          {
+1152   2      #ifdef CALLBACK
+                      Ism.macIntCb[intIrq].intHandler = intHdlr;
+              #endif
+1155   2              Ism.macIntCb[intIrq].cookie = cookie;
+1156   2              return STATUS_SUCCESS;
+1157   2          }
+1158   1          else
+1159   1          {
+1160   2              return STATUS_FAILURE;
+1161   2          }
+1162   1      }
+1163          
+1164          
+1165          
+1166          void ISM_UnregisterIntrHandler( eMacIntIrq intIrq)
+1167          {
+1168   1          if(intIrq < MAC_INT_IRQ_ALL)
+1169   1          {
+1170   2              Ism.macIntCb[intIrq].intHandler = NULL;
+1171   2              Ism.macIntCb[intIrq].cookie = NULL;
+1172   2          }
+1173   1      }
+1174          
+1175          /*
+1176          #ifdef RTX51_TINY_OS
+1177          extern void mac_hal_irq_handler(void);
+1178          void ISM_ExtInterruptPoll (void) _task_ HYBRII_TASK_ID_ISM_POLL
+1179          {
+1180              while (1) {
+1181          #ifdef HYBRII_HPGP
+1182                  ISM_PollInt();
+1183          #else
+1184                  // FIXME - To be removed
+1185                  mac_hal_irq_handler();
+1186          #endif
+1187                  os_switch_task();
+1188              }
+1189          }
+1190          #endif
+1191          */
+1192          
+1193          /** =========================================================
+1194           *
+1195           * Edit History
+1196           *
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 21  
+
+1197           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/common/ism.c,v $
+1198           *
+1199           * $Log: ism.c,v $
+1200           * Revision 1.48  2014/09/05 09:28:18  ranjan
+1201           * 1. uppermac cco-sta switching feature fix
+1202           * 2. general stability fixes for many station associtions
+1203           * 3. changed mgmt memory pool for many STA support
+1204           *
+1205           * Revision 1.47  2014/08/25 07:37:34  kiran
+1206           * 1) RSSI & LQI support
+1207           * 2) Fixed Sync related issues
+1208           * 3) Fixed timer 0 timing drift for SDK
+1209           * 4) MMSG & Error Logging in Flash
+1210           *
+1211           * Revision 1.46  2014/07/30 12:26:25  kiran
+1212           * 1) Software Recovery for CCo
+1213           * 2) User appointed CCo support in SDK
+1214           * 3) Association process performance fixes
+1215           * 4) SSN related fixes
+1216           *
+1217           * Revision 1.45  2014/07/22 21:04:25  tri
+1218           * Fixed compiler error
+1219           *
+1220           * Revision 1.44  2014/07/22 10:03:52  kiran
+1221           * 1) SDK Supports Power Save
+1222           * 2) Uart_Driver.c cleanup
+1223           * 3) SDK app memory pool optimization
+1224           * 4) Prints from STM.c are commented
+1225           * 5) Print messages are trimmed as common no memory left in common
+1226           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+1227           *
+1228           * Revision 1.43  2014/07/16 10:47:40  kiran
+1229           * 1) Updated SDK
+1230           * 2) Fixed Diag test in SDK
+1231           * 3) Ethernet and SPI interfaces removed from SDK as common memory is less
+1232           * 4) GPIO access API's added in SDK
+1233           * 5) GV701x chip reset command supported
+1234           * 6) Start network and Join network supported in SDK (Forced CCo and STA)
+1235           * 7) Some bug fixed in SDK (CP free, p app command issue etc.)
+1236           *
+1237           * Revision 1.42  2014/07/11 10:23:37  kiran
+1238           * power save changes
+1239           *
+1240           * Revision 1.41  2014/06/19 17:13:19  ranjan
+1241           * -uppermac fixes for lvnet and reset command for cco and sta mode
+1242           * -backup cco working
+1243           *
+1244           * Revision 1.40  2014/06/17 20:35:23  varsha
+1245           * freq detect code for hal test and umac prj is under flag compilation.
+1246           *
+1247           * Revision 1.39  2014/06/11 15:09:43  tri
+1248           * took out debug printf
+1249           *
+1250           * Revision 1.38  2014/06/05 10:26:07  prashant
+1251           * Host Interface selection isue fix, Ac sync issue fix
+1252           *
+1253           * Revision 1.37  2014/05/28 10:58:58  prashant
+1254           * SDK folder structure changes, Uart changes, removed htm (UI) task
+1255           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+1256           *
+1257           * Revision 1.36  2014/05/21 15:57:51  yiming
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 22  
+
+1258           * temporary uncheck DBC and HP101 checking
+1259           *
+1260           * Revision 1.35  2014/05/15 19:30:43  varsha
+1261           * FREQ_DETECT code is added
+1262           *
+1263           * Revision 1.34  2014/05/13 20:28:18  varsha
+1264           * This file added for sW recovery machenism
+1265           *
+1266           * Revision 1.33  2014/05/12 08:09:57  prashant
+1267           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+1268           *
+1269           * Revision 1.32  2014/04/29 21:29:28  yiming
+1270           * disable print message for Mitsumi (MPER)
+1271           *
+1272           * Revision 1.31  2014/04/25 21:16:51  tri
+1273           * PS
+1274           *
+1275           * Revision 1.30  2014/04/24 21:50:00  yiming
+1276           * Working Code for Mitsumi
+1277           *
+1278           * Revision 1.29  2014/04/23 23:21:11  tri
+1279           * fix compiler error
+1280           *
+1281           * Revision 1.28  2014/04/23 23:09:10  tri
+1282           * more PS
+1283           *
+1284           * Revision 1.27  2014/04/21 20:04:23  tri
+1285           * more PS
+1286           *
+1287           * Revision 1.26  2014/04/21 03:10:59  tri
+1288           * more PS
+1289           *
+1290           * Revision 1.25  2014/04/20 19:47:12  tri
+1291           * more PS
+1292           *
+1293           * Revision 1.24  2014/04/20 05:06:24  tri
+1294           * compiler error
+1295           *
+1296           * Revision 1.23  2014/04/20 05:04:57  tri
+1297           * more PS
+1298           *
+1299           * Revision 1.22  2014/04/20 04:55:19  tri
+1300           * more PS
+1301           *
+1302           * Revision 1.21  2014/04/15 23:07:21  tri
+1303           * more PS
+1304           *
+1305           * Revision 1.20  2014/04/15 19:52:20  yiming
+1306           * Merge new ASIC setting, Add throughput improvement code, add M_PER code
+1307           *
+1308           * Revision 1.19  2014/04/09 21:11:58  yiming
+1309           * fix compile error
+1310           *
+1311           * Revision 1.18  2014/04/09 21:04:23  tri
+1312           * more PS
+1313           *
+1314           * Revision 1.17  2014/03/27 23:51:48  tri
+1315           * more PS
+1316           *
+1317           * Revision 1.16  2014/03/26 00:11:50  yiming
+1318           * Add DBC register definition
+1319           *
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 23  
+
+1320           * Revision 1.15  2014/03/25 17:01:07  son
+1321           * Hybrii B ASIC bring up
+1322           *
+1323           * Revision 1.14  2014/03/19 00:13:46  tri
+1324           * PS
+1325           *
+1326           * Revision 1.13  2014/03/15 17:24:06  tri
+1327           * Power Save deep sleep
+1328           *
+1329           * Revision 1.12  2014/03/12 19:51:45  tri
+1330           * added code for ETH_BRDG_DEBUG
+1331           *
+1332           * Revision 1.11  2014/03/10 05:58:10  ranjan
+1333           * 1. added HomePlug BackupCCo feature. verified C&I test.(passed.) (bug 176)
+1334           *
+1335           * Revision 1.10  2014/02/27 10:42:47  prashant
+1336           * Routing code added
+1337           *
+1338           * Revision 1.9  2014/02/26 22:56:06  tri
+1339           * more PS code
+1340           *
+1341           * Revision 1.8  2014/02/19 20:30:21  son
+1342           * Replace calling CHAL_Ext1Isr with ISM_PollInt
+1343           *
+1344           * Revision 1.7  2014/02/19 10:22:40  ranjan
+1345           * - common sync for hal_tst and upper mac project
+1346           * - ism.c is MAC interrupt handler for hhal_tst and upper mac.
+1347           *    chal_ext1isr function   is removed
+1348           * - verified : lower mac sync, upper mac sync data traffic.
+1349           *
+1350           * Revision 1.6  2014/02/14 21:09:35  varsha
+1351           * I have added work around in posthpgpBP interrupt because we were missing polling in three device commun
+             -ication.
+1352           * With this fix AC,DC, uppermac and Lower MAc sync is working fine.
+1353           *
+1354           * Varsha.
+1355           *
+1356           * Revision 1.5  2014/02/12 11:45:16  prashant
+1357           * Performance improvement fixes
+1358           *
+1359           * Revision 1.4  2014/02/07 22:45:05  yiming
+1360           * add HP101 and HP11 detection code
+1361           *
+1362           * Revision 1.3  2014/01/28 17:53:46  tri
+1363           * Added Power Save code
+1364           *
+1365           * Revision 1.2  2014/01/10 17:02:18  yiming
+1366           * check in Rajan 1/8/2014 code release
+1367           *
+1368           * Revision 1.14  2014/01/08 10:53:53  ranjan
+1369           * Changes for LM OS support.
+1370           * New Datapath FrameTask
+1371           * LM and UM  datapath, feature verified.
+1372           *
+1373           * known issues : performance numbers needs revisit
+1374           *
+1375           * review : pending.
+1376           *
+1377           * Revision 1.13  2013/10/25 13:08:16  prashant
+1378           * ism.c fix for zigbee, Sniffer support for lower MAC
+1379           *
+1380           * Revision 1.12  2013/10/21 18:59:51  son
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 24  
+
+1381           * Fixed compilation issue for zigbee project
+1382           *
+1383           * Revision 1.11  2013/10/16 07:43:37  prashant
+1384           * Hybrii B Upper Mac compiling issues and QCA fix, added default eks code
+1385           *
+1386           * Revision 1.10  2013/09/20 14:19:36  yiming
+1387           * merge Varsha SEP 16 code to Hybrii_B CVS
+1388           *
+1389           * Revision 1.9  2013/09/17 22:08:46  yiming
+1390           * merge Hybrii_A ism.c to Hybrii_B CVS
+1391           *
+1392           * Revision 1.8  2013/09/17 22:00:03  yiming
+1393           * fixed the compile error on 0916 sync code merge, remove older code and hpgpBPSta bit setting
+1394           *
+1395           * Revision 1.7  2013/09/16 22:29:38  yiming
+1396           * Merge 0916 sync code
+1397           *
+1398           * Revision 1.6  2013/09/13 19:39:07  yiming
+1399           * Merge Varsha 0911_2013 Beacon Sync code
+1400           *
+1401           * Revision 1.5  2013/09/04 15:49:18  yiming
+1402           * comment out old line of code
+1403           *
+1404           * Revision 1.4  2013/09/04 14:43:30  yiming
+1405           * New changes for Hybrii_A code merge
+1406           *
+1407           * Revision 1.3  2013/06/04 20:29:05  yiming
+1408           * Merge 0603_2013 Hybrii A Code to Hybrii_B Test Code
+1409           *
+1410           * Revision 1.2  2013/01/24 00:13:46  yiming
+1411           * Use 01-23-2013 Hybrii-A code as first Hybrii-B code base
+1412           *
+1413           * Revision 1.24  2013/01/22 12:41:38  prashant
+1414           * Fixing build issues
+1415           *
+1416           * Revision 1.23  2013/01/17 16:06:03  ranjan
+1417           * datapath stability fixes
+1418           *
+1419           * Revision 1.22  2013/01/15 12:26:11  ranjan
+1420           * a)fixed issues in swQ for plc->host intf datapath and
+1421           *    swQ for host -> plc datapath
+1422           *
+1423           * Revision 1.21  2013/01/04 16:11:22  prashant
+1424           * SPI to PLC bridgeing added, Queue added for SPI and Ethernet
+1425           *
+1426           * Revision 1.20  2012/12/14 11:06:57  ranjan
+1427           * queue added for eth to plc datapath
+1428           * removed mgmt tx polling
+1429           *
+1430           * Revision 1.19  2012/11/13 22:39:43  son
+1431           * Added Reset and RX reable primitives
+1432           *
+1433           * Revision 1.18  2012/10/11 06:21:00  ranjan
+1434           * ChangeLog:
+1435           * 1. Added HPGP_MAC_SAP to support linux host data and command path.
+1436           *     define HPGP_MAC_SAP, NMA needs to be added in project.
+1437           *
+1438           * 2. Added 'p ping' command in htm.c . Feature is under AUTO_PING macro.
+1439           *
+1440           * 3. Extended  'p key' command to include PPEK support.
+1441           *
+1442           * verified :
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 25  
+
+1443           *   1. Datapath ping works overnite after association,auth
+1444           *   2. HAL TEST project is intact
+1445           *
+1446           * Revision 1.17  2012/09/08 04:01:43  son
+1447           * Integrated SPI, Zigbee into common interrupt service function
+1448           *
+1449           * Revision 1.16  2012/07/19 21:46:07  son
+1450           * Prepared files for zigbee integration
+1451           *
+1452           * Revision 1.15  2012/07/18 22:02:11  son
+1453           * Changed ISM Polling task name
+1454           *
+1455           * Revision 1.14  2012/07/14 04:07:58  kripa
+1456           * Reverting the change to ISM Poll task temporarily, to avoid a unknown crash.
+1457           * Committed on the Free edition of March Hare Software CVSNT Client.
+1458           * Upgrade to CVS Suite for more features and support:
+1459           * http://march-hare.com/cvsnt/
+1460           *
+1461           * Revision 1.13  2012/07/12 22:05:55  son
+1462           * Moved ISM Polling to ISM Task.
+1463           * UI is now part of init task
+1464           *
+1465           * Revision 1.12  2012/07/04 19:08:36  kripa
+1466           * Calling PnedingTxProc funciton from interrupt polling routine.
+1467           * Committed on the Free edition of March Hare Software CVSNT Client.
+1468           * Upgrade to CVS Suite for more features and support:
+1469           * http://march-hare.com/cvsnt/
+1470           *
+1471           * Revision 1.11  2012/06/20 17:29:13  kripa
+1472           * Adding Bcn3SentIntHandler()
+1473           * Committed on the Free edition of March Hare Software CVSNT Client.
+1474           * Upgrade to CVS Suite for more features and support:
+1475           * http://march-hare.com/cvsnt/
+1476           *
+1477           * Revision 1.10  2012/06/13 06:24:31  yuanhua
+1478           * add code for tx bcn interrupt handler integration and data structures for region entry schedule. But th
+             -ey are not in execution yet.
+1479           *
+1480           * Revision 1.9  2012/06/07 06:10:29  yuanhua
+1481           * (1) free CPs if frame tx fails (2) add compiler flag HAL_INT_HDL to differentiate the interrupt and int
+             -errupt handler. (3) enable all interrupts during the system initialization.
+1482           *
+1483           * Revision 1.8  2012/06/05 22:37:11  son
+1484           * UART console does not get initialized due to task ID changed
+1485           *
+1486           * Revision 1.7  2012/06/05 07:25:58  yuanhua
+1487           * (1) add a scan call to the MAC during the network discovery. (2) add a tiny task in ISM for interrupt p
+             -olling (3) modify the frame receiving integration. (4) modify the tiny task in STM.
+1488           *
+1489           * Revision 1.6  2012/06/04 23:09:18  son
+1490           * Timer Handler to be called from RTX51 OS
+1491           *
+1492           * Revision 1.5  2012/05/19 22:22:16  yuanhua
+1493           * added bcn Tx/Rx non-callback option for the ISM.
+1494           *
+1495           * Revision 1.4  2012/05/12 04:11:46  yuanhua
+1496           * (1) added list.h (2) changed the hal tx for the hw MAC implementation.
+1497           *
+1498           * Revision 1.3  2012/04/19 16:46:30  yuanhua
+1499           * fixed some C51 compiler errors for the integration.
+1500           *
+1501           * Revision 1.2  2012/04/13 06:15:10  yuanhua
+C51 COMPILER V9.52.0.0   ISM                                                               12/02/2014 14:35:37 PAGE 26  
+
+1502           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+1503           *
+1504           * Revision 1.1  2011/07/03 05:58:49  jie
+1505           * Initial check in
+1506           *
+1507           * Revision 1.1  2011/05/06 18:31:47  kripa
+1508           * Adding common utils and isr files for Greenchip firmware.
+1509           *
+1510           * Revision 1.1  2011/04/08 21:41:00  yuanhua
+1511           * Framework
+1512           *
+1513           *
+1514           * =========================================================*/
+1515          
+1516          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2009    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    230      45
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  2 WARNING(S),  0 ERROR(S)

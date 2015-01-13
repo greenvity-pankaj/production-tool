@@ -1,0 +1,3162 @@
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE DATAPATH
+OBJECT MODULE PLACED IN .\obj\datapath.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\..\common\datapath\datapath.c LARGE OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X
+                    -2100) INCDIR(..\..\common;..\..\project\hal\src;..\..\hpgp\src\mux;..\..\hpgp\src\link;..\..\hpgp\src\ctrl;..\..\hpgp\sr
+                    -c\nma;..\..\hal;.\src;..\..\hpgp\src\hal;..\..\hpgp\src\sap;..\..\hpgp\src\test;..\..\hpgp\src\;..\..\common\datapath;..
+                    -\..\hpgp\src\route;..\..\..\components\utilities\datatype\inc;..\..\..\components\utilities\event\inc;..\..\..\component
+                    -s\utilities\linklist\inc;..\..\..\components\utilities\timer\inc;..\..\app_support;..\..\..\sampleapp\src;..\..\..\sampl
+                    -eapp\inc;..\..\..\components\hpgp\inc;..\..\..\components\aps\inc) DEFINE(P8051,HYBRII_8051,HYBRII_HPGP,HYBRII_ASIC,PLC_
+                    -SW_SYNC=1,inline,HPGP_HAL_TEST,RTX51_TINY_OS,_TIMER_INTERRUPT_,SNIFFER,Hybrii_B,NEW_SYNC,_TIMER_INTERRUPT_,HYBRII_B,HW_S
+                    -PI_TX_CRC,HW_SPI_RX_CRC,_CRC_VERIFY_,HYBRII_SPI,SNIFFER,HYBRII_ETH,B_ASICPLC,FREQ_DETECT,PROD_TEST) DEBUG OBJECTEXTEND P
+                    -RINT(.\lst\datapath.lst) TABS(2) OBJECT(.\obj\datapath.obj)
+
+line level    source
+
+   1          
+   2          #ifdef RTX51_TINY_OS
+   3          #include <rtx51tny.h>
+   4          #endif
+   5          #include <stdio.h>
+   6          #include <string.h>
+   7          #include "fm.h"
+   8          #include <intrins.h>
+   9          #include "papdef.h"
+  10          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  13          #include "fm.h"
+  14          #include "hal_common.h"
+  15          #include "hal.h"
+  16          #include "hal_eth.h"
+  17          #include "hal_tst.h"
+  18          #include "hal_cfg.h"
+  19          #include "hal_spi.h"
+  20          #include "hpgpdef.h"
+  21          #include "datapath.h"
+  22          
+  23          #include "papdef.h"
+  24          //#include "crm.h"
+  25          #ifdef UM
+              #include "ctrll.h"
+              #include "linkl.h"
+              #include "timer.h"
+              #include "stm.h"
+              #endif
+  31          #include "hpgpapi.h"
+  32          
+  33          
+  34          #include "frametask.h"
+  35          #include "hybrii_tasks.h"
+  36          //#define printf(x)
+  37          //#define FM_Printf(x, z)
+  38          
+  39          sConnState  ConnState[MAX_NUM_STATIONS];
+  40          
+  41          #ifdef POWERSAVE
+              extern u32 psNoTxFrmCnt;
+              extern u32 psTxFrmCnt;
+              extern u32 psPlcTxWriteErrCnt;
+              extern u32 psPlcIdleErrCnt;
+              extern u32 psPlcTxOKCnt;
+              extern u32 psPclTxWriteFromBcn;
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 2   
+
+              extern u32 psPclTxWriteFromFrame;
+              extern u32 psFrmBcnNoTxFrmCnt;
+              extern u32 psFrmBcnTxFrmCnt;
+              extern u32 psFrmBcnPlcTxWriteErrCnt;
+              extern u32 psFrmBcnPlcIdleErrCnt;
+              extern u32 psFrmBcnPlcTxOKCnt;
+              extern u32 psNoTxWrongBpFrmCnt;
+              extern u32 psFrmBcnNoTxWrongBpFrmCnt;
+              extern u32 psNoTxZeroAwdFrmCnt;
+              extern u32 psFrmBcnNoTxZeroAwdFrmCnt;
+              extern u8 psDebug;
+              #endif
+  60          
+  61          #if defined(UM) || defined(HPGP_HAL_TEST)
+  62          #include "mac_intf_common.h"
+  63          #endif
+  64          #include "utils.h"
+  65          #ifdef UART_HOST_INTF
+              #include "uart_driver.h"
+              #endif
+  68          
+  69          #ifdef AUTO_PING
+              #include "htm.h"
+              #endif
+  72          #include "utils.h"
+  73          
+  74          
+  75          
+  76          
+  77          
+  78          volatile dqueue_t gDqueue[MAX_DATA_QUEUES];
+  79          
+  80          extern u8 spi_payload_rx_pending;
+  81          extern u8 gEthMacAddrDef[];
+  82          
+  83          #ifdef UM
+              extern u8 xdata ufrm[];
+              #endif
+  86          
+  87          extern u8 eth_plc_bridge;
+  88          
+  89          
+  90          volatile u8 host_intf_max_cp =0;
+  91          volatile u8 numHostCPs = 0;
+  92          static u32 plcTxTime = 0;
+  93          
+  94          
+  95                                   
+  96          u8  gNekEks = HPGP_UNENCRYPTED_EKS;
+  97          
+  98          #ifdef DEBUG_DATAPATH
+              extern u8 sigDbg;
+              extern u8 pktDbg;
+              extern u8 ethQueueDebug;
+              
+              #endif
+ 104          
+ 105          #ifdef FREQ_DETECT
+ 106          extern u32 PLC_MIN_AC_BPLEN;
+ 107          extern u32 PLC_AC_BP_LEN; 
+ 108          extern u32 PLC_MAX_AC_BPLEN; 
+ 109          #endif
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 3   
+
+ 110          #ifdef ETH_BRDG_DEBUG
+              extern u8 myDebugFlag;
+              
+              extern u32 ethTxFrameCnt;
+              extern u32 numEthTxCp;
+              extern u32 plcRxFrameCnt;
+              extern u8 myDebugFlag1;
+              extern u32 numPlcPendingRet;
+              extern u32 numForcePlcTxDone; 
+              extern u32 numEthTxDoneInts;
+              extern u32 numEthTxCpReleased;
+              extern u32 numPlcTxCp;
+              extern u32 plcTxWriteFail;
+              extern u32 plcTxFrameCnt;
+              
+              extern u32 ethRxFrameCnt;
+              extern u32 numTxDoneInts;
+              
+              
+              
+              extern u32 ethTxWriteFail;
+              #endif
+ 132          
+ 133          #ifdef SPI_DEBUG
+              extern u8 mySpiDebugFlag;
+              extern hal_spi_stats_t hal_spi_stats;
+              #endif
+ 137          
+ 138          #ifdef UM
+              
+              
+              static void Host_MgmtCmdRxHandler(sHpgpHalCB *pHalCb, 
+                                                    sCommonRxFrmSwDesc* pRxFrmDesc,
+                                  u16 frmLen, u8 frmType);
+              
+              #endif
+ 146          
+ 147          void datapath_writeHostIntf(sSwFrmDesc *hostTxFrmSwDesc)
+ 148          {
+ 149   1      
+ 150   1        u16       crc16 = 0;
+ 151   1        
+ 152   1        eStatus     status;
+ 153   1      
+ 154   1        u8         firstCp = 0;
+ 155   1      
+ 156   1      
+ 157   1      
+ 158   1        if(hostIntf == HOST_INTF_ETH)
+ 159   1        {
+ 160   2      #ifdef HYBRII_ETH            
+ 161   2          status = EHAL_EthTxQWrite(hostTxFrmSwDesc);
+ 162   2      #endif //HYBRII_ETH
+ 163   2          if(status != STATUS_SUCCESS)
+ 164   2          {
+ 165   3      #ifdef ETH_BRDG_DEBUG
+                    if (myDebugFlag1)
+                      printf("EHT_SendToHost: EHAL_EthTxQWrite returned FAIL\n");
+                    ethTxWriteFail++;
+              #endif
+ 170   3              FM_Printf(FM_ERROR, "Tx to Eth Fail\n");
+ 171   3          
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 4   
+
+ 172   3                  gHpgpHalCB.halStats.PtoHswDropCnt++;
+ 173   3              // free CPs 
+ 174   3              CHAL_FreeFrameCp(hostTxFrmSwDesc->cpArr, hostTxFrmSwDesc->cpCount);
+ 175   3          } 
+ 176   2          numHostCPs -= hostTxFrmSwDesc->cpCount;
+ 177   2        }
+ 178   1      #ifdef HYBRII_SPI
+ 179   1        else if(hostIntf == HOST_INTF_SPI)
+ 180   1        {       
+ 181   2      
+ 182   2        
+ 183   2          // FM_Printf(FM_USER, "s t\n");
+ 184   2          //status = hal_spi_tx_dma_cp(hostTxFrmSwDesc->frmLen,hostTxFrmSwDesc);
+ 185   2      
+ 186   2          if(status != STATUS_SUCCESS)
+ 187   2          {
+ 188   3            ///  FM_Printf(FM_ERROR, "Tx to SPI Failed\n");
+ 189   3      #ifdef SPI_DEBUG
+                      hal_spi_stats.tx_return_err++;
+                    if (mySpiDebugFlag)
+                    {
+                          printf("Tx to SPI Fail\n"); // TODO need to take action if tx failed
+                    }
+              #endif
+ 196   3                  gHpgpHalCB.halStats.PtoHswDropCnt++;
+ 197   3              // Free CPs
+ 198   3              CHAL_FreeFrameCp(hostTxFrmSwDesc->cpArr, hostTxFrmSwDesc->cpCount);
+ 199   3          }
+ 200   2      
+ 201   2          numHostCPs -= hostTxFrmSwDesc->cpCount;    
+ 202   2            
+ 203   2        }
+ 204   1      #endif  //HYBRII_SPI
+ 205   1      #ifdef UART_HOST_INTF //UART_16550
+                else if(hostIntf == HOST_INTF_UART)
+                {
+                  if(hostTxFrmSwDesc->frmLen != 0)
+                  {     
+                    status = hal_uart_tx_cp (hostTxFrmSwDesc);
+                    if(status != STATUS_SUCCESS)
+                    {
+              
+                        CHAL_FreeFrameCp(hostTxFrmSwDesc->cpArr, hostTxFrmSwDesc->cpCount);
+                    }
+                    numHostCPs -= hostTxFrmSwDesc->cpCount;
+                  }
+                }
+              
+              #endif //UART_HOST_INTF
+ 221   1      
+ 222   1      
+ 223   1      
+ 224   1      }
+ 225          
+ 226          
+ 227          
+ 228          void datapath_handlePlcTxDone()
+ 229          {
+ 230   1      
+ 231   1        u8 tailIdx;
+ 232   1        sSwFrmDesc *lpPlcTxFrmSwDesc;
+ 233   1      #ifdef UART_HOST_INTF
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 5   
+
+                EA = 0;
+              #endif
+ 236   1        if (1)
+ 237   1        {
+ 238   2      #ifdef ETH_BRDG_DEBUG
+                  numTxDoneInts++;
+              #endif
+ 241   2             
+ 242   2                
+ 243   2          tailIdx = gDqueue[PLC_DATA_QUEUE].tail & 0x7F;
+ 244   2      
+ 245   2          lpPlcTxFrmSwDesc =  &gDqueue[PLC_DATA_QUEUE].desc[tailIdx];
+ 246   2      
+ 247   2          if (lpPlcTxFrmSwDesc->frmInfo.plc.status == PLC_TX_PENDING)
+ 248   2          {
+ 249   3            lpPlcTxFrmSwDesc->frmInfo.plc.status = PLC_TX_DONE;        
+ 250   3      
+ 251   3            
+ 252   3      
+ 253   3      #ifdef DEBUG_DATAPATH                        
+                    if (sigDbg)
+                        FM_Printf(FM_ERROR," plc txDone t:%bu\n",gDqueue[PLC_DATA_QUEUE].tail);
+              #endif   //DEBUG_DATAPATH         
+ 257   3          }
+ 258   2      
+ 259   2          
+ 260   2        }
+ 261   1      #ifdef UART_HOST_INTF
+                EA = 1;
+              #endif
+ 264   1      
+ 265   1      }
+ 266          void datapath_init()
+ 267          {
+ 268   1        memset((u8*)&gDqueue, 0, sizeof(gDqueue));
+ 269   1      }
+ 270          
+ 271          bool datapath_IsQueueFull(queue_id_e id)
+ 272          {
+ 273   1        u8 head = gDqueue[id].head;
+ 274   1        u8 tail = gDqueue[id].tail;
+ 275   1      #ifdef UART_HOST_INTF
+                EA = 0;
+              #endif
+ 278   1        if ((head & 0x7F) != (tail  & 0x7F)||
+ 279   1               ((head & 0x80) != (tail  & 0x80)))
+ 280   1        {
+ 281   2      
+ 282   2          // check if pending queue is full. if yes drop the frame or if not-full queue the frame
+ 283   2      
+ 284   2          if (((head & 0x80) != (tail  & 0x80)) &&
+ 285   2            ((head & 0x7F) == (tail  & 0x7F)))
+ 286   2          {
+ 287   3      
+ 288   3      #ifdef DEBUG_DATAPATH
+                    if (sigDbg)
+                    {
+                      FM_Printf(FM_ERROR,"q id %bu full\n", id);
+                    }
+              
+              #endif
+ 295   3      #ifdef UART_HOST_INTF
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 6   
+
+                    EA = 1;
+              #endif
+ 298   3            return TRUE;
+ 299   3      
+ 300   3      
+ 301   3          }
+ 302   2      
+ 303   2        }
+ 304   1      #ifdef UART_HOST_INTF
+                EA = 1;
+              #endif
+ 307   1          return FALSE;
+ 308   1      
+ 309   1      }
+ 310          
+ 311          extern u8 CHAL_GetFreeCPCnt() __REENTRANT__;
+ 312          
+ 313          void datapath_queue_depth(queue_id_e id)   
+ 314          {
+ 315   1        u8 head = gDqueue[id].head;
+ 316   1        u8 tail = gDqueue[id].tail;
+ 317   1      #ifndef MPER  
+ 318   1        printf ("h %bu \n ", head);
+ 319   1        
+ 320   1        printf ("t %bu \n ", tail);
+ 321   1        
+ 322   1          printf("fr = %bu\n",CHAL_GetFreeCPCnt());   
+ 323   1      #endif  
+ 324   1      }
+ 325          
+ 326          
+ 327          void datapath_queue(queue_id_e id,
+ 328                         sSwFrmDesc *pPlcTxFrmSwDesc)
+ 329          {
+ 330   1        u8 wrapBit;
+ 331   1          u8 indexHd;
+ 332   1        sSwFrmDesc *swDesc;
+ 333   1      
+ 334   1      #ifdef UART_HOST_INTF
+                EA = 0;
+              #endif
+ 337   1        indexHd = (gDqueue[id].head & 0x7F);       
+ 338   1      
+ 339   1        swDesc = &gDqueue[id].desc[indexHd];
+ 340   1        
+ 341   1        memcpy ((void*)swDesc, (void*)pPlcTxFrmSwDesc,
+ 342   1               sizeof(sSwFrmDesc)); 
+ 343   1      
+ 344   1        wrapBit = gDqueue[id].head & 0x80;
+ 345   1      
+ 346   1        swDesc->frmInfo.plc.status = 0;
+ 347   1      
+ 348   1      
+ 349   1        if (id == PLC_DATA_QUEUE)
+ 350   1        {
+ 351   2      
+ 352   2          host_intf_max_cp += pPlcTxFrmSwDesc->cpCount;
+ 353   2      
+ 354   2        }
+ 355   1      
+ 356   1        gDqueue[id].head = ((gDqueue[id].head & 0x7F) + 1 ) | wrapBit;
+ 357   1        
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 7   
+
+ 358   1        if ((gDqueue[id].head & 0x7F)== MAX_Q_BUFFER)
+ 359   1        {
+ 360   2          gDqueue[id].head ^= 0x80;     //inverse wraparound bit
+ 361   2          gDqueue[id].head &= 0x80;
+ 362   2        }
+ 363   1      
+ 364   1      #ifdef UART_HOST_INTF
+                EA = 1;
+              #endif
+ 367   1      }
+ 368          
+ 369          
+ 370          sSwFrmDesc *datapath_getHeadDesc(queue_id_e id, u8 pop)
+ 371          {
+ 372   1        u8 wrapBit;
+ 373   1        u8 tailIdx;
+ 374   1        sSwFrmDesc  *lpPlcTxFrmSwDesc;
+ 375   1      #ifdef UART_HOST_INTF
+                EA = 0;
+              #endif
+ 378   1        tailIdx = (gDqueue[id].tail & 0x7F);
+ 379   1        lpPlcTxFrmSwDesc =  &gDqueue[id].desc[tailIdx];
+ 380   1      
+ 381   1      
+ 382   1        if (pop)
+ 383   1        {
+ 384   2      
+ 385   2          wrapBit = gDqueue[id].tail & 0x80;
+ 386   2          gDqueue[id].tail = ((gDqueue[id].tail & 0x7F) + 1) | wrapBit;
+ 387   2      
+ 388   2          if (id == PLC_DATA_QUEUE)
+ 389   2          {
+ 390   3      
+ 391   3            host_intf_max_cp -= lpPlcTxFrmSwDesc->cpCount;
+ 392   3      
+ 393   3          }
+ 394   2          if ((gDqueue[id].tail & 0x7F) == MAX_Q_BUFFER)
+ 395   2          {
+ 396   3            gDqueue[id].tail ^= 0x80;     //inverse wraparound bi
+ 397   3            gDqueue[id].tail &= 0x80;
+ 398   3      
+ 399   3          }
+ 400   2      
+ 401   2      
+ 402   2      
+ 403   2        }
+ 404   1      #ifdef UART_HOST_INTF
+                EA = 1;
+              #endif
+ 407   1        return lpPlcTxFrmSwDesc;
+ 408   1      }
+ 409          
+ 410          bool datapath_IsQueueEmpty(queue_id_e id)
+ 411          {
+ 412   1      
+ 413   1        u8 head = gDqueue[id].head;
+ 414   1        u8 tail = gDqueue[id].tail;
+ 415   1      #ifdef UART_HOST_INTF
+                EA = 0;
+              #endif
+ 418   1      
+ 419   1        if (((head & 0x7F) != (tail & 0x7F)||
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 8   
+
+ 420   1           ((head & 0x80) != (tail & 0x80))))
+ 421   1        {
+ 422   2      
+ 423   2          return FALSE;
+ 424   2      
+ 425   2        }
+ 426   1      #ifdef UART_HOST_INTF
+                EA = 1;
+              #endif
+ 429   1        return TRUE;
+ 430   1      
+ 431   1      
+ 432   1      
+ 433   1      }
+ 434          
+ 435          
+ 436          
+ 437          void EHT_SetFrameTypeLen (u8* rxBcnByteArr, u8 frmType, u16 frmLen)
+ 438          {
+ 439   1          sMfHdr *mh_hdr;
+ 440   1          mh_hdr = (sMfHdr *)rxBcnByteArr;
+ 441   1          switch (frmType)
+ 442   1          {
+ 443   2             //MFT and MFL is not presend in Beacon and sound frames
+ 444   2              case HPGP_HW_FRMTYPE_MGMT:  // SOF frame
+ 445   2      #ifdef UM
+                          memset(rxBcnByteArr, 0, (sizeof(sMfHdr) + CONFOUNDER_SIZE) );
+              #endif
+ 448   2      
+ 449   2                  // Beacon should have different type
+ 450   2                  // SOF frame len + confounder
+ 451   2                  frmLen += CONFOUNDER_SIZE;
+ 452   2                  mh_hdr->mft = HPGP_HW_FRMTYPE_MGMT;
+ 453   2                  mh_hdr->mflHi = (frmLen >> 6) & 0xFF;
+ 454   2                  mh_hdr->mflLo =  (frmLen & 0x3F);
+ 455   2      
+ 456   2                  break;
+ 457   2              case HPGP_HW_FRMTYPE_MSDU: // Data frame
+ 458   2                  memset(rxBcnByteArr, 0, sizeof(sMfHdr));
+ 459   2                  mh_hdr->mft = HPGP_HW_FRMTYPE_MSDU;
+ 460   2                  mh_hdr->mflHi = (frmLen >> 6) & 0xFF;
+ 461   2                  mh_hdr->mflLo = frmLen & 0x3F;
+ 462   2                  break;
+ 463   2              default:
+ 464   2                  return;
+ 465   2          }
+ 466   1      
+ 467   1      
+ 468   1      }
+ 469          
+ 470          void EHT_FillEtherHeader (u8* rxBcnByteArr)
+ 471          {
+ 472   1          sEth2Hdr*  pEth2Hdr;
+ 473   1      
+ 474   1          pEth2Hdr = (sEth2Hdr*)rxBcnByteArr;
+ 475   1          pEth2Hdr->ethtype = 0x88E1;
+ 476   1          memset(pEth2Hdr->dstaddr, 0xFF, MAC_ADDR_LEN);
+ 477   1          memcpy(pEth2Hdr->srcaddr, gEthMacAddrDef, MAC_ADDR_LEN);
+ 478   1      }
+ 479          #if defined(UM) || defined(HPGP_HAL_TEST)
+ 480          u8 ETH_FillHybriiHeader(u8 *rxArr,
+ 481                                  sSwFrmDesc *pPlcRxFrmSwDesc,
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 9   
+
+ 482                                  u16 frameSize,
+ 483                                  u8 offset)
+ 484          {
+ 485   1          u8 addLen = 0;
+ 486   1          hostHdr_t *hostHdr;
+ 487   1      
+ 488   1          memset(rxArr, 0, sizeof(hostHdr_t));
+ 489   1          addLen = sizeof(hostHdr_t);
+ 490   1          hostHdr = (hostHdr_t *)rxArr;
+ 491   1          if(pPlcRxFrmSwDesc != NULL)
+ 492   1          {
+ 493   2              hostHdr->length     = frameSize;
+ 494   2              switch (pPlcRxFrmSwDesc->frmType)
+ 495   2              {
+ 496   3                  case HPGP_HW_FRMTYPE_SOUND:
+ 497   3      
+ 498   3                      hostHdr->rsvd       = offset;
+ 499   3                      break;
+ 500   3                  case HPGP_HW_FRMTYPE_MGMT:
+ 501   3      
+ 502   3                      hostHdr->type       = MGMT_FRM_ID;
+ 503   3                      hostHdr->protocol   = HPGP_MAC_ID;
+ 504   3                      //hostHdr->rsvd       = ((u16)offset << 8);
+ 505   3      
+ 506   3                      break;
+ 507   3      
+ 508   3                  case HPGP_HW_FRMTYPE_MSDU:
+ 509   3                      hostHdr->type       = DATA_FRM_ID;
+ 510   3                      hostHdr->protocol   = HPGP_MAC_ID;
+ 511   3                     // hostHdr->rsvd       = ((u16)offset << 8);
+ 512   3                      break;
+ 513   3                 default:
+ 514   3                      hostHdr->type       = 0x03;
+ 515   3                      hostHdr->protocol   = HPGP_MAC_ID;
+ 516   3                  //    hostHdr->rsvd       = ((u16)offset << 8);
+ 517   3              }
+ 518   2          }
+ 519   1          else
+ 520   1          {
+ 521   2              hostHdr->type       = MGMT_FRM_ID;
+ 522   2              hostHdr->protocol   = HPGP_MAC_ID;
+ 523   2           //   hostHdr->rsvd       = ((u16)offset << 8);
+ 524   2          }
+ 525   1          return (addLen);
+ 526   1      }
+ 527          #endif
+ 528          #ifdef HYBRII_ETH
+ 529          void EHT_FromPlcBcnTx (u8* rxBcnByteArr, u16 frameSize)
+ 530          {
+ 531   1          u16              dataIdx;
+ 532   1          u16              curFrmLen;
+ 533   1          u8               cpIdx;
+ 534   1          u8               len;
+ 535   1          eStatus          status;
+ 536   1          sSwFrmDesc      ethTxFrmSwDesc;
+ 537   1      
+ 538   1          if (frameSize == 0)
+ 539   1          {
+ 540   2              return;
+ 541   2          }
+ 542   1      
+ 543   1          EHT_FillEtherHeader(rxBcnByteArr);
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 10  
+
+ 544   1          len = sizeof(sEth2Hdr);
+ 545   1          ETH_FillHybriiHeader(&rxBcnByteArr[len],
+ 546   1                              NULL,
+ 547   1                              frameSize,
+ 548   1                              0);
+ 549   1          dataIdx                = 0;
+ 550   1          cpIdx                  = 0;
+ 551   1          // Smiffer expected 14 bytes ethernet header and 6 bytes Hybrii header
+ 552   1          curFrmLen              = frameSize + sizeof(sEth2Hdr)+ sizeof(hostHdr_t);  
+ 553   1      
+ 554   1          ethTxFrmSwDesc.frmLen  = curFrmLen;
+ 555   1          ethTxFrmSwDesc.cpCount = 0;
+ 556   1      
+ 557   1          while (curFrmLen)
+ 558   1          {
+ 559   2              u8                  cp;
+ 560   2              volatile u8 xdata * cellAddr;
+ 561   2              u8                  actualDescLen;
+ 562   2      
+ 563   2              status = CHAL_RequestCP(&cp);
+ 564   2              if (status != STATUS_SUCCESS)
+ 565   2              {
+ 566   3                  return;
+ 567   3              }
+ 568   2              cellAddr = CHAL_GetAccessToCP(cp);
+ 569   2              if (curFrmLen > HYBRII_CELLBUF_SIZE)
+ 570   2              {
+ 571   3                  actualDescLen = HYBRII_CELLBUF_SIZE;
+ 572   3              }
+ 573   2              else
+ 574   2              {
+ 575   3                  actualDescLen = curFrmLen;
+ 576   3              }
+ 577   2              memcpy(cellAddr, &rxBcnByteArr[dataIdx], actualDescLen);
+ 578   2              dataIdx += actualDescLen;
+ 579   2              ethTxFrmSwDesc.cpArr[cpIdx].offsetU32 = 0;
+ 580   2              ethTxFrmSwDesc.cpArr[cpIdx].len  = actualDescLen;
+ 581   2              ethTxFrmSwDesc.cpArr[cpIdx].cp = cp;
+ 582   2              cpIdx++;
+ 583   2              ethTxFrmSwDesc.cpCount++;
+ 584   2              curFrmLen -= actualDescLen;
+ 585   2          }
+ 586   1          status = EHAL_EthTxQWrite(&ethTxFrmSwDesc);
+ 587   1          if (status == STATUS_FAILURE)
+ 588   1          {
+ 589   2              for (cpIdx = 0; cpIdx < ethTxFrmSwDesc.cpCount; cpIdx++)
+ 590   2              {
+ 591   3                  CHAL_DecrementReleaseCPCnt(ethTxFrmSwDesc.cpArr[cpIdx].cp);
+ 592   3              }
+ 593   2              //printf("\nCannot send Eth packet");
+ 594   2          }
+ 595   1          else
+ 596   1          {
+ 597   2              gEthHalCB.CurTxTestFrmCnt++;
+ 598   2              gEthHalCB.CurTxTestBytesCnt+= frameSize;
+ 599   2          }
+ 600   1      }
+ 601          #endif
+ 602          u8 EHT_GetSniffHdrSize (eHpgpHwFrmType frmType)
+ 603          {
+ 604   1          u8 addLen = sizeof(sEth2Hdr);  // Ether header is common
+ 605   1      
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 11  
+
+ 606   1          switch (frmType)
+ 607   1          {
+ 608   2              case HPGP_HW_FRMTYPE_SOUND:
+ 609   2                  addLen += (VF_SIZE);
+ 610   2                  break;
+ 611   2              case HPGP_HW_FRMTYPE_MGMT:
+ 612   2                  addLen += (VF_SIZE  + sizeof(sMfHdr) + CONFOUNDER_SIZE);
+ 613   2                  break;
+ 614   2              case HPGP_HW_FRMTYPE_MSDU:
+ 615   2                  addLen += (VF_SIZE + sizeof(sMfHdr));
+ 616   2              default:
+ 617   2                  break;
+ 618   2          }
+ 619   1      //#ifdef HPGP_MAC_SAP
+ 620   1          addLen += sizeof(hostHdr_t); // Len for hybrii header
+ 621   1      //#endif
+ 622   1      
+ 623   1      
+ 624   1          return (addLen);
+ 625   1      }
+ 626          #if 0
+              u8 EHT_FillVariantField (u8*            rxBcnByteArr,
+                                       sSwFrmDesc*  pPlcRxFrmSwDesc,
+                                       uRxFrmHwDesc*  pRxPktQ1stDesc,
+                                       uRxCpDesc*     pRxPktQCPDesc)
+              {
+                  u8 addLen = 0;
+              
+                  switch (pPlcRxFrmSwDesc->frmType)
+                  {
+                      case HPGP_HW_FRMTYPE_SOUND:
+                          memset(rxBcnByteArr, 0, 16);
+                          addLen = 16;
+                          rxBcnByteArr[0]  = 0x04 | (pPlcRxFrmSwDesc->frmInfo.plc.snid << 4); // dt_av = 0b0 100
+                          rxBcnByteArr[1]  = pPlcRxFrmSwDesc->frmInfo.plc.stei;
+                          rxBcnByteArr[4]  = pRxPktQ1stDesc->sound.saf << 3 |
+                                             pRxPktQ1stDesc->sound.scf << 4;
+                          rxBcnByteArr[4]  = 0x3E;
+                          rxBcnByteArr[8] = pRxPktQ1stDesc->sound.srcHi << 6 |
+                                             pRxPktQ1stDesc->sound.srcLo;
+                          break;
+                      case HPGP_HW_FRMTYPE_MGMT:
+                          memset(rxBcnByteArr, 0, 16);
+                          addLen = 16;
+                          rxBcnByteArr[0]  = 0x01 | (pPlcRxFrmSwDesc->frmInfo.plc.snid << 4); // dt_av = 0b0 100
+                          rxBcnByteArr[1]  = pPlcRxFrmSwDesc->frmInfo.plc.stei;
+                          rxBcnByteArr[4]  = pRxPktQCPDesc->plc.eks << 4;
+                          rxBcnByteArr[8]  = 0x3E;
+                          rxBcnByteArr[10] = pRxPktQ1stDesc->sof.mcst << 6;
+                          rxBcnByteArr[11] = pRxPktQ1stDesc->sof.clst << 1;
+                          break;
+                      case HPGP_HW_FRMTYPE_MSDU:
+                          memset(rxBcnByteArr, 0, 16);
+                          addLen = 16;
+                          rxBcnByteArr[0]  = 0x01 | (pPlcRxFrmSwDesc->frmInfo.plc.snid << 4); // dt_av = 0b0 100
+                          rxBcnByteArr[1]  = pPlcRxFrmSwDesc->frmInfo.plc.stei;
+                          rxBcnByteArr[4]  = pRxPktQCPDesc->plc.eks << 4;
+                          rxBcnByteArr[8]  = 0x3E;
+                          rxBcnByteArr[10] = pRxPktQ1stDesc->sof.mcst << 6;
+                          rxBcnByteArr[11] = pRxPktQ1stDesc->sof.clst << 1;
+                          break;
+                      default:
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 12  
+
+                          break;
+                  }
+              
+                  return (addLen);
+              }
+              #endif
+ 674          
+ 675          eStatus datapath_queueToHost (sSwFrmDesc*  pPlcRxFrmSwDesc,
+ 676                                        u16            frameSize)
+ 677          {
+ 678   1          u8                i, j, rsvd = 0;
+ 679   1          eStatus           status;
+ 680   1          u8                eth_hdr_cp = 0;
+ 681   1          u8 xdata          *cellAddr;  
+ 682   1       
+ 683   1          sSwFrmDesc        hostTxFrmSwDesc;
+ 684   1          u8                actualDescLen;
+ 685   1          u8                headerStart;
+ 686   1          
+ 687   1      #ifdef SW_RETRY
+                  u16                pad = 0;
+              #endif  //SW_RETRY
+ 690   1          u8                addFrameSize;
+ 691   1          u16               curFrmLen;
+ 692   1          u8                offsetAdj = 0; // 0 to 3 -  if hdrOffset is not align to 4 bytes then set
+ 693   1          u8 ptr;
+ 694   1                                          // offsetAdj to align hdrOffset
+ 695   1      
+ 696   1          u8 HybriLen;
+ 697   1      
+ 698   1          u16               crc16 = 0;
+ 699   1          u8                alin128 = 0;
+ 700   1      #ifdef MEM_PROTECTION
+                u8          cp_localBuf[HYBRII_CELLBUF_SIZE]; // local CP buffer
+              #endif
+ 703   1      
+ 704   1          status = STATUS_FAILURE;
+ 705   1      #ifdef UM
+                  if((numHostCPs + pPlcRxFrmSwDesc->cpCount) >= PLC_TO_HOST_MAX_CP)
+                  {
+                      // Return fail
+                      FM_Printf(FM_ERROR, "H CP lim\n");
+                  gHpgpHalCB.halStats.PtoHswDropCnt++;
+                    return (status);
+                  }
+                numHostCPs += pPlcRxFrmSwDesc->cpCount;
+              
+              #endif  //HPGP_MAC_SAP        
+ 716   1          memset(&hostTxFrmSwDesc, 0, sizeof(sSwFrmDesc));
+ 717   1      
+ 718   1          if (frameSize == 0 || hostIntf == HOST_INTF_NO)
+ 719   1          {
+ 720   2              return (status);
+ 721   2          }
+ 722   1          if (pPlcRxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_MGMT)
+ 723   1          {
+ 724   2             
+ 725   2              pPlcRxFrmSwDesc->cpArr[0].offsetU32  = 1;
+ 726   2      
+ 727   2              
+ 728   2              frameSize -= 4; // offset in first CP.
+ 729   2      
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 13  
+
+ 730   2          }
+ 731   1      
+ 732   1          if(1 == eth_plc_sniffer)
+ 733   1          {
+ 734   2              status = CHAL_RequestCP(&eth_hdr_cp);
+ 735   2              if (status != STATUS_SUCCESS)
+ 736   2              {
+ 737   3                  //printf("\nFailed to allocate CP");     
+ 738   3      #ifdef UM
+                          numHostCPs -= pPlcRxFrmSwDesc->cpCount;
+              #endif  //HPGP_MAC_SAP
+ 741   3                  return (status);
+ 742   3              }
+ 743   2      #ifdef UM
+                      numHostCPs += 1;
+              #endif  //HPGP_MAC_SAP
+ 746   2      #ifdef MEM_PROTECTION
+                  if (HHAL_CP_Get_Copy(eth_hdr_cp, &cp_localBuf[0], HYBRII_CELLBUF_SIZE) == STATUS_FAILURE) 
+                  {
+                    printf("datapath_queueToHost: Failed to make a copy of CP %bu. Return\n", eth_hdr_cp);
+                      return (STATUS_FAILURE);
+                  }
+                      cellAddr = &cp_localBuf[0];
+              #else
+ 754   2              cellAddr = CHAL_GetAccessToCP(eth_hdr_cp);
+ 755   2      #endif
+ 756   2              addFrameSize = EHT_GetSniffHdrSize(pPlcRxFrmSwDesc->frmType);
+ 757   2      
+ 758   2              headerStart = (HYBRII_CELLBUF_SIZE - addFrameSize);
+ 759   2      
+ 760   2              offsetAdj = headerStart % sizeof(u32);
+ 761   2      
+ 762   2              addFrameSize += offsetAdj;
+ 763   2      
+ 764   2              headerStart -= offsetAdj;
+ 765   2      
+ 766   2              ptr = headerStart;
+ 767   2      
+ 768   2      
+ 769   2              EHT_FillEtherHeader(&cellAddr[ptr]);
+ 770   2      
+ 771   2      
+ 772   2              ptr += sizeof(sEth2Hdr);
+ 773   2              HybriLen = (frameSize + addFrameSize -
+ 774   2                          (sizeof(sEth2Hdr) + sizeof(hostHdr_t)));
+ 775   2      
+ 776   2      
+ 777   2      
+ 778   2              ETH_FillHybriiHeader(&cellAddr[ptr],
+ 779   2                                      pPlcRxFrmSwDesc,
+ 780   2                                      HybriLen,
+ 781   2                                      offsetAdj);
+ 782   2      
+ 783   2      
+ 784   2              ptr += (sizeof(hostHdr_t) + offsetAdj);
+ 785   2      
+ 786   2      /*
+ 787   2              EHT_FillVariantField(&cellAddr[ptr],
+ 788   2                                      pPlcRxFrmSwDesc,
+ 789   2                                      pRxPktQ1stDesc,
+ 790   2                                      pRxPktQCPDesc);
+ 791   2      */
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 14  
+
+ 792   2      //        memcpy(&cellAddr[ptr], (u8*)pPlcRxFrmSwDesc->fc, VF_SIZE);
+ 793   2      
+ 794   2              ptr += VF_SIZE;
+ 795   2      
+ 796   2              EHT_SetFrameTypeLen(&cellAddr[ptr],
+ 797   2                                      pPlcRxFrmSwDesc->frmType,
+ 798   2                                      frameSize);
+ 799   2      
+ 800   2              if (pPlcRxFrmSwDesc->frmType == HPGP_HW_FRMTYPE_MGMT)
+ 801   2              {
+ 802   3      
+ 803   3                  ptr += sizeof(sMfHdr) + CONFOUNDER_SIZE;
+ 804   3      
+ 805   3              }
+ 806   2              else
+ 807   2              {
+ 808   3                  ptr += sizeof(sMfHdr);
+ 809   3      
+ 810   3              }
+ 811   2      #ifdef MEM_PROTECTION
+                      if(HHAL_CP_Put_Copy(eth_hdr_cp, cp_localBuf, HYBRII_CELLBUF_SIZE) == STATUS_FAILURE)
+                      {
+                        printf("datapath_queueToHost: Failed to make a copy of CP %bu. Return\n", eth_hdr_cp);
+                          return (STATUS_FAILURE);
+                      }
+              #endif
+ 818   2      #ifdef UM
+              #if 0
+                      hostTxFrmSwDesc->frmLen             = frameSize + addFrameSize;
+                      hostTxFrmSwDesc->cpArr[0].cp        = eth_hdr_cp;
+                      hostTxFrmSwDesc->cpArr[0].len       = addFrameSize;
+                      hostTxFrmSwDesc->cpArr[0].offsetU32 = headerStart / sizeof(u32);
+                      hostTxFrmSwDesc->cpCount            = 1;
+              
+              #else
+              hostTxFrmSwDesc.frmLen             = frameSize + addFrameSize;
+                     hostTxFrmSwDesc.cpArr[0].cp        = eth_hdr_cp;
+                     hostTxFrmSwDesc.cpArr[0].len       = addFrameSize;
+                     hostTxFrmSwDesc.cpArr[0].offsetU32 = headerStart / sizeof(u32);
+                     hostTxFrmSwDesc.cpCount            = 1;
+              
+              
+              #endif // 0
+              
+              #else
+ 837   2              hostTxFrmSwDesc.frmLen             = frameSize + addFrameSize;
+ 838   2              hostTxFrmSwDesc.cpArr[0].cp        = eth_hdr_cp;
+ 839   2              hostTxFrmSwDesc.cpArr[0].len       = addFrameSize;
+ 840   2              hostTxFrmSwDesc.cpArr[0].offsetU32 = headerStart / sizeof(u32);
+ 841   2              hostTxFrmSwDesc.cpCount            = 1;
+ 842   2      #endif  //HPGP_MAC_SAP
+ 843   2      
+ 844   2      
+ 845   2          }
+ 846   1          else
+ 847   1          {                        
+ 848   2      
+ 849   2              if(hostIntf == HOST_INTF_SPI)
+ 850   2              {
+ 851   3                  
+ 852   3      #ifdef HYBRII_SPI
+ 853   3      
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 15  
+
+ 854   3              status = CHAL_RequestCP(&eth_hdr_cp);
+ 855   3      
+ 856   3                  if (status != STATUS_SUCCESS)
+ 857   3                  {
+ 858   4                      FM_Printf(FM_USER, "\nSPI - Failed to alloc CP");
+ 859   4                      numHostCPs -= pPlcRxFrmSwDesc->cpCount;
+ 860   4                      return (status);
+ 861   4                  }
+ 862   3      
+ 863   3                  numHostCPs += 1;
+ 864   3                  
+ 865   3                  cellAddr = CHAL_GetAccessToCP(eth_hdr_cp);
+ 866   3                  // addFrameSize = sizeof(hostHdr_t) + rsvd  + sizeof(hybrii_tx_req_t);        
+ 867   3      
+ 868   3                  addFrameSize = sizeof(hybrii_tx_req_t); 
+ 869   3      
+ 870   3                  headerStart = sizeof(hybrii_tx_req_t);
+ 871   3      #ifdef HYBRII_B
+ 872   3                  hostTxFrmSwDesc.frmLen       = frameSize + addFrameSize;
+ 873   3      #else
+                          hostTxFrmSwDesc.frmLen       = frameSize + addFrameSize + SPI_CRC_LEN ;
+              #endif
+ 876   3      #ifdef SW_RETRY
+              
+                          //        pHybrii->rsvd += pad;
+              #endif  //SW_RETRY
+ 880   3      
+ 881   3                  hostTxFrmSwDesc.cpArr[0].cp        = eth_hdr_cp;
+ 882   3      #ifndef HYBRII_B
+                          for (j = headerStart; j < addFrameSize; j++) {
+                              crc16 = crc_ccitt_update(crc16, cellAddr[j]);
+                          }
+              #endif
+ 887   3                  hostTxFrmSwDesc.cpArr[0].offsetU32 = 0;
+ 888   3                  hostTxFrmSwDesc.cpArr[0].len      = addFrameSize;        
+ 889   3                  hostTxFrmSwDesc.cpCount            = 1;
+ 890   3      #endif  //HYBRII_SPI
+ 891   3      
+ 892   3      
+ 893   3              }else
+ 894   2              {
+ 895   3                  hostTxFrmSwDesc.cpCount            = 0;
+ 896   3                  hostTxFrmSwDesc.frmLen             = frameSize;
+ 897   3      
+ 898   3              }
+ 899   2      
+ 900   2          }
+ 901   1      
+ 902   1          curFrmLen = frameSize;  
+ 903   1          alin128 = frameSize % HYBRII_CELLBUF_SIZE;
+ 904   1          for (i = 0 ; i < pPlcRxFrmSwDesc->cpCount ; i++)
+ 905   1          {
+ 906   2      
+ 907   2      
+ 908   2              if(hostIntf == HOST_INTF_SPI)
+ 909   2              {
+ 910   3                cellAddr =
+ 911   3                    CHAL_GetAccessToCP(pPlcRxFrmSwDesc->cpArr[i].cp);
+ 912   3          }
+ 913   2      #ifdef DEBUG_DATAPATH   
+                  else
+                  {
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 16  
+
+                    cellAddr =
+                    CHAL_GetAccessToCP(pPlcRxFrmSwDesc->cpArr[i].cp);
+              
+                  }
+              
+              #endif
+ 922   2      
+ 923   2              if (i == 0)
+ 924   2              {
+ 925   3                  actualDescLen = ((curFrmLen < HYBRII_CELLBUF_SIZE)? curFrmLen : (HYBRII_CELLBUF_SIZE -
+ 926   3                                   (pPlcRxFrmSwDesc->cpArr[i].offsetU32 *4)));
+ 927   3              }
+ 928   2              else
+ 929   2              if (curFrmLen > HYBRII_CELLBUF_SIZE)
+ 930   2              {
+ 931   3                  actualDescLen = HYBRII_CELLBUF_SIZE;
+ 932   3              }
+ 933   2              else
+ 934   2              {
+ 935   3                  actualDescLen = curFrmLen;
+ 936   3              }
+ 937   2      
+ 938   2              
+ 939   2      #ifdef DEBUG_DATAPATH
+              
+                      if (pktDbg || sigDbg)
+                          FM_Printf(FM_ERROR,"p rx\n");
+              
+              #endif  //DEBUG_DATAPATH
+ 945   2      
+ 946   2              if(hostIntf == HOST_INTF_SPI)
+ 947   2              {
+ 948   3      #ifndef HYBRII_B
+                          for (j = 0; j < actualDescLen; j++) {
+                              crc16 = crc_ccitt_update(crc16, cellAddr[j]);
+                          }
+              #endif
+ 953   3      
+ 954   3      #ifdef DEBUG_DATAPATH
+              
+                              if (pktDbg) {
+                                  FM_HexDump(FM_ERROR,"SPI: ", cellAddr, actualDescLen);
+                              }
+              #endif  //DEBUG_DATAPATH                
+ 960   3      #ifndef HYBRII_B        
+                          if(actualDescLen <= (HYBRII_CELLBUF_SIZE - SPI_CRC_LEN))
+                          {
+                              cellAddr[j] = crc16 & 0xFF;
+                              j++;
+                              cellAddr[j] = (crc16 >> 8) & 0xFF;
+                              actualDescLen += SPI_CRC_LEN;
+                              
+                          }
+                          else if(actualDescLen == (HYBRII_CELLBUF_SIZE - 1) && 
+                                      alin128 == (HYBRII_CELLBUF_SIZE - 1)) // len chech of descriptor (127)
+                          {
+                              cellAddr[j] = crc16 & 0xFF;
+                              actualDescLen += (SPI_CRC_LEN - 1);
+                          }
+                          else if(actualDescLen != HYBRII_CELLBUF_SIZE)
+                          {
+                              FM_Printf(FM_ERROR, "Error in adding CRC\n");
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 17  
+
+                          }
+              #endif
+ 980   3            }
+ 981   2              
+ 982   2      #ifdef DEBUG_DATAPATH
+                  else
+                   {
+                  if (pktDbg)
+                  {    
+                    FM_HexDump(FM_ERROR,"", cellAddr, actualDescLen);
+                  }
+                   }
+              #endif  //DEBUG_DATAPATH
+ 991   2      
+ 992   2             
+ 993   2              
+ 994   2              if(1 == eth_plc_sniffer)
+ 995   2              {
+ 996   3      #ifdef UM
+                          hostTxFrmSwDesc.cpArr[i+1].offsetU32 = pPlcRxFrmSwDesc->cpArr[i].offsetU32;
+                          hostTxFrmSwDesc.cpArr[i+1].len = actualDescLen;
+                          hostTxFrmSwDesc.cpArr[i+1].cp  = pPlcRxFrmSwDesc->cpArr[i].cp;
+              #else
+1001   3                  hostTxFrmSwDesc.cpArr[i+1].offsetU32 = pPlcRxFrmSwDesc->cpArr[i].offsetU32;
+1002   3                  hostTxFrmSwDesc.cpArr[i+1].len = actualDescLen;
+1003   3                  hostTxFrmSwDesc.cpArr[i+1].cp  = pPlcRxFrmSwDesc->cpArr[i].cp;
+1004   3      #endif  //HPGP_MAC_SAP
+1005   3              }
+1006   2              else
+1007   2              {
+1008   3                  if(hostIntf == HOST_INTF_SPI)
+1009   3                  {
+1010   4      
+1011   4                      hostTxFrmSwDesc.cpArr[i+1].offsetU32 = 0;
+1012   4                      hostTxFrmSwDesc.cpArr[i+1].len = actualDescLen;
+1013   4                      hostTxFrmSwDesc.cpArr[i+1].cp  = pPlcRxFrmSwDesc->cpArr[i].cp;
+1014   4      
+1015   4                  }
+1016   3                  else
+1017   3                  {
+1018   4      
+1019   4                      hostTxFrmSwDesc.cpArr[i].offsetU32 = 0;
+1020   4                      hostTxFrmSwDesc.cpArr[i].len = actualDescLen;
+1021   4                      hostTxFrmSwDesc.cpArr[i].cp  = pPlcRxFrmSwDesc->cpArr[i].cp;
+1022   4      
+1023   4                  }
+1024   3      
+1025   3              }
+1026   2      
+1027   2              hostTxFrmSwDesc.cpCount++;
+1028   2              curFrmLen -= actualDescLen;
+1029   2      
+1030   2          }
+1031   1      
+1032   1      #ifdef DEBUG_DATAPATH
+              
+                  if (pktDbg)
+                      FM_Printf(FM_ERROR,"rx end\n");
+              #endif  //DEBUG_DATAPATH
+1037   1      #ifndef HYBRII_B
+                  if(hostIntf == HOST_INTF_SPI)
+                  {
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 18  
+
+                      // If crc need to be added in next CP
+                      if(alin128 == (HYBRII_CELLBUF_SIZE - 1) || alin128 == 0)
+                      {
+                          status = CHAL_RequestCP(&eth_hdr_cp);
+                          if (status != STATUS_SUCCESS)
+                          {
+                              FM_Printf(FM_ERROR, "\nFailed to alloc CP");
+                              numHostCPs -= (pPlcRxFrmSwDesc->cpCount + 1);
+                              return (status);
+                          }
+                          numHostCPs += 1;
+                          cellAddr = CHAL_GetAccessToCP(eth_hdr_cp);
+                          if(alin128 == 0)
+                          {
+                              cellAddr[0] = crc16 & 0xFF;
+                              cellAddr[1] = (crc16 >> 8) & 0xFF;
+                          }
+                          else
+                          {
+                              cellAddr[0] = (crc16 >> 8) & 0xFF;
+                          }
+              #ifdef UM        
+                          hostTxFrmSwDesc.cpArr[i+1].offsetU32 = 0;
+                          hostTxFrmSwDesc.cpArr[i+1].len = (alin128 == 0)? SPI_CRC_LEN:1;
+                          hostTxFrmSwDesc.cpArr[i+1].cp  = eth_hdr_cp;
+                          hostTxFrmSwDesc.cpCount++;
+              #else
+                          hostTxFrmSwDesc.cpArr[i+1].offsetU32 = 0;
+                          hostTxFrmSwDesc.cpArr[i+1].len = (alin128 == 0)? SPI_CRC_LEN:1;
+                          hostTxFrmSwDesc.cpArr[i+1].cp  = eth_hdr_cp;
+                          hostTxFrmSwDesc.cpCount++;
+              #endif  //HPGP_MAC_SAP
+                      }
+                  }
+              #endif //HYBRII_B
+1075   1      #ifdef AUTO_PING
+                      {
+              //            sEth2Hdr *pEthHdr;
+                    volatile u8 xdata * cellAddr1stCP;
+                          u8 stei;
+              #if 1
+                          cellAddr1stCP  = CHAL_GetAccessToCP(pPlcRxFrmSwDesc->cpArr[0].cp);
+                          stei = pPlcRxFrmSwDesc->frmInfo.plc.stei;
+                          
+                          if (HHAL_RcvPing((sEth2Hdr*)cellAddr1stCP, stei) == TRUE)
+                          {
+                              CHAL_DecrementReleaseCPCnt(eth_hdr_cp);
+              #ifdef UM
+                              numHostCPs -= pPlcRxFrmSwDesc->cpCount;
+              #endif  //HPGP_MAC_SAP
+                              return STATUS_FAILURE; // To let caller free PLC CPs
+                          }
+              #endif
+              
+              
+                      }
+              
+              
+              
+              #endif //AUTO_PING
+1100   1          if(hostIntf == HOST_INTF_SPI)
+1101   1          {
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 19  
+
+1102   2      #ifdef HYBRII_SPI
+1103   2      
+1104   2              hostTxFrmSwDesc.frmLen -= sizeof(hybrii_tx_req_t);
+1105   2      #endif  //HYBRII_SPI
+1106   2          }
+1107   1      #if 1 //def HPGP_MAC_SAP
+1108   1      
+1109   1          if (datapath_IsQueueFull(HOST_DATA_QUEUE) == TRUE)
+1110   1          {
+1111   2      
+1112   2              
+1113   2              numHostCPs -= hostTxFrmSwDesc.cpCount;
+1114   2      if(hostIntf == HOST_INTF_SPI)
+1115   2              {
+1116   3                  
+1117   3      #ifdef HYBRII_SPI        
+1118   3                CHAL_DecrementReleaseCPCnt(eth_hdr_cp);
+1119   3      #endif
+1120   3          }
+1121   2              return STATUS_FAILURE;
+1122   2                  
+1123   2          }
+1124   1      
+1125   1        
+1126   1        
+1127   1      #ifdef ETH_BRDG_DEBUG
+                  plcRxFrameCnt++;
+              #endif
+1130   1        os_set_ready(HYBRII_TASK_ID_FRAME);
+1131   1        datapath_queue(HOST_DATA_QUEUE, &hostTxFrmSwDesc);
+1132   1      
+1133   1        
+1134   1          status = STATUS_SUCCESS;
+1135   1      #else
+                  if(hostIntf == HOST_INTF_SPI)
+                  {
+              #ifdef HYBRII_SPI
+                      hal_spi_tx_cleanup ();
+                      hal_spi_rx_cleanup ();
+                      hostTxFrmSwDesc.frmLen -= sizeof(hybrii_tx_req_t);
+                      status = hal_spi_tx_dma_cp(hostTxFrmSwDesc.frmLen, &hostTxFrmSwDesc);
+              #endif  //HYBRII_SPI
+                  }
+                  else if(hostIntf == HOST_INTF_ETH)
+                  {
+                      status = EHAL_EthTxQWrite(&hostTxFrmSwDesc);
+                  }
+                  
+                  if (status == STATUS_FAILURE)
+                  {
+                      if((eth_plc_sniffer)
+              #ifdef HPGP_MAC_SAP
+                          || (1)
+              #endif  //HPGP_MAC_SAP
+                          )
+                      {
+                          CHAL_DecrementReleaseCPCnt(eth_hdr_cp);
+                      }
+                     FM_Printf(FM_ERROR,"\nCan not send packet to interface");
+                  }
+              #endif  // 1
+1163   1      
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 20  
+
+1164   1      
+1165   1        return STATUS_SUCCESS;
+1166   1      
+1167   1      }
+*** WARNING C280 IN LINE 678 OF ..\..\common\datapath\datapath.c: 'j': unreferenced local variable
+1168          
+1169          
+1170          #ifndef HYBRII_FPGA
+1171          void datapath_transmitDataHost()
+1172          {
+1173   1        sSlink *slink = NULL;
+1174   1        sSwFrmDesc* tHostTxFrmSwDesc = NULL;
+1175   1        sSwFrmDesc hostTxFrmSwDesc;
+1176   1      
+1177   1        eStatus status = STATUS_FAILURE;
+1178   1      
+1179   1          // If Eth interface
+1180   1          if((tHostTxFrmSwDesc = 
+1181   1                        datapath_getHeadDesc(HOST_DATA_QUEUE, 1)) != NULL)
+1182   1          {
+1183   2               memcpy((u8*)&hostTxFrmSwDesc,
+1184   2              (u8*)tHostTxFrmSwDesc, sizeof(hostTxFrmSwDesc));
+1185   2      
+1186   2      
+1187   2      
+1188   2          datapath_writeHostIntf(&hostTxFrmSwDesc);
+1189   2          
+1190   2          }
+1191   1      
+1192   1        
+1193   1      } 
+1194          #endif   //HYBRII_FPGA
+1195          /*
+1196          -------------------------------------------------------------------------
+1197          
+1198          
+1199            HAL_ETH.C
+1200          
+1201          ----------------=======================================----------------------=-------------=-
+1202          */
+1203          
+1204          eStatus hostRxPostProcess(sSwFrmDesc *plcTxFrmSwDesc)
+1205          {
+1206   1        
+1207   1        u8 dropFrame=0;
+1208   1        sEth2Hdr *pktEthHdr;
+1209   1        u8 dstTei=0;
+1210   1        sHpgpHalCB *hhalCb;
+1211   1      #ifdef UM 
+                sHaLayer *hal;
+                sLinkLayer *linkLayer;
+                sStaInfo *staInfo = NULL;
+              #endif
+1216   1      
+1217   1      #ifdef UM
+                
+                xdata u8 *cellAddr;
+              
+                linkLayer = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                staInfo = LINKL_GetStaInfo(linkLayer);  
+                
+                if(plcTxFrmSwDesc->frmInfo.plc.dtei == 0 )
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 21  
+
+                {
+                  cellAddr = CHAL_GetAccessToCP(plcTxFrmSwDesc->cpArr[0].cp);
+              
+                  pktEthHdr = ((sEth2Hdr*)cellAddr);
+                  if ((pktEthHdr->dstaddr[0] & 0x01))
+                  {
+              
+                  /*
+                  Note : dstTei should be set to 0xFF for broadcast frame.
+                  Has to be revisited. 0xFF was getting dropped by receiver
+              
+                  */
+              
+                    dstTei = 0xFF;
+              
+                  }
+                  else
+                  {
+                    sScb* dstScb = NULL;
+                    
+                    sCnam *ccoNam = &linkLayer->ccoNam;
+                    u8 devmode = LINKL_GetMode(linkLayer);
+              
+                    //dstScb = CRM_FindScbMacAddr(&pktEthHdr->dstaddr);
+                    {
+                    //sScb* dstScb = NULL;
+                    //sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                      sCrm      *crm = LINKL_GetCrm(linkLayer);
+                      dstScb = CRM_GetNextScb(crm, dstScb);
+                      while(dstScb)
+                      {
+                        if(memcmp(&pktEthHdr->dstaddr, &dstScb->macAddr, MAC_ADDR_LEN) == 0)
+                        {
+                          break;
+                        }
+                        dstScb = CRM_GetNextScb(crm, dstScb);
+                      }
+                    }
+              
+                    if (!dstScb)
+                    {
+                      dropFrame = 1;
+                      FM_Printf(FM_ERROR,"post proc drop\n");
+              #if 0
+                      FM_HexDump(FM_USER,"DST Address",&pktEthHdr->dstaddr,MAC_ADDR_LEN);
+              #endif
+                    }
+                    else
+                    {
+                      if(devmode == LINKL_STA_MODE_STA)
+                      {
+                        if(0)//staInfo->staStatus.fields.authStatus != 1)
+                        {
+                          
+                        // dropFrame = 1;
+                        }
+                      }
+              
+                      else if(devmode == LINKL_STA_MODE_CCO)
+                      {
+                        if(0)//dstScb->staStatus.fields.authStatus != 1)
+                        {
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 22  
+
+                          //dropFrame = 1;
+                        }
+                      }
+                      else
+                      {
+                        dropFrame = 1;
+                      }
+              #ifdef ROUTE
+                      if(dstScb->lrtEntry.routeIsInvalid == TRUE || dstScb->lrtEntry.routeOnHold == TRUE)
+                      {
+                        dropFrame = 1;
+                        FM_Printf(FM_USER,"Route drop\n");
+                      }
+                      else
+                      {
+                        dstTei = dstScb->lrtEntry.nTei;
+                      }
+              #else
+                      dstTei = dstScb->tei;
+              #endif
+                    }
+              
+              
+                  }
+              #else
+1312   1          dstTei = 1;
+1313   1      #endif
+1314   1      
+1315   1          if(1 == dropFrame)
+1316   1          {
+1317   2          //FM_Printf(FM_USER,"Frame dropped\n");
+1318   2            datapath_getHeadDesc(PLC_DATA_QUEUE, 1);
+1319   2            CHAL_FreeFrameCp(plcTxFrmSwDesc->cpArr,plcTxFrmSwDesc->cpCount);
+1320   2            return STATUS_FAILURE;
+1321   2          }
+1322   1      
+1323   1      
+1324   1          if (dstTei == 0xFF)
+1325   1          {
+1326   2            plcTxFrmSwDesc->frmInfo.plc.mcstMode     = HPGP_MCST;
+1327   2              
+1328   2            plcTxFrmSwDesc->frmInfo.plc.phyPendBlks    = HPGP_PPB_MCFRPT;
+1329   2          }
+1330   1          else
+1331   1          {
+1332   2            plcTxFrmSwDesc->frmInfo.plc.mcstMode     = HPGP_UCST;  // Unicast
+1333   2          }
+1334   1      
+1335   1      
+1336   1      #ifdef HPGP_HAL_TEST
+1337   1          hhalCb = &gHpgpHalCB;
+1338   1      #else
+                  hal = (sHaLayer*)HOMEPLUG_GetHal();
+              
+                  hhalCb = hal->hhalCb;
+              #endif
+1343   1      
+1344   1      #ifdef HPGP_HAL_TEST
+1345   1          plcTxFrmSwDesc->frmInfo.plc.eks =  gNekEks; //HPGP_UNENCRYPTED_EKS;
+1346   1          plcTxFrmSwDesc->frmInfo.plc.dtei           = hhalCb->remoteTei;
+1347   1          plcTxFrmSwDesc->frmInfo.plc.stei           = hhalCb->selfTei;//HYBRII_DEFAULT_TEISTA;
+1348   1      #else
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 23  
+
+                
+                  plcTxFrmSwDesc->frmInfo.plc.eks = staInfo->nekEks;//HPGP_UNENCRYPTED_EKS;
+              #endif
+1352   1          plcTxFrmSwDesc->frmInfo.plc.bcnDetectFlag  = REG_FLAG_SET;// REG_FLAG_CLR;
+1353   1          plcTxFrmSwDesc->frmInfo.plc.clst = HPGP_CONVLYRSAPTYPE_ETH;
+1354   1          plcTxFrmSwDesc->frmType        = HPGP_HW_FRMTYPE_MSDU;
+1355   1      
+1356   1      #ifdef UM
+                  if(linkLayer->mode == LINKL_STA_MODE_CCO)
+                  {
+              
+                  //    FM_Printf(FM_USER, "f cc\n");
+              #ifdef CCO_FUNC               
+                    plcTxFrmSwDesc->frmInfo.plc.dtei      = dstTei;
+                    plcTxFrmSwDesc->frmInfo.plc.stei      = staInfo->ccoScb->tei;
+              #endif
+                  }
+                  else
+                  {
+              #ifdef STA_FUNC
+                    plcTxFrmSwDesc->frmInfo.plc.dtei      = dstTei;//staInfo->ccoScb->tei;
+                    plcTxFrmSwDesc->frmInfo.plc.stei      = staInfo->tei;
+              #endif
+              
+                  }
+              
+                  } 
+              #endif  
+1377   1        plcTxFrmSwDesc->frmInfo.plc.plid = 0;   //[YM] This line of code has to be changed base on differnet QoS 
+             -priority
+1378   1      
+1379   1      
+1380   1        if (plcTxFrmSwDesc->frmInfo.plc.plid == 0)
+1381   1        {
+1382   2          plcTxFrmSwDesc->frmInfo.plc.phyPendBlks    = HPGP_PPB_CAP0;
+1383   2        }
+1384   1        else
+1385   1        {
+1386   2          plcTxFrmSwDesc->frmInfo.plc.phyPendBlks    = HPGP_PPB_CAP123;
+1387   2        }
+1388   1      
+1389   1      #ifdef UM
+              
+                plcTxFrmSwDesc->frmInfo.plc.snid = staInfo->snid;
+              
+              
+              #endif
+1395   1      
+1396   1      #if 1 //def HPGP_HAL_TEST
+1397   1        plcTxFrmSwDesc->frmInfo.plc.stdModeSel     = STD_ROBO_TEST; // std robo
+1398   1      #endif
+1399   1        plcTxFrmSwDesc->frmInfo.plc.dt_av = HPGP_DTAV_SOF;
+1400   1        plcTxFrmSwDesc->frmInfo.plc.saf = 1;
+1401   1      
+1402   1          
+1403   1        return STATUS_SUCCESS;
+1404   1      }
+*** WARNING C280 IN LINE 1208 OF ..\..\common\datapath\datapath.c: 'pktEthHdr': unreferenced local variable
+1405          
+1406          
+1407          #ifdef POWERSAVE
+              void datapath_transmitDataPlc(u8 from)
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 24  
+
+              #else
+1410          void datapath_transmitDataPlc()
+1411          #endif
+1412          {
+1413   1        // their is something queued in hea
+1414   1        eStatus status;
+1415   1      #ifndef HPGP_HAL_TEST    
+                sHaLayer *hal;
+              #endif    
+1418   1        sHpgpHalCB *hhalCb;
+1419   1        u8  RegValue;
+1420   1        u8   TxLoop;
+1421   1        uPlcTxPktQCAP_Write   cap_write;
+1422   1      #ifdef POWERSAVE
+                  sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer);
+                sScb          *scb;
+                sScb          *dstScb;
+                u32 ntb=0;
+                u32 bpst=0;
+                u32 timeDiff=0;
+                sPsSchedule commAwd;
+                u8 tmpPss;
+                u8 dtei;
+                u8 modVal;
+                u32 tmpBpCnt;
+              #endif
+1436   1      
+1437   1      #ifdef HPGP_HAL_TEST
+1438   1        hhalCb = &gHpgpHalCB;
+1439   1      #else
+                hal = (sHaLayer*)HOMEPLUG_GetHal();
+              
+                hhalCb = hal->hhalCb;
+              #endif
+1444   1          TxLoop = 0;
+1445   1        RegValue = 0;
+1446   1      SWQCheckAgain:
+1447   1      
+1448   1      
+1449   1      #if 1
+1450   1          //RegValue = ReadU32Reg(PLC_CMDQ_STAT);
+1451   1        //[YM] check CMD queue count
+1452   1        RegValue = ReadU8Reg(0xEAC);         //Check CMD queue number
+1453   1        if (RegValue > 0)
+1454   1        {
+1455   2            uPlcStatusReg         plcStatus;
+1456   2      
+1457   2           //printf("RegValue = %bX\n", RegValue);
+1458   2           cap_write.capw.CapRdy = 1;   //[YM] Temporary set CAP 0 packet only
+1459   2           WriteU32Reg(PLC_CAP_REG, cap_write.reg);
+1460   2      
+1461   2           plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+1462   2           plcStatus.s.plcTxQRdy = 1;
+1463   2           WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+1464   2        }
+1465   1      #endif
+1466   1      
+1467   1        if (datapath_IsQueueEmpty(PLC_DATA_QUEUE)
+1468   1                    == FALSE )
+1469   1        {
+1470   2          sSwFrmDesc  *lpPlcTxFrmSwDesc;
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 25  
+
+1471   2      
+1472   2          lpPlcTxFrmSwDesc =
+1473   2                  datapath_getHeadDesc(PLC_DATA_QUEUE, 0);
+1474   2      
+1475   2          if (lpPlcTxFrmSwDesc->frmInfo.plc.status == PLC_TX_PENDING)
+1476   2          {
+1477   3      #ifdef  HPGP_HAL_TEST_DONT_DO_THIS
+                    if( MAX_PLC_TX_TIMEOUT < (get_TimerTick() - plcTxTime))
+                    {
+                      lpPlcTxFrmSwDesc->frmInfo.plc.status = PLC_TX_DONE;
+              #ifdef ETH_BRDG_DEBUG
+                      numForcePlcTxDone++; 
+                      if (myDebugFlag)
+                        printf("LM Forcing PLC TX Done\n");
+              #endif
+                    }
+              #endif
+1488   3            // Tx timeout handling to release Tx pending flag
+1489   3      #ifdef HPGP_HAL_TEST_DONT_DO_THIS           
+                    if( MAX_PLC_TX_TIMEOUT < (STM_GetTick() - plcTxTime))
+                    {
+                      lpPlcTxFrmSwDesc->frmInfo.plc.status = PLC_TX_DONE;
+              #if 1 //def DEBUG_DATAPATH
+                      if(1)
+                      {
+                        FM_Printf(FM_USER, "Missing PLC TX Done\n");
+                      }
+              #endif
+                    }
+              #endif
+1501   3            /*
+1502   3                 we dont process next frame until TX_PENDING is cleared
+1503   3              */
+1504   3      
+1505   3      #ifdef ETH_BRDG_DEBUG
+                    numPlcPendingRet++;
+              #endif      
+1508   3      
+1509   3          //rajantbd  os_set_ready(HYBRII_TASK_ID_FRAME); 
+1510   3            return;
+1511   3          }
+1512   2          else 
+1513   2          if (lpPlcTxFrmSwDesc->frmInfo.plc.status == PLC_TX_DONE)
+1514   2          {
+1515   3            
+1516   3            lpPlcTxFrmSwDesc->frmInfo.plc.status = 0;        
+1517   3            
+1518   3          //        FM_Printf(FM_USER, "pop\n");
+1519   3            datapath_getHeadDesc(PLC_DATA_QUEUE, 1);
+1520   3            goto SWQCheckAgain;
+1521   3          }
+1522   2      
+1523   2        }
+1524   1        
+1525   1        if (datapath_IsQueueEmpty(PLC_DATA_QUEUE)
+1526   1                      == FALSE )
+1527   1      
+1528   1        {
+1529   2        
+1530   2          sSwFrmDesc  *lpPlcTxFrmSwDesc;  
+1531   2      
+1532   2          RegValue = ReadU8Reg(0xEAC);         //Check CMD queue number
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 26  
+
+1533   2        //if (RegValue > 0)            // [YM] Push multiple paclets to Tx queue
+1534   2            status = HHAL_IsPlcIdle();
+1535   2        //else
+1536   2        //  status = STATUS_SUCCESS;
+1537   2      
+1538   2          if (status == STATUS_SUCCESS)
+1539   2          {
+1540   3            lpPlcTxFrmSwDesc =
+1541   3                datapath_getHeadDesc(PLC_DATA_QUEUE, 0);
+1542   3      
+1543   3      //      lpPlcTxFrmSwDesc->frmInfo.plc.retry = 0;
+1544   3      
+1545   3      #ifdef POWERSAVE
+                  if (psDebug)
+                  {
+                    printf("tx plc(from=%bu):\n", from);
+                  }
+                  if (from == 1)
+                    psPclTxWriteFromBcn++;
+                  else psPclTxWriteFromFrame++;
+              
+                  if (hhalCb->psInSleepMode == TRUE)
+                    // in Sleep mode, can't Tx
+                    return;
+                  // STA should only talk to CCO in our implementation.
+                  memset(&commAwd, 0, sizeof(sPsSchedule));
+                  dtei = lpPlcTxFrmSwDesc->frmInfo.plc.dtei;
+              
+                  if( hhalCb->devMode == DEV_MODE_STA)
+                  {
+                    u8 dteiIsCco = 0; // 0: unknown, 1: CCO's TEI, 2: broadcast
+              
+                    scb = staInfo->staScb;
+                    if (scb)
+                    {
+                      if (scb->psState == PSM_PS_STATE_ON)
+                      {
+                        if (dtei == staInfo->ccoScb->tei)
+                        {
+                          // DTEI is CCO, use STA's common AWD
+                          memcpy(&commAwd, &scb->commAwd, sizeof(sPsSchedule));
+                        }
+                        else
+                        {
+                        if (psDebug)
+                          printf("txPlc: STA: dtei %bu is not CCO\n", dtei);
+                          // any other types, ie. broadcast, just use STA's PSS
+                          PSM_cvrtPss_Awd(scb->pss, &commAwd);
+                        }
+                      }
+                    }
+                    else
+                    {
+                      if (psDebug)
+                        printf("txPlc: STA: scb=NULL\n");
+                    }
+                  }
+                  else
+                  {
+                    scb = staInfo->ccoScb;
+                    if (scb)
+                    {
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 27  
+
+                      if (scb->psState == PSM_PS_STATE_ON)
+                      {
+                        if (dtei == 0xFF)
+                        {
+                          // DTEI is broadcast, use CCO's common AWD
+                          memcpy(&commAwd, &scb->commAwd, sizeof(sPsSchedule));
+                        }
+                        else
+                        {
+                          // DTEI is unicast, get the smaller of the 2 AWDs
+                          if ((dstScb = CRM_GetScb(&linkLayer->ccoRm, dtei)) != NULL)
+                          {
+                            u8 tmpPss;
+              
+                            tmpPss =  scb->pss;
+                            PSM_getLargerPSS(&tmpPss, dstScb->pss);
+                            PSM_cvrtPss_Awd(tmpPss, &commAwd);
+                          }
+                          else
+                          {
+                            if (psDebug)
+                              printf("txPlc: CCO: cannot find dtei %bu\n");
+                          }
+                        }
+                      }
+                    }
+                    else
+                    {
+                      if (psDebug)
+                        printf("txPlc: CCO: scb=NULL\n");
+                    }
+                  }
+              
+                  if (psDebug)
+                  {
+                    printf("txPlc: commAwd.awdTime=%bu, commAwd.numBp=%d, scb->bpCnt=%d, gHpgpHalCB.halStats.psBpIntCnt=%lu
+             -\n", 
+                        commAwd.awdTime, commAwd.numBp, scb->bpCnt, gHpgpHalCB.halStats.psBpIntCnt);
+                  }
+              
+                  if (commAwd.awdTime && commAwd.numBp)
+                  {
+                    // common AWD exists. This means that: 
+                    // if CCO: at least 1 station is in PS mode. if STA: it must be in PS mode
+              //      printf("scb->bpCnt=%d, scb->commAwd.numBp=%d\n", scb->bpCnt, scb->commAwd.numBp);
+                    if (gHpgpHalCB.devMode == DEV_MODE_STA)
+                      tmpBpCnt = gHpgpHalCB.halStats.psBpIntCnt;
+                    else tmpBpCnt = scb->bpCnt;
+              
+                    modVal = tmpBpCnt % commAwd.numBp;
+                    if (modVal == 0)
+                    {
+                      // start of PSP: commAwd.numBp must be of power of 2
+                      if (!(commAwd.awdTime & 0x80))
+                      {
+                        // AwdTime is in ms
+                        ntb = (rtocl(ReadU32Reg(PLC_NTB_REG))*40)/1000000;
+                        bpst = (rtocl(ReadU32Reg(PLC_CurBPST_REG))*40)/1000000;
+                        // take care of wrap-around ???
+                        if (ntb > bpst)
+                          timeDiff = ntb-bpst;
+                        else timeDiff = 0;
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 28  
+
+                        if (psDebug)
+                          printf("txPlc: ntb=%lu, bpst=%lu, timeDiff=%lu\n", ntb, bpst, timeDiff);
+                        if (timeDiff > commAwd.awdTime)
+                        {
+                          if (psDebug)
+                            printf("timediff too big. Return\n");
+                          if (from == 2)
+                            psNoTxFrmCnt++;
+                          else psFrmBcnNoTxFrmCnt++;
+                          return;
+                        }
+                      }
+                      // AwdTime is in # of BP, allow Tx 
+                      if (psDebug)
+                        printf("PSP: AWD = %bu >= modVal = %bu. OK to Tx\n", commAwd.awdTime & 0xF, modVal);
+                    }
+                    else
+                    {
+                      // in between PSPs
+                      if (commAwd.awdTime & 0x80)
+                      {
+                        // AwdTime is in # of BP 
+                        if (modVal >= (commAwd.awdTime & 0xF))
+                        {
+                          if (psDebug)
+                            printf("AWD = %bu >= modVal = %bu. Return\n", commAwd.awdTime & 0xF, modVal);
+                          return;
+                        }
+                        if (psDebug)
+                          printf("AWD = %bu < modVal = %bu. OK to Tx\n", commAwd.awdTime & 0xF, modVal);
+                      }
+                      else
+                      {
+                        
+                        if (psDebug)
+                          printf("Mod op not 0. Return\n");
+                        if (from == 2)
+                          psNoTxWrongBpFrmCnt++;
+                        else  psFrmBcnNoTxWrongBpFrmCnt++;
+                        return;
+                      }
+                    }
+                  }
+                  else
+                  {
+                    if (from == 2)
+                      psNoTxZeroAwdFrmCnt++;
+                    else  psFrmBcnNoTxZeroAwdFrmCnt++;
+              
+                    if (from == 1)
+                      // only send frames from ZeroCrossing interrupt and BcnRx interrupt if this sta is in PS mode
+                      return;
+                  }
+                  if (from == 2)
+                    psTxFrmCnt++;
+                  else psFrmBcnTxFrmCnt++;
+                  if (psDebug)
+                    printf("OK to PLC TX\n");
+              #endif
+1715   3      
+1716   3          status = hostRxPostProcess(lpPlcTxFrmSwDesc);
+1717   3          if(status == STATUS_FAILURE)//kiran
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 29  
+
+1718   3          {
+1719   4            //FM_Printf(FM_USER,"RX Failed\n");
+1720   4            return;
+1721   4          }
+1722   3      #ifdef DEBUG_DATAPATH
+                  if (sigDbg)
+                  FM_Printf(FM_USER, "ptx\n");
+              #endif
+1726   3      
+1727   3      #ifdef HPGP_HAL_TEST
+1728   3            status  = HHAL_PlcTxQWrite(lpPlcTxFrmSwDesc);
+1729   3      #else                          
+                    status = HHAL_PlcTxQWrite(hal, lpPlcTxFrmSwDesc);
+              #endif
+1732   3            hhalCb->halStats.CurTxTestFrmCnt++;
+1733   3      #ifdef ETH_BRDG_DEBUG
+                    plcTxFrameCnt++;
+              #endif
+1736   3            TxLoop++;
+1737   3            if (status == STATUS_FAILURE)
+1738   3            {
+1739   4              u16 i;
+1740   4      #ifdef ETH_BRDG_DEBUG
+                      plcTxWriteFail++;
+              #endif
+1743   4      #ifdef POWERSAVE
+                  if (from == 2)
+                    psPlcTxWriteErrCnt++;
+                  else psFrmBcnPlcTxWriteErrCnt++;
+              #endif
+1748   4              datapath_getHeadDesc(PLC_DATA_QUEUE, 1);
+1749   4                      gHpgpHalCB.halStats.HtoPswDropCnt++;
+1750   4      
+1751   4              for( i=0 ; i< lpPlcTxFrmSwDesc->cpCount ; i++ )
+1752   4              {
+1753   5                CHAL_DecrementReleaseCPCnt(lpPlcTxFrmSwDesc->cpArr[i].cp);
+1754   5              }
+1755   4      
+1756   4            }
+1757   3            else
+1758   3            {
+1759   4      
+1760   4              lpPlcTxFrmSwDesc->frmInfo.plc.status = PLC_TX_DONE;  //PLC_TX_PENDING;
+1761   4            
+1762   4      #ifdef UM
+                      plcTxTime = STM_GetTick();
+              #else
+1765   4      //           plcTxTime = get_TimerTick();
+1766   4      #endif
+1767   4              lpPlcTxFrmSwDesc->frmInfo.plc.attemptCnt++;
+1768   4      #ifdef POWERSAVE
+                  if (from == 2)
+                    psPlcTxOKCnt++;
+                  else psFrmBcnPlcTxOKCnt++;
+              #endif
+1773   4            }
+1774   3          }
+1775   2          else
+1776   2          {
+1777   3      #ifdef ETH_BRDG_DEBUG
+                    if (myDebugFlag)
+                      printf("SendToPlc: HHAL_IsPlcIdle returns FAIL\n"); 
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 30  
+
+                    
+              #endif
+1782   3      #ifdef POWERSAVE
+                    if (from == 2)
+                      psPlcIdleErrCnt++;
+                    else psFrmBcnPlcIdleErrCnt++;
+              #endif
+1787   3      //      FM_Printf(FM_USER, "per\n");
+1788   3      
+1789   3          
+1790   3            os_set_ready(HYBRII_TASK_ID_FRAME); 
+1791   3      
+1792   3          }         
+1793   2                
+1794   2      
+1795   2        }
+1796   1      
+1797   1      }
+1798          
+1799          u32 plcTxDataSeqNum = 1;
+1800          u32 plcRxDataSeqNum = 0;
+1801          #define MAX_U32_VALUE 0xFFFFFFFF
+1802          
+1803          
+1804          // isGCIpkt checks the 1st CP of a received ETH pkt to determine
+1805          // whether this is a Greenvity test pkt
+1806          // Return:
+1807          //      - TRUE if it's a GCI pkt
+1808          //      - FALSE otherwise
+1809          #ifdef DO_GV_ETH_TEST
+              
+              u8 isGCIpkt(uRxPktQCPDesc *pRxPktQCPDesc,
+                          sSwFrmDesc *pEthTxFrmSwDesc, u16 frmLen,
+                          u8 descLen, u8 *pRetId, 
+                          u8 *pRetRcvPkt, u8 *pdropPkt)
+              {
+              //    volatile u8 XDATA *cellAddr;
+                u8 *cellAddr; 
+                  u8 boardId;
+                  u8 rcvPkt;
+                  u8 nxtPktType = 0;
+                  u8 GCIpkt = FALSE;
+              #ifdef MEM_PROTECTION
+                u8 cp_localBuf[HYBRII_CELLBUF_SIZE];  // local CP buffer
+              #endif
+              
+              #ifdef MEM_PROTECTION
+                // copy cp to local buf
+                if (HHAL_CP_Get_Copy(pRxPktQCPDesc->s.cp, &cp_localBuf[0], sizeof(sEth2Hdr)+sizeof(sEthGCIHdr)) == STATUS
+             -_FAILURE)
+                {
+                  printf("isGCIpkt: Failed to make a copy of CP. Return FALSE\n");
+                  return(FALSE);
+                }
+                cellAddr = &cp_localBuf[0];
+              #else
+                  cellAddr = CHAL_GetAccessToCP(pRxPktQCPDesc->s.cp);
+              #endif
+              
+                  if (descLen >= (sizeof(sEth2Hdr)+sizeof(sEthGCIHdr)))
+                  {
+                      volatile sEth2Hdr   *pEthHdr;
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 31  
+
+                      volatile sEthGCIHdr *pGCIHdr;
+                      u8                  tmpAddr[MAC_ADDR_LEN];
+              
+                      pEthHdr = (sEth2Hdr *) cellAddr;
+              
+                      if (pEthHdr->ethtype == ETH_TYPE_GREENVITY)
+                      {
+                          /* Our test pkt */
+                          GCIpkt = TRUE;
+                          pGCIHdr = (sEthGCIHdr *) (cellAddr + sizeof(sEth2Hdr));
+                          rcvPkt = pGCIHdr->pktType;
+                          boardId = 0xff;
+                          if (rcvPkt == CMD_CONN_REQ_PKT)
+                          {
+                              // this must be a slave, ConnState must be the 1st index
+                              boardId = 0;
+                              if (ConnState[boardId].state == GCI_STATE_OPEN)
+                              {
+                                  // this station is already OPEN for a test, do nothing
+                                  *pdropPkt = TRUE;
+                              }
+                              else
+                              {
+                                  // Conn Req to start of test (slave), send CONN RESP
+                                  // the dest MAC Addr is broadcast, copy slave addr 
+                                  // to dest so we can swap the addr when transmit the CONN RESP later
+                                  memcpy(pEthHdr->dstaddr, pGCIHdr->slaveMACaddr, MAC_ADDR_LEN);
+                                  nxtPktType = CMD_CONN_RESP_PKT; // Conn Response back
+                              }
+                          } else if (rcvPkt  == CMD_CONN_RESP_ACK_PKT)
+                          {
+                              // this must be a slave, ConnState must be the 1st index
+                              boardId = 0;
+                              if (ConnState[boardId].state == GCI_STATE_OPEN)
+                              {
+                                  // this connection is already OPEN, do nothing
+                                  *pdropPkt = TRUE;
+                              }
+                              else
+                              {
+                                  // ACK for Conn Response(slave), set station ready to 
+                                  // receive test data
+                                  ConnState[boardId].state = GCI_STATE_OPEN;
+                                  ConnState[boardId].testType = pGCIHdr->testType;
+                                  ConnState[boardId].my_numPktTx = 0;
+                                  ConnState[boardId].my_numPktRx = 0;
+                                  memcpy(ConnState[boardId].myMACaddr, pGCIHdr->slaveMACaddr, 
+                                          MAC_ADDR_LEN);
+                                  stationType = SLAVE_STATION;
+                                  *pdropPkt = TRUE;
+                                  printf("\nStation %bx:%bx:%bx:%bx:%bx:%bx is ready to receive data from "
+                                          "%bx:%bx:%bx:%bx:%bx:%bx\n", 
+                                          pGCIHdr->slaveMACaddr[0], pGCIHdr->slaveMACaddr[1], 
+                                          pGCIHdr->slaveMACaddr[2], pGCIHdr->slaveMACaddr[3],
+                                          pGCIHdr->slaveMACaddr[4], pGCIHdr->slaveMACaddr[5], 
+                                          pEthHdr->srcaddr[0], pEthHdr->srcaddr[1], 
+                                          pEthHdr->srcaddr[2], pEthHdr->srcaddr[3], pEthHdr->srcaddr[4], 
+                                          pEthHdr->srcaddr[5]);
+                              }
+                          } else if (rcvPkt == CMD_DISCON_REQ_PKT)
+                          {
+                              // end of test (slave), send ACK with slave's statistics
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 32  
+
+                              // make sure MAC dest addr match with this station's
+                              if (ConnExistSlave(pEthHdr->dstaddr, &boardId) == FALSE)
+                              {
+                                  *pdropPkt = TRUE;
+                              }
+                              else
+                              {
+                                  pGCIHdr->numPktTx = ConnState[boardId].my_numPktTx;
+                                  pGCIHdr->numPktRx = ConnState[boardId].my_numPktRx;
+                                  nxtPktType = CMD_DISCON_ACK_PKT;    // ACK back
+                                  memset(&ConnState[boardId], 0, sizeof(sConnState));
+              //                  stationType = UNDEFINED_STATION;    // set it to unknown
+                              }
+                          } else if (rcvPkt == CMD_CONN_RESP_PKT)
+                          {
+                              // Conn Response (master). Set State to OPEN and send ACK
+                              // make sure MAC dest addr match with this station's
+                              if (ConnExistMaster(pEthHdr->dstaddr, pEthHdr->srcaddr, &boardId)
+                                       == TRUE)
+                              {
+                                  if (ConnState[boardId].state == GCI_STATE_OPEN)
+                                  {
+                                      // this connection is already OPEN, do nothing
+                                      *pdropPkt = TRUE;
+                                  }
+                                  else
+                                  {
+                                      stationType = MASTER_STATION;
+                                      ConnState[boardId].state = GCI_STATE_OPEN;
+                                      ConnState[boardId].my_numPktTx = 0;
+                                      ConnState[boardId].my_numPktRx = 0;
+                                      nxtPktType = CMD_CONN_RESP_ACK_PKT; // ACK back
+                                  }
+                              }
+                          } else if (rcvPkt == CMD_DISCON_ACK_PKT)
+                          {
+                              // DISC ACK:  Stop of test (master). Set State to CLOSED, copy the 
+                              // slave's statistics and return
+                              // make sure MAC dest addr match with this station's
+                              if (ConnExistMaster(pEthHdr->dstaddr, pEthHdr->srcaddr, 
+                                      &boardId) == TRUE)
+                              {
+                                  ConnState[boardId].state = GCI_STATE_CLOSED;
+                                  ConnState[boardId].slave_numPktTx = pGCIHdr->numPktTx;
+                                  ConnState[boardId].slave_numPktRx = pGCIHdr->numPktRx;
+                              }
+                              *pdropPkt =  TRUE;
+                          } else if (rcvPkt == CMD_DATA_PKT)
+                          {
+                              // DATA pkt. 2 scenarios:
+                              //      - if this is the master: discard the pkt
+                              //      - if this is a slave: if it's half duplex, discard
+                              //        the pkt, otherwise, xmit that same pkt
+                              //        back to the master
+                              if ((stationType != MASTER_STATION) && (stationType != SLAVE_STATION))
+                              {
+                                  *pdropPkt = TRUE;
+                              }
+                              else
+                              {
+                                  // make sure MAC dest addr match with this station's
+                                  if (((stationType == MASTER_STATION) && 
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 33  
+
+                                      (ConnExistMaster(pEthHdr->dstaddr, pEthHdr->srcaddr, &boardId)
+                                           == FALSE)) ||
+                                      ((stationType == SLAVE_STATION) && 
+                                          (ConnExistSlave(pEthHdr->dstaddr, &boardId) == FALSE)))
+                                  {
+                                      *pdropPkt = TRUE;
+                                  }
+                                  else
+                                  {
+                                      // both master and slave can receive DATA pkts
+                                      if (ConnState[boardId].state == GCI_STATE_OPEN)
+                                      {
+                                          ConnState[boardId].my_numPktRx++;
+                                          if(((ConnState[boardId].my_numPktRx % 64) == 0) && 
+                                              (ConnState[boardId].my_numPktRx> 0))
+                                          {
+                                              printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+                                                     "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b");
+                                              if (ConnState[boardId].testType == HALF_DUPLEX_TEST)
+                                                  printf("Received %li ETH Data frames", 
+                                                      ConnState[boardId].my_numPktRx);
+                                              else
+                                                  printf("Sent %li Data frames, rcvd %li Data frames", 
+                                                      ConnState[boardId].my_numPktTx, 
+                                                      ConnState[boardId].my_numPktRx);
+                                          }
+                                          if ((stationType == SLAVE_STATION) && 
+                                              (ConnState[boardId].testType == FULL_DUPLEX_TEST))
+                                              // transmit the DATA pkt back to sender if 
+                                              // we are slave and this is a Full Duplex test
+                                              nxtPktType = CMD_DATA_PKT;
+                                          else
+                                          {
+                                              *pdropPkt = TRUE;
+                                          }
+                                      } else
+                                      {
+                                          *pdropPkt =  TRUE;   // bad state
+                                      }
+                                  }
+                              }
+                          } else
+                          {
+                              *pdropPkt =  TRUE;       // invalid pkt
+                          }
+              
+                          if (!*pdropPkt)
+                          {
+                              // if it gets here, it means that we need to transmit a response 
+                              // pkt or it's a DATA pkt and we need to transmit it back in
+                              // the FULL Duplex test mode 
+                              // swap src and dest addresses of MAC layer
+                              memcpy(tmpAddr, pEthHdr->dstaddr, MAC_ADDR_LEN);
+                              memcpy(pEthHdr->dstaddr, pEthHdr->srcaddr, MAC_ADDR_LEN);
+                              memcpy(pEthHdr->srcaddr, tmpAddr, MAC_ADDR_LEN);
+                              pEthHdr->ethtype = ETH_TYPE_GREENVITY;
+                              // Greenvity's
+                              pGCIHdr->pktType = nxtPktType;
+                              if (nxtPktType == CMD_DATA_PKT)
+                              {
+                                  // DATA pkt
+                                  pEthTxFrmSwDesc->frmLen =  frmLen; // pkt len
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 34  
+
+                                  pEthTxFrmSwDesc->cpArr[0].len = descLen; // CP len
+                              } else
+                              {
+                                 // CONN RESPONSE or ACK pkt
+                                 // pkt len is ETH+GREENVITY headers
+                                  pEthTxFrmSwDesc->frmLen = pEthTxFrmSwDesc->cpArr[0].len = 
+                                          sizeof(sEth2Hdr) + sizeof(sEthGCIHdr); 
+                              }
+                              pEthTxFrmSwDesc->cpArr[0].offsetU32 = 0;
+                              pEthTxFrmSwDesc->cpArr[0].cp        = pRxPktQCPDesc->s.cp;
+                              pEthTxFrmSwDesc->cpCount++;
+              
+              #ifdef MEM_PROTECTION
+                      if (HHAL_CP_Put_Copy(pRxPktQCPDesc->s.cp, cellAddr, sizeof(sEth2Hdr)+sizeof(sEthGCIHdr)) == STATUS_FAI
+             -LURE)
+                      {
+                        printf("isGCIpkt: Failed to put a copy of CP. Return FALSE\n");
+                      }
+              #endif
+                          }
+                      } else GCIpkt = FALSE;
+                  } else GCIpkt = FALSE;
+              
+                  *pRetRcvPkt = rcvPkt;
+                  *pRetId = boardId;
+                  return(GCIpkt);
+              }       
+              
+              #endif //#ifdef DO_GV_ETH_TEST
+2055          
+2056          #ifdef HPGP_HAL_TEST
+2057          void Host_RxHandler(sCommonRxFrmSwDesc* pRxFrmDesc)
+2058          
+2059          #else
+              
+              void Host_RxHandler(sHaLayer *pHal, sCommonRxFrmSwDesc* pRxFrmDesc)
+              
+              #endif
+2064          
+2065          {
+2066   1      
+2067   1      
+2068   1          uRxPktQDesc1*      pRxPktQ1stDesc;
+2069   1          uRxPktQCPDesc*     pRxPktQCPDesc;
+2070   1      //    volatile u8 XDATA * cellAddr;
+2071   1        u8          *cellAddr;
+2072   1          u16                frmLen;
+2073   1          u8                 i;
+2074   1          u16                tmpFrmLen = 0;
+2075   1          u8                 tmpdescLen = 0;
+2076   1          eStatus status = STATUS_SUCCESS;
+2077   1          u16                retriesCnt = 0;
+2078   1          u16                lclPrintCount = 0;
+2079   1          u16                lclCount = 0;
+2080   1          u8                  GreenvityPkt = FALSE;
+2081   1          u8                  leave = FALSE;
+2082   1          u8                  myStationId = 0xff;
+2083   1          u8                  rcv_pktType = 0;
+2084   1      #ifdef UM
+                  hostHdr_t     *pHybrii;
+                 
+                  u8          isCmd= 0;
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 35  
+
+                 sEth2Hdr   *pktEthHdr;
+                  sStaInfo      *staInfo = NULL;
+                  sLinkLayer      *linkl;
+              #endif
+2092   1          sHpgpHalCB      *hhalCb;
+2093   1      #ifdef MEM_PROTECTION
+                u8          cp_localBuf[HYBRII_CELLBUF_SIZE]; // local CP buffer
+              #endif      
+2096   1        u8           dropFrame = 0;
+2097   1      
+2098   1          u8          isEthData = 0;
+2099   1      
+2100   1      
+2101   1          u8 dstTei =0;
+2102   1      
+2103   1          u8 brdcast[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+2104   1          //  sPlcTxFrmSwDesc plcTxFrmSwDesc;
+2105   1          sSwFrmDesc    plcTxFrmSwDesc;
+2106   1          sSwFrmDesc    ethTxFrmSwDesc;
+2107   1        u8 alingOffset = 0;
+2108   1          u8 payloadOffset = 0;
+2109   1          u8 FIFOCtrl=0;
+2110   1      
+2111   1        u8 cp = 0;
+2112   1          if(hostDetected == FALSE) //hostIntf == HOST_INTF_NO)
+2113   1          {
+2114   2              hostIntf = HOST_INTF_ETH;
+2115   2          }
+2116   1      //#ifdef UM
+2117   1          hostDetected = TRUE;
+2118   1      //#endif
+2119   1          memset (&plcTxFrmSwDesc, 0x00, sizeof(sSwFrmDesc));
+2120   1      
+2121   1          plcTxFrmSwDesc.cpCount        = 0;
+2122   1          ethTxFrmSwDesc.cpCount        = 0;
+2123   1      #ifdef HPGP_HAL_TEST       
+2124   1          hhalCb = &gHpgpHalCB;
+2125   1      #else   
+                     
+                  hhalCb = pHal->hhalCb;
+              #endif
+2129   1          
+2130   1      
+2131   1          pRxPktQ1stDesc = &pRxFrmDesc->hdrDesc;
+2132   1          pRxPktQCPDesc  = &pRxFrmDesc->firstCpDesc;
+2133   1          frmLen = pRxPktQ1stDesc->s.frmLenHi;
+2134   1          frmLen = frmLen<<PKTQDESC1_FRMLENHI_POS | pRxPktQ1stDesc->s.frmLenLo;
+2135   1        plcTxFrmSwDesc.txPort = pRxPktQ1stDesc->s.dstPort;
+2136   1        plcTxFrmSwDesc.rxPort = pRxPktQ1stDesc->s.srcPort;  
+2137   1      
+2138   1          gEthHalCB.TotalRxFrmCnt++;
+2139   1          gEthHalCB.TotalRxBytesCnt += frmLen;
+2140   1      
+2141   1        if (hostIntf == HOST_INTF_ETH) 
+2142   1        {
+2143   2            if (frmLen > MAX_ETH_BUFF || frmLen < MIN_ETH_BUFF)
+2144   2            {
+2145   3              
+2146   3                hal_common_free_frame(pRxFrmDesc);
+2147   3                  gHpgpHalCB.halStats.HtoPswDropCnt++;
+2148   3                return;
+2149   3            }
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 36  
+
+2150   2      #if 0   //[YM] temp comment out pause function
+                    // Check for FIFO Overrun reg. If it's set, send a PAUSE pkt out
+                    FIFOCtrl     = ReadU8Reg(ETHMAC_FIFOCTL_REG);
+                    if (FIFOCtrl & 4)
+                  {
+                        /* Rcv FIFO Overrun flag is set, send ETH Pause pkt out */
+                        EHAL_EthSendPause();
+                  }
+              #endif    
+2159   2        }
+2160   1          
+2161   1        if (hostIntf == HOST_INTF_SPI) {
+2162   2          cellAddr = CHAL_GetAccessToCP(pRxFrmDesc->cpArr[0]);
+2163   2      
+2164   2        } else if (hostIntf == HOST_INTF_ETH) {
+2165   2      #ifdef UM
+              #ifdef MEM_PROTECTION
+                  // copy cp to local buf
+                  if (HHAL_CP_Get_Copy(pRxPktQCPDesc->s.cp, &cp_localBuf[0], HYBRII_CELLBUF_SIZE) 
+                      == STATUS_FAILURE)
+                  {
+                    printf("Host_RxHandler: Failed to make a copy of CP. Return\n");
+                        hal_common_free_frame(pRxFrmDesc);
+                        return;
+                  }
+                  cellAddr = &cp_localBuf[0];
+              #else
+                    //cellAddr = CHAL_GetAccessToCP(pRxPktQCPDesc->s.cp);
+                  cellAddr = CHAL_GetAccessToCP(pRxFrmDesc->cpArr[0]);//kiran
+              #endif
+              #endif
+2181   2        } 
+2182   1        else if(hostIntf == HOST_INTF_UART)
+2183   1        {
+2184   2          cellAddr = CHAL_GetAccessToCP(pRxPktQCPDesc->s.cp);
+2185   2        } 
+2186   1          if(frmLen < HYBRII_CELLBUF_SIZE)
+2187   1          {
+2188   2              tmpdescLen = frmLen;
+2189   2          }
+2190   1          else
+2191   1          {
+2192   2              tmpdescLen = HYBRII_CELLBUF_SIZE;
+2193   2          }
+2194   1      
+2195   1          
+2196   1      #ifdef DEBUG_DATAPATH
+                      
+                  if (pktDbg)
+                  {
+                      FM_Printf(FM_ERROR, "\n host rx\n");
+                      for( lclPrintCount=0; lclPrintCount<tmpdescLen; lclPrintCount++ )
+                      {
+                          FM_Printf(FM_ERROR, "0x%02bX ", *(cellAddr+lclPrintCount));
+                      }
+                      FM_Printf(FM_ERROR, "\n end \n");
+              
+                  }
+                      
+              #endif
+2210   1      
+2211   1          tmpFrmLen = tmpdescLen;
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 37  
+
+2212   1      
+2213   1      
+2214   1      #ifdef UM
+                  // Check for MAC SAP pkt
+                 
+                     pktEthHdr = ((sEth2Hdr*)cellAddr);
+                            
+                      if (pktEthHdr->ethtype == 0x88E1)
+                      {            
+                          pHybrii = (hostHdr_t*)(((u8*)cellAddr) + sizeof(sEth2Hdr));        
+                   
+                          #if 0
+                          
+                          alingOffset = (u8)pHybrii->rsvd;  
+              
+                          if( alingOffset > 3)
+                          {
+                      //      FM_Printf(FM_ERROR, "Invalid alingoffset : %bu, %d\n", alingOffset, pHybrii->rsvd);
+                              hal_common_free_frame(pRxFrmDesc);
+                              return;
+                          }
+                          
+                          #endif           
+                                      
+                          
+                          if ((pHybrii->type == CONTROL_FRM_ID) ||
+                              (pHybrii->type == MGMT_FRM_ID))
+                          {
+              
+                      if (pHybrii->protocol == HPGP_MAC_ID 
+              #ifdef HYBRII_ZIGBEE          
+                        || pHybrii->protocol == IEEE802_15_4_MAC_ID
+              #endif          
+                                              )
+                      {
+                        Host_MgmtCmdRxHandler(hhalCb, pRxFrmDesc, 
+                                          frmLen,pHybrii->type);          
+                      }
+                          }
+                         
+                    hal_common_free_frame(pRxFrmDesc);
+                    return;
+              
+              
+                      }
+                      else
+              #endif      
+2259   1          {
+2260   2      
+2261   2      #if 1
+2262   2            if (datapath_IsQueueFull(PLC_DATA_QUEUE)
+2263   2                == TRUE)
+2264   2            {
+2265   3      
+2266   3            
+2267   3      #ifdef DEBUG_DATAPATH
+                          
+                      if (sigDbg)
+                      FM_Printf(FM_ERROR,"q f\n");
+              #endif        
+2272   3              dropFrame = 1;
+2273   3            }
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 38  
+
+2274   2            
+2275   2            if ((host_intf_max_cp + pRxFrmDesc->cpCount)> HOST_TO_PLC_MAX_CP)
+2276   2            {       
+2277   3      
+2278   3              
+2279   3                
+2280   3      #ifdef DEBUG_DATAPATH
+                          
+                      if (sigDbg)
+                      FM_Printf(FM_ERROR,"max cp %bu\n",(pRxFrmDesc->cpCount + host_intf_max_cp));
+                
+              #endif          
+2286   3              dropFrame = 1;
+2287   3      
+2288   3            }
+2289   2      
+2290   2              
+2291   2      #ifdef UM       
+                    if (0)//(!MCTRL_IsAssociated())
+                    {       
+                      dropFrame = 1;
+                    }
+              #endif
+2297   2      
+2298   2            if (dropFrame)
+2299   2            {
+2300   3              hal_common_free_frame(pRxFrmDesc); // drop frame
+2301   3      #if 1 //def DEBUG_DATAPATH
+2302   3            //  FM_Printf(FM_USER, "drop frame\n");
+2303   3      #endif      
+2304   3                      gHpgpHalCB.halStats.HtoPswDropCnt++;
+2305   3              return;
+2306   3            }
+2307   2            
+2308   2      #endif
+2309   2      
+2310   2            
+2311   2      #ifdef UM
+              
+                    isEthData = 1;
+                    
+                      /* Check to drop the Ethernet frame based on peer's connection status */
+                     /* !memcmp(pktEthHdr->dstaddr, brdcast, sizeof(brdcast)) */
+                      if ((pktEthHdr->dstaddr[0] & 0x01))
+                      {
+              
+                              /*
+                                              Note : dstTei should be set to 0xFF for broadcast frame.
+                                              Has to be revisited. 0xFF was getting dropped by receiver
+              
+                                              */
+              
+                          dstTei = 0xFF;
+              
+                      }
+                      else
+                      {
+                          sScb* dstScb = NULL;
+                          sLinkLayer *linkLayer = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                          sCnam *ccoNam = &linkLayer->ccoNam;
+                          u8 devmode = LINKL_GetMode(linkLayer);
+                      
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 39  
+
+                          dstScb = CRM_FindScbMacAddr(&pktEthHdr->dstaddr);
+              
+                          if (!dstScb)
+                          {
+                              dropFrame = 1;
+              
+                          }
+                          else
+                          {
+                              if(devmode == LINKL_STA_MODE_STA)
+                              {
+                                  if(0)//staInfo->staStatus.fields.authStatus != 1)
+                                  {
+                                      dropFrame = 1;
+                                  }
+                              }
+              
+                              else if(devmode == LINKL_STA_MODE_CCO)
+                              {
+                                  if(0)//dstScb->staStatus.fields.authStatus != 1)
+                                  {
+                                      dropFrame = 1;
+                                  }
+                              }
+                              else
+                              {
+                                  dropFrame = 1;
+                              }
+              #ifdef ROUTE
+                                  if(dstScb->lrtEntry.routeIsInvalid == TRUE || dstScb->lrtEntry.routeOnHold == TRUE)
+                                  {
+                                      dropFrame = 1;
+                                  }
+                                  else
+                                  {
+                                      dstTei = dstScb->lrtEntry.nTei;
+                                  }
+              #else
+                              dstTei = dstScb->tei;
+              #endif
+                          }
+              
+              
+                      }
+              
+              
+              #else
+2383   2      
+2384   2        isEthData = 1;
+2385   2        dstTei = 1;
+2386   2      
+2387   2      #endif
+2388   2      
+2389   2          }
+2390   1      
+2391   1      
+2392   1      #ifdef UM
+                   isEthData = 1;
+              #endif    
+2395   1         
+2396   1      #ifdef HYBRII_ETH
+2397   1          // now examine the pkt once more to see if it's
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 40  
+
+2398   1          // a Greenvity test pkt
+2399   1      #ifdef DO_GV_ETH_TEST // make this test compilable to save time to examine ETH header
+                  if ((GreenvityPkt = isGCIpkt(pRxPktQCPDesc, &ethTxFrmSwDesc, frmLen, 
+                          tmpdescLen, &myStationId, &rcv_pktType, &leave)) == TRUE)
+                  {
+                  }
+              #else
+2405   1        GreenvityPkt = FALSE;
+2406   1      #endif //HYBRII_ETH 
+2407   1      #endif
+2408   1      
+2409   1          if (leave
+2410   1      #ifdef UM
+                      || dropFrame
+              #endif
+2413   1          ) {
+2414   2      
+2415   2          //FM_Printf(FM_USER, "drop x\n");
+2416   2              // free the received pkt and return
+2417   2              hal_common_free_frame(pRxFrmDesc);
+2418   2              gHpgpHalCB.halStats.HtoPswDropCnt++;
+2419   2              return;
+2420   2          }
+2421   1      
+2422   1          if ((eth_plc_bridge
+2423   1      #ifdef UM
+                  || (isEthData == 1)
+              #endif
+2426   1              ) && !GreenvityPkt)
+2427   1          {
+2428   2            
+2429   2            plcTxFrmSwDesc.cpArr[0].offsetU32 = 0;
+2430   2            plcTxFrmSwDesc.cpArr[0].len       = tmpdescLen;
+2431   2        
+2432   2          plcTxFrmSwDesc.cpArr[0].cp    = pRxFrmDesc->cpArr[0];
+2433   2            plcTxFrmSwDesc.cpCount++;
+2434   2      
+2435   2      #ifdef HPGP_HAL_TEST
+2436   2          plcTxFrmSwDesc.frmInfo.plc.eks =  gNekEks; //HPGP_UNENCRYPTED_EKS;
+2437   2      
+2438   2          hhalCb = &gHpgpHalCB;
+2439   2      #else
+              
+                  linkl = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+              
+                  staInfo = LINKL_GetStaInfo(linkl);
+              
+                  hhalCb = pHal->hhalCb;
+              
+                  plcTxFrmSwDesc.frmInfo.plc.eks = staInfo->nekEks;//HPGP_UNENCRYPTED_EKS;
+              #endif
+2449   2      
+2450   2      
+2451   2          plcTxFrmSwDesc.frmInfo.plc.bcnDetectFlag  = REG_FLAG_SET;// REG_FLAG_CLR;
+2452   2          plcTxFrmSwDesc.frmInfo.plc.clst = HPGP_CONVLYRSAPTYPE_ETH;
+2453   2      
+2454   2          plcTxFrmSwDesc.frmType        = HPGP_HW_FRMTYPE_MSDU;
+2455   2      
+2456   2      
+2457   2        
+2458   2      #ifdef UM
+                  /*
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 41  
+
+                  we need to fetch scb and then populate TEIs.
+                  */
+                  if(linkl->mode == LINKL_STA_MODE_CCO)
+                  {
+              
+              //    FM_Printf(FM_USER, "f cc\n");
+              #ifdef CCO_FUNC               
+                      plcTxFrmSwDesc.frmInfo.plc.dtei       = dstTei;
+                      plcTxFrmSwDesc.frmInfo.plc.stei       = staInfo->ccoScb->tei;
+              #endif
+                  }
+                  else
+                  {
+              #ifdef STA_FUNC
+                      plcTxFrmSwDesc.frmInfo.plc.dtei       = dstTei;//staInfo->ccoScb->tei;
+                      plcTxFrmSwDesc.frmInfo.plc.stei       = staInfo->tei;
+              #endif
+                  }
+              
+              
+              #else
+2481   2          plcTxFrmSwDesc.frmInfo.plc.dtei           = hhalCb->remoteTei;
+2482   2          plcTxFrmSwDesc.frmInfo.plc.stei           = hhalCb->selfTei;//HYBRII_DEFAULT_TEISTA;
+2483   2      
+2484   2      #endif
+2485   2        if (dstTei == 0xFF)
+2486   2        {
+2487   3          plcTxFrmSwDesc.frmInfo.plc.mcstMode    = HPGP_MCST;
+2488   3          plcTxFrmSwDesc.frmInfo.plc.phyPendBlks   = HPGP_PPB_MCFRPT;
+2489   3        }
+2490   2        else
+2491   2        {
+2492   3          plcTxFrmSwDesc.frmInfo.plc.mcstMode    = HPGP_UCST;  // Unicast
+2493   3        }
+2494   2      
+2495   2          plcTxFrmSwDesc.frmLen         = frmLen;
+2496   2      #if 0
+                  plcTxFrmSwDesc.frmInfo.plc.plid = 0;   //[YM] This line of code has to be changed base on differnet Qo
+             -S priority
+              
+              
+                  if (plcTxFrmSwDesc.frmInfo.plc.plid == 0)
+                      plcTxFrmSwDesc.frmInfo.plc.phyPendBlks    = HPGP_PPB_CAP0;
+                else
+                  plcTxFrmSwDesc.frmInfo.plc.phyPendBlks    = HPGP_PPB_CAP123;
+              
+                 
+              #if 1 //def HPGP_HAL_TEST
+                  plcTxFrmSwDesc.frmInfo.plc.stdModeSel     = STD_ROBO_TEST; // std robo
+              #endif
+                  plcTxFrmSwDesc.frmInfo.plc.dt_av = HPGP_DTAV_SOF;
+                  plcTxFrmSwDesc.frmInfo.plc.saf = 1;
+              
+              #endif
+2513   2          }
+2514   1      
+2515   1          // Read second and subsequent CP descriptors
+2516   1          for( i=1 ; i< pRxFrmDesc->cpCount ; i++ )
+2517   1          {
+2518   2      #ifdef UM
+              #ifdef MEM_PROTECTION
+                  // copy cp to local buf
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 42  
+
+                  if (HHAL_CP_Get_Copy(pRxFrmDesc->cpArr[i], &cp_localBuf[0], HYBRII_CELLBUF_SIZE) == STATUS_FAILURE)
+                  {
+                    printf("Host_RxHandler: Failed to make a copy of CP %bu. Return\n", pRxFrmDesc->cpArr[i]);
+                        hal_common_free_frame(pRxFrmDesc);
+                        return;
+                  }
+                  //cellAddr = &cp_localBuf[0];// Kiran. Commented as no one uses cellAddr
+              #else
+                      //cellAddr = CHAL_GetAccessToCP(pRxFrmDesc->cpArr[i]);// Kiran. Commented as no one uses cellAddr
+              #endif
+              #endif
+2532   2      
+2533   2              if((frmLen - tmpFrmLen) > HYBRII_CELLBUF_SIZE)
+2534   2                  tmpdescLen = HYBRII_CELLBUF_SIZE;
+2535   2              else
+2536   2                  tmpdescLen = frmLen - tmpFrmLen;
+2537   2      
+2538   2              if (GreenvityPkt)
+2539   2              {
+2540   3      #ifdef HYBRII_ETH
+2541   3                  // our test pkt
+2542   3                  if ((rcv_pktType == CMD_DATA_PKT) && 
+2543   3                      (ConnState[myStationId].testType == FULL_DUPLEX_TEST))
+2544   3                  {
+2545   4                      // only DATA pkts can have more than 1 CP
+2546   4                      // and we're going to xmit this DATA pkt back out
+2547   4                      // in FULL DUPLEX mode
+2548   4                      ethTxFrmSwDesc.cpArr[i].offsetU32 = 0;
+2549   4                      ethTxFrmSwDesc.cpArr[i].len       = tmpdescLen;
+2550   4                      ethTxFrmSwDesc.cpArr[i].cp        = pRxFrmDesc->cpArr[i];
+2551   4                      ethTxFrmSwDesc.cpCount++;
+2552   4                      tmpFrmLen += tmpdescLen;
+2553   4                  }
+2554   3      #endif
+2555   3              } else if((1 == eth_plc_bridge)
+2556   2      #ifdef UM
+                      || (isEthData == 1)
+              #endif
+2559   2              )
+2560   2              {
+2561   3                  //either bridging would be on or mac sap would be on
+2562   3      
+2563   3            plcTxFrmSwDesc.cpArr[i].offsetU32 = 0;
+2564   3                  plcTxFrmSwDesc.cpArr[i].len       = (u8)tmpdescLen; 
+2565   3                  plcTxFrmSwDesc.cpArr[i].cp    = pRxFrmDesc->cpArr[i];
+2566   3                  plcTxFrmSwDesc.cpCount++;
+2567   3                  tmpFrmLen += tmpdescLen;
+2568   3              }
+2569   2      
+2570   2          } // for i..
+2571   1      
+2572   1      
+2573   1          if(eth_plc_bridge || GreenvityPkt
+2574   1      #ifdef UM
+                      || (isEthData == 1)
+              #endif
+2577   1              )
+2578   1          {
+2579   2              // Transmit the frame
+2580   2              retriesCnt=0;
+2581   2      #if 0 //def HYBRII_ETH
+              
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 43  
+
+                      if(GreenvityPkt)
+                      {
+                          // Greenvity test pk, xmit it back out via ETH
+                          do
+                          {                   
+                          // Greenvity test pk, xmit it back out via ETH
+                          status = EHAL_EthTxQWrite(&ethTxFrmSwDesc);
+              
+                          // check for pending Tx and process it.
+                          if( status != STATUS_SUCCESS)
+                          {
+                          // TODO try for ETH_PLC_TX_RETRIES number of times, if not success then break
+                          if(retriesCnt >= ETH_PLC_TX_RETRIES)
+                          {
+                              break;
+                          }
+                          retriesCnt++;
+                          }
+                          }while(status != STATUS_SUCCESS);
+              
+                          if(status == STATUS_SUCCESS)
+                          {
+                          gHpgpHalCB.halStats.CurTxTestFrmCnt++;
+                          if ((rcv_pktType == CMD_DATA_PKT))
+                          // only the slave transmits the DATA pkt in the ETH_RCV ISR
+                          ConnState[myStationId].my_numPktTx++;
+                          }
+                          else
+                          {
+                          FM_Printf(FM_ERROR,"ETH, PLC or MAC SAP tx failed\n");
+                          // If Tx failed, free the rcv pkt
+                          hal_common_free_frame(pRxFrmDesc);
+                          }
+              
+                      }
+                      else
+              #endif
+2620   2      
+2621   2          {
+2622   3      
+2623   3            
+2624   3      //      FM_Printf(FM_USER, "hr\n");
+2625   3          
+2626   3            fwdAgent_handleData(&plcTxFrmSwDesc);
+2627   3          }
+2628   2              // if MAC SAP or Bridging is ON, send it to PLC
+2629   2              
+2630   2              // end of bridge or mac case
+2631   2          } 
+2632   1        else
+2633   1      
+2634   1      
+2635   1          {
+2636   2              // pkt is not for ETH testing nor bridging nor MAC SAP, free the CP
+2637   2              hal_common_free_frame(pRxFrmDesc);
+2638   2              gHpgpHalCB.halStats.HtoPswDropCnt++;
+2639   2          } 
+2640   1      
+2641   1      //        CHAL_DecrementReleaseCPCnt(pRxFrmDesc->cpArr[i]);
+2642   1              //FM_Printf(FM_MINFO,"EHAL_EthRxIntHandler2: Releasing CP %02bX \n",pRxFrmDesc->cpArr[i]);
+2643   1      }
+2644          
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 44  
+
+2645          
+2646          
+2647          #ifdef UM
+              
+              void Host_SendIndication(u8 eventId, u8 *payload, u8 length)
+              {
+                hostEventHdr_t  *pHostEvent;
+                hostHdr_t  *pHostHdr;
+                sEvent     *event = NULL;
+              #ifdef ROUTE    
+                  u8 i;
+                  if(HOST_EVENT_ROUTE_VALID== eventId)
+                  {
+                      FM_Printf(FM_ROUTE,"ROUTE Valid: TEI=%bu NTEI=%bu NHOP=%bu\n",payload[0],payload[1],payload[2]);
+                  }
+                  else if(HOST_EVENT_ROUTE_INVALID== eventId)
+                  {
+                      FM_Printf(FM_ROUTE,"ROUTE Invalid: TEI=%bu\n",payload[0]);
+                  }
+                  else if(HOST_EVENT_ROUTE_CHANGE == eventId)
+                  {
+                      FM_Printf(FM_ROUTE,"ROUTE Change: TEI=%bu NTEI=%bu NHOP=%bu\n",payload[0],payload[1],payload[2]);
+                  }
+                  else if(HOST_EVENT_ROUTE_HOLD== eventId)
+                  {
+                      FM_Printf(FM_ROUTE,"ROUTE Hold: TEIs = ");
+                      for(i = 0; i < length; i++)
+                      {
+                          FM_Printf(FM_ROUTE,"%bu ", payload[i]);
+                      }
+                      FM_Printf(FM_ROUTE,"\n");
+                  }
+              #endif
+              
+              
+                  event = EVENT_Alloc(sizeof(hostHdr_t) + length + sizeof(hostEventHdr_t), sizeof(hostHdr_t));
+              
+                  if(event != NULL)
+                  {
+                    event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                  event->eventHdr.type = eventId;
+              
+                    pHostHdr = (hostHdr_t*)event->buffDesc.dataptr;
+                    
+                    pHostEvent = (hostEventHdr_t*)(pHostHdr + 1);
+              
+                    pHostHdr->type = EVENT_FRM_ID;
+                    pHostHdr->protocol = HPGP_MAC_ID;
+                    pHostHdr->rsvd = 0;
+                    pHostHdr->length = sizeof(hostEventHdr_t) +  length;
+              #ifndef NO_HOST
+                    pHostHdr->length = HTONHS(pHostHdr->length);
+              #endif
+                    pHostEvent->eventClass = EVENT_CLASS_CTRL;
+                  pHostEvent->type = eventId;
+              
+                    if (payload)
+                      memcpy ((u8*)(pHostEvent + 1),  payload, length);
+                    
+                    event->buffDesc.datalen = sizeof(hostHdr_t) +  
+                                  sizeof(hostEventHdr_t) + length;
+                    SEND_HOST_EVENT(event);
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 45  
+
+                  }
+              
+              return;
+              
+              }
+              
+              
+              
+              void Host_MgmtCmdRxHandler(sHpgpHalCB *pHalCb, 
+                                                    sCommonRxFrmSwDesc* pRxFrmDesc,
+                                  u16 frmLen, u8 frmType)
+              {
+                u8          *cellAddr;
+                u8 dropFrame = 0;
+                u16          lclPrintCount = 0;
+                u8            *cmdPtr;
+                u16          lclCount = 0;
+                u8           copylen;
+                u16          remainingLen;
+                u8 i;
+              
+                u8 payloadOffset;
+              #ifdef MEM_PROTECTION
+                u8          cp_localBuf[HYBRII_CELLBUF_SIZE]; // local CP buffer
+              #endif      
+              
+                if ((frmLen <= MAX_FRAME_LEN) && ((CONTROL_FRM_ID == frmType) || (MGMT_FRM_ID == frmType)))
+                {
+              
+                  if(frmLen < HYBRII_CELLBUF_SIZE)
+                  {
+                    copylen = frmLen;
+                  }
+                  else
+                  {
+                    copylen = HYBRII_CELLBUF_SIZE;
+                  }
+              
+                  remainingLen = frmLen;
+              
+                  if (pRxFrmDesc->cpCount == 1) // If more than one cp are present then copy them to buffer
+                  {
+                    cmdPtr = CHAL_GetAccessToCP(pRxFrmDesc->cpArr[0])+ sizeof(sEth2Hdr);
+                    // First cell pointer contains ethernet header + payload. We need to offset ethernet header
+                    lclCount =  frmLen;
+                  }
+                  else
+                  {
+              
+                    // Read second and subsequent CP descriptors
+                    for( i=0; i< pRxFrmDesc->cpCount ; i++ )
+                    {
+                      payloadOffset = (i == 0)?sizeof(sEth2Hdr):0;
+              
+              
+              
+              #ifdef HPGP_MAC_SAP
+              #ifdef MEM_PROTECTION
+                  // copy cp to local buf
+                  if (HHAL_CP_Get_Copy(pRxFrmDesc->cpArr[i], &cp_localBuf[0], HYBRII_CELLBUF_SIZE) 
+                  == STATUS_FAILURE)
+                  {
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 46  
+
+                  printf("Host_RxHandler: Failed to make a copy of CP %bu. Return\n", pRxFrmDesc->cpArr[i]);
+                  hal_common_free_frame(pRxFrmDesc);
+                  return;
+                  }
+                  cellAddr = &cp_localBuf[0];
+              #else
+                  cellAddr = CHAL_GetAccessToCP(pRxFrmDesc->cpArr[i]);
+              #endif
+              #endif
+              
+              
+                  for( lclPrintCount=0; lclPrintCount< ( copylen - payloadOffset);
+                      lclPrintCount++ )
+                  {
+                    ufrm[lclCount++] = *(cellAddr + payloadOffset + lclPrintCount);
+                  }
+              
+                  //FM_Printf(FM_MINFO,"EHAL_EthRxIntHandler2: Releasing CP %02bX \n",pRxFrmDesc->cpArr[i]);
+              
+                  
+                  remainingLen = remainingLen - copylen;
+              
+                  if(remainingLen > HYBRII_CELLBUF_SIZE)
+                    copylen = HYBRII_CELLBUF_SIZE;
+                  else
+                    copylen = remainingLen; 
+              
+                  
+                  
+                  }
+              
+                    cmdPtr = ufrm;
+              
+                  }
+                  // Command Handling
+                  GV701x_CmdSend((hostHdr_t*)cmdPtr, lclCount);
+              
+                }
+              
+              
+              }
+              
+              
+              
+              void datapath_hostTransmitFrame(u8* TxByteArr, u16 frameSize)
+              {
+                  u16              dataIdx;
+                  u16              curFrmLen;
+                  u16              crc16 = 0;
+                  u8               cpIdx;
+                  eStatus          status;
+                  sSwFrmDesc  hostTxFrmSwDesc;
+                  u8 ethhdr[14];
+                  u8              firstCp = 0;
+                  u8 i;
+              
+                  if (frameSize == 0 || hostIntf == HOST_INTF_NO)
+                  {
+                      return;
+                  }
+                  //EHT_FillEtherHeader(TxByteArr);
+                  if(hostIntf == HOST_INTF_SPI)
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 47  
+
+                  {
+              #ifdef HYBRII_SPI
+                      curFrmLen              = frameSize + sizeof(hybrii_tx_req_t) + SPI_CRC_LEN;
+                      EHT_FillEtherHeader(ethhdr);
+                      curFrmLen              += sizeof(sEth2Hdr);
+              
+              #endif   //HYBRII_SPI
+                  }
+                  else if(hostIntf == HOST_INTF_ETH)
+                  {
+                      EHT_FillEtherHeader(ethhdr);
+                      curFrmLen              = frameSize + sizeof(sEth2Hdr);    
+                  }
+              #ifdef UART_HOST_INTF 
+                else if(hostIntf == HOST_INTF_UART)
+                  {
+                      curFrmLen              = frameSize ;//+ sizeof(sEth2Hdr);    
+                  }//Kiran
+              #endif// UART_16550
+                  dataIdx                = 0;
+                  cpIdx                  = 0;
+                  hostTxFrmSwDesc.frmLen  = curFrmLen;
+                  hostTxFrmSwDesc.cpCount = 0;
+              
+                  while (curFrmLen)
+                  {
+                      u8                  cp;
+                      volatile u8 xdata * cellAddr;
+                      u8                  actualDescLen;
+              
+                      status = CHAL_RequestCP(&cp);
+                      if (status != STATUS_SUCCESS)
+                      {
+                          return;
+                      }
+                      cellAddr = CHAL_GetAccessToCP(cp);
+                      if (curFrmLen > HYBRII_CELLBUF_SIZE)
+                      {
+                          actualDescLen = HYBRII_CELLBUF_SIZE;
+                      }
+                      else
+                      {
+                          actualDescLen = curFrmLen;
+                      }
+                      //memcpy(cellAddr, &TxByteArr[dataIdx], actualDescLen);
+                      if(firstCp == 0)
+                      {
+                        //  hostHdr_t *pHybrii;
+                          u8 hdrLen;
+                          if(hostIntf == HOST_INTF_SPI)
+                          {
+              #ifdef HYBRII_SPI
+                              hdrLen = sizeof(hybrii_tx_req_t);
+                              actualDescLen = hdrLen;
+              
+              #endif  //HYBRII_SPI
+                          }
+                          else if(hostIntf == HOST_INTF_ETH)
+                          {
+                              hdrLen = (sizeof(sEth2Hdr));                
+                              memcpy(cellAddr, ethhdr, sizeof(sEth2Hdr));
+                              memcpy( (cellAddr + hdrLen), &TxByteArr[dataIdx], (actualDescLen - hdrLen));
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 48  
+
+                          }
+              #ifdef UART_HOST_INTF 
+                    else if(hostIntf == HOST_INTF_UART)
+                      {
+                        hdrLen = 0;//UART driver creates required header for Formatted mode   
+                              memcpy(cellAddr, &TxByteArr[dataIdx], actualDescLen);
+                      }//Kiran
+              #endif// UART_16550
+                          firstCp = 1;
+                          dataIdx += (actualDescLen - hdrLen);
+              
+                      }
+                      else
+                      {
+                          if(hostIntf == HOST_INTF_SPI)
+                          {
+                              u8 ethHdrLen = sizeof(sEth2Hdr);
+                              memcpy(cellAddr, ethhdr, ethHdrLen);                
+                              memcpy(&cellAddr[ethHdrLen], &TxByteArr[dataIdx], actualDescLen);
+                          }
+                          else if(hostIntf == HOST_INTF_ETH)
+                          {
+                              memcpy(cellAddr, &TxByteArr[dataIdx], actualDescLen);
+                          }
+                    else// For UART 
+                          {
+                              memcpy(cellAddr, &TxByteArr[dataIdx], actualDescLen);
+                          }
+                          dataIdx += actualDescLen;
+                          if(hostIntf == HOST_INTF_SPI)
+                          {
+                              if(curFrmLen <= HYBRII_CELLBUF_SIZE && curFrmLen > 1)
+                              {
+                                  actualDescLen -= SPI_CRC_LEN;               }
+                              else if(curFrmLen == (HYBRII_CELLBUF_SIZE + 1))
+                              {
+                                  actualDescLen -= 1;
+                              }
+                              else if(curFrmLen == 1)
+                              {
+                                  actualDescLen -= 1;
+                              }
+                              for (i = 0; i < actualDescLen; i++) {
+                                  crc16 = crc_ccitt_update(crc16, cellAddr[i]);
+                              }
+                          
+                              if(curFrmLen <= HYBRII_CELLBUF_SIZE && curFrmLen > 1)
+                              {
+                                  cellAddr[i] = crc16 & 0xFF;
+                                  i++;
+                                  cellAddr[i] = (crc16 >> 8) & 0xFF;
+                                  actualDescLen += SPI_CRC_LEN;
+                              }
+                              else if(curFrmLen == (HYBRII_CELLBUF_SIZE + 1))
+                              {
+                                  cellAddr[i] = crc16 & 0xFF;
+                                  actualDescLen += 1;
+                              }
+                              else if(curFrmLen == 1)
+                              {
+                                  cellAddr[i] = (crc16 >> 8) & 0xFF;
+                                  actualDescLen += 1;
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 49  
+
+                              }
+                          }
+                      }
+                      hostTxFrmSwDesc.cpArr[cpIdx].offsetU32 = 0;
+                      hostTxFrmSwDesc.cpArr[cpIdx].len  = actualDescLen;
+                      hostTxFrmSwDesc.cpArr[cpIdx].cp = cp;
+                      cpIdx++;
+                      hostTxFrmSwDesc.cpCount++;
+                      curFrmLen -= actualDescLen;
+                  }
+                  
+                  numHostCPs += hostTxFrmSwDesc.cpCount;
+                  if(hostIntf == HOST_INTF_SPI)
+                  {
+              #ifdef HYBRII_SPI
+              
+                      hostTxFrmSwDesc.frmLen -= sizeof(hybrii_tx_req_t);
+              #endif  //HYBRII_SPI
+                  }
+              
+              
+                datapath_writeHostIntf(&hostTxFrmSwDesc);
+                
+                status = STATUS_SUCCESS;
+                
+              
+              
+              /*    if(hostIntf == HOST_INTF_SPI)
+                  {
+              #ifdef HYBRII_SPI
+                      
+                      hal_spi_tx_cleanup ();
+                      hal_spi_rx_cleanup ();
+                      hostTxFrmSwDesc.frmLen -= sizeof(hybrii_tx_req_t);
+                      status = hal_spi_tx_dma_cp(hostTxFrmSwDesc.frmLen, &hostTxFrmSwDesc);
+              #endif
+                  }
+                  else if(hostIntf == HOST_INTF_ETH)
+                  {
+                      status = EHAL_EthTxQWrite(&hostTxFrmSwDesc);
+                  }
+                  */
+                  if (status == STATUS_FAILURE)
+                  {
+                      for (cpIdx = 0; cpIdx < hostTxFrmSwDesc.cpCount; cpIdx++)
+                      {
+                          CHAL_DecrementReleaseCPCnt(hostTxFrmSwDesc.cpArr[cpIdx].cp);
+                      }
+                      //FM_Printf(FM_ERROR, "\nCannot send Eth/SPI packet");
+                  }
+                  else
+                  {
+                      gEthHalCB.CurTxTestFrmCnt++;
+                      gEthHalCB.CurTxTestBytesCnt+= frameSize;
+                  }
+              }
+              
+              
+              bool datapath_transmitMgmtPlc()
+              {
+                
+                if (HAL_Proc(HOMEPLUG_GetHal()))
+C51 COMPILER V9.52.0.0   DATAPATH                                                          01/10/2015 21:25:28 PAGE 50  
+
+                      return TRUE;
+                  else
+                      return FALSE;
+              
+              }
+              
+              
+              #endif
+3025          
+3026          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   4298    ----
+   CONSTANT SIZE    =     76    ----
+   XDATA SIZE       =   4263     463
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  2 WARNING(S),  0 ERROR(S)

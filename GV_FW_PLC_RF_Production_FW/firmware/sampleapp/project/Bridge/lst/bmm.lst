@@ -1,0 +1,182 @@
+C51 COMPILER V9.53.0.0   BMM                                                               11/04/2015 20:09:51 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE BMM
+OBJECT MODULE PLACED IN .\obj\bmm.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\zigbee\bmm.c LARGE OBJECTADVANCED OPTIMIZE(9,SIZE) 
+                    -BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\..\fir
+                    -mware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\hal;..\.
+                    -.\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\firmware\
+                    -hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee;..\..
+                    -\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;..\..
+                    -\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\inc;..\.
+                    -.\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;..\..\.
+                    -.\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\hpgp\i
+                    -nc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\..\..\
+                    -..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\compone
+                    -nts\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\flash\
+                    -inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities;..\..
+                    -\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nwk\inc;
+                    -..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\..\com
+                    -ponents\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,H
+                    -YBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,UM,HYB
+                    -RII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETECT,HYB
+                    -RII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT,MCCO,
+                    -SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGISTER_A
+                    -PP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\bmm.lst) TABS(2) OBJECT(.\ob
+                    -j\bmm.obj)
+
+line level    source
+
+   1          /**
+   2           * @file 
+   3           *
+   4           * This file implements the functions buffers management 
+   5           *
+   6           * $Id: bmm.c,v 1.2 2014/11/11 14:52:58 ranjan Exp $
+   7           *
+   8           * Copyright (c) 2011, Greenvity Communication All rights reserved.
+   9           *
+  10           */
+  11          #ifdef HYBRII_802154
+  12          /* === Includes ============================================================ */
+  13          #include <stdio.h>
+  14          #include "papdef.h"
+  15          #include "bmm.h"
+  16          #include "qmm.h"
+  17          #include "fm.h"
+  18          
+  19          /* === Types =============================================================== */
+  20          
+  21          
+  22          /* === Macros ============================================================== */
+  23          
+  24          /* === Globals ============================================================= */
+  25          
+  26          /**
+  27           * Common Buffer pool holding the buffer user area
+  28           */
+  29          static xdata uint8_t buf_pool[(TOTAL_NUMBER_OF_BUFFERS * BUFFER_SIZE)];
+  30          /*
+  31           * Array of buffer headers
+  32           */
+  33          static xdata buffer_t buf_header[TOTAL_NUMBER_OF_BUFFERS];
+  34          
+C51 COMPILER V9.53.0.0   BMM                                                               11/04/2015 20:09:51 PAGE 2   
+
+  35          /*
+  36           * Queue of buffers
+  37           */
+  38          static queue_t free_buffer_q;
+  39          
+  40          /* === Prototypes ========================================================== */
+  41          
+  42          
+  43          /* === Implementation ====================================================== */
+  44          
+  45          /**
+  46           * bmm_buffer_init.
+  47           *
+  48           * This function initializes the buffer module.
+  49           * This function should be called before using any other functionality
+  50           * of buffer module.
+  51           */
+  52          void bmm_buffer_init (void)
+  53          {
+  54   1          uint8_t index;
+  55   1      
+  56   1          /* Initialize free buffer queue */
+  57   1          qmm_queue_init(&free_buffer_q, TOTAL_NUMBER_OF_BUFFERS);
+  58   1      
+  59   1          for (index = 0; index < TOTAL_NUMBER_OF_BUFFERS; index++) {
+  60   2              /*
+  61   2               * Initialize the buffer body pointer with address of the
+  62   2               * buffer body
+  63   2               */
+  64   2              buf_header[index].body = buf_pool + (index * BUFFER_SIZE);
+  65   2      
+  66   2              /* Append the buffer to free large buffer queue */
+  67   2              qmm_queue_append(&free_buffer_q, &buf_header[index]);
+  68   2          }
+  69   1      }
+  70          
+  71          
+  72          /**
+  73           * This function allocates a buffer and returns a pointer to the buffer.
+  74           * The same pointer should be used while freeing the buffer.User should
+  75           * call BMM_BUFFER_POINTER(buf) to get the pointer to buffer user area.
+  76           *
+  77           * size: size of buffer to be allocated.
+  78           *
+  79           * return pointer to the buffer allocated, NULL if buffer not available.
+  80           */
+  81          
+  82          u8 buffCount=0;
+  83           
+  84          buffer_t *bmm_buffer_alloc (uint8_t size)
+  85          {
+  86   1          buffer_t *buffer_p = NULL;
+  87   1      
+  88   1          /*
+  89   1           * Allocate buffer only if size requested is less than or equal to  maximum
+  90   1           * size that can be allocated.
+  91   1           */
+  92   1          if (size <= BUFFER_SIZE) {
+  93   2              buffer_p = qmm_queue_remove(&free_buffer_q, NULL);
+  94   2          }
+  95   1        
+  96   1        if(buffer_p)
+C51 COMPILER V9.53.0.0   BMM                                                               11/04/2015 20:09:51 PAGE 3   
+
+  97   1        {
+  98   2          buffCount++;
+  99   2          FM_Printf(FM_APP, "\nba1.2 %bu", buffCount);      
+ 100   2        }
+ 101   1        else
+ 102   1        {
+ 103   2          FM_Printf(FM_APP, "\nba1.3 %bu", buffCount);
+ 104   2        }
+ 105   1          return buffer_p;
+ 106   1      }
+ 107          
+ 108          
+ 109          /**
+ 110           * Frees up a buffer.
+ 111           *
+ 112           * This function frees up a buffer. The pointer passed to this function
+ 113           * should be the pointer returned during buffer allocation. The result is
+ 114           * unpredictable if an incorrect pointer is passed.
+ 115           *
+ 116           * pbuffer Pointer to buffer that has to be freed.
+ 117           */
+ 118          void bmm_buffer_free (buffer_t *buffer_p)
+ 119          {
+ 120   1          if (NULL == buffer_p) {
+ 121   2              /* If the buffer pointer is NULL abort free operation */
+ 122   2              return;
+ 123   2          }
+ 124   1      
+ 125   1          /* Append the buffer into free large buffer queue */
+ 126   1        buffCount--;
+ 127   1        FM_Printf(FM_APP, "\nba1.4:%bu", buffCount);
+ 128   1          qmm_queue_append(&free_buffer_q, buffer_p);
+ 129   1      }
+ 130          #endif //HYBRII_802154
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    269    ----
+   CONSTANT SIZE    =     33    ----
+   XDATA SIZE       =   3177       7
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

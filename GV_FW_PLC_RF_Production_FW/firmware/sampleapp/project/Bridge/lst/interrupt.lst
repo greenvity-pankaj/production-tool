@@ -1,0 +1,108 @@
+C51 COMPILER V9.53.0.0   INTERRUPT                                                         11/04/2015 20:09:37 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE INTERRUPT
+OBJECT MODULE PLACED IN .\obj\interrupt.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\common\interrupt.c LARGE OBJECTADVANCED OPTIMIZE(9,
+                    -SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\
+                    -..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\ha
+                    -l;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\fir
+                    -mware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee
+                    -;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc
+                    -;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\in
+                    -c;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;.
+                    -.\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\
+                    -hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\
+                    -..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\c
+                    -omponents\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\
+                    -flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities
+                    -;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nw
+                    -k\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\
+                    -..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_
+                    -8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,
+                    -UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETE
+                    -CT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT
+                    -,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGI
+                    -STER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\interrupt.lst) TABS(2)
+                    - OBJECT(.\obj\interrupt.obj)
+
+line level    source
+
+   1          /*
+   2          * $Id: interrupt.c,v 1.2 2014/11/11 14:52:56 ranjan Exp $
+   3          *
+   4          * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/common/interrupt.c,v $
+   5          * 
+   6          * Description  : Common Interrupt routine module.
+   7          * 
+   8          * Copyright (c) 2010-2013 Greenvity Communications, Inc.
+   9          * All rights reserved.
+  10          *
+  11          * Purpose      :
+  12          *     The files serves the purpose of placing all system 
+  13          *     interrupt routines in a consolidate place so that 
+  14          *     they can be placed in the common bank.
+  15          *     Additionally implements Ext Int 0 ISR and Timer1 ISR.
+  16          *
+  17          */
+  18          #include "papdef.h"
+  19          #include "timer.h"
+  20          #include "list.h"
+  21          #include "stm.h"
+  22          
+  23          extern volatile sStm Stm;
+  24          extern void CHAL_IncTimerIntCnt();
+  25          extern u32 gtimer2, gtimer1;
+  26          #ifndef UART_HOST_INTF
+              void timer_handler (void) using 2 //__INTERRUPT1__   //[YM] For Hybrii_B ASIC SPI TEST
+              {
+              #if 1
+                Stm.timeTick++;
+              #else
+                  //Increment the software time tick
+                  if(Stm.timeTick == STM_TIME_TICK_MAX)
+                  {
+C51 COMPILER V9.53.0.0   INTERRUPT                                                         11/04/2015 20:09:37 PAGE 2   
+
+                      Stm.timeSector = !Stm.timeSector;
+                      Stm.timeTick = 0;
+                      
+                  }
+                  else
+                  {
+                      Stm.timeTick++;
+                  }
+                  //CHAL_IncTimerIntCnt();
+              #ifndef RTX51_TINY_OS
+                  /* reload timer register */
+                  TH0 = HYBRII_MSTIMER25MHZ_HI;
+                  TL0 = HYBRII_MSTIMER25MHZ_LO;
+              #endif
+                  
+              
+              #endif
+              #ifdef HPGP_HAL_TEST
+                   CHAL_IncTimerIntCnt();
+                    gtimer2++;
+                    gtimer1++;
+              #endif
+              }
+              #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   ----    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

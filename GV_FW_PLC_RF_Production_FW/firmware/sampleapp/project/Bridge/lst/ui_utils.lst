@@ -1,0 +1,386 @@
+C51 COMPILER V9.53.0.0   UI_UTILS                                                          11/04/2015 20:09:41 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE UI_UTILS
+OBJECT MODULE PLACED IN .\obj\ui_utils.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\common\ui_utils.c LARGE OBJECTADVANCED OPTIMIZE(9,S
+                    -IZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\.
+                    -.\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\hal
+                    -;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\firm
+                    -ware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee;
+                    -..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;
+                    -..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\inc
+                    -;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;..
+                    -\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\h
+                    -pgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\.
+                    -.\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\co
+                    -mponents\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\f
+                    -lash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities;
+                    -..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nwk
+                    -\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\.
+                    -.\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8
+                    -051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,U
+                    -M,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETEC
+                    -T,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT,
+                    -MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGIS
+                    -TER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\ui_utils.lst) TABS(2) O
+                    -BJECT(.\obj\ui_utils.obj)
+
+line level    source
+
+   1          #include <stdio.h>
+   2          #include "papdef.h"
+   3          #include "hal_common.h"
+   4          #include "hal_eth.h"
+   5          #include "uart.h"
+   6          #include "utils_fw.h"
+   7          
+   8          void ui_utils_cmd_spi (char* cmd_buf_p)        
+   9          {
+  10   1          u16  spi_addr;
+  11   1          u16  spi_data;                 
+  12   1        char action;
+  13   1      
+  14   1          if (sscanf(cmd_buf_p+1, "%c", &action) < 1) {
+  15   2              return;
+  16   2          }    
+  17   1       
+  18   1          if (action == 'w' || action == 'W') {
+  19   2              if (sscanf(cmd_buf_p+2, "%x %x", &spi_addr, &spi_data) < 2) {
+  20   3                  return;
+  21   3              }
+  22   2      
+  23   2              mac_utils_spi_write(spi_addr, spi_data);
+  24   2      
+  25   2              printf("    SPI:  %03X --> [%02X]\n\n", spi_data, spi_addr);
+  26   2        } else if (action == 'r' || action == 'R') {
+  27   2              if (sscanf(cmd_buf_p+2, "%x", &spi_addr) < 1) {
+  28   3                  return;
+  29   3              }
+  30   2      
+  31   2              spi_data = mac_utils_spi_read(spi_addr);
+  32   2      
+  33   2              printf("    SPI:  %03X --> [%02X]\n\n", spi_data, spi_addr);
+  34   2          }
+C51 COMPILER V9.53.0.0   UI_UTILS                                                          11/04/2015 20:09:41 PAGE 2   
+
+  35   1      }
+  36          #ifdef UM
+  37          u8 ui_utils_cmd_get_poll(u8 *cmd_buf_p, u8 max_cmd_buff_size)
+  38          {
+  39   1          char  c;
+  40   1          static u8    idx = 0;
+  41   1      
+  42   1          //while (1) 
+  43   1        {
+  44   2      #if 0
+                      c = _getkey_poll();
+              #else
+  47   2          {
+  48   3           c = 0xee;
+  49   3      
+  50   3          //   do
+  51   3          //   {
+  52   3          if (RI == 0) 
+  53   3          {
+  54   4            c = 0xee;
+  55   4          }
+  56   3          else
+  57   3          {
+  58   4            RI = 0;
+  59   4              c = SBUF;
+  60   4      
+  61   4            if (c == 0x11)
+  62   4            {
+  63   5              
+  64   5              c = 0xee;
+  65   5            }
+  66   4            
+  67   4          }
+  68   3      
+  69   3          }
+  70   2      
+  71   2      #endif
+  72   2              switch (c) 
+  73   2          {
+  74   3          case 0xee:
+  75   3            return 0;
+  76   3          break;
+  77   3          
+  78   3              case '\b':    // backspace
+  79   3                  if (idx > 0) {
+  80   4                      printf("\b \b");
+  81   4                      idx--;
+  82   4                  }
+  83   3            return 0;
+  84   3                  break;
+  85   3      
+  86   3              case 0x1B:    // ESC
+  87   3              case '`':
+  88   3                  *cmd_buf_p = 0;
+  89   3            idx = 0;
+  90   3                  printf("\n");
+  91   3                  return 0;
+  92   3                  break;
+  93   3      
+  94   3              
+  95   3              case '\r':    // enter
+  96   3              case '\n':
+C51 COMPILER V9.53.0.0   UI_UTILS                                                          11/04/2015 20:09:41 PAGE 3   
+
+  97   3                         printf(" \n");
+  98   3                         if (idx == 0)
+  99   3                         {
+ 100   4                             *cmd_buf_p = 0;
+ 101   4                             printf("> ");
+ 102   4                   return 0;
+ 103   4                             break;
+ 104   4                         }
+ 105   3                         
+ 106   3                         while (idx < max_cmd_buff_size) {
+ 107   4                             *(cmd_buf_p + idx++) = 0;
+ 108   4                         }
+ 109   3      
+ 110   3                 idx = 0;
+ 111   3                         return 1;
+ 112   3              
+ 113   3      
+ 114   3              default:
+ 115   3                  if (idx < max_cmd_buff_size) {
+ 116   4                      *(cmd_buf_p + idx) = c;
+ 117   4              #if 0
+                              putchar(*(cmd_buf_p + idx++));
+                      #else
+ 120   4              {
+ 121   5                char c = *(cmd_buf_p + idx++);
+ 122   5                
+ 123   5                if (c == '\n')  
+ 124   5                {
+ 125   6                  TI = 0;
+ 126   6                  SBUF = '\r';    // output CR before LF
+ 127   6                  while (TI == 0);
+ 128   6                  TI = 0;
+ 129   6                }
+ 130   5                TI = 0;
+ 131   5                SBUF = c;    // output CR before LF
+ 132   5                while (TI == 0);
+ 133   5                TI = 0;
+ 134   5                     
+ 135   5              }
+ 136   4      
+ 137   4              #endif
+ 138   4                  }
+ 139   3            return 0;
+ 140   3                  break;
+ 141   3              }
+ 142   2          }
+ 143   1        
+ 144   1      }
+ 145          #else
+              void ui_utils_cmd_get (u8 *cmd_buf_p, u8 max_cmd_buff_size)
+              {
+                  char  c;
+                  u8    idx = 0;
+              
+                  while (1) {
+                      c = _getkey();
+              
+                      switch (c) {
+                      case '\b':    // backspace
+                          if (idx > 0) {
+                              printf("\b \b");
+                              idx--;
+C51 COMPILER V9.53.0.0   UI_UTILS                                                          11/04/2015 20:09:41 PAGE 4   
+
+                          }
+                          break;
+              
+                      case 0x1B:    // ESC
+                      case '`':
+                          *cmd_buf_p = 0;
+                          printf("\n");
+                          return;
+                          break;
+              
+                      
+                      case '\r':    // enter
+                      case '\n':
+                                 printf(" \n");
+                                 if (idx == 0)
+                                 {
+                                     *cmd_buf_p = 0;
+                                     printf("> ");
+                                     break;
+                                 }
+                                 
+                                 while (idx < max_cmd_buff_size) {
+                                     *(cmd_buf_p + idx++) = 0;
+                                 }
+                                 return;
+                      
+              
+                      default:
+                          if (idx < max_cmd_buff_size) {
+                              *(cmd_buf_p + idx) = c;
+                              putchar(*(cmd_buf_p + idx++));
+                          }
+                          break;
+                      }
+                  }
+              }
+              #endif
+ 196          void ui_utils_reg_read (uint8_t *cmd_buf_p)
+ 197          {
+ 198   1          u32 reg_addr;
+ 199   1          u8  reg_type;
+ 200   1      
+ 201   1          if (sscanf(cmd_buf_p+1, "%c", &reg_type) < 1) {
+ 202   2              return;         
+ 203   2          }
+ 204   1      
+ 205   1          // U32 reg read
+ 206   1          if (reg_type == 'w' || reg_type == 'W') {                    
+ 207   2              if (sscanf(cmd_buf_p+2, "%lx", &reg_addr) < 1) {
+ 208   3                  return;
+ 209   3              }
+ 210   2              printf("    RegRd:  [0x%08lX] --> 0x%08lX\n\n", 
+ 211   2                     reg_addr, hal_common_reg_32_read(reg_addr));
+ 212   2        } else if (reg_type == 'b' || reg_type == 'B') {   
+ 213   2              if (sscanf(cmd_buf_p+2, "%lx", &reg_addr) < 1) {
+ 214   3                  return;
+ 215   3              }
+ 216   2              printf("    RegRd:  [0x%08lX] --> 0x%02bX\n\n", 
+ 217   2                     reg_addr, ReadU8Reg(reg_addr));
+ 218   2          } else if (reg_type == 'e' || reg_type == 'E') {
+ 219   2      #ifdef HYBRII_ETH
+                      // Ethernet Registers                                     
+C51 COMPILER V9.53.0.0   UI_UTILS                                                          11/04/2015 20:09:41 PAGE 5   
+
+                      u8 mac_or_phy;
+                      u8 byte_reg_addr;
+              
+                      if (sscanf(cmd_buf_p+2, "%c", &mac_or_phy) < 1) {
+                          return;
+                      }
+                      if (sscanf(cmd_buf_p+3, "%bx", &byte_reg_addr) < 1) {
+                          return;
+                      }
+              
+                      // Ethernet MAC reg read
+                      if (mac_or_phy == 'm' || mac_or_phy == 'M') {
+                          printf("    RegRd:  [0x%02bX] --> 0x%02bX\n\n", 
+                                 byte_reg_addr, 
+                                 ReadU8Reg(ETHMAC_REGISTER_BASEADDR+byte_reg_addr));
+                      } else if (mac_or_phy == 's' || mac_or_phy == 'S') {
+                          // Ethernet MAC Statistucs reg read       
+              #ifdef HYBRII_ETH            
+                          printf("    RegRd:  [0x%02bX] --> %08lu\n\n", 
+                                 byte_reg_addr, rtocl(EHAL_ReadEthStatReg(byte_reg_addr)));
+              #endif
+                      } else if (mac_or_phy == 'p' || mac_or_phy == 'P')  {
+                          // Ethernet PHY reg read
+                          u16 reg_data;
+                          if (EHAL_EthPhyRegOp(gEthHalCB.phyChipAddr, 
+                                              byte_reg_addr & 0x1F, &reg_data, RD) == STATUS_SUCCESS) {
+                        printf("    RegRd:  [0x%02bX] --> 0x%04X\n\n", byte_reg_addr, rtocs(reg_data));       
+                          } else {
+                              printf (" Eth Phy Reg Read Err\n");
+                          }                
+                      }
+              #endif
+ 253   2          }
+ 254   1      }
+ 255          
+ 256          void ui_utils_reg_write (u8 *cmd_buf_p)
+ 257          {
+ 258   1          u32  reg_addr;                 
+ 259   1        char reg_type;
+ 260   1      
+ 261   1          if (sscanf(cmd_buf_p+1, "%c", &reg_type) < 1) {
+ 262   2              return;    
+ 263   2          }
+ 264   1      
+ 265   1          // U32 reg write
+ 266   1          if (reg_type == 'w' || reg_type == 'W') {
+ 267   2              u32 reg_data;
+ 268   2              if (sscanf(cmd_buf_p+2, "%lx %lx", &reg_addr, &reg_data) < 2) {
+ 269   3                  return;
+ 270   3              }
+ 271   2              hal_common_reg_32_write(reg_addr, reg_data);
+ 272   2              printf("    RegWr:  [0x%08lX] <-- 0x%08lX\n\n", reg_addr, reg_data);
+ 273   2          } else if(reg_type == 'b' || reg_type == 'B') {
+ 274   2              u8 reg_data;
+ 275   2              if (sscanf(cmd_buf_p+2, "%lx %bx", &reg_addr, &reg_data) < 2) {
+ 276   3                  return;
+ 277   3              }
+ 278   2              WriteU8Reg(reg_addr, reg_data);
+ 279   2              printf("    RegWr:  [0x%08lX] <-- 0x%02bX\n\n", reg_addr, reg_data);
+ 280   2          } else if(reg_type == 'e' || reg_type == 'E') {
+ 281   2      #ifdef HYBRII_ETH
+                      // Ethernet reg write
+C51 COMPILER V9.53.0.0   UI_UTILS                                                          11/04/2015 20:09:41 PAGE 6   
+
+                      u8 mac_or_phy;
+                      u8 byte_reg_addr;
+              
+                      if (sscanf(cmd_buf_p+2, "%c", &mac_or_phy) < 1) {
+                          return;
+                      }
+                      if (sscanf(cmd_buf_p+3, "%bx", &byte_reg_addr) < 1) {
+                          return;
+                      }
+                      // Ethernet MAC reg write
+                      if (mac_or_phy == 'm' || mac_or_phy == 'M') {
+                          u8 reg_data;
+                          if (sscanf(cmd_buf_p+4, "%bx", &reg_data) < 1) {
+                              return;
+                          }
+                          WriteU8Reg(ETHMAC_REGISTER_BASEADDR+byte_reg_addr, reg_data);
+                    printf("    RegWr:  [0x%02bX] <-- 0x%02bX\n\n", byte_reg_addr, reg_data);
+                      }  else if(mac_or_phy == 'p' || mac_or_phy == 'P') {
+                          // Ethernet PHY reg read
+                          u16 reg_data;
+                          if (sscanf(cmd_buf_p+4, "%x", &reg_data) < 1) {
+                              return;
+                          }
+                          if (EHAL_EthPhyRegOp(gEthHalCB.phyChipAddr, byte_reg_addr&0x1F, &reg_data, WR) == STATUS_SUCCE
+             -SS) {
+                        printf("    RegWr:  [0x%02bX] <-- 0x%04X\n\n", byte_reg_addr, reg_data);
+                          } else {
+                              printf (" Eth Phy Reg Write Err\n");
+                          }                     
+                      }
+              #endif
+ 313   2          }
+ 314   1      }
+ 315          
+ 316          bool abort (void)
+ 317          {
+ 318   1          char c;
+ 319   1      
+ 320   1          c = _getchar();
+ 321   1      
+ 322   1          if (c != 0) {
+ 323   2              printf("\nUser aborted test");
+ 324   2              return (TRUE);
+ 325   2          }
+ 326   1          return (FALSE);
+ 327   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1408    ----
+   CONSTANT SIZE    =    235    ----
+   XDATA SIZE       =      1      34
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

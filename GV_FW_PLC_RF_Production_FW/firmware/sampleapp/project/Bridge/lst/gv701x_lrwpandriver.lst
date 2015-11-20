@@ -1,0 +1,1637 @@
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE GV701X_LRWPANDRIVER
+OBJECT MODULE PLACED IN .\obj\gv701x_lrwpandriver.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\components\drivers\ieee802154\src\gv701x_lrwpandriver.c LARG
+                    -E OBJECTADVANCED OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmw
+                    -are\common\include;..\..\..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\.
+                    -.\..\..\firmware\hpgp\src\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\
+                    -hpgp\src\nma;..\..\..\..\firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src
+                    -;..\..\..\..\firmware\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\co
+                    -mponents\utilities\event\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..
+                    -\..\..\..\components\hpgp\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\
+                    -..\..\firmware\app_support;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\
+                    -..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\in
+                    -c;..\..\..\..\components;..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\
+                    -ieee802154\inc;..\..\..\..\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\
+                    -..\..\..\components\drivers\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\.
+                    -.\..\..\components\utilities;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..
+                    -\..\..\components\drivers\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampl
+                    -eapp\src;..\..\inc;..\..\..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inlin
+                    -e,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYN
+                    -C,HPGP_MAC_SAP,NMA,NEW_SYNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY
+                    -_,BB_GAIN_TABLE,B2,FREQ_DETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_H
+                    -OST_INTF,UART_GPIO_INTERRUPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_
+                    -APP,ROUTE_APP,RTOPO_APP,REGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(
+                    -.\lst\gv701x_lrwpandriver.lst) TABS(2) OBJECT(.\obj\gv701x_lrwpandriver.obj)
+
+line level    source
+
+   1          /* ========================================================
+   2           *
+   3           * @file:  gv701x_lrwpandriver.c
+   4           * 
+   5           * @brief: This file governs and maintains the IEEE 802.15.4 link
+   6           *      
+   7           *  Copyright (C) 2010-2015, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * =========================================================*/
+  11          
+  12          #ifdef LRWPAN_DRIVER_APP
+  13          
+  14          /****************************************************************************** 
+  15            * Includes
+  16            ******************************************************************************/
+  17            
+  18          #include <stdio.h>
+  19          #include <string.h>
+  20          #include <stdlib.h>
+  21          #include "gv701x_includes.h"
+  22          #include "gv701x_lrwpandriver.h"
+  23          #ifdef ROUTE_APP
+  24          #include "route.h"
+  25          #endif
+  26          
+  27          /****************************************************************************** 
+  28            * Global Data
+  29            ******************************************************************************/
+  30          
+  31          lrwpan_db_t lrwpan_db;
+  32          gv701x_state_t lrwpan_state;
+  33          
+  34          /****************************************************************************** 
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 2   
+
+  35            * Local Data
+  36            ******************************************************************************/  
+  37            
+  38          /****************************************************************************** 
+  39            * External Data
+  40            ******************************************************************************/
+  41          
+  42          /******************************************************************************
+  43            * External Funtion prototypes
+  44            ******************************************************************************/
+  45          
+  46          /******************************************************************************
+  47            * Funtion prototypes
+  48            ******************************************************************************/
+  49            
+  50          static void lrwpan_device_config(void); 
+  51          static void lrwpan_device_start(void);
+  52          void GV701x_LrwpanDriverFlush(void);
+  53          
+  54          void lrwpan_SendAssocRsp(uint64_t DeviceAddress,
+  55                                       uint16_t AssocShortAddress,
+  56                                       uint8_t status,
+  57                                       security_info_t *sec_p);
+  58          
+  59          void lrwpan_SendScanReq(uint8_t ScanType,
+  60                                      uint32_t ScanChannels,
+  61                                      uint8_t ScanDuration,
+  62                                      uint8_t ChannelPage,
+  63                                      security_info_t *sec_p);
+  64          
+  65          void lrwpan_SendAssocReq(uint8_t LogicalChannel,
+  66                                           uint8_t ChannelPage,
+  67                                           wpan_addr_spec_t *CoordAddrSpec_p,
+  68                                           uint8_t CapabilityInformation,
+  69                                           security_info_t *sec_p);
+  70          
+  71          void lrwpan_SendStartReq(uint16_t PANId,
+  72                                        uint8_t LogicalChannel,
+  73                                        uint8_t ChannelPage,
+  74                                        uint32_t StartTime,
+  75                                        uint8_t BeaconOrder,
+  76                                        uint8_t SuperframeOrder,
+  77                                        bool PANCoordinator,
+  78                                        bool BatteryLifeExtension,
+  79                                        bool CoordRealignment,
+  80                                        security_info_t *CoordRealignmentSecurity_p,
+  81                                        security_info_t *BeaconSecurity_p);
+  82          
+  83          void lrwpan_SendResetReq(uint8_t SetDefaultPIB);
+  84          
+  85          void GV701x_LrwpanScanInd(uint8_t* ind);
+  86          
+  87          void GV701x_LrwpanBcnUpdate(mlme_beacon_notify_ind_t* bcn_ind);
+  88          
+  89          
+  90          /******************************************************************************
+  91           * @fn      GV701x_LrwpanDriverInit
+  92           *
+  93           * @brief   Initializes the LRWPAN driver
+  94           *
+  95           * @param   app_id - application identification number
+  96           *
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 3   
+
+  97           * @return  none
+  98           */
+  99          
+ 100          void GV701x_LrwpanDriverInit(u8 app_id)
+ 101          {
+ 102   1        u8* macaddr;
+ 103   1        mlme_set_req_t mlme_set;
+ 104   1        mlme_set.cmdcode = MLME_SET_REQUEST;
+ 105   1        mlme_set.PIBAttributeIndex = 0; 
+ 106   1      
+ 107   1        memset(&lrwpan_db, 0x00, sizeof (lrwpan_db_t));
+ 108   1        
+ 109   1        /*Record the applications id,will 
+ 110   1         be used while allocating timers*/
+ 111   1        lrwpan_db.app_id = app_id;  
+ 112   1        SLIST_Init(&lrwpan_db.queues.appRxQueue);
+ 113   1        
+ 114   1        FM_Printf(FM_USER, "\nInit Lrwpan (app id %bu)", app_id);
+ 115   1        
+ 116   1        memcpy((u8*)&lrwpan_db.ieee_addr, (u8*)macaddr, MAC_ADDR_LEN);
+ 117   1      #if 0 
+                FM_HexDump(FM_APP, "MAC: ", (u8*)&lrwpan_db.ieee_addr, MAC_ADDR_LEN);     
+              #endif
+ 120   1        
+ 121   1        /*Initialize the state machine*/
+ 122   1        lrwpan_state.state = LRWPAN_IDLE;
+ 123   1        lrwpan_state.event = LRWPAN_IDLE_EVNT;
+ 124   1        lrwpan_state.statedata = NULL;
+ 125   1        lrwpan_state.statedatalen = 0;  
+ 126   1      
+ 127   1        
+ 128   1        lrwpan_db.dev = COORDINATOR; 
+ 129   1        lrwpan_db.scan.time = 5;    
+ 130   1        lrwpan_db.scan.type = MLME_SCAN_TYPE_ACTIVE;    
+ 131   1        lrwpan_db.panid = LRWPAN_PANID; 
+ 132   1        lrwpan_db.scan.ch_mask = LRWPAN_CHANNEL_MASK; 
+ 133   1        lrwpan_db.channel = LRWPAN_CHANNEL;
+ 134   1        lrwpan_db.scan.active = FALSE;
+ 135   1        lrwpan_db.start.active = FALSE; 
+ 136   1        lrwpan_db.cfg.active = FALSE;
+ 137   1        lrwpan_db.cfg.params = 0xFF;
+ 138   1      
+ 139   1        /* Allocate Start timer */
+ 140   1        lrwpan_db.start.timer = STM_AllocTimer(SW_LAYER_TYPE_APP, 
+ 141   1                              LRWPAN_START_TIMEOUT_EVT, 
+ 142   1                              &lrwpan_db.app_id); 
+ 143   1        /* Allocate Profile timer */
+ 144   1        lrwpan_db.profile_timer = STM_AllocTimer(SW_LAYER_TYPE_APP, 
+ 145   1                              LRWPAN_PROFILE_TIMEOUT_EVT, 
+ 146   1                              &lrwpan_db.app_id); 
+ 147   1      
+ 148   1        srand(TL0);
+ 149   1        lrwpan_db.short_addr = (u16)rand();   
+ 150   1      #ifndef OLD_SCAN  
+ 151   1        lrwpan_device_config();
+ 152   1      #else
+                lrwpan_db.auto_request = TRUE;
+                mlme_set.PIBAttribute = macAutoRequest;       
+                memcpy((u8*)&mlme_set.PIBAttributeValue, &lrwpan_db.auto_request, sizeof(uint8_t));   
+                GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+                        EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, sizeof(mlme_set_req_t), 0);
+              #endif  
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 4   
+
+ 159   1      }
+ 160          
+ 161          /******************************************************************************
+ 162           * @fn      GV701x_LrwpanDriverStart
+ 163           *
+ 164           * @brief   Starts the LRWPAN driver
+ 165           *
+ 166           * @param   app_id - application identification number
+ 167           *
+ 168           * @return  none
+ 169           */
+ 170          
+ 171          void GV701x_LrwpanDriverStart(void)
+ 172          { 
+ 173   1        lrwpan_state.state = LRWPAN_START;  
+ 174   1      
+ 175   1        /*Start profile timeout timer*/
+ 176   1        STM_StopTimer(lrwpan_db.profile_timer);
+ 177   1        STM_StopTimer(lrwpan_db.start.timer); 
+ 178   1        STM_StartTimer(lrwpan_db.profile_timer, LRWPAN_PROFILE_TIME);
+ 179   1        STM_StartTimer(lrwpan_db.start.timer, LRWPAN_START_TIME);
+ 180   1        
+ 181   1      }
+ 182          
+ 183          /******************************************************************************
+ 184           * @fn      lrwpan_set_shortaddr
+ 185           *
+ 186           * @brief   Sets the IEEE802.15.4 short address
+ 187           *
+ 188           * @param   addr - short address
+ 189           *
+ 190           * @return  none
+ 191           */
+ 192          
+ 193          void lrwpan_set_shortaddr(uint16_t addr)
+ 194          {
+ 195   1        mlme_set_req_t mlme_set;
+ 196   1        mlme_set.cmdcode = MLME_SET_REQUEST;
+ 197   1        mlme_set.PIBAttributeIndex = 0;
+ 198   1      
+ 199   1        lrwpan_db.short_addr = addr;
+ 200   1        mlme_set.PIBAttribute = macShortAddress;    
+ 201   1        memcpy((u8*)&mlme_set.PIBAttributeValue, &lrwpan_db.short_addr, sizeof(uint16_t));                
+ 202   1        GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 203   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, sizeof(mlme_set_req_t), 0);
+ 204   1      }
+ 205          
+ 206          /******************************************************************************
+ 207           * @fn      lrwpan_device_config
+ 208           *
+ 209           * @brief   Configures all the PIB's required to instantiate the device
+ 210           *
+ 211           * @param   none
+ 212           *
+ 213           * @return  none
+ 214           */
+ 215          
+ 216          static void lrwpan_device_config(void) 
+ 217          {
+ 218   1        mlme_set_req_t mlme_set;
+ 219   1        mlme_set.cmdcode = MLME_SET_REQUEST;
+ 220   1        mlme_set.PIBAttributeIndex = 0; 
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 5   
+
+ 221   1      
+ 222   1        if(lrwpan_db.dev == COORDINATOR)
+ 223   1        {
+ 224   2          uint16_t panid = 0;
+ 225   2          uint8_t seq = 0x84;
+ 226   2          bool pan_coord = TRUE;    
+ 227   2          uint8_t association_permit;
+ 228   2          uint8_t beacon_payload_len = 10;    
+ 229   2          uint8_t beacon_payload[10];
+ 230   2          
+ 231   2          mlme_set.PIBAttribute = macPANId;       
+ 232   2          
+ 233   2          memcpy((u8*)&mlme_set.PIBAttributeValue, &lrwpan_db.panid, sizeof(uint16_t));   
+ 234   2          GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 235   2                  EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, sizeof(mlme_set_req_t), 0);     
+ 236   2          
+ 237   2          mlme_set.PIBAttribute = macIeeeAddress;   
+ 238   2          memcpy((u8*)&mlme_set.PIBAttributeValue, &lrwpan_db.ieee_addr, sizeof(uint64_t));     
+ 239   2          GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 240   2                  EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, sizeof(mlme_set_req_t), 0);
+ 241   2      #ifndef OLD_SCAN
+ 242   2          mlme_set.PIBAttribute = phyCurrentChannel;    
+ 243   2          memcpy((u8*)&mlme_set.PIBAttributeValue, &lrwpan_db.channel, sizeof(uint8_t));          
+ 244   2          GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 245   2                  EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, sizeof(mlme_set_req_t), 0);
+ 246   2      #endif    
+ 247   2              
+ 248   2          mlme_set.PIBAttribute = macShortAddress;    
+ 249   2          memcpy((u8*)&mlme_set.PIBAttributeValue, &lrwpan_db.short_addr, sizeof(uint16_t));                
+ 250   2          GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 251   2                    EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, sizeof(mlme_set_req_t), 0);
+ 252   2          association_permit = PERMIT_ASSOCIATION;      
+ 253   2      
+ 254   2          mlme_set.PIBAttribute = macAssociationPermit;   
+ 255   2          memcpy((u8*)&mlme_set.PIBAttributeValue, &association_permit, sizeof(uint8_t));               
+ 256   2          GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 257   2                    EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, sizeof(mlme_set_req_t), 0);     
+ 258   2      
+ 259   2          mlme_set.PIBAttribute = macBeaconPayloadLength;   
+ 260   2          memcpy((u8*)&mlme_set.PIBAttributeValue, &beacon_payload_len, sizeof(uint8_t));                     
+ 261   2          GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 262   2                    EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, sizeof(mlme_set_req_t), 0);
+ 263   2      
+ 264   2          mlme_set.PIBAttribute = macBeaconPayload;   
+ 265   2          memcpy(beacon_payload, (u8*)&lrwpan_db.ieee_addr, MAC_ADDR_LEN);    
+ 266   2          memcpy((u8*)&mlme_set.PIBAttributeValue, beacon_payload, beacon_payload_len);                     
+ 267   2          GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 268   2                    EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, 
+ 269   2                    sizeof(mlme_set_req_t) - sizeof(pib_value_t) + beacon_payload_len, 0);
+ 270   2      
+ 271   2          mlme_set.PIBAttribute = macBSN;
+ 272   2          memcpy((u8*)&mlme_set.PIBAttributeValue, &seq, sizeof(uint8_t));      
+ 273   2          GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 274   2                    EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, sizeof(mlme_set_req_t), 0); 
+ 275   2        }
+ 276   1      }
+ 277          
+ 278          /******************************************************************************
+ 279           * @fn      lrwpan_device_start
+ 280           *
+ 281           * @brief   Start the device
+ 282           *
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 6   
+
+ 283           * @param   device_type - ROUTER or COORDINATOR
+ 284           *
+ 285           * @return  none
+ 286           */
+ 287          
+ 288          static void lrwpan_device_start(void)
+ 289          {
+ 290   1        if(lrwpan_state.state != LRWPAN_START)
+ 291   1          return;
+ 292   1      
+ 293   1        if(lrwpan_db.dev == ROUTER) 
+ 294   1        { 
+ 295   2          /*Scan the network*/
+ 296   2          lrwpan_SendScanReq(MLME_SCAN_TYPE_ACTIVE, lrwpan_db.scan.ch_mask, 
+ 297   2              lrwpan_db.scan.time, 0, NULL);
+ 298   2        }
+ 299   1        else if(lrwpan_db.dev == COORDINATOR) 
+ 300   1        {         
+ 301   2          security_info_t CoordRealignmentSecurity;
+ 302   2          security_info_t BeaconSecurity;
+ 303   2            
+ 304   2          CoordRealignmentSecurity.SecurityLevel = 0;
+ 305   2          CoordRealignmentSecurity.KeyIdMode = 0x00;
+ 306   2          CoordRealignmentSecurity.KeySource[0] = 0x00;
+ 307   2          CoordRealignmentSecurity.KeySource[1] = 0x00;
+ 308   2          CoordRealignmentSecurity.KeySource[2] = 0x00;
+ 309   2          CoordRealignmentSecurity.KeySource[3] = 0x00;
+ 310   2          CoordRealignmentSecurity.KeySource[4] = 0x00;
+ 311   2          CoordRealignmentSecurity.KeySource[5] = 0x00;
+ 312   2          CoordRealignmentSecurity.KeySource[6] = 0x00;
+ 313   2          CoordRealignmentSecurity.KeySource[7] = 0x00;
+ 314   2          CoordRealignmentSecurity.KeyIndex = 0x01;
+ 315   2          
+ 316   2          BeaconSecurity.SecurityLevel = 0;
+ 317   2          BeaconSecurity.KeyIdMode = 0x00;
+ 318   2          BeaconSecurity.KeySource[0] = 0x00;
+ 319   2          BeaconSecurity.KeySource[1] = 0x00;
+ 320   2          BeaconSecurity.KeySource[2] = 0x00;
+ 321   2          BeaconSecurity.KeySource[3] = 0x00;
+ 322   2          BeaconSecurity.KeySource[4] = 0x00;
+ 323   2          BeaconSecurity.KeySource[5] = 0x00;
+ 324   2          BeaconSecurity.KeySource[6] = 0x00;
+ 325   2          BeaconSecurity.KeySource[7] = 0x00;
+ 326   2          BeaconSecurity.KeyIndex = 0x01;
+ 327   2      
+ 328   2          /*Start the network on the specified PAN*/
+ 329   2          lrwpan_SendStartReq(lrwpan_db.panid, lrwpan_db.channel,
+ 330   2                    0, 0, 0x0F, 0x0F, 0, 0, 0,
+ 331   2                    &CoordRealignmentSecurity,
+ 332   2                                  &BeaconSecurity);     
+ 333   2        }
+ 334   1      }
+ 335          
+ 336          /******************************************************************************
+ 337           * @fn      GV701x_LrwpanDriverRxAppMsg
+ 338           *
+ 339           * @brief   Receives a message from another app/fw
+ 340           *
+ 341           * @params  msg_buf - message buffer
+ 342           *
+ 343           * @return  none
+ 344           */
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 7   
+
+ 345          
+ 346          void GV701x_LrwpanDriverRxAppMsg(sEvent* event)
+ 347          {
+ 348   1        gv701x_app_msg_hdr_t* msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;
+ 349   1        hostHdr_t* hybrii_hdr;
+ 350   1        hostEventHdr_t* evnt_hdr;
+ 351   1      
+ 352   1        hybrii_hdr = (hostHdr_t*)(msg_hdr + 1);
+ 353   1        
+ 354   1        if(msg_hdr->dst_app_id == lrwpan_db.app_id)
+ 355   1        {
+ 356   2          memcpy(&lrwpan_state.msg_hdr, msg_hdr, sizeof(gv701x_app_msg_hdr_t));
+ 357   2          lrwpan_state.eventproto = hybrii_hdr->protocol;
+ 358   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 359   2            (hybrii_hdr->type == EVENT_FRM_ID))
+ 360   2          {
+ 361   3            evnt_hdr = (hostEventHdr_t*)(hybrii_hdr + 1);
+ 362   3            lrwpan_state.event = evnt_hdr->type;    
+ 363   3            lrwpan_state.statedata = (u8*)(evnt_hdr + 1);
+ 364   3            lrwpan_state.statedatalen = (u16)(hybrii_hdr->length - sizeof(hostEventHdr_t));     
+ 365   3          }
+ 366   2          else
+ 367   2          {
+ 368   3            lrwpan_state.event = (u8)(*((u8*)(hybrii_hdr + 1)));
+ 369   3            lrwpan_state.statedata = (u8*)(hybrii_hdr + 1);
+ 370   3            lrwpan_state.statedatalen = (u16)hybrii_hdr->length;
+ 371   3          }   
+ 372   2          lrwpan_state.eventtype = hybrii_hdr->type;
+ 373   2          lrwpan_state.eventclass = event->eventHdr.eventClass;
+ 374   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 375   2            (hybrii_hdr->type == EVENT_FRM_ID) &&
+ 376   2            (lrwpan_state.event == HOST_EVENT_APP_TIMER))
+ 377   2          {     
+ 378   3            GV701x_LrwpanTimerHandler((u8*)(evnt_hdr + 1)); 
+ 379   3            return;
+ 380   3          }   
+ 381   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 382   2            (hybrii_hdr->type == EVENT_FRM_ID) &&
+ 383   2            (lrwpan_state.event == HOST_EVENT_APP_CMD))
+ 384   2          {     
+ 385   3            GV701x_LrwpanCmdProcess((char*)(evnt_hdr + 1)); 
+ 386   3            return;
+ 387   3          }       
+ 388   2        } 
+ 389   1        else if(msg_hdr->dst_app_id == APP_BRDCST_MSG_APPID)
+ 390   1        {
+ 391   2          u8 *event = (u8*)(hybrii_hdr + 1);
+ 392   2          return;
+ 393   2        }
+ 394   1        GV701x_LrwpanDriverSM(&lrwpan_state);
+ 395   1      }
+ 396          
+ 397          /******************************************************************************
+ 398           * @fn      lrwpan_mlme_assoc_ind
+ 399           *
+ 400           * @brief   Association Indication coming from a peer device 
+ 401           *
+ 402           * @param   address - the address of the device requesting association
+ 403           *      capability - the operational capabilities of the device requesting association
+ 404           *
+ 405           * @return  none
+ 406           */
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 8   
+
+ 407          
+ 408          void lrwpan_mlme_assoc_ind(uint8_t* buf)
+ 409          {
+ 410   1        mlme_associate_ind_t* AssocInd = (mlme_associate_ind_t* )buf;
+ 411   1      
+ 412   1        if(lrwpan_db.dev == COORDINATOR)
+ 413   1        {
+ 414   2          /*The command shall be ignored if association is not permitted*/
+ 415   2          if(!PERMIT_ASSOCIATION)
+ 416   2          {
+ 417   3            return;
+ 418   3          }
+ 419   2            
+ 420   2          if(lrwpan_state.state == LRWPAN_UP) 
+ 421   2          {
+ 422   3            uint16_t shortAddress;
+ 423   3            shortAddress = 0x1200;  
+ 424   3            /*Send Association Response*/
+ 425   3            lrwpan_SendAssocRsp(AssocInd->DeviceAddress, 
+ 426   3                      shortAddress, MAC_SUCCESS, NULL);
+ 427   3          }
+ 428   2        }
+ 429   1      }
+ 430          
+ 431          /******************************************************************************
+ 432           * @fn      lrwpan_mcps_data_ind
+ 433           *
+ 434           * @brief   Data coming from a peer device 
+ 435           *
+ 436           * @param   src_panid - the PAN Id of the originating device
+ 437           *      long_src_addr - the IEEE source address of the peer
+ 438           *      long_dst_addr - the IEEE destination address to which the frame was sent
+ 439           *      mpduLength - data length in bytes
+ 440           *      msdu - data
+ 441           *
+ 442           * @return  none
+ 443           */
+ 444           
+ 445          bool lrwpan_mcps_data_ind(uint8_t* buf)
+ 446          {
+ 447   1        mcps_data_ind1_t* DataInd = (mcps_data_ind1_t* )buf;
+ 448   1        
+ 449   1      #if 0 
+                if(lrwpan_state.state != LRWPAN_UP) 
+                {
+                  return FALSE;
+                }
+              #endif
+ 455   1      
+ 456   1        if(lrwpan_db.panid != DataInd->SrcPANId) 
+ 457   1        { 
+ 458   2          return FALSE;
+ 459   2        }
+ 460   1      
+ 461   1      #ifdef ROUTE_APP
+ 462   1        /*Data Handler of the Routing application*/
+ 463   1        route_handle_rx_from_ll((uint8_t*)(DataInd + 1), DataInd->msduLength, 
+ 464   1                    WIRELESS, DataInd->mpduLinkQuality);
+ 465   1      #endif  
+ 466   1        return TRUE;
+ 467   1      }
+ 468          
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 9   
+
+ 469          /******************************************************************************
+ 470           * @fn      lrwpan_SendAssocRsp
+ 471           *
+ 472           * @brief   Send Association Response primitive 
+ 473           *
+ 474           * @param   DeviceAddress - the address of the device requesting association
+ 475           *      AssocShortAddress - the short device address allocated by the coordinator 
+ 476           *                on successful association  
+ 477           *      status - status of the opertaion (as defined in return_val.h)
+ 478           *      sec_p - security keys
+ 479           *      
+ 480           * @return  none
+ 481           */
+ 482          
+ 483          void lrwpan_SendAssocRsp(uint64_t DeviceAddress,
+ 484                                       uint16_t AssocShortAddress,
+ 485                                       uint8_t status,
+ 486                                       security_info_t *sec_p)
+ 487          {
+ 488   1        u8 len;
+ 489   1        u8 buf[MAX_HOST_CMD_LENGTH];  
+ 490   1        mlme_associate_resp_t* mlme_associate_resp = (mlme_associate_resp_t*)buf; 
+ 491   1        
+ 492   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 493   1        
+ 494   1        mlme_associate_resp->cmdcode = MLME_ASSOCIATE_RESPONSE;
+ 495   1          mlme_associate_resp->DeviceAddress  = DeviceAddress;
+ 496   1          mlme_associate_resp->AssocShortAddress = AssocShortAddress;
+ 497   1          mlme_associate_resp->status = status;
+ 498   1        
+ 499   1          if(sec_p) 
+ 500   1        {
+ 501   2              mlme_associate_resp->Security.SecurityLevel = sec_p->SecurityLevel;
+ 502   2              mlme_associate_resp->Security.KeyIdMode     = sec_p->KeyIdMode;
+ 503   2              mlme_associate_resp->Security.KeyIndex      = sec_p->KeyIndex;
+ 504   2              memcpy(mlme_associate_resp->Security.KeySource, sec_p->KeySource,
+ 505   2                     SEC_KEY_SRC_MAX);
+ 506   2          len = sizeof(mlme_associate_resp_t) + SEC_KEY_SRC_MAX;
+ 507   2          } 
+ 508   1        else 
+ 509   1          {
+ 510   2              mlme_associate_resp->Security.SecurityLevel = 0;
+ 511   2          len = sizeof(mlme_associate_resp_t);
+ 512   2          } 
+ 513   1      
+ 514   1        GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 515   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, len, 0);  
+ 516   1      }
+ 517          
+ 518          /******************************************************************************
+ 519           * @fn      lrwpan_SendScanReq
+ 520           *
+ 521           * @brief   Send a Scan Request primitive 
+ 522           *
+ 523           * @param   ScanType - the scan type (as defined in mac_internal.h)
+ 524           *      ScanChannels - bitmap of the channels to scan
+ 525           *      ScanDuration - scan duration (as define by IEEE 802.15.4 spec)
+ 526           *      ChannelPage - not used
+ 527           *      sec_p - security keys
+ 528           *      
+ 529           * @return  none
+ 530           */
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 10  
+
+ 531          
+ 532          void lrwpan_SendScanReq(uint8_t ScanType,
+ 533                                      uint32_t ScanChannels,
+ 534                                      uint8_t ScanDuration,
+ 535                                      uint8_t ChannelPage,
+ 536                                      security_info_t *sec_p)
+ 537          {
+ 538   1        u8 len;
+ 539   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 540   1        mlme_scan_req_t* mlme_scan_req = (mlme_scan_req_t*)buf; 
+ 541   1      
+ 542   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 543   1      
+ 544   1          mlme_scan_req->cmdcode = MLME_SCAN_REQUEST;
+ 545   1          mlme_scan_req->ScanType = ScanType;
+ 546   1          mlme_scan_req->ScanChannels = ScanChannels;
+ 547   1          mlme_scan_req->ScanDuration = ScanDuration;
+ 548   1          mlme_scan_req->ChannelPage = ChannelPage;
+ 549   1      
+ 550   1        if(sec_p) 
+ 551   1        {
+ 552   2          mlme_scan_req->Security.SecurityLevel = sec_p->SecurityLevel;
+ 553   2          mlme_scan_req->Security.KeyIdMode = sec_p->KeyIdMode;
+ 554   2          mlme_scan_req->Security.KeyIndex = sec_p->KeyIndex;
+ 555   2          memcpy(mlme_scan_req->Security.KeySource, sec_p->KeySource,
+ 556   2               SEC_KEY_SRC_MAX);
+ 557   2          len = sizeof(mlme_scan_req_t) + SEC_KEY_SRC_MAX;    
+ 558   2        } 
+ 559   1        else 
+ 560   1        {
+ 561   2          mlme_scan_req->Security.SecurityLevel = 0; 
+ 562   2          len = sizeof(mlme_scan_req_t);    
+ 563   2        }
+ 564   1      
+ 565   1        GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 566   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, len, 0);    
+ 567   1      }
+ 568          
+ 569          /******************************************************************************
+ 570           * @fn      lrwpan_SendAssocReq
+ 571           *
+ 572           * @brief   Send a Association Request primitive 
+ 573           *
+ 574           * @param   LogicalChannel - the channel to be sent on
+ 575           *      ChannelPage - not used
+ 576           *      CoordAddrSpec_p - Coordinator Address specification (as defined in mac_msgs.h)
+ 577           *      CapabilityInformation - Device capability (as define in IEEE 802.15.4 spec)
+ 578           *      sec_p - security keys
+ 579           *      
+ 580           * @return  none
+ 581           */
+ 582          
+ 583          void lrwpan_SendAssocReq(uint8_t LogicalChannel,
+ 584                                           uint8_t ChannelPage,
+ 585                                           wpan_addr_spec_t *CoordAddrSpec_p,
+ 586                                           uint8_t CapabilityInformation,
+ 587                                           security_info_t *sec_p)
+ 588          {
+ 589   1        u8 len;
+ 590   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 591   1        mlme_associate_req_t *mlme_associate_req = (mlme_associate_req_t*)buf; 
+ 592   1      
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 11  
+
+ 593   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH);
+ 594   1        
+ 595   1          mlme_associate_req->cmdcode = MLME_ASSOCIATE_REQUEST;
+ 596   1          mlme_associate_req->LogicalChannel = LogicalChannel;
+ 597   1          mlme_associate_req->CoordAddrMode = CoordAddrSpec_p->AddrMode;
+ 598   1          mlme_associate_req->CoordPANId = CoordAddrSpec_p->PANId;
+ 599   1          mlme_associate_req->CoordAddress.long_address.lo_u32 = 
+ 600   1                                            CoordAddrSpec_p->Addr.long_address.lo_u32;
+ 601   1          mlme_associate_req->CoordAddress.long_address.hi_u32 = 
+ 602   1                                            CoordAddrSpec_p->Addr.long_address.hi_u32;
+ 603   1      
+ 604   1          mlme_associate_req->CapabilityInformation = CapabilityInformation;
+ 605   1          mlme_associate_req->ChannelPage = ChannelPage;
+ 606   1      
+ 607   1          if(sec_p) 
+ 608   1        {
+ 609   2              mlme_associate_req->Security.SecurityLevel = sec_p->SecurityLevel;
+ 610   2              mlme_associate_req->Security.KeyIdMode = sec_p->KeyIdMode;
+ 611   2              mlme_associate_req->Security.KeyIndex = sec_p->KeyIndex;
+ 612   2              memcpy(mlme_associate_req->Security.KeySource, sec_p->KeySource,
+ 613   2                     SEC_KEY_SRC_MAX);
+ 614   2          len = sizeof(mlme_associate_req_t) + SEC_KEY_SRC_MAX;
+ 615   2          } 
+ 616   1        else 
+ 617   1          {
+ 618   2              mlme_associate_req->Security.SecurityLevel = 0;
+ 619   2          len = sizeof(mlme_associate_req_t);   
+ 620   2          } 
+ 621   1      
+ 622   1        GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 623   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, len, 0);      
+ 624   1      }
+ 625          
+ 626          /******************************************************************************
+ 627           * @fn      lrwpan_SendAttributeSetReq
+ 628           *
+ 629           * @brief   Sends a MLME Set request 
+ 630           *
+ 631           * @param   attribute - attribute number(found in mac_const.h)
+ 632           *      
+ 633           * @return  none
+ 634           */
+ 635          
+ 636          void lrwpan_SendAttributeSetReq(uint8_t attribute, uint8_t* value)
+ 637          {
+ 638   1        uint8_t len;
+ 639   1        uint8_t buf[MAX_HOST_CMD_LENGTH];
+ 640   1        mlme_set_req_t* mlme_set_req = (mlme_set_req_t *)buf; 
+ 641   1      
+ 642   1        attribute = attribute;
+ 643   1        value = value;
+ 644   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH);
+ 645   1        
+ 646   1          mlme_set_req->cmdcode = MLME_SET_REQUEST;
+ 647   1          mlme_set_req->PIBAttribute = phyCurrentChannel;
+ 648   1        mlme_set_req->PIBAttributeValue.pib_value_8bit = lrwpan_db.channel;
+ 649   1        //memcpy((uint8_t*)&mlme_set_req[sizeof(lrwpan_cfg_evnt_msg_t) - sizeof(pib_value_t)], (uint8_t*)value, s
+             -izeof(pib_value_t));
+ 650   1        len = sizeof(mlme_set_req_t);   
+ 651   1      
+ 652   1        GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 653   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, len, 0);      
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 12  
+
+ 654   1      }
+ 655          
+ 656          /******************************************************************************
+ 657           * @fn      lrwpan_SendResetReq
+ 658           *
+ 659           * @brief   Sends a MLME Reset request 
+ 660           *
+ 661           * @param   SetDefaultPIB - if TRUE it resets all PIB values to default
+ 662           *      
+ 663           * @return  none
+ 664           */
+ 665          
+ 666          void lrwpan_SendResetReq(uint8_t SetDefaultPIB)
+ 667          {
+ 668   1        u8 len;
+ 669   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 670   1        mlme_reset_req_t* mlme_reset_req = (mlme_reset_req_t*)buf; 
+ 671   1      
+ 672   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH);
+ 673   1        
+ 674   1          mlme_reset_req->cmdcode = MLME_RESET_REQUEST;
+ 675   1          mlme_reset_req->SetDefaultPIB = SetDefaultPIB;
+ 676   1        len = sizeof(mlme_reset_req_t );    
+ 677   1      
+ 678   1        GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 679   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, len, 0);      
+ 680   1      }
+ 681          
+ 682          /******************************************************************************
+ 683           * @fn      lrwpan_SendStartReq
+ 684           *
+ 685           * @brief   Send a Start Request primitive 
+ 686           *
+ 687           * @param   PANId - the PAN Id the netowrk is to be formed
+ 688           *      LogicalChannel - the channel on which the network is to be formed
+ 689           *      ChannelPage - not used
+ 690           *      StartTime - start time (as defined in IEEE 802.15.4 spec)
+ 691           *      BeaconOrder - Beacon Order(as define in IEEE 802.15.4 spec)
+ 692           *      SuperframeOrder - Superframe Order(as define in IEEE 802.15.4 spec)
+ 693           *      PANCoordinator - PAN specification
+ 694           *      BatteryLifeExtension - (as define in IEEE 802.15.4 spec)
+ 695           *      CoordRealignment - (as define in IEEE 802.15.4 spec)
+ 696           *      CoordRealignmentSecurity_p - security keys (as define in IEEE 802.15.4 spec)
+ 697           *      BeaconSecurity_p - security keys (as define in IEEE 802.15.4 spec)
+ 698           *      
+ 699           * @return  none
+ 700           */
+ 701          
+ 702          void lrwpan_SendStartReq(uint16_t PANId,
+ 703                                        uint8_t LogicalChannel,
+ 704                                        uint8_t ChannelPage,
+ 705                                        uint32_t StartTime,
+ 706                                        uint8_t BeaconOrder,
+ 707                                        uint8_t SuperframeOrder,
+ 708                                        bool PANCoordinator,
+ 709                                        bool BatteryLifeExtension,
+ 710                                        bool CoordRealignment,
+ 711                                        security_info_t *CoordRealignmentSecurity_p,
+ 712                                        security_info_t *BeaconSecurity_p)
+ 713          {
+ 714   1        u8 len;
+ 715   1        u8 buf[MAX_HOST_CMD_LENGTH];
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 13  
+
+ 716   1        u8 seclength = 0;
+ 717   1        mlme_start_req_t *mlme_start_req = (mlme_start_req_t*)buf; 
+ 718   1      
+ 719   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 720   1      
+ 721   1          mlme_start_req->cmdcode = MLME_START_REQUEST;
+ 722   1          mlme_start_req->PANId = PANId;
+ 723   1          mlme_start_req->LogicalChannel = LogicalChannel;
+ 724   1          mlme_start_req->ChannelPage = ChannelPage;
+ 725   1          mlme_start_req->StartTime = StartTime;                                      
+ 726   1          mlme_start_req->BeaconOrder = BeaconOrder;
+ 727   1          mlme_start_req->SuperframeOrder = SuperframeOrder;
+ 728   1          mlme_start_req->PANCoordinator = PANCoordinator;
+ 729   1          mlme_start_req->BatteryLifeExtension = BatteryLifeExtension;
+ 730   1          mlme_start_req->CoordRealignment = CoordRealignment;                                          
+ 731   1        
+ 732   1          if(CoordRealignmentSecurity_p) 
+ 733   1        {
+ 734   2              mlme_start_req->CoordRealignmentSecurity.SecurityLevel = CoordRealignmentSecurity_p->SecurityLevel
+             -;
+ 735   2              mlme_start_req->CoordRealignmentSecurity.KeyIdMode = CoordRealignmentSecurity_p->KeyIdMode;
+ 736   2              mlme_start_req->CoordRealignmentSecurity.KeyIndex = CoordRealignmentSecurity_p->KeyIndex;
+ 737   2              memcpy(mlme_start_req->CoordRealignmentSecurity.KeySource, CoordRealignmentSecurity_p->KeySource,
+ 738   2                     SEC_KEY_SRC_MAX);
+ 739   2          seclength = SEC_KEY_SRC_MAX;
+ 740   2          } 
+ 741   1        else 
+ 742   1          {
+ 743   2              mlme_start_req->CoordRealignmentSecurity.SecurityLevel = 0;
+ 744   2          seclength = 0;
+ 745   2          } 
+ 746   1      
+ 747   1          if(BeaconSecurity_p) 
+ 748   1        {
+ 749   2              mlme_start_req->BeaconSecurity.SecurityLevel = BeaconSecurity_p->SecurityLevel;
+ 750   2              mlme_start_req->BeaconSecurity.KeyIdMode = BeaconSecurity_p->KeyIdMode;
+ 751   2              mlme_start_req->BeaconSecurity.KeyIndex = BeaconSecurity_p->KeyIndex;
+ 752   2              memcpy(mlme_start_req->BeaconSecurity.KeySource, BeaconSecurity_p->KeySource,
+ 753   2                     SEC_KEY_SRC_MAX);
+ 754   2          seclength = SEC_KEY_SRC_MAX;    
+ 755   2          } 
+ 756   1        else 
+ 757   1          {
+ 758   2              mlme_start_req->BeaconSecurity.SecurityLevel = 0;
+ 759   2          seclength = 0;
+ 760   2          } 
+ 761   1      
+ 762   1        len = sizeof(mlme_start_req_t) + seclength;
+ 763   1      
+ 764   1        GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 765   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, len, 0);      
+ 766   1      }
+ 767          
+ 768          /******************************************************************************
+ 769           * @fn      lrwpan_SendData
+ 770           *
+ 771           * @brief   Send a Data Request primitive 
+ 772           *
+ 773           * @param   addr - the short address of the destination
+ 774           *      msdu - data packet
+ 775           *      msduLength - data packet length
+ 776           *      
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 14  
+
+ 777           * @return  none
+ 778           */
+ 779          
+ 780          void lrwpan_SendData(uint16_t addr, uint8_t* msdu, u8 msduLength) 
+ 781          { 
+ 782   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 783   1        uint16_t addr1;
+ 784   1        mcps_data_req_t *mcps_data_req = (mcps_data_req_t *)buf; 
+ 785   1      
+ 786   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 787   1        addr1 = addr;
+ 788   1        mcps_data_req->cmdcode = MCPS_DATA_REQUEST;
+ 789   1        mcps_data_req->SrcAddrMode = WPAN_ADDRMODE_SHORT;
+ 790   1        mcps_data_req->DstAddrMode = WPAN_ADDRMODE_SHORT;
+ 791   1        
+ 792   1        if(addr1 == 0xFFFF)
+ 793   1          mcps_data_req->DstPANId = 0xFFFF;
+ 794   1        else
+ 795   1          mcps_data_req->DstPANId = lrwpan_db.panid;
+ 796   1        
+ 797   1        if(lrwpan_db.dev == COORDINATOR)
+ 798   1        {
+ 799   2          memcpy((uint8_t*)&mcps_data_req->DstAddr, (uint8_t*)&addr1, sizeof(uint16_t));    
+ 800   2        }
+ 801   1        else
+ 802   1        {
+ 803   2          if(addr1 == 0xFFFF)
+ 804   2            memset((uint8_t*)&mcps_data_req->DstAddr, 0xFF, sizeof(uint64_t));
+ 805   2          else
+ 806   2            memcpy((uint8_t*)&mcps_data_req->DstAddr, (uint8_t*)&addr1, sizeof(uint16_t));      
+ 807   2        }
+ 808   1        
+ 809   1        if(addr1 == 0xFFFF)
+ 810   1          mcps_data_req->TxOptions = TX_CAP;
+ 811   1        else
+ 812   1          mcps_data_req->TxOptions = TX_CAP_ACK;  
+ 813   1        
+ 814   1        mcps_data_req->Security.SecurityLevel = 0;
+ 815   1        mcps_data_req->msduHandle = 0x01;
+ 816   1        mcps_data_req->msdu_p = (uint8_t*)(mcps_data_req + 1);
+ 817   1        memcpy((uint8_t*)mcps_data_req->msdu_p, (uint8_t*)msdu, msduLength);
+ 818   1        mcps_data_req->msduLength = msduLength;
+ 819   1      
+ 820   1        GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
+ 821   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, sizeof(mcps_data_req_t) + msduLength, 0);   
+ 822   1      }
+ 823          
+ 824          /******************************************************************************
+ 825           * @fn      GV701x_LrwpanTimerHandler
+ 826           *
+ 827           * @brief   Timer handler for LRWPAN driver timer events
+ 828           *
+ 829           * @param   event - event from firmware
+ 830           *
+ 831           * @return  none
+ 832           *
+ 833           */
+ 834          
+ 835          void GV701x_LrwpanTimerHandler(uint8_t* buf)
+ 836          { 
+ 837   1        hostTimerEvnt_t* timerevt = (hostTimerEvnt_t*)buf;          
+ 838   1      
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 15  
+
+ 839   1        if(buf == NULL)
+ 840   1          return;
+ 841   1      
+ 842   1        /*Demultiplexing the specific timer event*/           
+ 843   1        switch((u8)timerevt->type)
+ 844   1        {                     
+ 845   2          case LRWPAN_PROFILE_TIMEOUT_EVT:  
+ 846   2            GV701x_LrwpanDriverStart();
+ 847   2          break;
+ 848   2      
+ 849   2          case LRWPAN_START_TIMEOUT_EVT:  
+ 850   2            lrwpan_device_start();
+ 851   2          break;
+ 852   2          
+ 853   2          default:
+ 854   2          break;
+ 855   2        }             
+ 856   1      }
+ 857          
+ 858          /******************************************************************************
+ 859           * @fn      GV701x_LrwpanSendEvent
+ 860           *
+ 861           * @brief   Sends an indication(on state change) to the 
+ 862           *          app that requested the service
+ 863           *
+ 864           * @param   ind - indication type
+ 865           *          status - status of the operation requested
+ 866           *                   (STATUS_SUCCESS/STATUS_FAILURE only valid for Scan service)
+ 867           *          reason - reason for the transition 
+ 868           *                  (hostEventNetworkIndReason_e in hpgp_msgs.h)
+ 869           *
+ 870           * @return  none
+ 871           *
+ 872           */
+ 873          
+ 874          void GV701x_LrwpanSendEvent(u8 ind, u8 status, u8 value) 
+ 875          {   
+ 876   1        if(ind == LRWPAN_UP_IND)
+ 877   1        {
+ 878   2          lrwpan_up_ind_t lrwpan_up;
+ 879   2          lrwpan_up.event = ind;
+ 880   2          GV701x_SendAppEvent(lrwpan_db.app_id, lrwpan_db.start.app_id, APP_MSG_TYPE_APPIND, APP_MAC_ID,
+ 881   2                    EVENT_CLASS_CTRL, MGMT_FRM_ID, &lrwpan_up, sizeof(lrwpan_up_ind_t), 0);   
+ 882   2          lrwpan_state.state = LRWPAN_UP;
+ 883   2          lrwpan_db.start.active = FALSE; 
+ 884   2          lrwpan_db.start.app_id = 0; 
+ 885   2          STM_StopTimer(lrwpan_db.profile_timer);
+ 886   2          STM_StopTimer(lrwpan_db.start.timer);   
+ 887   2        }
+ 888   1        else if(ind == LRWPAN_DWN_IND)
+ 889   1        {
+ 890   2          lrwpan_dwn_ind_t lrwpan_dwn;
+ 891   2          lrwpan_dwn.event = ind;
+ 892   2      
+ 893   2          GV701x_SendAppEvent(lrwpan_db.app_id, lrwpan_db.start.app_id, APP_MSG_TYPE_APPIND, APP_MAC_ID,
+ 894   2                    EVENT_CLASS_CTRL, MGMT_FRM_ID, &lrwpan_dwn, sizeof(lrwpan_dwn_ind_t), 0);   
+ 895   2          lrwpan_state.state = LRWPAN_DOWN;
+ 896   2          lrwpan_db.start.active = FALSE; 
+ 897   2          lrwpan_db.start.app_id = 0;     
+ 898   2        }
+ 899   1        else if(ind == LRWPAN_SCAN_IND)
+ 900   1        {
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 16  
+
+ 901   2          lrwpan_scan_ind_t lrwpan_scanind;
+ 902   2          lrwpan_scanind.event = ind;
+ 903   2          lrwpan_scanind.status = status;
+ 904   2          GV701x_SendAppEvent(lrwpan_db.app_id, lrwpan_db.scan.app_id, APP_MSG_TYPE_APPIND, APP_MAC_ID,
+ 905   2                    EVENT_CLASS_CTRL, MGMT_FRM_ID, &lrwpan_scanind, 
+ 906   2                    sizeof(lrwpan_scan_ind_t), APP_EVNT_TX_CRITICAL_OPT);   
+ 907   2          
+ 908   2          //if(lrwpan_db.scan.result.UnscannedChannels == 0)
+ 909   2          { 
+ 910   3            lrwpan_state.state = lrwpan_db.scan.prev_state;   
+ 911   3            lrwpan_db.scan.prev_state = LRWPAN_IDLE;
+ 912   3            lrwpan_db.scan.active = FALSE;  
+ 913   3            lrwpan_db.scan.app_id = 0;    
+ 914   3          }
+ 915   2        }
+ 916   1        else if(ind == LRWPAN_BCN_IND)
+ 917   1        {
+ 918   2          lrwpan_bcn_ind_t lrwpan_bcnind;
+ 919   2          lrwpan_bcnind.event = ind;
+ 920   2          GV701x_SendAppEvent(lrwpan_db.app_id, lrwpan_db.scan.app_id, APP_MSG_TYPE_APPIND, APP_MAC_ID,
+ 921   2                    EVENT_CLASS_CTRL, MGMT_FRM_ID, &lrwpan_bcnind, 
+ 922   2                    sizeof(lrwpan_bcn_ind_t), 0);   
+ 923   2        } 
+ 924   1        else if(ind == LRWPAN_CFG_IND)
+ 925   1        {
+ 926   2          lrwpan_cfg_ind_t lrwpan_cfg_ind;
+ 927   2          lrwpan_cfg_ind.event = ind;
+ 928   2          lrwpan_cfg_ind.status = status;
+ 929   2          lrwpan_cfg_ind.attribute = value;
+ 930   2          lrwpan_db.cfg.active = FALSE;     
+ 931   2          lrwpan_db.cfg.params = 0xFF;
+ 932   2          GV701x_SendAppEvent(lrwpan_db.app_id, lrwpan_db.cfg.app_id, APP_MSG_TYPE_APPIND, APP_MAC_ID,
+ 933   2                    EVENT_CLASS_CTRL, MGMT_FRM_ID, &lrwpan_cfg_ind, 
+ 934   2                    sizeof(lrwpan_cfg_ind_t), 0);   
+ 935   2          lrwpan_db.cfg.app_id = 0;           
+ 936   2        } 
+ 937   1        else
+ 938   1          return;
+ 939   1      }
+ 940          
+ 941          /******************************************************************************
+ 942           * @fn      GV701x_LrwpanScanInd
+ 943           *
+ 944           * @brief   Services the result of a scan 
+ 945           *
+ 946           * @param   ind - scan result(mlme_scan_conf_t found in mac_msgs.h) 
+ 947           *
+ 948           * @return  none
+ 949           *
+ 950           */
+ 951          
+ 952          void GV701x_LrwpanScanInd(uint8_t* ind) 
+ 953          {     
+ 954   1        uint8_t i, j = 0xFF;
+ 955   1        mlme_scan_conf_t* cnf = NULL;
+ 956   1      
+ 957   1        if(ind == NULL)
+ 958   1          GV701x_LrwpanSendEvent(LRWPAN_SCAN_IND, STATUS_FAILURE, 0); 
+ 959   1      
+ 960   1        cnf = (mlme_scan_conf_t*)ind;   
+ 961   1      
+ 962   1      #if 0
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 17  
+
+                FM_Printf(FM_APP, "\nScan CNf s %bx ch %bx Uc %lx rs %bu", cnf->status, 
+                  cnf->ChannelPage, cnf->UnscannedChannels, cnf->ResultListSize);
+              #endif
+ 966   1      
+ 967   1        if((cnf->status != MAC_SUCCESS) &&
+ 968   1          (cnf->status != MAC_NO_BEACON))
+ 969   1        {
+ 970   2          GV701x_LrwpanSendEvent(LRWPAN_SCAN_IND, STATUS_FAILURE, 0);
+ 971   2        }
+ 972   1        
+ 973   1        /*Only Channel Page 0 is supported*/    
+ 974   1        if(cnf->ChannelPage != 0x00)
+ 975   1          GV701x_LrwpanSendEvent(LRWPAN_SCAN_IND, STATUS_FAILURE, 0); 
+ 976   1        
+ 977   1        lrwpan_db.scan.result.status = cnf->status;
+ 978   1        lrwpan_db.scan.result.ScanType = cnf->ScanType; 
+ 979   1        lrwpan_db.scan.result.ChannelPage = cnf->ChannelPage;   
+ 980   1        lrwpan_db.scan.result.UnscannedChannels = cnf->UnscannedChannels; 
+ 981   1        if((cnf->status == MAC_LIMIT_REACHED) && (cnf->ResultListSize > LRWPAN_MAX_SCAN_LIST))
+ 982   1          lrwpan_db.scan.result.ResultListSize = LRWPAN_MAX_SCAN_LIST;    
+ 983   1        else 
+ 984   1          lrwpan_db.scan.result.ResultListSize = cnf->ResultListSize; 
+ 985   1      
+ 986   1        for(i = 0; i < (cnf->ResultListSize < LRWPAN_MAX_SCAN_LIST ? 
+ 987   1          cnf->ResultListSize : LRWPAN_MAX_SCAN_LIST); i++)
+ 988   1        { 
+ 989   2          if(cnf->ScanType == MLME_SCAN_TYPE_ACTIVE)
+ 990   2          {   
+ 991   3            if( (lrwpan_db.scan.result.list[i].active == TRUE) &&
+ 992   3              (memcmp(&lrwpan_db.scan.result.list[i].val.PANDescriptor.CoordAddrSpec,
+ 993   3                  &cnf->scan_result_list[i].PANDescriptor.CoordAddrSpec, sizeof(wpan_addr_spec_t)) == 0)  &&
+ 994   3              (lrwpan_db.scan.result.list[i].val.PANDescriptor.LogicalChannel == 
+ 995   3                cnf->scan_result_list[i].PANDescriptor.LogicalChannel))                 
+ 996   3            {   
+ 997   4      #if 0     
+                      memcpy(lrwpan_db.scan.result.list[i].bcn_payload, bcn_ind.sdu, 
+                          (bcn_ind.sduLength > MAX_BCN_PAYLOAD) ? MAX_BCN_PAYLOAD : bcn_ind.sduLength);     
+                      break;
+              #endif
+1002   4            }
+1003   3            else
+1004   3            {
+1005   4              if(lrwpan_db.scan.result.list[i].active == FALSE)
+1006   4              {
+1007   5                j = i;
+1008   5              }
+1009   4            }
+1010   3          }
+1011   2          else if(cnf->ScanType == MLME_SCAN_TYPE_ED)
+1012   2          { 
+1013   3            memcpy((uint8_t*)&lrwpan_db.scan.result.list[0].val.ed_value[i], 
+1014   3              (uint8_t*)&cnf->scan_result_list[0].ed_value[i], 
+1015   3              sizeof(cnf->scan_result_list[0].ed_value[0]));
+1016   3      #if 0
+                    FM_Printf(FM_APP, "\nNo. %bu ED %bx" , i, 
+                      lrwpan_db.scan.result.list[0].val.ed_value[i]);
+              #endif
+1020   3          }     
+1021   2        }
+1022   1      
+1023   1        if(cnf->ScanType == MLME_SCAN_TYPE_ACTIVE)
+1024   1        {
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 18  
+
+1025   2          if(i == (cnf->ResultListSize < LRWPAN_MAX_SCAN_LIST ? 
+1026   2            cnf->ResultListSize : LRWPAN_MAX_SCAN_LIST))
+1027   2          {
+1028   3            if(j != 0xFF)
+1029   3            {
+1030   4              lrwpan_db.scan.result.list[j].active = TRUE;
+1031   4              memcpy(&lrwpan_db.scan.result.list[j].val.PANDescriptor,
+1032   4                  &cnf->scan_result_list[i].PANDescriptor, sizeof(pandescriptor_t));
+1033   4      #if 0       
+                      memcpy(lrwpan_db.scan.result.list[j].bcn_payload, bcn_ind.sdu, 
+                          (bcn_ind.sduLength > MAX_BCN_PAYLOAD) ? MAX_BCN_PAYLOAD : bcn_ind.sduLength);     
+              #endif
+1037   4            }
+1038   3          }
+1039   2        }
+1040   1        
+1041   1        GV701x_LrwpanSendEvent(LRWPAN_SCAN_IND, STATUS_SUCCESS, 0); 
+1042   1      }
+1043          
+1044          /******************************************************************************
+1045           * @fn      GV701x_LrwpanBcnUpdate
+1046           *
+1047           * @brief   Populates the beacon payload in the scaned peer list
+1048           *
+1049           * @param   bcn_ind - beacon notification 
+1050           *                    (mlme_beacon_notify_ind_t found in mac_msgs.h) 
+1051           *
+1052           * @return  none
+1053           *
+1054           */
+1055          
+1056          void GV701x_LrwpanBcnUpdate(mlme_beacon_notify_ind_t* bcn_ind) 
+1057          {   
+1058   1        uint8_t i, j = 0xFF;
+1059   1        uint8_t bcn_update = FALSE; 
+1060   1      
+1061   1        if(lrwpan_db.scan.active == TRUE)
+1062   1        {
+1063   2          if(bcn_ind->PANDescriptor.CoordAddrSpec.PANId != LRWPAN_PANID)
+1064   2            return;
+1065   2      
+1066   2      #if 0   
+                  FM_Printf(FM_APP, "\nBcn: Ch %bx Pan %x AM %bu A %x Lqi %bu", 
+                    bcn_ind->PANDescriptor.LogicalChannel,
+                    bcn_ind->PANDescriptor.CoordAddrSpec.PANId,
+                    bcn_ind->PANDescriptor.CoordAddrSpec.AddrMode,
+                    bcn_ind->PANDescriptor.CoordAddrSpec.Addr.short_address,
+                    bcn_ind->PANDescriptor.LinkQuality);  
+              #endif    
+1074   2          for(i = 0; i < LRWPAN_MAX_SCAN_LIST; i++)
+1075   2          {
+1076   3            if( (lrwpan_db.scan.result.list[i].active == TRUE) &&
+1077   3              (memcmp(&lrwpan_db.scan.result.list[i].val.PANDescriptor.CoordAddrSpec,
+1078   3                  &bcn_ind->PANDescriptor.CoordAddrSpec, sizeof(wpan_addr_spec_t)) == 0)  &&
+1079   3              (lrwpan_db.scan.result.list[i].val.PANDescriptor.LogicalChannel == 
+1080   3                bcn_ind->PANDescriptor.LogicalChannel))                 
+1081   3            {   
+1082   4              if(memcmp(&lrwpan_db.scan.result.list[i].bcn_payload,
+1083   4                  bcn_ind->sdu, (bcn_ind->sduLength > MAX_BCN_PAYLOAD) ? MAX_BCN_PAYLOAD : bcn_ind->sduLength) != 0)
+1084   4              {
+1085   5                memcpy(lrwpan_db.scan.result.list[i].bcn_payload, bcn_ind->sdu, 
+1086   5                    (bcn_ind->sduLength > MAX_BCN_PAYLOAD) ? MAX_BCN_PAYLOAD : bcn_ind->sduLength);     
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 19  
+
+1087   5                bcn_update = TRUE;
+1088   5              }
+1089   4              break;      
+1090   4            }
+1091   3            else
+1092   3            {
+1093   4              if((lrwpan_db.scan.result.list[i].active == FALSE) && (j == 0xFF))
+1094   4              {
+1095   5                j = i;
+1096   5              }
+1097   4            }     
+1098   3          }
+1099   2      
+1100   2          if(i == LRWPAN_MAX_SCAN_LIST)
+1101   2          {
+1102   3            if(j != 0xFF)
+1103   3            {
+1104   4              lrwpan_db.scan.result.list[j].active = TRUE;
+1105   4              memcpy(&lrwpan_db.scan.result.list[j].val.PANDescriptor,
+1106   4                  &bcn_ind->PANDescriptor, sizeof(pandescriptor_t));
+1107   4              memcpy(lrwpan_db.scan.result.list[j].bcn_payload, bcn_ind->sdu, 
+1108   4                  (bcn_ind->sduLength > MAX_BCN_PAYLOAD) ? MAX_BCN_PAYLOAD : bcn_ind->sduLength);
+1109   4      #if 0
+                      FM_HexDump(FM_APP,"\nBcnPay:", lrwpan_db.scan.result.list[j].bcn_payload,
+                            MAX_BCN_PAYLOAD);
+              #endif
+1113   4              
+1114   4              if(lrwpan_db.scan.active == FALSE)        
+1115   4                bcn_update = TRUE;
+1116   4            }
+1117   3          }
+1118   2      
+1119   2          if(bcn_update == TRUE)
+1120   2          {
+1121   3            GV701x_LrwpanSendEvent(LRWPAN_BCN_IND, STATUS_SUCCESS, 0);      
+1122   3          }
+1123   2        }
+1124   1      }
+1125          
+1126          /******************************************************************************
+1127           * @fn      GV701x_LrwpanDriverFlush
+1128           *
+1129           * @brief   Flushes all the driver variables and MAC configuration
+1130           *
+1131           * @param   none
+1132           *
+1133           * @return  none
+1134           *
+1135           */
+1136          void GV701x_LrwpanDriverFlush(void)
+1137          {
+1138   1        lrwpan_db.dev = COORDINATOR; 
+1139   1        lrwpan_db.scan.time = 5;  
+1140   1      #if 0 
+                lrwpan_db.scan.ch_mask = LRWPAN_CHANNEL_MASK;
+              #endif
+1143   1        lrwpan_db.scan.type = MLME_SCAN_TYPE_ACTIVE;    
+1144   1        lrwpan_db.panid = LRWPAN_PANID; 
+1145   1        lrwpan_db.channel = LRWPAN_CHANNEL;
+1146   1        lrwpan_state.state = LRWPAN_IDLE;
+1147   1        lrwpan_db.cfg.active = FALSE;
+1148   1        lrwpan_db.cfg.params = 0xFF;
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 20  
+
+1149   1        lrwpan_SendResetReq(FALSE);
+1150   1      }
+1151          
+1152          /******************************************************************************
+1153           * @fn      GV701x_LrwpanDriverSM
+1154           *
+1155           * @brief   LRWPAN State Machine, it executes all internal/external 
+1156           *      events triggered
+1157           *
+1158           * @param   state - state machine object of the driver
+1159           *          (passed as a reference incase there are more than one object)
+1160           *
+1161           * @return  none
+1162           *
+1163           */
+1164          
+1165          void GV701x_LrwpanDriverSM(gv701x_state_t* state)
+1166          {
+1167   1        if(state == NULL)
+1168   1          return;
+1169   1      
+1170   1      #if 1
+1171   1        if(state->event != LRWPAN_IDLE_EVNT)
+1172   1          FM_Printf(FM_APP, "\nLrwpan S %bu E %bx P %bu C %bu E %bu Da %bu Sa %bu T %bu a %bu p %bu", 
+1173   1              state->state, state->event,
+1174   1              state->eventproto, state->eventclass, state->eventtype, 
+1175   1              state->msg_hdr.dst_app_id, state->msg_hdr.src_app_id, state->msg_hdr.type,
+1176   1              lrwpan_db.cfg.active, lrwpan_db.cfg.params);        
+1177   1      #endif
+1178   1        switch(state->state) 
+1179   1        {
+1180   2          case LRWPAN_IDLE:   
+1181   2            if(state->eventproto == APP_MAC_ID)
+1182   2            { 
+1183   3              if(state->msg_hdr.type == APP_MSG_TYPE_APPEVENT)
+1184   3              {
+1185   4                switch(state->event) 
+1186   4                {       
+1187   5                  /*Start event*/
+1188   5                  case LRWPAN_START_EVNT:
+1189   5                    if((lrwpan_db.start.active == FALSE) &&
+1190   5                       (lrwpan_db.scan.active == FALSE))
+1191   5                    {
+1192   6                      lrwpan_db.start.active = TRUE;  
+1193   6                      lrwpan_db.start.app_id = state->msg_hdr.src_app_id; 
+1194   6                      lrwpan_device_config();
+1195   6                      GV701x_LrwpanDriverStart();
+1196   6                    }
+1197   5                  break;
+1198   5                  
+1199   5                  /*Scan event*/
+1200   5                  case LRWPAN_SCAN_EVNT:  
+1201   5                    if((lrwpan_db.scan.active == FALSE) &&      
+1202   5                       (lrwpan_db.start.active == FALSE))
+1203   5                    {
+1204   6                      lrwpan_db.scan.active = TRUE; 
+1205   6                      lrwpan_db.scan.prev_state = state->state;
+1206   6                      state->state = LRWPAN_SCAN;
+1207   6                      lrwpan_db.scan.app_id = state->msg_hdr.src_app_id;
+1208   6                      lrwpan_SendScanReq(lrwpan_db.scan.type, lrwpan_db.scan.ch_mask, 
+1209   6                          lrwpan_db.scan.time, 0, NULL);              
+1210   6                    }
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 21  
+
+1211   5                  break;          
+1212   5      
+1213   5                  /*Configuration event*/
+1214   5                  case LRWPAN_CFG_EVNT: 
+1215   5                    if((lrwpan_db.scan.active == FALSE) &&      
+1216   5                       (lrwpan_db.start.active == FALSE) &&
+1217   5                       (lrwpan_db.cfg.active == FALSE))
+1218   5                    {
+1219   6                      lrwpan_cfg_evnt_msg_t* cfg_msg = (lrwpan_cfg_evnt_msg_t*)state->state;
+1220   6                      lrwpan_db.cfg.active = TRUE;  
+1221   6                      lrwpan_db.cfg.app_id = state->msg_hdr.src_app_id;
+1222   6                      lrwpan_db.cfg.params =  cfg_msg->attribute;
+1223   6                      lrwpan_SendAttributeSetReq(cfg_msg->attribute, 
+1224   6                        (u8*)&cfg_msg[sizeof(lrwpan_cfg_evnt_msg_t) - sizeof(pib_value_t)]);
+1225   6                    }
+1226   5                  break;  
+1227   5                  
+1228   5                  default:
+1229   5                  break;          
+1230   5                } 
+1231   4              }
+1232   3            } 
+1233   2            else if(state->eventproto == IEEE802_15_4_MAC_ID)
+1234   2            {
+1235   3              switch(state->event) 
+1236   3              {     
+1237   4                case MLME_RESET_CONFIRM:
+1238   4                  if(state->statedata != NULL)
+1239   4                  {               
+1240   5                    mlme_reset_conf_t* reset_cnf = (mlme_reset_conf_t*)state->statedata;
+1241   5                    
+1242   5                    if(reset_cnf->status != STATUS_SUCCESS)
+1243   5                    { 
+1244   6                      lrwpan_SendResetReq(FALSE);
+1245   6                    }
+1246   5                    else
+1247   5                    {
+1248   6                      GV701x_LrwpanSendEvent(LRWPAN_DWN_IND, reset_cnf->status, 0);
+1249   6                    }
+1250   5                  }
+1251   4                break;
+1252   4      
+1253   4                case MLME_SET_CONFIRM:
+1254   4                  if(state->statedata != NULL)
+1255   4                  {               
+1256   5                    mlme_set_conf_t* set_cnf = (mlme_set_conf_t*)state->statedata;
+1257   5                    if((lrwpan_db.cfg.active == TRUE) && 
+1258   5                      (lrwpan_db.cfg.params == set_cnf->PIBAttribute))
+1259   5                    {
+1260   6                      GV701x_LrwpanSendEvent(LRWPAN_CFG_IND, (set_cnf->status == MAC_SUCCESS ?
+1261   6                        STATUS_SUCCESS : STATUS_FAILURE), set_cnf->PIBAttribute);
+1262   6                    }
+1263   5                  }
+1264   4                break;  
+1265   4      
+1266   4                case MCPS_DATA_INDICATION:    
+1267   4                  if(state->statedata != NULL)
+1268   4                  {
+1269   5                    lrwpan_mcps_data_ind(state->statedata);           
+1270   5                  }
+1271   4                break;            
+1272   4      
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 22  
+
+1273   4                default:
+1274   4                break;
+1275   4              }
+1276   3            }
+1277   2          break;
+1278   2      
+1279   2          case LRWPAN_SCAN:
+1280   2          case LRWPAN_START:
+1281   2          case LRWPAN_DOWN: 
+1282   2            if(state->eventproto == APP_MAC_ID)
+1283   2            {     
+1284   3              if(state->msg_hdr.type == APP_MSG_TYPE_APPEVENT)
+1285   3              {     
+1286   4                switch(state->event) 
+1287   4                {
+1288   5                  /*Start event*/
+1289   5                  case LRWPAN_START_EVNT:             
+1290   5                    if((lrwpan_db.start.active == FALSE) &&
+1291   5                       (lrwpan_db.scan.active == FALSE))
+1292   5                    {
+1293   6                      lrwpan_db.start.active = TRUE;  
+1294   6                      lrwpan_db.start.app_id = state->msg_hdr.src_app_id;
+1295   6                      lrwpan_device_config();
+1296   6                      GV701x_LrwpanDriverStart();
+1297   6                    }
+1298   5                  break;                  
+1299   5      
+1300   5                  /*Scan event*/
+1301   5                  case LRWPAN_SCAN_EVNT:  
+1302   5                    if((lrwpan_db.scan.active == FALSE) &&      
+1303   5                       (lrwpan_db.start.active == FALSE))         
+1304   5                    {
+1305   6                      lrwpan_db.scan.active = TRUE; 
+1306   6                      lrwpan_db.scan.prev_state = state->state;
+1307   6                      state->state = LRWPAN_SCAN;
+1308   6                      lrwpan_db.scan.app_id = state->msg_hdr.src_app_id;
+1309   6                      lrwpan_SendScanReq(lrwpan_db.scan.type, lrwpan_db.scan.ch_mask, 
+1310   6                          lrwpan_db.scan.time, 0, NULL);              
+1311   6                    }
+1312   5                  break;  
+1313   5      
+1314   5                  /*Configuration event*/
+1315   5                  case LRWPAN_CFG_EVNT: 
+1316   5                    if((lrwpan_db.scan.active == FALSE) &&      
+1317   5                       (lrwpan_db.start.active == FALSE) &&
+1318   5                       (lrwpan_db.cfg.active == FALSE))
+1319   5                    {
+1320   6                      lrwpan_cfg_evnt_msg_t* cfg_msg = (lrwpan_cfg_evnt_msg_t*)state->state;
+1321   6                      lrwpan_db.cfg.active = TRUE;  
+1322   6                      lrwpan_db.cfg.app_id = state->msg_hdr.src_app_id;
+1323   6                      lrwpan_db.cfg.params =  cfg_msg->attribute;
+1324   6                      lrwpan_SendAttributeSetReq(cfg_msg->attribute,
+1325   6                        (u8*)&cfg_msg[sizeof(lrwpan_cfg_evnt_msg_t) - sizeof(pib_value_t)]);
+1326   6                    }
+1327   5                  break;  
+1328   5      
+1329   5                  case LRWPAN_STOP_EVNT:
+1330   5                    lrwpan_db.start.active = FALSE; 
+1331   5                    lrwpan_db.start.app_id = state->msg_hdr.src_app_id;           
+1332   5                    GV701x_LrwpanDriverFlush();
+1333   5                  break;
+1334   5                  
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 23  
+
+1335   5                  default:
+1336   5                  break;            
+1337   5                }
+1338   4              }
+1339   3            }
+1340   2            else if(state->eventproto == IEEE802_15_4_MAC_ID)
+1341   2            {
+1342   3              switch(state->event) 
+1343   3              {     
+1344   4                /*Start complete event*/
+1345   4                case MLME_BEACON_NOTIFY_INDICATION: 
+1346   4                  if(state->statedata != NULL)            
+1347   4                  {
+1348   5      #if 0           
+                            GV701x_LrwpanBcnUpdate((mlme_beacon_notify_ind_t*)state->statedata);
+              #endif
+1351   5                  }
+1352   4                break;  
+1353   4                
+1354   4                /*Start complete event*/
+1355   4                case MLME_SCAN_CONFIRM:             
+1356   4                  GV701x_LrwpanScanInd(state->statedata);           
+1357   4                break;  
+1358   4                
+1359   4                case MLME_START_CONFIRM:
+1360   4                  if(state->statedata != NULL)
+1361   4                  {         
+1362   5                    mlme_start_conf_t* cnf = (mlme_start_conf_t*)state->statedata;
+1363   5                    if(cnf->status == MAC_SUCCESS)                
+1364   5                      GV701x_LrwpanSendEvent(LRWPAN_UP_IND, STATUS_SUCCESS, 0);
+1365   5                    else
+1366   5                      GV701x_LrwpanSendEvent(LRWPAN_DWN_IND, STATUS_SUCCESS, 0);
+1367   5                  }         
+1368   4                break;
+1369   4      
+1370   4                case MLME_SET_CONFIRM:
+1371   4                  if(state->statedata != NULL)
+1372   4                  {               
+1373   5                    mlme_set_conf_t* set_cnf = (mlme_set_conf_t*)state->statedata;
+1374   5                    if((lrwpan_db.cfg.active == TRUE) && 
+1375   5                      (lrwpan_db.cfg.params == set_cnf->PIBAttribute))
+1376   5                    {
+1377   6                      GV701x_LrwpanSendEvent(LRWPAN_CFG_IND, (set_cnf->status == MAC_SUCCESS ?
+1378   6                        STATUS_SUCCESS : STATUS_FAILURE), set_cnf->PIBAttribute);
+1379   6                    }
+1380   5                  }
+1381   4                break;  
+1382   4      
+1383   4                case MCPS_DATA_INDICATION:    
+1384   4                  if(state->statedata != NULL)
+1385   4                  {
+1386   5                    lrwpan_mcps_data_ind(state->statedata);           
+1387   5                  }
+1388   4                break;
+1389   4                
+1390   4                default:
+1391   4                break;
+1392   4              }
+1393   3            }       
+1394   2          break;
+1395   2                        
+1396   2          case LRWPAN_UP:
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 24  
+
+1397   2            if(state->eventproto == APP_MAC_ID)
+1398   2            { 
+1399   3              if(state->msg_hdr.type == APP_MSG_TYPE_APPEVENT)
+1400   3              {     
+1401   4                switch(state->event) 
+1402   4                {
+1403   5                  /*Start event*/
+1404   5                  case LRWPAN_START_EVNT:           
+1405   5                    if((lrwpan_db.start.active == FALSE) &&
+1406   5                       (lrwpan_db.scan.active == FALSE))
+1407   5                    {
+1408   6                      lrwpan_db.start.active = TRUE;  
+1409   6                      lrwpan_db.start.app_id = state->msg_hdr.src_app_id;
+1410   6                      lrwpan_device_config();
+1411   6                      GV701x_LrwpanDriverStart();
+1412   6                    }
+1413   5                  break;
+1414   5      
+1415   5                  /*Scan event*/
+1416   5                  case LRWPAN_SCAN_EVNT:      
+1417   5                    if((lrwpan_db.scan.active == FALSE) &&      
+1418   5                       (lrwpan_db.start.active == FALSE))         
+1419   5                    {           
+1420   6                      lrwpan_db.scan.active = TRUE;
+1421   6                      lrwpan_db.scan.prev_state = state->state;
+1422   6                      state->state = LRWPAN_SCAN;
+1423   6                      lrwpan_db.scan.app_id = state->msg_hdr.src_app_id;
+1424   6                      lrwpan_SendScanReq(lrwpan_db.scan.type, lrwpan_db.scan.ch_mask, 
+1425   6                          lrwpan_db.scan.time, 0, NULL);              
+1426   6                    }
+1427   5                  break;  
+1428   5      
+1429   5                  /*Configuration event*/
+1430   5                  case LRWPAN_CFG_EVNT: 
+1431   5                    if((lrwpan_db.scan.active == FALSE) &&      
+1432   5                       (lrwpan_db.start.active == FALSE) &&
+1433   5                       (lrwpan_db.cfg.active == FALSE))
+1434   5                    {
+1435   6                      lrwpan_cfg_evnt_msg_t* cfg_msg = (lrwpan_cfg_evnt_msg_t*)state->state;
+1436   6                      lrwpan_db.cfg.active = TRUE;  
+1437   6                      lrwpan_db.cfg.app_id = state->msg_hdr.src_app_id;
+1438   6                      lrwpan_db.cfg.params =  cfg_msg->attribute;
+1439   6                      lrwpan_SendAttributeSetReq(cfg_msg->attribute, 
+1440   6                        (u8*)&cfg_msg[sizeof(lrwpan_cfg_evnt_msg_t) - sizeof(pib_value_t)]);
+1441   6                    }
+1442   5                  break;  
+1443   5      
+1444   5                  case LRWPAN_STOP_EVNT:
+1445   5                    lrwpan_db.start.active = FALSE; 
+1446   5                    lrwpan_db.start.app_id = state->msg_hdr.src_app_id; 
+1447   5                    GV701x_LrwpanDriverFlush();
+1448   5                  break;
+1449   5                  
+1450   5                  default:
+1451   5                  break;
+1452   5                }
+1453   4              }
+1454   3            }
+1455   2            else if(state->eventproto == IEEE802_15_4_MAC_ID)
+1456   2            {
+1457   3              switch(state->event)
+1458   3              {     
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 25  
+
+1459   4                case MCPS_DATA_CONFIRM:
+1460   4                  if(state->statedata != NULL)            
+1461   4                  {
+1462   5                    mcps_data_conf_t* data_cnf = (mcps_data_conf_t*)(state->statedata);
+1463   5                  }
+1464   4                break;
+1465   4                
+1466   4                case MCPS_DATA_INDICATION:    
+1467   4                  if(state->statedata != NULL)
+1468   4                  {
+1469   5                    lrwpan_mcps_data_ind(state->statedata);           
+1470   5                  }
+1471   4                break;  
+1472   4      
+1473   4                case MLME_SET_CONFIRM:
+1474   4                  if(state->statedata != NULL)
+1475   4                  {               
+1476   5                    mlme_set_conf_t* set_cnf = (mlme_set_conf_t*)state->statedata;              
+1477   5                    if((lrwpan_db.cfg.active == TRUE) && 
+1478   5                      (lrwpan_db.cfg.params == set_cnf->PIBAttribute))
+1479   5                    {
+1480   6                      GV701x_LrwpanSendEvent(LRWPAN_CFG_IND, (set_cnf->status == MAC_SUCCESS ?
+1481   6                        STATUS_SUCCESS : STATUS_FAILURE), set_cnf->PIBAttribute);
+1482   6                    }
+1483   5                  }
+1484   4                break;  
+1485   4                
+1486   4                default:
+1487   4                break;
+1488   4              }
+1489   3            }
+1490   2          break;
+1491   2          
+1492   2          default:
+1493   2          break;
+1494   2        }
+1495   1      
+1496   1      
+1497   1        state->event = LRWPAN_IDLE_EVNT;  
+1498   1        state->eventtype = 0;
+1499   1        state->eventclass = 0;
+1500   1        state->eventproto = 0;
+1501   1        state->statedata = NULL;  
+1502   1        state->statedatalen = 0;  
+1503   1        memset((u8*)&state->msg_hdr, 0x00, sizeof(gv701x_app_msg_hdr_t)); 
+1504   1      }
+1505          
+1506          /******************************************************************************
+1507           * @fn      GV701x_LrwpanCmdProcess
+1508           *
+1509           * @brief   It handles application command line requests
+1510           *
+1511           * @param   CmdBuf - command string
+1512           *
+1513           * @return  none
+1514           *
+1515           */
+1516          
+1517          void GV701x_LrwpanCmdProcess(char* CmdBuf) 
+1518          {
+1519   1      #if 1
+1520   1        if(strcmp(CmdBuf, "state") == 0) 
+C51 COMPILER V9.53.0.0   GV701X_LRWPANDRIVER                                               11/04/2015 20:09:53 PAGE 26  
+
+1521   1        {
+1522   2          printf("\nLrwpan S %bu E %bu", lrwpan_state.state, lrwpan_state.event);       
+1523   2        }
+1524   1        else if(strcmp(CmdBuf, "stats") == 0) 
+1525   1        {
+1526   2          printf("\nLrwpan pan %x ch %bx chmask %lx", lrwpan_db.panid, lrwpan_db.channel, 
+1527   2                lrwpan_db.scan.ch_mask);    
+1528   2        } 
+1529   1        else if(strcmp(CmdBuf, "nvclear") == 0) 
+1530   1        {
+1531   2          GV701x_FlashErase(lrwpan_db.app_id);
+1532   2        }
+1533   1      #else
+                CmdBuf = CmdBuf;
+              #endif  
+1536   1      } 
+1537          #endif /*LRWPAN_DRIVER_APP*/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   7492    ----
+   CONSTANT SIZE    =    169    ----
+   XDATA SIZE       =    239    1969
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

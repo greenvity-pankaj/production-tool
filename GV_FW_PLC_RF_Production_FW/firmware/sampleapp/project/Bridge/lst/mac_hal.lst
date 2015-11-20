@@ -1,0 +1,1959 @@
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE MAC_HAL
+OBJECT MODULE PLACED IN .\obj\mac_hal.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\zigbee\mac_hal.c LARGE OBJECTADVANCED OPTIMIZE(9,SI
+                    -ZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\..
+                    -\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\hal;
+                    -..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\firmw
+                    -are\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee;.
+                    -.\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;.
+                    -.\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\inc;
+                    -..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;..\
+                    -..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\hp
+                    -gp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\..
+                    -\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\com
+                    -ponents\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\fl
+                    -ash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities;.
+                    -.\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nwk\
+                    -inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\..
+                    -\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_80
+                    -51,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,UM
+                    -,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETECT
+                    -,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT,M
+                    -CCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGIST
+                    -ER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\mac_hal.lst) TABS(2) OBJ
+                    -ECT(.\obj\mac_hal.obj)
+
+line level    source
+
+   1          /**
+   2           * @file mac_hal.c
+   3           *
+   4           * This file implements the radio state machine and provides general
+   5           * functionality used by the HAL.
+   6           *
+   7           * $Id: mac_hal.c,v 1.9 2014/11/26 13:19:41 ranjan Exp $
+   8           *
+   9           * Copyright (c) 2011, Greenvity Communication All rights reserved.
+  10           *
+  11           */
+  12          #ifdef HYBRII_802154
+  13          /* === INCLUDES ============================================================ */
+  14          #ifdef RTX51_TINY_OS
+  15          #include <rtx51tny.h>
+  16          #include "hybrii_tasks.h"
+  17          #endif
+  18          #include <stdio.h>
+  19          #include <string.h>
+  20          #include "papdef.h"
+  21          #include "timer.h"
+  22          #include "hal_common.h"
+  23          #include "gv701x_cfg.h"
+  24          #include "hybrii_802_15_4_regs.h"
+  25          #include "return_val.h"
+  26          #include "mac_const.h"
+  27          #include "bmm.h"
+  28          #include "qmm.h"
+  29          #include "mac_msgs.h"
+  30          #include "mac_data_structures.h"
+  31          #include "mac_hal.h"
+  32          #include "mac_internal.h"
+  33          #include "utils_fw.h"
+  34          #include "mac.h"
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 2   
+
+  35          #include "mac_security.h"
+  36          #include "hpgpdef.h"
+  37          #include "fm.h"
+  38          
+  39          /* === TYPES =============================================================== */
+  40          
+  41          /* === MACROS ============================================================== */
+  42          
+  43          /* === GLOBALS ============================================================= */
+  44          
+  45          /*
+  46           * Global HAL variables
+  47           * These variables are only to be used by the HAL internally.
+  48           */
+  49          
+  50          /**
+  51           * Current state of the HAL state machine.
+  52           */
+  53          hal_state_t hal_state;
+  54          
+  55          /**
+  56           * Current state of the transceiver.
+  57           */
+  58          tal_trx_status_t tal_trx_status;
+  59          
+  60          /**
+  61           * Indicates if the transceiver needs to switch on its receiver by hal_task(),
+  62           * because it could not be switched on due to buffer shortage.
+  63           */
+  64          bool hal_rx_on_required;
+  65          
+  66          /**
+  67           * Pointer to the 15.4 frame created by the HAL to be handed over
+  68           * to the transceiver.
+  69           */
+  70          uint8_t *tal_frame_to_tx;
+  71          
+  72          /**
+  73           * Pointer to receive buffer that can be used to upload a frame from the trx.
+  74           */
+  75          buffer_t *hal_rx_buffer = NULL;
+  76          
+  77          /**
+  78           * Queue that contains all frames that are uploaded from the trx, but have not
+  79           * be processed by the MCL yet.
+  80           */
+  81          queue_t hal_incoming_frame_queue;
+  82          
+  83          /**
+  84           * Frame pointer for the frame structure provided by the MCL.
+  85           */
+  86          frame_info_t *mac_frame_p;
+  87          
+  88          /* Last frame length for IFS handling. */
+  89          uint8_t last_frame_length;
+  90          
+  91          /* Flag indicating awake end irq at successful wake-up from sleep. */
+  92          volatile bool tal_awake_end_flag;
+  93          
+  94          /**
+  95           * Timestamp
+  96           * The timestamping is only required for beaconing networks
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 3   
+
+  97           * or if timestamping is explicitly enabled.
+  98           */
+  99          uint32_t tal_rx_timestamp;
+ 100          
+ 101          /*
+ 102           * Flag indicating if beacon transmission is currently in progress.
+ 103           */
+ 104          bool tal_beacon_transmission;
+ 105          
+ 106          bool hybrii_mode = TRUE;
+ 107          
+ 108          tx_mode_t hal_current_tx_mode;
+ 109          
+ 110          static uint8_t hal_encrypt_key[16];
+ 111          static uint8_t hal_decrypt_key[16];
+ 112          static uint8_t hal_aes_ext_addr[8];
+ 113          
+ 114          static uint8_t max_ed_level;
+ 115          uint32_t scan_sample_counter;
+ 116          
+ 117          #ifdef Z_P_BRIDGE
+              bool zb_plc_bridging = TRUE;
+              #endif
+ 120          
+ 121          /* === PROTOTYPES ========================================================== */
+ 122          
+ 123          /* === IMPLEMENTATION ====================================================== */
+ 124          
+ 125          /**
+ 126           * Adds two time values
+ 127           *
+ 128           * This function adds two time values
+ 129           *
+ 130           * a Time value 1
+ 131           * b Time value 2
+ 132           *
+ 133           * return value of a + b
+ 134           */
+ 135          uint32_t mac_hal_add_time_symbols (uint32_t a, uint32_t b)
+ 136          {
+ 137   1          return ((a + b) & SYMBOL_MASK);
+ 138   1      }
+ 139          
+ 140          /**
+ 141           * Subtract two time values
+ 142           *
+ 143           * This function subtracts two time values taking care of roll over.
+ 144           *
+ 145           * a Time value 1
+ 146           * b Time value 2
+ 147           *
+ 148           * return value a - b
+ 149           */
+ 150          uint32_t mac_hal_sub_time_symbols (uint32_t a, uint32_t b)
+ 151          {
+ 152   1          if (a > b) {
+ 153   2              return ((a - b) & SYMBOL_MASK);
+ 154   2          } else {
+ 155   2              /* This is a roll over case */
+ 156   2              return (((MAX_SYMBOL_TIME - b) + a) & SYMBOL_MASK);
+ 157   2          }
+ 158   1      }
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 4   
+
+ 159          
+ 160          void mac_hal_mac_busy_recover ()
+ 161          {
+ 162   1          uint32_t status;
+ 163   1      
+ 164   1          status = hal_common_reg_32_read(ZigStatus);
+ 165   1          if (status & ZIG_STATUS_CP_TX_FIFO_EMPTY) {
+ 166   2              if (TRUE == mac_busy) {
+ 167   3                  MAC_NOT_BUSY();
+ 168   3                  hal_common_reg_bit_set(ZigCtrl,
+ 169   3                                         ZIG_CTRL_TX_SOFT_RESET);
+ 170   3                  hal_common_reg_bit_clear(ZigCtrl,
+ 171   3                                           ZIG_CTRL_TX_SOFT_RESET);
+ 172   3                  mac_hal_intf_tx_frame_done(MAC_SUCCESS,
+ 173   3                                             mac_frame_p);
+ 174   3              }
+ 175   2          }
+ 176   1      }
+ 177          
+ 178          #ifdef RTX51_TINY_OS
+ 179          void hal_zb_pre_bc_tx_time_handler (void)
+ 180          {
+ 181   1          if (TRUE == hal_pib_PrivatePanCoordinator) {
+ 182   2              mac_beacon_send_cb();
+ 183   2          }
+ 184   1      }
+ 185          
+ 186          void hal_zb_bc_tx_time_handler (void)
+ 187          {
+ 188   1          mac_hal_get_current_time_symbols(&hal_pib_BeaconTxTime);
+ 189   1          mac_hal_pib_set(macBeaconTxTime, (void *)&hal_pib_BeaconTxTime);
+ 190   1      }
+ 191          
+ 192          void hal_zb_bc_tx_done_hadler (void)
+ 193          {
+ 194   1      #ifdef HYBRII_ASIC
+ 195   1      #ifndef HYBRII_ASIC_A2
+              #ifndef HYBRII_FPGA_A2
+                  gv701x_cfg_zb_afe_set_vco_rx(hal_pib_CurrentChannel);
+              #endif
+              #endif
+ 200   1      #endif
+ 201   1          mac_hal_intf_tx_frame_done(HAL_BC_TX_DONE, NULL);
+ 202   1          hal_state = HAL_IDLE;
+ 203   1      }
+ 204          
+ 205          void hal_zb_tx_done_handler (void)
+ 206          {
+ 207   1          retval_t tx_status;
+ 208   1      
+ 209   1          MAC_NOT_BUSY();
+ 210   1      #ifdef HYBRII_ASIC
+ 211   1      #ifndef HYBRII_ASIC_A2
+              #ifndef HYBRII_FPGA_A2
+                  gv701x_cfg_zb_afe_set_vco_rx(hal_pib_CurrentChannel);
+              #endif
+              #endif
+ 216   1      #endif
+ 217   1      #ifdef Z_P_BRIDGE
+                  if (NULL == mac_frame_p && FALSE == zb_plc_bridging) {
+              #else
+ 220   1          if (NULL == mac_frame_p) {
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 5   
+
+ 221   2      #endif
+ 222   2              //printf("\nInvalid mac_frame_p\n");
+ 223   2              return;
+ 224   2          }
+ 225   1          /* 
+ 226   1           * Read the timestamp. In non-beacon network, Beacon Counter is
+ 227   1           * a free running counter
+ 228   1           */
+ 229   1          mac_hal_get_current_time_symbols(&mac_frame_p->time_stamp);
+ 230   1          tx_status = hal_common_bit_field_reg_read(ZIG_TX_STATUS);
+ 231   1          switch (tx_status) {
+ 232   2          case TX_STATUS_NO_ACK:
+ 233   2              tx_status = MAC_NO_ACK;
+ 234   2              break;
+ 235   2          case TX_STATUS_OK_DATA_PENDING:
+ 236   2              tx_status = HAL_FRAME_PENDING;
+ 237   2              mac_stats_g.frame_pending++;
+ 238   2              break;
+ 239   2          case TX_STATUS_OK:
+ 240   2              tx_status = MAC_SUCCESS;
+ 241   2              break;
+ 242   2          case TX_STATUS_NO_CCA:
+ 243   2          case TX_STATUS_HANG_RECOVERED:
+ 244   2          default:
+ 245   2              /*
+ 246   2               * tx_status is defined in IEEE 802.15.4 spec.
+ 247   2               * There are not enough error code for each failure cases.          * Thus, all failure cases are 
+             -treated as CCA failure.
+ 248   2               * H/W does keep track statistics for each failure case.
+ 249   2               */
+ 250   2              tx_status = MAC_CHANNEL_ACCESS_FAILURE;
+ 251   2              break;
+ 252   2          }
+ 253   1          mac_hal_intf_tx_frame_done(tx_status, mac_frame_p);
+ 254   1          mac_frame_p = NULL;
+ 255   1      }
+ 256          #else
+              
+              static void mac_hal_handler_beacon_interrupt (uint32_t value)
+              {
+                  if (value & CPU_INT_ZB_PRE_BC_TX_TIME) {
+                      hal_zb_pre_bc_tx_time_handler();
+                  }
+              
+                  if (value & CPU_INT_ZB_BC_TX_TIME) {
+                      hal_zb_bc_tx_time_handler();
+                  }
+              }
+              
+              static void mac_hal_handle_zigbee_irq (void)
+              {    
+                  uint32_t value;
+              
+                  EA = 0;
+                  value = hal_common_reg_32_read(CPU_INTSTATUS_REG);
+                  hal_common_reg_32_write(CPU_INTSTATUS_REG, value);
+                  EA = 1;
+              
+              #ifndef _EXT_INT_ENABLE_
+                  mac_hal_handler_beacon_interrupt(value);
+              #endif
+              
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 6   
+
+                  if (value & CPU_INT_ZB_BC_TX_DONE) {
+                      hal_zb_bc_tx_done_hadler();
+                  }
+              
+                  if (value & CPU_INT_ZB_RX_CRC_ERR) {
+                      /* Keeping statistics */
+                  }
+                 
+                  if (value & CPU_INT_ZB_TX_DONE) {
+                      hal_zb_tx_done_handler();      
+                  }
+              
+                  if (value & CPU_INT_ZB_RX_DONE) {
+                      if (hybrii_mode) {
+                          CHAL_CpuTxQNemptyIntHandler();
+                      } else {
+                          /*
+                           * For Greenlite mode, pull the packet directly from RX FIFO
+                           */
+                          mac_hal_poll_rx_fifo_for_packet();
+                      }
+                  }
+                  
+                  if (value & CPU_INT_ZB_TX_DROP_NO_ACK) {
+                      /* Keeping statistics */
+                  }
+              }
+              
+              /**
+               * MAC interrupt handler
+               *
+               * This function handles the Zigbee MAC generated interrupts.
+               * trx_irq_handler_cb
+               */
+              void mac_hal_irq_handler (void)
+              {
+                  /* 
+                   * FIXME - Will move this function to hal_common.c
+                   * Need to read Interrupt status and call the appropriate
+                   * ISR Handling routine
+                   */
+                  mac_hal_handle_zigbee_irq();
+              }
+              #endif
+ 326          
+ 327          void mac_hal_ed_read ()
+ 328          {
+ 329   1          uint8_t retry = 0;
+ 330   1          uint8_t ed_level;
+ 331   1      
+ 332   1          if (scan_sample_counter) {
+ 333   2              scan_sample_counter--;
+ 334   2          }
+ 335   1          if (0 == scan_sample_counter) {
+ 336   2              hal_state = HAL_ED_DONE;
+ 337   2      
+ 338   2              hal_common_reg_8_bit_clear(PHY_SCAN_CONTROL, PHY_SCAN_START);
+ 339   2              while (hal_common_reg_8_bit_test(PHY_RSSI_REPORT_STATUS, 
+ 340   2                                               PHY_RSSI_REPORT_VLD) == false) {
+ 341   3                  if (retry++ > 50) {
+ 342   4                      return;
+ 343   4                  }
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 7   
+
+ 344   3              }
+ 345   2              ed_level = ReadU8Reg(PHY_SCAN_RSSI_REPORT);
+ 346   2              if (max_ed_level < ed_level) {
+ 347   3                  max_ed_level = ed_level;
+ 348   3              }
+ 349   2          }
+ 350   1      }
+ 351          
+ 352          void mac_hal_ed_start (uint8_t scan_duration)
+ 353          {
+ 354   1        hal_state = HAL_IDLE;
+ 355   1          if (HAL_IDLE != hal_state) {
+ 356   2              return;
+ 357   2          }
+ 358   1      
+ 359   1          hal_state = HAL_ED_RUNNING;
+ 360   1      
+ 361   1          max_ed_level = 0;
+ 362   1      
+ 363   1          scan_sample_counter = SCAN_DURATION_TO_SYMBOLS(scan_duration) / 
+ 364   1                                ED_SAMPLE_DURATION_SYM;
+ 365   1          hal_common_reg_8_bit_set(PHY_SCAN_CONTROL, PHY_SCAN_START);
+ 366   1      }
+ 367          
+ 368          static void mac_hal_set_tx_mode (tx_mode_t tx_mode)
+ 369          {
+ 370   1          if (tx_mode == NO_CSMA) {
+ 371   2              if (hal_current_tx_mode != tx_mode) {
+ 372   3                  hal_common_bit_field_reg_write(ZIG_TX_BKOFF_ENGINE_DIS, TRUE);
+ 373   3                  hal_current_tx_mode = tx_mode;
+ 374   3              }
+ 375   2          } else {
+ 376   2              if (hal_current_tx_mode == NO_CSMA) {
+ 377   3                  hal_common_bit_field_reg_write(ZIG_TX_BKOFF_ENGINE_DIS, FALSE);
+ 378   3              }
+ 379   2              if (tx_mode == CSMA_UNSLOTTED) {
+ 380   3                  if (hal_current_tx_mode != tx_mode) {
+ 381   4                      hal_common_bit_field_reg_write(ZIG_NON_BEACON_NWK, TRUE);
+ 382   4                      hal_current_tx_mode = tx_mode;
+ 383   4                  }
+ 384   3              } else {
+ 385   3                  if (hal_current_tx_mode != tx_mode) {
+ 386   4                      hal_common_bit_field_reg_write(ZIG_NON_BEACON_NWK, FALSE);
+ 387   4                      hal_current_tx_mode = tx_mode;
+ 388   4                  }
+ 389   3              }
+ 390   2          }
+ 391   1      }
+ 392          
+ 393          static bool mac_aes_available (uint32_t *aes_reg_value)
+ 394          {
+ 395   1          uint16_t retry;
+ 396   1      
+ 397   1          retry = 0;
+ 398   1          while (1) {
+ 399   2              *aes_reg_value = hal_common_reg_32_read(ZigAESKeyAddr);
+ 400   2              if (*aes_reg_value & ZIG_AES_ENCRYPT_EN ||
+ 401   2                  *aes_reg_value & ZIG_AES_DECRYPT_EN) {
+ 402   3                  if (retry ++ > ZIGBEE_MAC_RETRY_MAX) {
+ 403   4                      //printf("\nAES is busy\n");
+ 404   4                      return (FALSE);
+ 405   4                  }
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 8   
+
+ 406   3              } else {
+ 407   3                  break;
+ 408   3              }
+ 409   2          }
+ 410   1      
+ 411   1          return (TRUE);
+ 412   1      }
+ 413          
+ 414          static retval_t mac_hal_encrypt_enable (tinybool use_beacon_template)
+ 415          {
+ 416   1          uint32_t value;
+ 417   1      
+ 418   1          if (FALSE == mac_aes_available(&value)) {
+ 419   2              return (MAC_TX_ACTIVE);
+ 420   2          }
+ 421   1      
+ 422   1      #ifdef _BC_SECURE_TEST_
+ 423   1      {
+ 424   2      #ifdef ZBMAC_DIAG
+                  extern tinybool use_bc_template_g;
+                  
+                  use_beacon_template = use_bc_template_g;
+              #endif  
+ 429   2      }
+ 430   1      #endif
+ 431   1      
+ 432   1          value |= ZIG_AES_ENCRYPT_EN;
+ 433   1          if (TRUE == use_beacon_template) {
+ 434   2              /* 
+ 435   2               * Indicate to MAC ASIC that the 
+ 436   2               * packet will be put in Beacon Template and send according
+ 437   2               * to beacon interval.
+ 438   2               */
+ 439   2               value &= ~ZIG_AES_BEACON_TO_TX_FIFO;
+ 440   2          } else {
+ 441   2              /* 
+ 442   2               * Indicate to MAC ASIC that the 
+ 443   2               * packet will be sending right away after encrypt
+ 444   2               * This is needed as the beacon will be send in unslotted CSMA
+ 445   2               * S/W set this blinding regardless of packet types but the ASIC
+ 446   2               * only look at this info for beacon packets.
+ 447   2               */
+ 448   2               value |= ZIG_AES_BEACON_TO_TX_FIFO;
+ 449   2          }
+ 450   1          hal_common_reg_32_write(ZigAESKeyAddr, value);
+ 451   1      
+ 452   1          return (MAC_SUCCESS);
+ 453   1      }
+ 454          
+ 455          static retval_t mac_hal_decrypt_enable ()
+ 456          {
+ 457   1          uint32_t value;
+ 458   1      
+ 459   1          if (FALSE == mac_aes_available(&value)) {
+ 460   2              return (MAC_FAILURE);
+ 461   2          }
+ 462   1      
+ 463   1          value |= ZIG_AES_DECRYPT_EN;
+ 464   1          hal_common_reg_32_write(ZigAESKeyAddr, value);
+ 465   1      
+ 466   1          return (MAC_SUCCESS);
+ 467   1      }
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 9   
+
+ 468          
+ 469          retval_t mac_hal_write_frame_to_fifo (uint8_t *frame_p, uint8_t frame_len,
+ 470                                                hal_aes_t aes_type_e,
+ 471                                                tinybool use_beacon_template)
+ 472          {
+ 473   1          uint8_t  byte_count;
+ 474   1          uint8_t  offset;
+ 475   1          uint16_t retry;
+ 476   1          retval_t status        = MAC_SUCCESS;
+ 477   1          uint32_t tx_fifo_reg   = ZigTxRxFifo;
+ 478   1          uint32_t tx_status_reg = ZigStatus;
+ 479   1          uint32_t tx_status_bit = ZIG_STATUS_CP_TX_FIFO_EMPTY;
+ 480   1          
+ 481   1          if (AES_NONE != aes_type_e) {
+ 482   2              if (AES_DECRYPT == aes_type_e) {
+ 483   3                  status = mac_hal_decrypt_enable();
+ 484   3              } else {
+ 485   3                  status = mac_hal_encrypt_enable(use_beacon_template);
+ 486   3              }
+ 487   2              tx_fifo_reg   = ZigAESTxRxFifo;
+ 488   2              tx_status_reg = ZigTxBlockEn;
+ 489   2              tx_status_bit = ZIG_BLK_AES_IN_FIFO_EMPTY;
+ 490   2          }
+ 491   1      
+ 492   1          if (MAC_SUCCESS != status) {
+ 493   2              return (status);
+ 494   2          }
+ 495   1      
+ 496   1          retry = 0;
+ 497   1          while (1) {
+ 498   2              if (hal_common_reg_bit_test(tx_status_reg, tx_status_bit)) {
+ 499   3                  break;
+ 500   3              }
+ 501   2      
+ 502   2              if (retry ++ > ZIGBEE_MAC_RETRY_MAX) {
+ 503   3                  return (MAC_TX_ACTIVE);
+ 504   3              }
+ 505   2          }
+ 506   1      #ifdef HYBRII_ASIC
+ 507   1          if (AES_DECRYPT != aes_type_e) {
+ 508   2      #ifndef HYBRII_ASIC_A2
+              #ifndef HYBRII_FPGA_A2
+                      gv701x_cfg_zb_afe_set_vco_tx(hal_pib_CurrentChannel);
+              #endif
+              #endif
+ 513   2          }
+ 514   1      #endif
+ 515   1          WriteU8Reg(tx_fifo_reg, frame_len);  /* Write frame len */
+ 516   1          byte_count = 1;
+ 517   1          while (byte_count <= frame_len) {
+ 518   2              offset = byte_count++ % 4;
+ 519   2              WriteU8Reg(tx_fifo_reg + offset, *frame_p++);
+ 520   2          }
+ 521   1          /* Pad to word (4 bytes)  boundary */
+ 522   1          for (byte_count = offset + 1; byte_count < 4; byte_count++) {
+ 523   2              WriteU8Reg(tx_fifo_reg + byte_count, 0);
+ 524   2          }
+ 525   1      
+ 526   1          if (AES_DECRYPT != aes_type_e) {
+ 527   2              hal_state = HAL_SLOTTED_CSMA;
+ 528   2          }
+ 529   1      
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 10  
+
+ 530   1          if (AES_ENCRYPT == aes_type_e) {
+ 531   2              /* 
+ 532   2               * FIXME - Call routine from MAC
+ 533   2               * to increment the FrameCounter
+ 534   2               */
+ 535   2              mac_sec_pib.FrameCounter++;
+ 536   2          }
+ 537   1          return (MAC_SUCCESS);
+ 538   1      }
+ 539          
+ 540          
+ 541          /**
+ 542           * Requests to HAL to transmit frame
+ 543           *
+ 544           * tx_frame_p - Pointer to the frame_info_t
+ 545           *
+ 546           * Return:
+ 547           * MAC_SUCCESS - if the HAL has accepted the data from the MAC for frame
+ 548           *               transmission
+ 549           */
+ 550          retval_t mac_hal_tx_frame (frame_info_t *tx_frame_p, tx_mode_t tx_mode,
+ 551                                     tinybool encryption)
+ 552          {
+ 553   1          uint8_t   *frame_p;
+ 554   1          uint8_t   frame_len;
+ 555   1          retval_t  status = MAC_SUCCESS;
+ 556   1          hal_aes_t aes_type = AES_NONE;
+ 557   1          /*
+ 558   1           * Save the tx frame into global variable for so we can send confirmation
+ 559   1           * when the packet is sent
+ 560   1           */
+ 561   1          mac_frame_p = tx_frame_p;
+ 562   1      
+ 563   1          frame_p = tx_frame_p->mpdu_p;
+ 564   1      
+ 565   1          if (TRUE == encryption) {
+ 566   2              aes_type = AES_ENCRYPT;
+ 567   2          }
+ 568   1      
+ 569   1          /*
+ 570   1           * The 1st byte of the frame is the frame length
+ 571   1           */
+ 572   1          frame_len = *frame_p++;    
+ 573   1          if (frame_len <= aMaxPHYPacketSize) {
+ 574   2              if (tx_mode != GTS_SLOTTED) {
+ 575   3                  mac_hal_set_tx_mode(tx_mode); 
+ 576   3                  status = mac_hal_write_frame_to_fifo(frame_p, frame_len,
+ 577   3                                                       aes_type, FALSE);
+ 578   3              } else {
+ 579   3                  /* FIXME - Add code to support GTS TX when HW supports it */
+ 580   3              }
+ 581   2          } else {
+ 582   2              status = MAC_FRAME_TOO_LONG;
+ 583   2          }
+ 584   1      
+ 585   1          return (status);
+ 586   1      }
+ 587          
+ 588          /**
+ 589           * Requests to HAL to transmit beacon frame
+ 590           *
+ 591           * tx_frame_p - Pointer to the frame_info_t
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 11  
+
+ 592           *
+ 593           * Return:
+ 594           * MAC_SUCCESS - if the HAL has accepted the data from the MAC for frame
+ 595           *               transmission
+ 596           */
+ 597          retval_t mac_hal_tx_beacon (frame_info_t *tx_frame_p, tinybool encrypt)
+ 598          {
+ 599   1          uint8_t  *frame_p;
+ 600   1          uint8_t  frame_len;
+ 601   1          uint8_t  idx;
+ 602   1          uint8_t  value;
+ 603   1      
+ 604   1          retval_t status = MAC_SUCCESS;
+ 605   1      
+ 606   1          value = ReadU8Reg(ZigBeaconTemplate);
+ 607   1          if ((value & ZIG_BC_TEMPLATE_VALID) != 0) {
+ 608   2              return (MAC_FAILURE);
+ 609   2          }
+ 610   1      
+ 611   1          frame_p = tx_frame_p->mpdu_p;
+ 612   1          /*
+ 613   1           * The 1st byte of the frame is the frame length
+ 614   1           */
+ 615   1          frame_len = *frame_p & 0x7F;
+ 616   1          if (FALSE == encrypt) {
+ 617   2      #ifdef HYBRII_ASIC
+ 618   2      #ifndef HYBRII_ASIC_A2
+              #ifndef HYBRII_FPGA_A2
+                      gv701x_cfg_zb_afe_set_vco_tx(hal_pib_CurrentChannel);
+              #endif
+              #endif
+ 623   2      #endif    
+ 624   2              WriteU8Reg(ZigBeaconTemplate, frame_len);
+ 625   2      
+ 626   2              for (idx = 1; idx <= frame_len; idx++) {
+ 627   3                  WriteU8Reg(ZigBeaconTemplate + idx, frame_p[idx]);
+ 628   3              }
+ 629   2              WriteU8Reg(ZigBeaconTemplate,
+ 630   2                         frame_len | ZIG_BC_TEMPLATE_VALID);
+ 631   2          } else {
+ 632   2              status = mac_hal_write_frame_to_fifo(&frame_p[1], frame_len,
+ 633   2                                                   AES_ENCRYPT, TRUE);
+ 634   2          }
+ 635   1      
+ 636   1          return (status);
+ 637   1      }
+ 638          
+ 639          /**
+ 640           * Resets HAL TX, RX and sets the default PIB values if requested
+ 641           *
+ 642           */
+ 643          retval_t mac_hal_reset (bool set_default_pib)
+ 644          {
+ 645   1          /*
+ 646   1           * Do the reset stuff.
+ 647   1           * Set the default PIBs depending on the given parameter set_default_pib.
+ 648   1           * Do NOT generate random seed again.
+ 649   1           */
+ 650   1          if (set_default_pib == TRUE) {
+ 651   2              mac_hal_pib_init();
+ 652   2          }
+ 653   1      
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 12  
+
+ 654   1          mac_hal_pib_write_to_asic();
+ 655   1      
+ 656   1          return MAC_SUCCESS;
+ 657   1      }
+ 658          
+ 659          static void mac_hal_hw_init (void)
+ 660          {
+ 661   1          /*
+ 662   1           * Initialize ASIC implement specific registers
+ 663   1           */
+ 664   1          hal_common_bit_field_reg_write(ZIG_CLK_PER_USECS, CLOCKS_PER_USECS);
+ 665   1          hal_common_bit_field_reg_write(ZIG_CURRENT_BIT_RATE, 100);
+ 666   1          hal_common_bit_field_reg_write(ZIG_US_PER_SYMBOL, US_PER_SYMBOL);
+ 667   1      }
+ 668          
+ 669          void mac_hal_zig_tx_rx_control (uint8_t enable)
+ 670          {
+ 671   1          u32 xdata value32;
+ 672   1      
+ 673   1          value32 = ZIG_CTRL_TX_EN | ZIG_CTRL_RX_EN | ZIG_CTRL_ACK_EN;
+ 674   1          if (enable) {
+ 675   2              hal_common_reg_bit_set(ZigCtrl, value32);
+ 676   2          } else {
+ 677   2              hal_common_reg_bit_clear(ZigCtrl, value32);
+ 678   2          }
+ 679   1      }
+ 680          
+ 681          /**
+ 682           * HAL Init
+ 683           *
+ 684           */
+ 685          void mac_hal_init (void)
+ 686          {
+ 687   1          mac_frame_p = NULL;
+ 688   1          hal_state = HAL_IDLE;
+ 689   1          hal_rx_on_required = FALSE;
+ 690   1          hal_current_tx_mode = NO_CSMA;   // Should read Control Reg to set this
+ 691   1          mac_hal_hw_init();
+ 692   1          mac_hal_reset(TRUE);
+ 693   1          bmm_buffer_init();
+ 694   1          memset(hal_encrypt_key, 0, 16);
+ 695   1          memset(hal_decrypt_key, 0, 16);
+ 696   1          hal_rx_buffer = bmm_buffer_alloc(BUFFER_SIZE);
+ 697   1          if (NULL == hal_rx_buffer) {
+ 698   2              hal_rx_on_required = TRUE;
+ 699   2              printf("\nError - Cannot allocate RX buffer");
+ 700   2              return;
+ 701   2          }
+ 702   1          qmm_queue_init(&hal_incoming_frame_queue,
+ 703   1                         HAL_INCOMING_FRAME_QUEUE_CAPACITY);
+ 704   1      
+ 705   1          gv701x_cfg_zb_afe_init(hal_pib_CurrentChannel, TRUE);
+ 706   1      #ifdef HYBRII_ASIC
+ 707   1          gv701x_cfg_zb_phy_init();
+ 708   1      #endif
+ 709   1      
+ 710   1          mac_hal_zig_tx_rx_control(TRUE);
+ 711   1      #ifdef Z_P_BRIDGE
+                  mac_hal_bridge_config(TRUE);
+              #endif
+ 714   1      
+ 715   1      #ifdef RTX51_TINY_OS
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 13  
+
+ 716   1      #ifdef HAL_802154_TASK
+                  os_create_task(HAL_802154_TASK_ID);
+              #endif
+ 719   1      #endif
+ 720   1      }
+ 721          
+ 722          #ifdef Z_P_BRIDGE
+              extern void hpgp_pkt_bridge (sCommonRxFrmSwDesc* pRxFrmDesc, u8 frmLen);
+              #endif
+ 725          
+ 726          void mac_hal_qc_frame_rx (sCommonRxFrmSwDesc* rx_frame_info_p)
+ 727          {
+ 728   1          uint8_t       frame_len;
+ 729   1          frame_info_t  *receive_frame_p;
+ 730   1          uint8_t       *frame_ptr;
+ 731   1          uint8_t xdata *cp_addr_p;
+ 732   1          uint8_t       byte_count;
+ 733   1          uint8_t       i, j;
+ 734   1          uint8_t       num_of_read;
+ 735   1          uint8_t       zb_pkt_size;
+ 736   1      #ifdef _CRC_VERIFY_
+ 737   1          uint8_t       bytes_to_verify; 
+ 738   1          uint8_t       crc_byte_count;  
+ 739   1          uint8_t       *crc_data_p;
+ 740   1          uint16_t      crc16;
+ 741   1      #endif
+ 742   1          frame_len = (rx_frame_info_p->hdrDesc.s.frmLenHi << 
+ 743   1                       PKTQDESC1_FRMLENHI_POS) | 
+ 744   1                      rx_frame_info_p->hdrDesc.s.frmLenLo;
+ 745   1      
+ 746   1          if (frame_len > aMaxPHYPacketSize + 6) { // Include LQI, RSSI and 4 timestamp bytes
+ 747   2              mac_stats_g.rx_frame_too_big++;
+ 748   2              hal_common_free_frame(rx_frame_info_p);
+ 749   2              return;
+ 750   2          }
+ 751   1      
+ 752   1      #ifdef Z_P_BRIDGE
+                  if (zb_plc_bridging) {
+                      mac_stats_g.rx_pkts_count++;
+                      mac_stats_g.rx_bytes_count += (frame_len - 6);
+                      hpgp_pkt_bridge(rx_frame_info_p, frame_len - 8);
+                      return;
+                  }
+              #endif
+ 760   1      
+ 761   1          if (NULL == hal_rx_buffer) {
+ 762   2              mac_stats_g.rx_no_buffer++;
+ 763   2              hal_common_free_frame(rx_frame_info_p);
+ 764   2              hal_rx_buffer = bmm_buffer_alloc(BUFFER_SIZE);
+ 765   2      
+ 766   2          if (hal_rx_buffer== NULL) {
+ 767   3            FM_Printf(FM_APP, "\nba1.0");
+ 768   3          }
+ 769   2              hal_rx_on_required = TRUE;
+ 770   2      #ifdef RTX51_TINY_OS
+ 771   2      #ifdef MAC_802154_TASK
+              #ifdef HAL_802154_TASK      
+                  os_set_ready(HAL_802154_TASK_ID);
+              #endif      
+              #else
+ 776   2          os_set_ready(HPGP_TASK_ID_CTRL);
+ 777   2      #endif /* MAC_802154_TASK */
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 14  
+
+ 778   2      #ifdef UM
+ 779   2          pending_802154_task = TRUE;
+ 780   2      #endif
+ 781   2      #endif
+ 782   2              return;
+ 783   2          }
+ 784   1      
+ 785   1          receive_frame_p = (frame_info_t*)BMM_BUFFER_POINTER(hal_rx_buffer);
+ 786   1          /*
+ 787   1           * Need to reserve additional 3 bytes since we always read
+ 788   1           * a complete word if the len is not word boundary
+ 789   1           */
+ 790   1          frame_ptr = (uint8_t *)receive_frame_p + BUFFER_SIZE - frame_len -
+ 791   1                                 LENGTH_FIELD_LEN - 3;
+ 792   1          receive_frame_p->mpdu_p = frame_ptr;
+ 793   1          /* 1st byte is the length which include FCS but not LQI, RSSI and timestamp */
+ 794   1          zb_pkt_size  = frame_len - LQI_LEN - ED_VAL_LEN - 4;   // 4 bytes timestamp
+ 795   1          *frame_ptr++ = zb_pkt_size;
+ 796   1          
+ 797   1          byte_count = MIN(frame_len, HYBRII_CELLBUF_SIZE);
+ 798   1          cp_addr_p = CHAL_GetAccessToCP(rx_frame_info_p->cpArr[0]);
+ 799   1          // FIXME printf("\n");
+ 800   1          num_of_read = (byte_count + 3) / sizeof(uint32_t);
+ 801   1      #ifdef _CRC_VERIFY_
+ 802   1          bytes_to_verify = zb_pkt_size;
+ 803   1          crc_byte_count  = 0;
+ 804   1          crc16           = 0;
+ 805   1      #endif
+ 806   1      
+ 807   1          for (i = 0; i < num_of_read; i++) {
+ 808   2              (uint32_t)(*frame_ptr) = ReadU32Reg(cp_addr_p + (i * 4));
+ 809   2      #ifdef _CRC_VERIFY_
+ 810   2              crc_data_p = frame_ptr;
+ 811   2              for (j = 0; j < 4; j++) {
+ 812   3                  if (crc_byte_count++ < bytes_to_verify) {
+ 813   4                      crc16 = crc_ccitt_update(crc16, *crc_data_p++);
+ 814   4                  }
+ 815   3              }
+ 816   2      #endif
+ 817   2              // FIXME printf("%08lx ", *((u32 *)frame_ptr));
+ 818   2              frame_ptr += 4;
+ 819   2          }
+ 820   1      
+ 821   1          if (frame_len > HYBRII_CELLBUF_SIZE) {
+ 822   2              uint8_t bytes_cp;
+ 823   2              
+ 824   2              bytes_cp = frame_len - HYBRII_CELLBUF_SIZE;
+ 825   2              cp_addr_p = CHAL_GetAccessToCP(rx_frame_info_p->cpArr[1]);
+ 826   2               
+ 827   2              for (j = 0; j < bytes_cp; j++) {
+ 828   3                  *frame_ptr++ = ReadU8Reg(cp_addr_p + j);
+ 829   3              }
+ 830   2          }
+ 831   1      
+ 832   1          /*
+ 833   1           * Timestamp is at after 2 bytes of LQI and RSSI. We also need to add 1 more byte
+ 834   1           * since length of the packet is the 1st byte in mpdu_p
+ 835   1           */
+ 836   1          receive_frame_p->time_stamp = 
+ 837   1              mac_utils_byte_array_to_32_bit(&receive_frame_p->mpdu_p[zb_pkt_size + 3]);
+ 838   1          hal_common_free_frame(rx_frame_info_p);
+ 839   1      #ifdef _CRC_VERIFY_
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 15  
+
+ 840   1          //if (crc16 != 0 || frame_len != 133) {
+ 841   1          if (crc16 != 0) {
+ 842   2              mac_stats_g.rx_bad_crc++;
+ 843   2              if (false == hal_pib_PromiscuousMode) {            
+ 844   3                  for (i = 0; i < frame_len; i++) {
+ 845   4                      //printf("%02bx ", receive_frame_p->mpdu_p[i+1]);
+ 846   4                  }
+ 847   3                  //printf("\n");
+ 848   3                  return;
+ 849   3              }
+ 850   2          }
+ 851   1      #endif 
+ 852   1      
+ 853   1          /* Append received frame to incoming_frame_queue and get new rx buffer. */
+ 854   1          qmm_queue_append(&hal_incoming_frame_queue, hal_rx_buffer);
+ 855   1      #ifdef RTX51_TINY_OS
+ 856   1      
+ 857   1      #ifdef HAL_802154_TASK
+                  os_set_ready(HAL_802154_TASK_ID);
+              #else
+ 860   1      #ifdef MAC_802154_TASK
+                os_set_ready(MAC_802154_TASK_ID);
+              #else
+ 863   1        os_set_ready(HPGP_TASK_ID_CTRL);
+ 864   1      #endif /* MAC_802154_TASK */
+ 865   1      #ifdef UM
+ 866   1        pending_802154_task = TRUE;
+ 867   1      #endif
+ 868   1      #endif
+ 869   1      #endif
+ 870   1          /* The previous buffer is eaten up and a new buffer is not assigned yet. */
+ 871   1          hal_rx_buffer = bmm_buffer_alloc(BUFFER_SIZE);
+ 872   1      
+ 873   1          /* Check if receive buffer is available */
+ 874   1          if (NULL == hal_rx_buffer) {
+ 875   2              /*
+ 876   2               * FIXME - Turn off the Rx Transiver until we can allocate a RX 
+ 877   2               * buffer
+ 878   2               */
+ 879   2          FM_Printf(FM_APP, "\nba1.1");
+ 880   2              hal_rx_on_required = TRUE;
+ 881   2          }
+ 882   1      }
+ 883          
+ 884          /**
+ 885           *
+ 886           * trx_cmd - the trx commands
+ 887           *
+ 888           * return current trx state
+ 889           */
+ 890          tal_trx_status_t mac_hal_trx_state (trx_cmd_t trx_cmd)
+ 891          {
+ 892   1          trx_cmd = trx_cmd;
+ 893   1          
+ 894   1          return (RX_ON);
+ 895   1      }
+ 896          
+ 897          /**
+ 898           *
+ 899           */
+ 900          uint8_t mac_hal_hw_control (uint8_t command)
+ 901          {
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 16  
+
+ 902   1          switch (command) {
+ 903   2          case PHY_TRX_OFF:
+ 904   2              hal_common_reg_bit_clear(ZigCtrl, ZIG_CTRL_TX_EN);
+ 905   2              hal_common_reg_bit_clear(ZigCtrl, ZIG_CTRL_RX_EN);
+ 906   2              break;
+ 907   2          case PHY_RX_ON:
+ 908   2              hal_common_reg_bit_set(ZigCtrl, ZIG_CTRL_RX_EN |
+ 909   2                                              ZIG_CTRL_ACK_EN);
+ 910   2              break;
+ 911   2          case PHY_TX_ON:
+ 912   2              hal_common_reg_bit_set(ZigCtrl, ZIG_CTRL_TX_EN);
+ 913   2              break;
+ 914   2          default:
+ 915   2              break;
+ 916   2          }
+ 917   1      
+ 918   1          return (command);
+ 919   1      }
+ 920          
+ 921          /**
+ 922           *
+ 923           */
+ 924          void mac_hal_get_current_time_symbols (uint32_t *current_time)
+ 925          {
+ 926   1          /*
+ 927   1           * 24-bit value per 802.15.4 spec
+ 928   1           */
+ 929   1          *current_time = hal_common_reg_32_read(ZigBeaconCounter) & 
+ 930   1                          0x00FFFFFF;
+ 931   1      }
+ 932          
+ 933          /**
+ 934           *
+ 935           */
+ 936          void mac_hal_get_current_time (uint32_t *current_time)
+ 937          {
+ 938   1          /*
+ 939   1           * Set TIMER READ ENABLE bit in order to read a free
+ 940   1           * running counter as the beacon counter and free
+ 941   1           * running counter are overloaded in h/w register
+ 942   1           * address.
+ 943   1           */
+ 944   1          hal_common_reg_bit_set(ZigTxBlockEn, ZIG_BLK_TIMER_READ_ENABLE);
+ 945   1          *current_time = hal_common_reg_32_read(ZigBeaconCounter) & 
+ 946   1                          0x00FFFFFF;
+ 947   1          hal_common_reg_bit_clear(ZigTxBlockEn, ZIG_BLK_TIMER_READ_ENABLE);
+ 948   1      }
+ 949          
+ 950          /**
+ 951           * This function parses the received frame and creates the frame_info_t
+ 952           * structure to be sent to the MAC as a parameter of hal_rx_frame_cb().
+ 953           *
+ 954           * buf_ptr - Pointer to the buffer containing the received frame
+ 955           */
+ 956          void mac_hal_process_incoming_frame (buffer_t *buf_ptr)
+ 957          {
+ 958   1          frame_info_t *receive_frame_p = (frame_info_t*)BMM_BUFFER_POINTER(buf_ptr);
+ 959   1         
+ 960   1          receive_frame_p->buffer_header_p = buf_ptr;
+ 961   1          mac_data_rx_frame_cb(receive_frame_p);
+ 962   1      }
+ 963          
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 17  
+
+ 964          retval_t mac_hal_aes_key_config (hal_aes_direction_t aes_dir_e, uint8_t *key_p,
+ 965                                           uint8_t *ext_addr_p)
+ 966          {
+ 967   1          uint8_t  i;
+ 968   1          uint32_t *var_32_p;
+ 969   1          tinybool is_current_key;
+ 970   1          uint8_t  *key_type;
+ 971   1          uint8_t  key_addr;
+ 972   1          uint16_t retry;
+ 973   1          uint32_t value;
+ 974   1          retval_t status;
+ 975   1      
+ 976   1          status = MAC_SUCCESS;
+ 977   1          is_current_key = FALSE;
+ 978   1          if (HAL_AES_ENCRYPT == aes_dir_e) {
+ 979   2              if (0 == memcmp(hal_encrypt_key, key_p, 16)) {
+ 980   3                  is_current_key = TRUE;
+ 981   3              } else {
+ 982   3                  key_type = hal_encrypt_key;
+ 983   3                  key_addr = ZIG_AES_ENCRYPT_KEY_ADDR;
+ 984   3              }
+ 985   2          } else {
+ 986   2              if (0 == memcmp(hal_decrypt_key, key_p, 16)) {
+ 987   3                  is_current_key = TRUE;
+ 988   3              } else {
+ 989   3                  key_type = hal_decrypt_key;
+ 990   3                  key_addr = ZIG_AES_DECRYPT_KEY_ADDR;
+ 991   3              }
+ 992   2          }
+ 993   1          if (FALSE == is_current_key) {
+ 994   2              if (FALSE == mac_aes_available(&value)) {
+ 995   3                  /*
+ 996   3                   * Cannot change key when AES is busy
+ 997   3                   */
+ 998   3                  return (MAC_FAILURE);
+ 999   3              }
+1000   2              var_32_p = (uint32_t *)key_p;
+1001   2              for (i = 0; i < 4; i++) {
+1002   3                  hal_common_bit_field_reg_write(ZIG_AES_KEY_ADDR, i + key_addr);
+1003   3                  WriteU32Reg(ZigAESKeyData, *var_32_p++);
+1004   3                  hal_common_reg_bit_set(ZigAESKeyAddr, ZIG_AES_KEY_ADDR_WRITE_EN);
+1005   3                  retry = 0;
+1006   3                  while (hal_common_reg_bit_test(ZigAESKeyAddr,
+1007   3                                                 ZIG_AES_KEY_ADDR_WRITE_EN)) {
+1008   4                      if (retry ++ > ZIGBEE_MAC_RETRY_MAX) {
+1009   5                          status = MAC_FAILURE;
+1010   5                          break;
+1011   5                      }
+1012   4                  }
+1013   3              }
+1014   2              if (MAC_SUCCESS == status) {
+1015   3                  memcpy(key_type, key_p, 16);  /* Update the local key */
+1016   3              }
+1017   2          }
+1018   1      
+1019   1          if (HAL_AES_DECRYPT == aes_dir_e &&
+1020   1            memcmp(hal_aes_ext_addr, ext_addr_p, 16)) {
+1021   2              var_32_p = (uint32_t *)ext_addr_p;
+1022   2      
+1023   2              key_addr = ZIG_AES_DECRYPT_EXT_ADDR;
+1024   2              for (i = 0; i < 2; i++) {
+1025   3                  hal_common_bit_field_reg_write(ZIG_AES_KEY_ADDR, i + key_addr);
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 18  
+
+1026   3                  WriteU32Reg(ZigAESKeyData, *var_32_p++);
+1027   3                  hal_common_reg_bit_set(ZigAESKeyAddr, ZIG_AES_KEY_ADDR_WRITE_EN);
+1028   3                  retry = 0;
+1029   3                  while (hal_common_reg_bit_test(ZigAESKeyAddr,
+1030   3                                                 ZIG_AES_KEY_ADDR_WRITE_EN)) {
+1031   4                      if (retry ++ > ZIGBEE_MAC_RETRY_MAX) {
+1032   5                          status = MAC_FAILURE;
+1033   5                          break;
+1034   5                      }
+1035   4                  }
+1036   3              }
+1037   2              if (MAC_SUCCESS == status) {
+1038   3                  memcpy(hal_aes_ext_addr, ext_addr_p, 8);
+1039   3              }
+1040   2          }
+1041   1          return (status);
+1042   1      }
+1043          
+1044          void mac_hal_sm_handler (void)
+1045          {
+1046   1          /* Handle the HAL state machines */
+1047   1          switch (hal_state) {
+1048   2          case HAL_IDLE:
+1049   2              break;
+1050   2          case HAL_ED_RUNNING:
+1051   2              mac_hal_ed_read();
+1052   2              break;
+1053   2          case HAL_ED_DONE:
+1054   2              hal_state = HAL_IDLE; 
+1055   2              mac_scan_ed_end_cb(max_ed_level);       
+1056   2              break;
+1057   2          default:
+1058   2              break;
+1059   2          }
+1060   1      }
+1061          
+1062          /**
+1063           * This function
+1064           * - Checks and allocates the receive buffer.
+1065           * - Processes the HAL incoming frame queue.
+1066           * - Implements the HAL state machine.
+1067           */
+1068          void mac_hal_task (void)
+1069          {
+1070   1          /* Check if the receiver needs to be switched on. */
+1071   1          if (hal_rx_on_required && (hal_state == HAL_IDLE)) {
+1072   2              /* Check if a receive buffer has not been available before. */
+1073   2              if (NULL == hal_rx_buffer) { 
+1074   3                  hal_rx_buffer = bmm_buffer_alloc(BUFFER_SIZE);
+1075   3            if(!hal_rx_buffer) {
+1076   4              FM_Printf(FM_APP, "\nba:halF");
+1077   4            }
+1078   3              }
+1079   2              if (NULL != hal_rx_buffer) {
+1080   3                  hal_rx_on_required = FALSE;
+1081   3                  if (hal_pib_PromiscuousMode) {
+1082   4                      /* FIXME - Turn on RX, disable ACK */
+1083   4                  } else {
+1084   4                      /* FIXME - Turn on RX, enable ACK */
+1085   4                  }
+1086   3              }
+1087   2          }
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 19  
+
+1088   1      
+1089   1          /*
+1090   1           * If the transceiver has received a frame and it has been placed
+1091   1           * into the queue of the HAL, the frame needs to be processed further.
+1092   1           */
+1093   1          while (hal_incoming_frame_queue.size > 0) {
+1094   2              buffer_t *rx_frame_p; 
+1095   2          FM_Printf(FM_APP, "\nrxQ: %bu", hal_incoming_frame_queue.size);
+1096   2              /* Check if there are any pending data in the incoming_frame_queue. */
+1097   2              rx_frame_p = qmm_queue_remove(&hal_incoming_frame_queue, NULL);
+1098   2              if (NULL != rx_frame_p) { 
+1099   3                  mac_hal_process_incoming_frame(rx_frame_p);
+1100   3              }
+1101   2          }
+1102   1      }
+1103          
+1104          #ifdef MAC_802154_TASK
+              #ifdef RTX51_TINY_OS
+              #ifdef HAL_802154_TASK
+              void os_mac_hal_task (void) _task_ HAL_802154_TASK_ID
+              {
+                  while (TRUE) {
+                  os_switch_task();
+                      mac_hal_task();
+                  }
+              }
+              #endif
+              #endif
+              #endif
+1117           
+1118          void mac_hal_flush_incoming_frame_queue (void)
+1119          {
+1120   1          qmm_queue_flush(&hal_incoming_frame_queue);
+1121   1          
+1122   1          if (NULL == hal_rx_buffer) {
+1123   2              hal_rx_buffer = bmm_buffer_alloc(BUFFER_SIZE);
+1124   2          }
+1125   1      }
+1126          
+1127          retval_t mac_hal_rx_decrypted_data_to_buffer (uint8_t *frame_ptr)
+1128          {
+1129   1          volatile uint32_t reg_value;
+1130   1          uint8_t           frame_len;
+1131   1          uint8_t           i;
+1132   1          retval_t          status;
+1133   1          uint16_t          retry;
+1134   1      
+1135   1          retry = 0;
+1136   1          while (1) {
+1137   2              uint32_t decrypt_status;
+1138   2      
+1139   2              decrypt_status = hal_common_reg_32_read(ZigAESKeyAddr);
+1140   2              if (0 == (decrypt_status & ZIG_AES_DECRYPT_EN)) {
+1141   3                  if (decrypt_status & ZIG_AES_DECRYPT_FAILURE) {
+1142   4                      return (MAC_FAILURE);
+1143   4                  } else if (decrypt_status & ZIG_AES_DECRYPT_SUCCESS) {
+1144   4                      if (hal_common_reg_bit_test(ZigTxBlockEn, 
+1145   4                                          ZIG_BLK_AES_OUT_FIFO_EMPTY) == FALSE) {
+1146   5                          break;
+1147   5                      }
+1148   4                  }
+1149   3              }
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 20  
+
+1150   2      
+1151   2      
+1152   2              if (retry ++ > ZIGBEE_MAC_RETRY_MAX) {
+1153   3                  //printf("\nNo Decrypt Stat\n");
+1154   3                  return (MAC_FAILURE);
+1155   3              }
+1156   2          }
+1157   1      
+1158   1          status = MAC_FAILURE;
+1159   1      
+1160   1          reg_value = hal_common_reg_32_read(ZigAESTxRxFifo);
+1161   1      #ifdef _AES_DEBUG_    
+                  printf("\nreg_value = %08lx\n", reg_value);
+              #endif    
+1164   1          frame_len = BIT_FIELD_GET(reg_value, CPU_TXQDESC_FRAME_LEN_MASK,
+1165   1                                    CPU_TXQDESC_FRAME_LEN_POS);
+1166   1          if (frame_len > (aMaxPHYPacketSize - FCS_LEN)) {
+1167   2              /*
+1168   2               * Frame len is invalid but still need to empty the fifo
+1169   2               */
+1170   2              mac_stats_g.rx_frame_too_big++;
+1171   2              frame_len = aMaxPHYPacketSize;
+1172   2          } else {
+1173   2              if (0 == frame_len) {
+1174   3                  //printf("\nLen is 0\n");
+1175   3              }
+1176   2              status = MAC_SUCCESS;
+1177   2          }                                           
+1178   1              
+1179   1          if (frame_ptr) {
+1180   2              uint8_t num_of_read;
+1181   2      
+1182   2              *frame_ptr++ = frame_len;
+1183   2              num_of_read = (frame_len + 3) / sizeof(uint32_t);
+1184   2      #ifdef _AES_DEBUG_        
+                      printf("\nlen = %d\n", (uint16_t)frame_len);
+              #endif
+1187   2              for (i = 0; i < num_of_read; i++) {
+1188   3                  (u32)(*frame_ptr) = ReadU32Reg(ZigAESTxRxFifo);
+1189   3      #ifdef _AES_DEBUG_
+                          printf("%08lx ", *((u32 *)frame_ptr));
+              #endif
+1192   3                  frame_ptr += 4;
+1193   3              }
+1194   2      #ifdef _AES_DEBUG_
+                      printf("\n");
+              #endif        
+1197   2          }
+1198   1      
+1199   1          return (status);
+1200   1      }
+1201          
+1202          void mac_hal_poll_rx_fifo_for_packet (void)
+1203          {
+1204   1          volatile     u32 reg_value;
+1205   1          uint8_t      frame_len;
+1206   1          uint8_t      i;
+1207   1          uint8_t      num_of_read;
+1208   1          frame_info_t *receive_frame_p;
+1209   1          uint8_t      *frame_ptr;
+1210   1          uint8_t      zb_pkt_size;
+1211   1      #ifdef _CRC_VERIFY_
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 21  
+
+1212   1          uint8_t      bytes_to_verify;
+1213   1          uint8_t      crc_byte_count;
+1214   1          uint8_t      j;
+1215   1          uint8_t      *crc_data_p;
+1216   1          uint16_t     crc16;
+1217   1      #endif
+1218   1      
+1219   1          if (hal_common_reg_bit_test(ZigStatus, ZIG_STATUS_RX_FIFO_AVAIL)) {
+1220   2              reg_value = hal_common_reg_32_read(ZigTxRxFifo);
+1221   2              frame_len = BIT_FIELD_GET(reg_value, CPU_TXQDESC_FRAME_LEN_MASK,
+1222   2                                        CPU_TXQDESC_FRAME_LEN_POS);
+1223   2              /*
+1224   2               * The frame_len has LQI, RSSI and 4 bytes timestamp
+1225   2               */
+1226   2              if (frame_len > aMaxPHYPacketSize + 6) {
+1227   3                  mac_stats_g.rx_frame_too_big++;
+1228   3              }
+1229   2              
+1230   2              if (hal_rx_buffer) {
+1231   3                  receive_frame_p = (frame_info_t*)BMM_BUFFER_POINTER(hal_rx_buffer);
+1232   3                  /*
+1233   3                   * Need to reserve additional 3 bytes since we always read
+1234   3                   * a complete word if the len is not word boundary
+1235   3                   */
+1236   3                  frame_ptr = (uint8_t *)receive_frame_p + BUFFER_SIZE - frame_len -
+1237   3                                 LENGTH_FIELD_LEN - 3;
+1238   3                  receive_frame_p->mpdu_p = frame_ptr;
+1239   3                  /* 
+1240   3                   * 1st byte is the length which include FCS but not LQI, RSSI
+1241   3                   * and 4 bytes timestamp
+1242   3                   */
+1243   3                  zb_pkt_size  = frame_len - LQI_LEN - ED_VAL_LEN - 4;
+1244   3                  *frame_ptr++ = zb_pkt_size;
+1245   3      
+1246   3                  // FIXME printf("\n");
+1247   3                  num_of_read = (frame_len + 3) / sizeof(uint32_t);
+1248   3      #ifdef _CRC_VERIFY_
+1249   3                  bytes_to_verify = zb_pkt_size;
+1250   3                  crc_byte_count  = 0;
+1251   3                  crc16           = 0;
+1252   3      #endif
+1253   3                  for (i = 0; i < num_of_read; i++) {
+1254   4                      (uint32_t)(*frame_ptr) = ReadU32Reg(ZigTxRxFifo);
+1255   4      #ifdef _CRC_VERIFY_
+1256   4                      crc_data_p = frame_ptr;
+1257   4                      for (j = 0; j < 4; j++) {
+1258   5                          if (crc_byte_count++ < bytes_to_verify) {
+1259   6                              crc16 = crc_ccitt_update(crc16, *crc_data_p++);
+1260   6                          }
+1261   5                      }
+1262   4      #endif
+1263   4                      // FIXME printf("%lx ", *((u32 *)frame_ptr));
+1264   4                      frame_ptr += 4;
+1265   4                  }
+1266   3      
+1267   3      #ifdef _CRC_VERIFY_
+1268   3                  if (crc16 != 0) {
+1269   4                      mac_stats_g.rx_bad_crc++;
+1270   4                      if (false == hal_pib_PromiscuousMode) {
+1271   5                          printf("\nBad CRC\n");
+1272   5                          return;
+1273   5                      }
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 22  
+
+1274   4                  }
+1275   3      #endif
+1276   3                  /*
+1277   3                   * Timestamp is at after 2 bytes of LQI and RSSI. We also need 
+1278   3                   * to add 1 more byte since length of the packet is the 1st byte
+1279   3                   * in mpdu_p
+1280   3                   */
+1281   3                  receive_frame_p->time_stamp = 
+1282   3                      mac_utils_byte_array_to_32_bit(&receive_frame_p->mpdu_p[zb_pkt_size + 3]);
+1283   3                  /*
+1284   3                   * Append received frame to incoming_frame_queue and 
+1285   3                   * get new rx buffer.
+1286   3                   */
+1287   3                  if (FALSE == qmm_queue_append(&hal_incoming_frame_queue, 
+1288   3                      hal_rx_buffer)) {
+1289   4                      bmm_buffer_free(hal_rx_buffer);
+1290   4                  } else {
+1291   4      #ifdef RTX51_TINY_OS
+1292   4      #ifdef HAL_802154_TASK
+                              os_set_ready(HAL_802154_TASK_ID);
+              #else
+1295   4      #ifdef MAC_802154_TASK
+                      os_set_ready(MAC_802154_TASK_ID);
+              #else
+1298   4              os_set_ready(HPGP_TASK_ID_CTRL);
+1299   4      #endif /* MAC_802154_TASK */
+1300   4      #ifdef UM
+1301   4              pending_802154_task = TRUE;
+1302   4      #endif
+1303   4      #endif
+1304   4      #endif
+1305   4      
+1306   4                  }
+1307   3                  hal_rx_buffer = bmm_buffer_alloc(BUFFER_SIZE);
+1308   3      
+1309   3                  /* Check if receive buffer is available */
+1310   3                  if (NULL == hal_rx_buffer) {
+1311   4                      /*
+1312   4                       * FIXME - Turn off the Rx Transiver until we can allocate a RX
+1313   4                       * buffer
+1314   4                       */
+1315   4                      hal_rx_on_required = TRUE;
+1316   4                  }
+1317   3              } else {
+1318   3                  mac_stats_g.rx_no_buffer++;
+1319   3              }
+1320   2          }
+1321   1      }
+1322          
+1323          void mac_hal_zigbee_interrupt_control (tinybool enable,
+1324                                                 uint32_t interrupt_types)
+1325          {
+1326   1          if (enable) {
+1327   2              hal_common_reg_bit_set(CPU_INTENABLE_REG, interrupt_types);
+1328   2          } else {
+1329   2              hal_common_reg_bit_clear(CPU_INTENABLE_REG, interrupt_types);
+1330   2          }
+1331   1      }
+1332          
+1333          void mac_hal_frame_pending (tinybool enable)
+1334          {
+1335   1          if (enable) {
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 23  
+
+1336   2              hal_common_reg_bit_set(ZigCtrl, ZIG_CTRL_FRAME_PENDING);
+1337   2          } else {
+1338   2              hal_common_reg_bit_clear(ZigCtrl, ZIG_CTRL_FRAME_PENDING);
+1339   2          }
+1340   1      }
+1341          
+1342          bool mac_hal_rx_enable (bool bc_on, 
+1343                                  mlme_rx_enable_req_t *rxe_p)
+1344          {
+1345   1          hal_common_reg_32_write(ZigRxDeferDuration, rxe_p->RxOnDuration);
+1346   1          if (FALSE == bc_on) {
+1347   2              mac_hal_hw_control(PHY_RX_ON);
+1348   2              hal_common_reg_32_write(ZigRxDeferStart, 0);
+1349   2              hal_common_reg_bit_set(ZigCtrl, ZIG_CTRL_RX_DEFER);
+1350   2          } else {
+1351   2              hal_common_reg_32_write(ZigRxDeferStart, rxe_p->RxOnTime);
+1352   2              if (rxe_p->DeferPermit) {
+1353   3                  hal_common_reg_bit_set(ZigCtrl, ZIG_CTRL_RX_DEFER);
+1354   3              } else {
+1355   3                  hal_common_reg_bit_clear(ZigCtrl, ZIG_CTRL_RX_DEFER);
+1356   3              }
+1357   2          }
+1358   1          hal_common_reg_bit_set(ZigCtrl, ZIG_CTRL_RX_DEFER_EN);
+1359   1      
+1360   1          return (TRUE);
+1361   1      }
+1362          
+1363          #ifdef Z_P_BRIDGE
+              #ifdef NO_HOST
+              void mac_hal_zb_pkt_bridge (sSwFrmDesc* rx_frame_info_p) 
+              {
+                  uint8_t       frame_len;
+              #ifdef BRIDGE_DEBUG
+                  uint8_t       cp_len;
+                  uint8_t       tmp_len;
+                  uint8_t       i;
+                  uint8_t       j;
+              #endif
+                  uint8_t xdata *cp_addr_p;
+              
+                  frame_len = rx_frame_info_p->frmLen;
+              #ifdef BRIDGE_DEBUG
+                  tmp_len = 0;  
+                  printf("\n");
+                  for (i = 0 ; i < rx_frame_info_p->cpCount; i++) {
+                    cp_addr_p = CHAL_GetAccessToCP(rx_frame_info_p->cpArr[i].cp);
+              
+                      if ((frame_len - tmp_len) > HYBRII_CELLBUF_SIZE) {
+                          cp_len = HYBRII_CELLBUF_SIZE;
+                      } else {
+                          cp_len = frame_len - tmp_len;
+                      }
+                      for (j = 0; j < cp_len; j++) {
+                          printf("0x%02bX ", cp_addr_p[j]);
+                      }
+                      printf("\n");
+                      tmp_len += cp_len;
+                  }
+              #endif
+                  
+                  if (frame_len > aMaxPHYPacketSize) {
+                  CHAL_FreeFrameCp(rx_frame_info_p->cpArr, rx_frame_info_p->cpCount); 
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 24  
+
+                      return;
+                  }
+                  mac_hal_set_tx_mode(CSMA_UNSLOTTED);
+                  cp_addr_p = CHAL_GetAccessToCP(rx_frame_info_p->cpArr[0].cp);
+                
+                  if (frame_len > 3) {   /* Don't bridge ACK (3 bytes) packets */
+                      mac_hal_write_frame_to_fifo(cp_addr_p, frame_len,
+                                                  AES_NONE, FALSE);
+                  }
+              }
+              
+              #else
+              void mac_hal_zb_pkt_bridge (sSwFrmDesc* rx_frame_info_p) //sCommonRxFrmSwDesc
+              {
+                  uint8_t       frame_len;
+              #ifdef BRIDGE_DEBUG
+                  uint8_t       cp_len;
+                  uint8_t       tmp_len;
+                  uint8_t       i;
+                  uint8_t       j;
+              #endif
+                  uint8_t xdata *cp_addr_p;
+              
+                  frame_len = rx_frame_info_p->frmLen;
+              #ifdef BRIDGE_DEBUG
+                  tmp_len = 0;  
+                  //printf("\n");
+                  for (i = 0 ; i < rx_frame_info_p->cpCount; i++) {
+                    cp_addr_p = CHAL_GetAccessToCP(rx_frame_info_p->cpArr[i].cp);
+              
+                      if ((frame_len - tmp_len) > HYBRII_CELLBUF_SIZE) {
+                          cp_len = HYBRII_CELLBUF_SIZE;
+                      } else {
+                          cp_len = frame_len - tmp_len;
+                      }
+                      for (j = 0; j < cp_len; j++) {
+                          //printf("0x%02bX ", cp_addr_p[j]);
+                      }
+                      //printf("\n");
+                      tmp_len += cp_len;
+                  }
+              #endif
+                  
+                  if ((frame_len - sizeof(sEth2Hdr)) > aMaxPHYPacketSize) {
+                      return;
+                  }
+                  mac_hal_set_tx_mode(CSMA_UNSLOTTED);
+                  cp_addr_p = CHAL_GetAccessToCP(rx_frame_info_p->cpArr[0].cp);
+              #if 0
+              #ifdef BRIDGE_DEBUG 
+                printf("\nPayload:\n");
+                  for (j = 0; j < (frame_len - sizeof(sEth2Hdr)); j++) {
+                      printf("0x%02bX ", cp_addr_p[j + sizeof(sEth2Hdr)]);
+                  }
+                printf("\n");
+              #endif  
+              #endif
+                  if ((frame_len - sizeof(sEth2Hdr)) > 3) {   /* Don't bridge ACK (3 bytes) packets */
+                      mac_hal_write_frame_to_fifo((cp_addr_p + sizeof(sEth2Hdr)), 
+                                (frame_len - sizeof(sEth2Hdr)),
+                                                  AES_NONE, FALSE);
+                  }
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 25  
+
+              }
+              #endif
+              #endif
+1463          
+1464          #ifdef HYBRII_B
+1465          static void mac_hal_promis_reg_bank (tinybool enable)
+1466          {
+1467   1          if (enable) {
+1468   2              hal_common_reg_bit_set(ZigRegBankSelect, ZIG_NEW_REG_BANK_EN);
+1469   2          } else {
+1470   2              hal_common_reg_bit_clear(ZigRegBankSelect, ZIG_NEW_REG_BANK_EN);
+1471   2          }
+1472   1      }
+1473          
+1474          void mac_hal_promis_ack_control (tinybool enable)
+1475          {
+1476   1          mac_hal_promis_reg_bank(TRUE);
+1477   1          if (enable) {
+1478   2              hal_common_reg_bit_set(ZigPromisAckCtrl, ZIG_PROMIS_ACK_EN);
+1479   2          } else {
+1480   2              hal_common_reg_bit_clear(ZigPromisAckCtrl, ZIG_PROMIS_ACK_EN);
+1481   2          }
+1482   1        mac_hal_promis_reg_bank(FALSE);
+1483   1      }
+1484          
+1485          void mac_hal_promis_ack_match_panid (tinybool enable)
+1486          {
+1487   1          mac_hal_promis_reg_bank(TRUE);
+1488   1        if (enable) {
+1489   2              hal_common_reg_bit_set(ZigPromisAckCtrl, 
+1490   2                                 ZIG_PROMIS_ACK_MATCH_PANID);
+1491   2          } else {
+1492   2              hal_common_reg_bit_clear(ZigPromisAckCtrl, 
+1493   2                                 ZIG_PROMIS_ACK_MATCH_PANID);
+1494   2          }
+1495   1        mac_hal_promis_reg_bank(FALSE);
+1496   1      }
+1497          
+1498          void mac_hal_promis_ack_set_match_mode (uint8_t match_mode)
+1499          {
+1500   1          mac_hal_promis_reg_bank(TRUE);
+1501   1          hal_common_bit_field_reg_write(ZIG_PROMIS_ACK_MATCH_MODE, match_mode);
+1502   1          mac_hal_promis_reg_bank(FALSE);
+1503   1      }
+1504          
+1505          static tinybool mac_hal_promis_ack_table_avail_entry (uint8_t table_id,
+1506                                                                uint8_t *cur_entries_map,
+1507                                                                uint8_t *avail_entry)
+1508          {
+1509   1          uint32_t enable_map;
+1510   1          uint32_t table_full_value;
+1511   1          tinybool rc;
+1512   1      
+1513   1          rc = TRUE;
+1514   1          mac_hal_promis_reg_bank(TRUE);
+1515   1          switch (table_id) {
+1516   2          case SHORT_DST_TABLE:
+1517   2              enable_map = 
+1518   2                 hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_SHORT_DST_EN);
+1519   2              table_full_value = 0xFF;
+1520   2              break;
+1521   2          case SHORT_SRC_TABLE:
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 26  
+
+1522   2              enable_map = 
+1523   2                 hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_SHORT_SRC_EN);
+1524   2              table_full_value = 0x03;
+1525   2              break;
+1526   2          case EXT_DST_TABLE:
+1527   2              enable_map = 
+1528   2                 hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_EXT_DST_EN);
+1529   2                 table_full_value = 0xFF;
+1530   2              break;
+1531   2          case EXT_SRC_TABLE:
+1532   2              enable_map = 
+1533   2                 hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_EXT_SRC_EN);
+1534   2              table_full_value = 0x03;
+1535   2              break;
+1536   2          default:
+1537   2              rc = FALSE;
+1538   2              break;
+1539   2          }
+1540   1      
+1541   1          if (enable_map == table_full_value) {
+1542   2              rc = FALSE;
+1543   2          }
+1544   1          
+1545   1          if (rc) {
+1546   2              *cur_entries_map = (uint8_t)enable_map;
+1547   2              *avail_entry = 0;
+1548   2              while (enable_map & 1) {  /* Find first empty entry */
+1549   3                  enable_map = enable_map >> 1;
+1550   3                  *avail_entry = *avail_entry + 1;
+1551   3              }
+1552   2          }
+1553   1          mac_hal_promis_reg_bank(FALSE);
+1554   1      
+1555   1          return (rc);
+1556   1      }
+1557          
+1558          tinybool mac_hal_promis_ack_short_addr_add (tinybool src, 
+1559                                                      uint16_t short_addr)
+1560          {
+1561   1          uint8_t  current_entries_map;
+1562   1          uint8_t  new_entries_map;
+1563   1          uint16_t addr;
+1564   1          uint8_t  index;
+1565   1      
+1566   1          if (TRUE == src) {
+1567   2              if (mac_hal_promis_ack_table_avail_entry(SHORT_SRC_TABLE,
+1568   2                                                       &current_entries_map,
+1569   2                                                       &index)) {
+1570   3                  new_entries_map = current_entries_map | BIT(index);        
+1571   3                  addr = ZigPromisAckSrcShort + (index * sizeof(short_addr));
+1572   3              } else {
+1573   3                  return (FALSE);
+1574   3              }
+1575   2          } else {
+1576   2              if (mac_hal_promis_ack_table_avail_entry(SHORT_DST_TABLE,
+1577   2                                                       &current_entries_map,
+1578   2                                                       &index)) {
+1579   3                  new_entries_map = current_entries_map | BIT(index);        
+1580   3                  addr = ZigPromisAckDstShort + (index * sizeof(short_addr));
+1581   3              } else {
+1582   3                  return (FALSE);
+1583   3              }
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 27  
+
+1584   2          }
+1585   1          //printf("\nindex = %bu, new_entries_map = 0x%02bX, addr = 0x%04X\n",
+1586   1          //       index, new_entries_map, addr);
+1587   1          mac_hal_promis_reg_bank(TRUE);
+1588   1          hal_common_reg_16_write(addr, short_addr);
+1589   1          /* 
+1590   1           * Mark the entry is valid
+1591   1           */
+1592   1          if (TRUE == src) {
+1593   2              hal_common_bit_field_reg_write(ZIG_PROMIS_ACK_SHORT_SRC_EN,
+1594   2                                             new_entries_map);
+1595   2          } else {
+1596   2              hal_common_bit_field_reg_write(ZIG_PROMIS_ACK_SHORT_DST_EN,
+1597   2                                             new_entries_map);
+1598   2          } 
+1599   1          mac_hal_promis_reg_bank(FALSE);
+1600   1      
+1601   1          return (TRUE);
+1602   1      }
+1603          
+1604          tinybool mac_hal_promis_ack_ext_addr_add (tinybool src, 
+1605                                                    uint64_t ext_addr)
+1606          {
+1607   1          uint8_t  current_entries_map;
+1608   1          uint8_t  new_entries_map;
+1609   1          uint16_t addr;
+1610   1          uint8_t  index;
+1611   1      
+1612   1          if (TRUE == src) {
+1613   2              if (mac_hal_promis_ack_table_avail_entry(EXT_SRC_TABLE,
+1614   2                                                       &current_entries_map,
+1615   2                                                       &index)) {
+1616   3                  new_entries_map = current_entries_map | BIT(index);        
+1617   3                  addr = ZigPromisAckSrcExt + (index * sizeof(ext_addr));
+1618   3              } else {
+1619   3                  return (FALSE);
+1620   3              }
+1621   2          } else {
+1622   2              if (mac_hal_promis_ack_table_avail_entry(EXT_DST_TABLE,
+1623   2                                                       &current_entries_map,
+1624   2                                                       &index)) {
+1625   3                  new_entries_map = current_entries_map | BIT(index);        
+1626   3                  addr = ZigPromisAckDstExt + (index * sizeof(ext_addr));
+1627   3              } else {
+1628   3                  return (FALSE);
+1629   3              }
+1630   2          }
+1631   1         
+1632   1          mac_hal_promis_reg_bank(TRUE);
+1633   1          //printf("\nAddr = 0x%04X, 0x%04X\n", addr, addr + 4);
+1634   1          hal_common_reg_32_write(addr,     ext_addr.lo_u32);
+1635   1          hal_common_reg_32_write(addr + 4, ext_addr.hi_u32);
+1636   1          /* 
+1637   1           * Mark the entry is valid
+1638   1           */
+1639   1          if (TRUE == src) {
+1640   2              hal_common_bit_field_reg_write(ZIG_PROMIS_ACK_EXT_SRC_EN,
+1641   2                                             new_entries_map);
+1642   2          } else {
+1643   2              hal_common_bit_field_reg_write(ZIG_PROMIS_ACK_EXT_DST_EN,
+1644   2                                             new_entries_map);
+1645   2          } 
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 28  
+
+1646   1          mac_hal_promis_reg_bank(FALSE);
+1647   1      
+1648   1          return (TRUE);
+1649   1      }
+1650          
+1651          tinybool mac_hal_promis_ack_short_addr_del (tinybool src, uint16_t short_addr)
+1652          {
+1653   1          uint32_t enable_map;
+1654   1          uint16_t addr;
+1655   1          uint16_t operation_reg;
+1656   1          uint16_t entry_addr;
+1657   1          uint8_t  current_map;
+1658   1          uint8_t  index;
+1659   1          tinybool found;
+1660   1      
+1661   1          mac_hal_promis_reg_bank(TRUE);
+1662   1          if (TRUE == src) {
+1663   2              enable_map = 
+1664   2                 hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_SHORT_SRC_EN);
+1665   2              operation_reg = ZigPromisAckSrcShort;
+1666   2          } else {
+1667   2              enable_map = 
+1668   2                 hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_SHORT_DST_EN);
+1669   2              operation_reg = ZigPromisAckDstShort;
+1670   2          }
+1671   1          /*
+1672   1           * Search DST Short Address table
+1673   1           */
+1674   1          
+1675   1          current_map = (uint8_t)enable_map;
+1676   1          index = 0;
+1677   1          found = FALSE;
+1678   1          while (enable_map) {
+1679   2              if (enable_map & 1) {
+1680   3                  addr = operation_reg + (index * sizeof(short_addr));
+1681   3                  entry_addr = hal_common_reg_16_read(addr);
+1682   3                  if (short_addr == entry_addr) {
+1683   4                      current_map = current_map & ~BIT(index);
+1684   4                      if (TRUE == src) {
+1685   5                          hal_common_bit_field_reg_write(ZIG_PROMIS_ACK_SHORT_SRC_EN,
+1686   5                                                         current_map);
+1687   5                      } else {
+1688   5                          hal_common_bit_field_reg_write(ZIG_PROMIS_ACK_SHORT_DST_EN,
+1689   5                                                         current_map);
+1690   5                      }
+1691   4                      found = TRUE;
+1692   4                      break;
+1693   4                  } 
+1694   3              }
+1695   2              enable_map = enable_map >> 1;
+1696   2              index++;
+1697   2          }
+1698   1      
+1699   1          mac_hal_promis_reg_bank(FALSE);
+1700   1      
+1701   1          return (found);
+1702   1      }
+1703          
+1704          tinybool mac_hal_promis_ack_ext_addr_del (tinybool src, uint64_t ext_addr)
+1705          {
+1706   1          uint32_t enable_map;
+1707   1          uint16_t addr;
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 29  
+
+1708   1          uint16_t operation_reg;
+1709   1          uint64_t entry_addr;
+1710   1          uint8_t  current_map;
+1711   1          uint8_t  index;
+1712   1          tinybool found;
+1713   1      
+1714   1          mac_hal_promis_reg_bank(TRUE);
+1715   1      
+1716   1          if (TRUE == src) {
+1717   2              enable_map = 
+1718   2                 hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_EXT_SRC_EN);
+1719   2              operation_reg = ZigPromisAckSrcExt;
+1720   2          } else {
+1721   2              /*
+1722   2               * Search DST Ext Address table
+1723   2               */
+1724   2              enable_map = 
+1725   2                 hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_EXT_DST_EN);
+1726   2              operation_reg = ZigPromisAckDstExt;
+1727   2          }
+1728   1      
+1729   1          current_map = (uint8_t)enable_map;
+1730   1          index = 0;
+1731   1          found = FALSE;
+1732   1          while (enable_map) {
+1733   2              if (enable_map & 1) {
+1734   3                  addr = operation_reg + (index * sizeof(ext_addr));
+1735   3                  entry_addr.lo_u32 = hal_common_reg_32_read(addr);
+1736   3                  entry_addr.hi_u32 = hal_common_reg_32_read(addr + 4);
+1737   3                  if (EXT_ADDR_MATCH(ext_addr, entry_addr)) {
+1738   4                      current_map = current_map & ~BIT(index);
+1739   4                      if (TRUE == src) {
+1740   5                          hal_common_bit_field_reg_write(ZIG_PROMIS_ACK_EXT_SRC_EN,
+1741   5                                                         current_map);
+1742   5                      } else {
+1743   5                          hal_common_bit_field_reg_write(ZIG_PROMIS_ACK_EXT_DST_EN,
+1744   5                                                         current_map);
+1745   5                      }
+1746   4                      found = TRUE;
+1747   4                      break;
+1748   4                  } 
+1749   3              }
+1750   2              enable_map = enable_map >> 1;
+1751   2              index++;
+1752   2          }
+1753   1          
+1754   1          mac_hal_promis_reg_bank(FALSE);
+1755   1      
+1756   1          return (found);
+1757   1      }
+1758          
+1759          void mac_hal_promis_ack_table_show (void)
+1760          {
+1761   1          uint32_t enable_map;
+1762   1          uint16_t addr;
+1763   1          uint16_t short_addr;
+1764   1          uint64_t ext_addr;
+1765   1          uint8_t  index;
+1766   1          uint8_t  state, mode;
+1767   1      
+1768   1          mac_hal_promis_reg_bank(TRUE);
+1769   1      
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 30  
+
+1770   1          /*
+1771   1           * SRC Short Address table
+1772   1           */
+1773   1          enable_map = 
+1774   1             hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_SHORT_SRC_EN);
+1775   1          printf("Src ShrtAddr Tb\n");
+1776   1          for (index = 0; index < ZIG_PROMIS_ACK_SRC_ENTRY_MAX; index++) {  
+1777   2             addr = ZigPromisAckSrcShort + (index * sizeof(short_addr));
+1778   2             short_addr = hal_common_reg_16_read(addr);
+1779   2             printf("%bu-%04x (%bu)\n", index, short_addr, (u8)((enable_map >> index) & 1));
+1780   2          }
+1781   1      
+1782   1          /*
+1783   1           * Source Ext Address table
+1784   1           */
+1785   1          enable_map = 
+1786   1             hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_EXT_SRC_EN);
+1787   1          printf("Src ExtAddr Tb\n");
+1788   1          for (index = 0; index < ZIG_PROMIS_ACK_SRC_ENTRY_MAX; index++) {  
+1789   2             addr = ZigPromisAckSrcExt + (index * sizeof(ext_addr));
+1790   2             ext_addr.lo_u32 = hal_common_reg_32_read(addr);
+1791   2             ext_addr.hi_u32 = hal_common_reg_32_read(addr + 4);
+1792   2             printf("%bu-%08lx-%08lx (%bu)\n", index, ext_addr.hi_u32, ext_addr.lo_u32,
+1793   2                    (u8)((enable_map >> index) & 1));
+1794   2          }
+1795   1          if (hal_common_reg_bit_test(ZigPromisAckCtrl, ZIG_PROMIS_ACK_EN)) {
+1796   2              state = TRUE;
+1797   2          } else {
+1798   2              state = FALSE;
+1799   2          }
+1800   1      
+1801   1          /*
+1802   1           * DST Short Address table
+1803   1           */
+1804   1          enable_map = 
+1805   1             hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_SHORT_DST_EN);
+1806   1          printf("\nDstn ShrtAddr Tb\n");
+1807   1          for (index = 0; index < ZIG_PROMIS_ACK_DST_ENTRY_MAX; index++) {  
+1808   2             addr = ZigPromisAckDstShort + (index * sizeof(short_addr));
+1809   2             short_addr = hal_common_reg_16_read(addr);
+1810   2             printf("%bu-%04x (%bu)\n", index, short_addr, (u8)((enable_map >> index) & 1));
+1811   2          }
+1812   1      
+1813   1          /*
+1814   1           * DST Ext Address table
+1815   1           */
+1816   1          enable_map = 
+1817   1             hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_EXT_DST_EN);
+1818   1          printf("Dstn ExtAddr Tb\n");
+1819   1          for (index = 0; index < ZIG_PROMIS_ACK_DST_ENTRY_MAX; index++) {  
+1820   2             addr = ZigPromisAckDstExt + (index * sizeof(ext_addr));
+1821   2             ext_addr.lo_u32 = hal_common_reg_32_read(addr);
+1822   2             ext_addr.hi_u32 = hal_common_reg_32_read(addr + 4);
+1823   2             printf("%bu-%08lx-%08lx (%bu)\n", index, ext_addr.hi_u32, ext_addr.lo_u32,
+1824   2                    (u8)((enable_map >> index) & 1));
+1825   2          }
+1826   1      
+1827   1          mode = hal_common_bit_field_reg_read(ZIG_PROMIS_ACK_MATCH_MODE);
+1828   1      
+1829   1          printf("\nPromAck - St:%bu, M:%bu\n", state, mode);
+1830   1      
+1831   1          mac_hal_promis_reg_bank(FALSE);
+C51 COMPILER V9.53.0.0   MAC_HAL                                                           11/04/2015 20:09:49 PAGE 31  
+
+1832   1      }
+1833          #endif
+1834          
+1835          #ifdef Z_P_BRIDGE
+              void mac_hal_bridge_config (uint8_t enable)
+              {
+                  if (enable) {
+                      zb_plc_bridging = TRUE;
+                      hal_common_reg_bit_set(ZigCtrl, ZIG_CTRL_FRAME_PENDING);
+                  } else {
+                      zb_plc_bridging = FALSE;
+                      hal_common_reg_bit_clear(ZigCtrl, ZIG_CTRL_FRAME_PENDING);
+                  }
+                  mac_hal_pib_set(macPromiscuousMode, 
+                                  (pib_value_t *)&zb_plc_bridging);
+                  mac_hal_promis_ack_control((tinybool)zb_plc_bridging);
+              }
+              #endif
+1850          #endif //HYBRII_802154
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   7852    ----
+   CONSTANT SIZE    =    212    ----
+   XDATA SIZE       =     74     266
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----      17
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

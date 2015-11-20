@@ -1,0 +1,1279 @@
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE GV701X_HPGPDRIVER
+OBJECT MODULE PLACED IN .\obj\gv701x_hpgpdriver.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\components\drivers\hpgp\src\gv701x_hpgpdriver.c LARGE OBJECT
+                    -ADVANCED OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\comm
+                    -on\include;..\..\..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\
+                    -firmware\hpgp\src\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src
+                    -\nma;..\..\..\..\firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\.
+                    -.\..\firmware\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components
+                    -\utilities\event\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\.
+                    -.\components\hpgp\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\fi
+                    -rmware\app_support;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..
+                    -\components\drivers\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\
+                    -..\..\components;..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee8021
+                    -54\inc;..\..\..\..\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..
+                    -\components\drivers\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\
+                    -components\utilities;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\c
+                    -omponents\drivers\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src
+                    -;..\..\inc;..\..\..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,
+                    -C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_M
+                    -AC_SAP,NMA,NEW_SYNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAI
+                    -N_TABLE,B2,FREQ_DETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF
+                    -,UART_GPIO_INTERRUPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUT
+                    -E_APP,RTOPO_APP,REGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\gv
+                    -701x_hpgpdriver.lst) TABS(2) OBJECT(.\obj\gv701x_hpgpdriver.obj)
+
+line level    source
+
+   1          
+   2          /* ========================================================
+   3           *
+   4           * @file: gv701x_hpgpdriver.c
+   5           * 
+   6           * @brief: This file supports all routines required by the application
+   7           *         to start and commence the PLC network
+   8           *      
+   9           *  Copyright (C) 2010-2015, Greenvity Communications, Inc.
+  10           *  All Rights Reserved
+  11           *  
+  12           * =========================================================*/
+  13          
+  14          #ifdef HPGP_DRIVER_APP
+  15          /****************************************************************************** 
+  16            * Includes
+  17            ******************************************************************************/
+  18            
+  19          #include <string.h>
+  20          #include <stdio.h>
+  21          #include <stdlib.h>
+  22          #include "gv701x_includes.h"
+  23          #include "gv701x_osal.h"
+  24          #include "gv701x_hpgpdriver.h"
+  25          
+  26          /****************************************************************************** 
+  27            * Global Data
+  28            ******************************************************************************/
+  29            
+  30          /*Network Database*/
+  31          hpgp_nwk_data_t hpgp_nwk_data;
+  32          
+  33          /*Driver Data*/
+  34          hpgp_drv_data_t hpgp_drv_data;
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 2   
+
+  35          
+  36          /*Network keys*/
+  37          u8 cco_nid[NID_LEN] = {0xc9, 0x21, 0x20, 0xe8, 0x43, 0x00, 0x00};
+  38          
+  39          u8 nmk[ENC_KEY_LEN] = {0x2e, 0xdc, 0xcf, 0x9c, 0xb0, 0x95, 0x5d, 0xf8, 
+  40                       0xd4, 0x23, 0xb3, 0xfa, 0xc6, 0x98, 0x95, 0xd5};
+  41          
+  42          /****************************************************************************** 
+  43            * External Data
+  44            ******************************************************************************/
+  45            
+  46          /******************************************************************************
+  47            * External Funtion prototypes
+  48            ******************************************************************************/
+  49            
+  50          /******************************************************************************
+  51            * Funtion prototypes
+  52            ******************************************************************************/
+  53            
+  54          void GV701x_HPGPSendEvent(u8 link_state, u8 state, u8 reason);
+  55          
+  56          /******************************************************************************
+  57           * @fn      GV701x_HPGPDriverInit
+  58           *
+  59           * @brief   Initializes the HPGP driver
+  60           *
+  61           * @param   app_id - application identification number
+  62           *
+  63           * @return  none
+  64           */
+  65          
+  66          void GV701x_HPGPDriverInit(u8 app_id)
+  67          { 
+  68   1        u8* macaddr;  
+  69   1        memset(&hpgp_drv_data, 0x00, sizeof(hpgp_drv_data_t));
+  70   1        memset(&hpgp_nwk_data, 0x00, sizeof(hpgp_nwk_data_t));  
+  71   1        
+  72   1        hpgp_drv_data.app_id = app_id;
+  73   1        SLIST_Init(&hpgp_drv_data.queues.appRxQueue);
+  74   1        
+  75   1        FM_Printf(FM_USER, "\nInit HPGPDrv (app id %bu)", app_id);
+  76   1        
+  77   1        macaddr = GV701x_ReadMacAddress();
+  78   1        memcpy((u8*)hpgp_nwk_data.params.mac_addr, (u8*)macaddr, MAC_ADDR_LEN);
+  79   1      #if 0 
+                FM_HexDump(FM_APP, "MAC: ", (u8*)hpgp_nwk_data.params.mac_addr, MAC_ADDR_LEN);      
+              #endif
+  82   1      
+  83   1        /*Initialize the Network Parameters*/ 
+  84   1        hpgp_nwk_data.params.nwk.line_mode = LINE_MODE_AC;  
+  85   1        hpgp_nwk_data.params.nwk.txpower_mode = HIGH_TX_POWER_MODE;
+  86   1        hpgp_nwk_data.params.nwk.dc_frequency = FREQ_50HZ;
+  87   1        memcpy(hpgp_nwk_data.params.nwk.key.nid, cco_nid, NID_LEN);
+  88   1        memcpy(hpgp_nwk_data.params.nwk.key.nmk, nmk, ENC_KEY_LEN);
+  89   1        hpgp_nwk_data.params.nwk.net_id = 0;
+  90   1        hpgp_nwk_data.params.nwk.tei = 0;
+  91   1        hpgp_nwk_data.params.nwk.role = DEV_MODE_STA;
+  92   1      
+  93   1        /*TBD: read ouid from mac address*/
+  94   1        /*0x84,0x86,0xf3*/
+  95   1        memcpy((u8*)hpgp_nwk_data.params.nwk.app_info.oem[0].ouid, 
+  96   1             (u8*)hpgp_nwk_data.params.mac_addr, OUID_LEN); 
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 3   
+
+  97   1        
+  98   1        /*Initialize the Driver's State Machine*/
+  99   1        hpgp_drv_data.state.state = HPGPDRV_INIT;
+ 100   1        hpgp_drv_data.state.event = HPGPDRV_IDLE_EVENT; 
+ 101   1        hpgp_drv_data.state.statedata = NULL;   
+ 102   1        hpgp_drv_data.state.statedatalen = 0; 
+ 103   1        
+ 104   1        hpgp_drv_data.scan.active = FALSE;
+ 105   1        hpgp_drv_data.scan.time = 0;
+ 106   1        hpgp_drv_data.start.active = FALSE;
+ 107   1        hpgp_drv_data.start.time = 0;
+ 108   1      
+ 109   1        srand(TL0);
+ 110   1        hpgp_nwk_data.params.nwk.tei = (u8)rand();  
+ 111   1        
+ 112   1        STM_AllocTimer(hpgp_drv_data.start.timer, HPGPDRV_START_TIMEOUT_EVT, 
+ 113   1                &hpgp_drv_data.app_id);
+ 114   1          
+ 115   1        GV701x_HPGPSetHwspec(hpgp_nwk_data.params.mac_addr,
+ 116   1              hpgp_nwk_data.params.nwk.line_mode,
+ 117   1              hpgp_nwk_data.params.nwk.txpower_mode, TRUE,
+ 118   1              hpgp_nwk_data.params.nwk.dc_frequency); 
+ 119   1      }
+ 120          
+ 121          /********************************************** ********************************
+ 122           * @fn      Gv701x_SetHwspec
+ 123           *
+ 124           * @brief   Sets the attributes of PLC link
+ 125           *
+ 126           * @param   mac_addr - MAC address to be set
+ 127           *        line_mode - Sets the PLC line Mode (AC or DC)
+ 128           *        txpower_mode - Sets the PLC tx power Mode 
+ 129           *        er_mode - Sets the extended range mode (TRUE-enabled, FALSE-disabled)
+ 130           *      dc_frequency - The operating frequency in DC mode(invalid for AC mode) 
+ 131           *
+ 132           * @return  none
+ 133           */
+ 134          void GV701x_HPGPSetHwspec(u8* mac_addr, u8 line_mode, u8 txpower_mode, u8 er_mode, u8 dc_frequency)
+ 135          {
+ 136   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 137   1        hostCmdHwspec* hwspec;    
+ 138   1        
+ 139   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 140   1        
+ 141   1        /*Fill the Hwspec structure*/ 
+ 142   1        hwspec = (hostCmdHwspec*)buf;
+ 143   1        hwspec->command = HOST_CMD_HARDWARE_SPEC_REQ;
+ 144   1        hwspec->action = ACTION_SET;
+ 145   1        hwspec->linemode = line_mode; 
+ 146   1        hwspec->dc_frequency = dc_frequency;    
+ 147   1        hwspec->hw_cfg.field.er = er_mode;
+ 148   1        hwspec->txpowermode = txpower_mode;   
+ 149   1        memcpy((u8*)&(hwspec->mac_addr), 
+ 150   1            (u8*)mac_addr, MAC_ADDR_LEN);
+ 151   1      
+ 152   1        /*Send command to firmware*/  
+ 153   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 154   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, sizeof(hostCmdHwspec), 0);
+ 155   1      }
+ 156          
+ 157          /******************************************************************************
+ 158           * @fn      GV701x_HPGPGetHwspec
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 4   
+
+ 159           *
+ 160           * @brief   Gets attributes of PLC link
+ 161           *
+ 162           * @param   none
+ 163           *
+ 164           * @return  none
+ 165           */
+ 166          
+ 167          void GV701x_HPGPGetHwspec(void)
+ 168          {
+ 169   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 170   1        hostCmdHwspec* hwspec;    
+ 171   1        
+ 172   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 173   1        
+ 174   1        /*Fill the Hwspec structure*/ 
+ 175   1        hwspec = (hostCmdHwspec*)buf;
+ 176   1        hwspec->command = HOST_CMD_HARDWARE_SPEC_REQ;
+ 177   1        hwspec->action = ACTION_GET;
+ 178   1        
+ 179   1        /*Send command to firmware*/  
+ 180   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 181   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, sizeof(hostCmdHwspec), 0);
+ 182   1      }
+ 183          
+ 184          
+ 185          /******************************************************************************
+ 186           * @fn      Gv701x_ReStartNwk
+ 187           *
+ 188           * @brief   Restarts/Initiates the PLC network
+ 189           *
+ 190           * @param   none
+ 191           *
+ 192           * @return  none
+ 193           */
+ 194          
+ 195          void GV701x_HPGPReStartNwk(void)
+ 196          {
+ 197   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 198   1        hostCmdRstSta* nwk;   
+ 199   1      
+ 200   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 201   1        
+ 202   1        /*Fill the Restart Network structure*/  
+ 203   1        nwk = (hostCmdRstSta*)buf;  
+ 204   1        nwk->command = APCM_STA_RESTART_REQ;
+ 205   1      
+ 206   1        /*Send command to firmware*/  
+ 207   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 208   1                  EVENT_CLASS_CTRL, CONTROL_FRM_ID, buf, sizeof(hostCmdRstSta), 0);
+ 209   1      }
+ 210          
+ 211          /******************************************************************************
+ 212           * @fn      GV701x_HPGPStartNwk
+ 213           *
+ 214           * @brief   Starts the PLC network
+ 215           *
+ 216           * @param   netoption - Start options as defined in hpgpdef.h
+ 217           *        nid - Network Identification Key
+ 218           *
+ 219           * @return  none
+ 220           */
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 5   
+
+ 221          
+ 222          void GV701x_HPGPStartNwk(u8 netoption, u8* nid)
+ 223          {
+ 224   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 225   1        hostCmdNwk* nwk; 
+ 226   1      
+ 227   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 228   1      
+ 229   1        /*Fill the Start Network structure*/  
+ 230   1        nwk = (hostCmdNwk*)buf; 
+ 231   1        nwk->command = APCM_SET_NETWORKS_REQ;
+ 232   1        nwk->netoption = netoption;
+ 233   1        if(nid != NULL)
+ 234   1          memcpy((u8*)nwk->nid, (u8*)nid, NID_LEN); 
+ 235   1      
+ 236   1        /*Send command to firmware*/  
+ 237   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 238   1                  EVENT_CLASS_CTRL, CONTROL_FRM_ID, buf, sizeof(hostCmdNwk), 0);
+ 239   1      }
+ 240          
+ 241          
+ 242          /******************************************************************************
+ 243           * @fn      Gv701x_SetNetId
+ 244           *
+ 245           * @brief   Sets the Network keys in the firmware
+ 246           *
+ 247           *  
+ 248           * @param   nmk - Network Managment Key
+ 249           *        nid - Network Identification Key
+ 250           *
+ 251           * @return  none
+ 252           */
+ 253           
+ 254          void GV701x_HPGPSetNetId(u8* nmk, u8* nid)
+ 255          {
+ 256   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 257   1        hostCmdNetId* netid;    
+ 258   1      
+ 259   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 260   1      
+ 261   1        /*Fill the Network key structure*/  
+ 262   1        netid = (hostCmdNetId*)buf; 
+ 263   1        netid->command = APCM_SET_KEY_REQ;
+ 264   1        memcpy((u8*)netid->nid, (u8*)nid, NID_LEN);
+ 265   1        memcpy((u8*)netid->nmk, (u8*)nmk, ENC_KEY_LEN);
+ 266   1        /*Setting the security level to defualts*/
+ 267   1        netid->seclvl = SECLV_SC;
+ 268   1          
+ 269   1        /*Send command to firmware*/  
+ 270   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 271   1                  EVENT_CLASS_CTRL, CONTROL_FRM_ID, buf, sizeof(hostCmdNetId), 0);
+ 272   1      }
+ 273          
+ 274          /******************************************************************************
+ 275           * @fn      GV701x_HPGPGetDevStats
+ 276           *
+ 277           * @brief   Sends a request to fetch Device Statistics 
+ 278           *        (eg. frame transmit/receive count etc)
+ 279           *
+ 280           * @param   none
+ 281           *
+ 282           * @return  none
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 6   
+
+ 283           */
+ 284          
+ 285          void GV701x_HPGPGetDevStats(void)
+ 286          {
+ 287   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 288   1        hostCmdDevstats *devstats;    
+ 289   1      
+ 290   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 291   1      
+ 292   1        /*Fill the Device Stats structure*/ 
+ 293   1        devstats = (hostCmdDevstats*)buf; 
+ 294   1        devstats->command = HOST_CMD_DEVICE_STATS_REQ;
+ 295   1        devstats->action = ACTION_GET;  
+ 296   1        
+ 297   1        /*Send command to firmware*/  
+ 298   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 299   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, sizeof(hostCmdDevstats), 0);
+ 300   1      }
+ 301          
+ 302          /******************************************************************************
+ 303           * @fn      GV701x_HPGPSetPsAvln
+ 304           *
+ 305           * @brief   Sends a request to set AVLN powersave mode
+ 306           *
+ 307           * @param   mode - the powersave mode intended
+ 308           *
+ 309           * @return  none
+ 310           */
+ 311          
+ 312          void GV701x_HPGPSetPsAvln(u8 mode)
+ 313          {
+ 314   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 315   1        hostCmdPsAvln* psAvln;    
+ 316   1      
+ 317   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 318   1      
+ 319   1        /*Fill the Power Save AVLN structure*/  
+ 320   1        psAvln = (hostCmdPsAvln*)buf; 
+ 321   1        psAvln->command = HOST_CMD_PSAVLN_REQ;
+ 322   1        psAvln->action = ACTION_SET;
+ 323   1        psAvln->mode = mode;
+ 324   1      
+ 325   1        /*Send command to firmware*/    
+ 326   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 327   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, sizeof(hostCmdPsAvln), 0);
+ 328   1      }
+ 329          
+ 330          /******************************************************************************
+ 331           * @fn      GV701x_HPGPSetPsSta
+ 332           *
+ 333           * @brief   Sends a request to set AVLN powersave mode 
+ 334           *          configurations on the Station
+ 335           *
+ 336           * @param   mode - the powersave mode on the network
+ 337           *        awd - awake window
+ 338           *        psp - powersave period 
+ 339           *
+ 340           * @return  none
+ 341           */
+ 342          
+ 343          void GV701x_HPGPSetPsSta(u8 mode, u8 awd, u8 psp)
+ 344          {
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 7   
+
+ 345   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 346   1        hostCmdPsSta* psSta;    
+ 347   1      
+ 348   1        /*Fill the Hybrii Header*/
+ 349   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 350   1      
+ 351   1        /*Fill the Power Save STA structure*/ 
+ 352   1        psSta = (hostCmdPsSta*)buf; 
+ 353   1        psSta->command = HOST_CMD_PSSTA_REQ;
+ 354   1        psSta->action = ACTION_SET;
+ 355   1        psSta->mode = mode;
+ 356   1        psSta->awd =  awd;
+ 357   1        psSta->psp = psp;
+ 358   1      
+ 359   1        /*Send command to firmware*/  
+ 360   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 361   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, sizeof(hostCmdPsSta), 0);
+ 362   1      }
+ 363          
+ 364          /******************************************************************************
+ 365           * @fn      GV701x_HPGPGetPeerInfo
+ 366           *
+ 367           * @brief   Sends a request to get all peer information on PLC
+ 368           *
+ 369           * @param   none
+ 370           *
+ 371           * @return  none
+ 372           */
+ 373          
+ 374          void GV701x_HPGPGetPeerInfo(void)
+ 375          {
+ 376   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 377   1        hostCmdPeerinfo* peerinfo;    
+ 378   1      
+ 379   1        /*Fill the Hybrii Header*/
+ 380   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 381   1      
+ 382   1        /*Fill the Peer Info request structure*/  
+ 383   1        peerinfo = (hostCmdPeerinfo*)buf; 
+ 384   1        peerinfo->command = HOST_CMD_PEERINFO_REQ;
+ 385   1        peerinfo->action = ACTION_GET;
+ 386   1      
+ 387   1        /*Send command to firmware*/  
+ 388   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 389   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, sizeof(hostCmdPeerinfo), 0);
+ 390   1      }
+ 391          
+ 392          /******************************************************************************
+ 393           * @fn      GV701x_HPGPNetExit
+ 394           *
+ 395           * @brief   Request a network exit
+ 396           *
+ 397           * @param   none
+ 398           *
+ 399           * @return  none
+ 400           */
+ 401          
+ 402          void GV701x_HPGPNetExit(void)
+ 403          {
+ 404   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 405   1        hostCmdNetExit* netexit;    
+ 406   1      
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 8   
+
+ 407   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 408   1      
+ 409   1        /*Fill the Net Exit request structure*/ 
+ 410   1        netexit = (hostCmdNetExit*)buf; 
+ 411   1        netexit->command = APCM_NET_EXIT_REQ;
+ 412   1        netexit->action = ACTION_SET;
+ 413   1      
+ 414   1        /*Send command to firmware*/  
+ 415   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 416   1                  EVENT_CLASS_CTRL, CONTROL_FRM_ID, buf, sizeof(hostCmdNetExit), 0);
+ 417   1      }
+ 418          
+ 419          /******************************************************************************
+ 420           * @fn      GV701x_HPGPScanNetwork
+ 421           *
+ 422           * @brief   Sends a request to Scan the network
+ 423           *
+ 424           * @param   scantime - time to scan 
+ 425           *
+ 426           * @return  none
+ 427           */
+ 428          
+ 429          void GV701x_HPGPScanNetwork(tTime scantime)
+ 430          {
+ 431   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 432   1        hostCmdScanNet* netlist;    
+ 433   1      
+ 434   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 435   1      
+ 436   1        /*Fill the Scan request structure*/ 
+ 437   1        netlist = (hostCmdScanNet*)buf; 
+ 438   1        netlist->command = HOST_CMD_SCANNETWORK_REQ;
+ 439   1        netlist->action = ACTION_GET;
+ 440   1        netlist->scanTime = scantime;
+ 441   1      
+ 442   1        /*Send command to firmware*/  
+ 443   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 444   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, sizeof(hostCmdScanNet), 0);
+ 445   1      }
+ 446          
+ 447          /******************************************************************************
+ 448           * @fn      GV701x_HPGPNwkVendorFieldAccess
+ 449           *
+ 450           * @brief   Sends a request to get/set the network's vendor specific information
+ 451           *
+ 452           * @param   action (use ACTION_SET to set and ACTION_GET to fetch)
+ 453           *
+ 454           * @return  none
+ 455           */
+ 456          
+ 457          void GV701x_HPGPNwkVendorFieldAccess(u8 action, u8* ouid, u8* vendor_info)
+ 458          {
+ 459   1        u8 buf[MAX_HOST_CMD_LENGTH];
+ 460   1        hostCmdVendorSpec* vendorInfo;    
+ 461   1      
+ 462   1        memset(buf, 0x00, MAX_HOST_CMD_LENGTH); 
+ 463   1      
+ 464   1        /*Fill the Vendor Info request structure*/  
+ 465   1        vendorInfo = (hostCmdVendorSpec*)buf; 
+ 466   1        vendorInfo->command = HOST_CMD_VENDORSPEC_REQ;
+ 467   1        vendorInfo->action = action;
+ 468   1        vendorInfo->enable = FALSE;
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 9   
+
+ 469   1        
+ 470   1        if((action == ACTION_SET) && (vendor_info != NULL) && (ouid != NULL))
+ 471   1        {
+ 472   2          vendorInfo->enable = TRUE;
+ 473   2          memcpy(&vendorInfo->vendor_ota.ouid, ouid, OUID_LEN);
+ 474   2          memcpy(&vendorInfo->vendor_ota.buf, vendor_info, VENDOR_SPEC_FIELD_LEN);
+ 475   2        }
+ 476   1        /*Send command to firmware*/  
+ 477   1        GV701x_SendAppEvent(hpgp_drv_data.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_ID,
+ 478   1                  EVENT_CLASS_MGMT, MGMT_FRM_ID, buf, sizeof(hostCmdVendorSpec), 0);
+ 479   1      
+ 480   1      }
+ 481          
+ 482          /******************************************************************************
+ 483           * @fn      GV701x_HPGPDriverRxAppMsg
+ 484           *
+ 485           * @brief   Receives a message from another app/fw
+ 486           *
+ 487           * @params  msg_buf - message buffer
+ 488           *
+ 489           * @return  none
+ 490           */
+ 491          
+ 492          void GV701x_HPGPDriverRxAppMsg(sEvent* event)
+ 493          {
+ 494   1        gv701x_app_msg_hdr_t* msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;
+ 495   1        hostHdr_t* hybrii_hdr;
+ 496   1        hostEventHdr_t* evnt_hdr;
+ 497   1        
+ 498   1        hybrii_hdr = (hostHdr_t*)(msg_hdr + 1);
+ 499   1      
+ 500   1        if(msg_hdr->dst_app_id == hpgp_drv_data.app_id)
+ 501   1        {
+ 502   2          memcpy(&hpgp_drv_data.state.msg_hdr, msg_hdr, sizeof(gv701x_app_msg_hdr_t));
+ 503   2          hpgp_drv_data.state.eventproto = hybrii_hdr->protocol;
+ 504   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 505   2            (hybrii_hdr->type == EVENT_FRM_ID))
+ 506   2          {
+ 507   3            evnt_hdr = (hostEventHdr_t*)(hybrii_hdr + 1);
+ 508   3            hpgp_drv_data.state.event = evnt_hdr->type;     
+ 509   3            hpgp_drv_data.state.statedata = (u8*)(evnt_hdr + 1);
+ 510   3            hpgp_drv_data.state.statedatalen = (u16)(hybrii_hdr->length - sizeof(hostEventHdr_t));      
+ 511   3          }
+ 512   2          else
+ 513   2          {
+ 514   3            hpgp_drv_data.state.event = (u8)(*((u8*)(hybrii_hdr + 1)));
+ 515   3            hpgp_drv_data.state.statedata = (u8*)(hybrii_hdr + 1);
+ 516   3            hpgp_drv_data.state.statedatalen = (u16)hybrii_hdr->length;
+ 517   3          }   
+ 518   2          hpgp_drv_data.state.eventtype = hybrii_hdr->type;
+ 519   2          hpgp_drv_data.state.eventclass = event->eventHdr.eventClass;
+ 520   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 521   2            (hybrii_hdr->type == EVENT_FRM_ID) &&
+ 522   2            (hpgp_drv_data.state.event == HOST_EVENT_APP_TIMER))
+ 523   2          {     
+ 524   3            GV701x_HPGPDriverTimerHandler((u8*)(evnt_hdr + 1)); 
+ 525   3            return;
+ 526   3          }
+ 527   2          else if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 528   2            (hybrii_hdr->type == EVENT_FRM_ID) &&
+ 529   2            (hpgp_drv_data.state.event == HOST_EVENT_APP_CMD))
+ 530   2          { 
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 10  
+
+ 531   3            GV701x_HPGPDriver_CmdProcess((char*)(evnt_hdr + 1)); 
+ 532   3            return;
+ 533   3          }   
+ 534   2        } 
+ 535   1        else if(msg_hdr->dst_app_id == APP_BRDCST_MSG_APPID)
+ 536   1        {
+ 537   2          u8 *event = (u8*)(hybrii_hdr + 1);
+ 538   2          return;
+ 539   2        }
+ 540   1      
+ 541   1        GV701x_HPGPDriverSM(&hpgp_drv_data.state);  
+ 542   1      }
+ 543          
+ 544          /******************************************************************************
+ 545           * @fn      GV701x_HPGPDriverUpdateNwkTable
+ 546           *
+ 547           * @brief   Updates the network table about co-existing networks 
+ 548           *
+ 549           * @param   data_buf - Data coming from the firmware 
+ 550           *          of type hostEvent_ScanInd_t(in hpgp_msgs.h)
+ 551           *
+ 552           * @return  none
+ 553           */
+ 554          
+ 555          void GV701x_HPGPDriverUpdateNwkTable(u8* data_buf)
+ 556          {
+ 557   1        hostEvent_ScanInd_t* scanInd = (hostEvent_ScanInd_t*)data_buf;
+ 558   1      
+ 559   1      //  if(scanInd->noOfEntries != 0)
+ 560   1        { 
+ 561   2          hpgp_nwk_data.netlist.entries = scanInd->noOfEntries;
+ 562   2          memcpy((u8*)&hpgp_nwk_data.netlist.list, (u8*)&scanInd->networkList, 
+ 563   2                MAX_NETWORK_LIST*sizeof(hostEventScanList));            
+ 564   2        }
+ 565   1        GV701x_HPGPSendEvent(HPGPDRV_SCAN_IND, 0, 0);
+ 566   1      }
+ 567          
+ 568          /******************************************************************************
+ 569           * @fn      GV701x_HPGPDriverTimerHandler
+ 570           *
+ 571           * @brief   Timer handler for HPGP driver timer events
+ 572           *
+ 573           * @param   event - event from firmware
+ 574           *
+ 575           * @return  none
+ 576           *
+ 577           */
+ 578          
+ 579          void GV701x_HPGPDriverTimerHandler(u8* buf)
+ 580          { 
+ 581   1        hostTimerEvnt_t* timerevt = (hostTimerEvnt_t*)buf;  
+ 582   1      
+ 583   1        if(buf == NULL)
+ 584   1          return;
+ 585   1        
+ 586   1        /*Demultiplexing the specific timer event*/           
+ 587   1        switch((u8)timerevt->type)
+ 588   1        {                 
+ 589   2          default:
+ 590   2          break;
+ 591   2        }           
+ 592   1      }
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 11  
+
+ 593          
+ 594          /******************************************************************************
+ 595           * @fn      GV701x_HPGPSendEvent
+ 596           *
+ 597           * @brief   Sends an indication(on state change) to the 
+ 598           *          app that requested the service
+ 599           *
+ 600           * @param   ind - indication type
+ 601           *          state - state of the PLC link (_nwIdState_e in hpgp_msgs.h)
+ 602           *          reason - reason for the transition 
+ 603           *                  (hostEventNetworkIndReason_e in hpgp_msgs.h)
+ 604           *
+ 605           * @return  none
+ 606           *
+ 607           */
+ 608          
+ 609          void GV701x_HPGPSendEvent(u8 ind, u8 state, u8 reason) 
+ 610          { 
+ 611   1        if(ind == HPGPDRV_UP_IND)
+ 612   1        {
+ 613   2          hpgp_drv_up_ind_msg_t hpgp_up;
+ 614   2          hpgp_up.event = ind;
+ 615   2          hpgp_up.state = state;
+ 616   2          hpgp_up.reason = reason;
+ 617   2          GV701x_SendAppEvent(hpgp_drv_data.app_id, hpgp_drv_data.start.app_id, APP_MSG_TYPE_APPIND, 
+ 618   2                      APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, 
+ 619   2                      &hpgp_up, sizeof(hpgp_drv_up_ind_msg_t), 0);    
+ 620   2          hpgp_drv_data.start.active = FALSE;   
+ 621   2        }
+ 622   1        else if(ind == HPGPDRV_DWN_IND)
+ 623   1        {
+ 624   2          hpgp_drv_dwn_ind_msg_t hpgp_dwn;
+ 625   2          hpgp_dwn.event = ind;
+ 626   2          hpgp_dwn.state = state;
+ 627   2          hpgp_dwn.reason = reason;
+ 628   2          GV701x_SendAppEvent(hpgp_drv_data.app_id, hpgp_drv_data.start.app_id, APP_MSG_TYPE_APPIND, 
+ 629   2                      APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, 
+ 630   2                      &hpgp_dwn, sizeof(hpgp_drv_dwn_ind_msg_t), 0);    
+ 631   2          hpgp_drv_data.start.active = FALSE;   
+ 632   2        }
+ 633   1        else if(ind == HPGPDRV_SCAN_IND)
+ 634   1        {
+ 635   2          hpgp_drv_scan_ind_msg_t scan_ind;
+ 636   2          scan_ind.event = ind;
+ 637   2          GV701x_SendAppEvent(hpgp_drv_data.app_id, hpgp_drv_data.scan.app_id, APP_MSG_TYPE_APPIND, 
+ 638   2                      APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, 
+ 639   2                      &scan_ind, sizeof(hpgp_drv_scan_ind_msg_t), 0);   
+ 640   2          hpgp_drv_data.scan.active = FALSE;
+ 641   2          hpgp_drv_data.scan.app_id = 0;          
+ 642   2        }
+ 643   1        else
+ 644   1          return;
+ 645   1      }
+ 646          
+ 647          /******************************************************************************
+ 648           * @fn      GV701x_HPGPDriverSM
+ 649           *
+ 650           * @brief   HPGP State Machine, it executes all internal/external 
+ 651           *      events triggered
+ 652           *
+ 653           * @param   state - state machine object of the driver
+ 654           *          (passed as a reference incase there are more than one object)
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 12  
+
+ 655           *
+ 656           * @return  none
+ 657           *
+ 658           */
+ 659          
+ 660          void GV701x_HPGPDriverSM(gv701x_state_t* state) 
+ 661          { 
+ 662   1        if(state == NULL)
+ 663   1          return;
+ 664   1      
+ 665   1      #if 1 
+ 666   1        if(state->event != HPGPDRV_IDLE_EVENT)
+ 667   1          FM_Printf(FM_APP, "\nHpgp S %bu E %bu P %bu C %bu E %bu Da %bu Sa %bu T %bu", 
+ 668   1              state->state, state->event,
+ 669   1              state->eventproto, state->eventclass, state->eventtype, 
+ 670   1              state->msg_hdr.dst_app_id, state->msg_hdr.src_app_id, state->msg_hdr.type);
+ 671   1      #endif
+ 672   1        switch(state->state)
+ 673   1        {
+ 674   2          /*Initial State*/
+ 675   2          case HPGPDRV_INIT:
+ 676   2            if(state->eventproto == HPGP_MAC_ID)
+ 677   2            {
+ 678   3              if((state->eventclass == EVENT_CLASS_MGMT) && 
+ 679   3                (state->eventtype == MGMT_FRM_ID))
+ 680   3              {
+ 681   4                switch(state->event)
+ 682   4                {
+ 683   5                  case HOST_CMD_HARDWARE_SPEC_CNF:
+ 684   5                  break;
+ 685   5      
+ 686   5                  default:
+ 687   5                  break;
+ 688   5                }
+ 689   4              }
+ 690   3              else if((state->eventclass == EVENT_CLASS_CTRL) &&
+ 691   3                    (state->eventtype == EVENT_FRM_ID))
+ 692   3              {   
+ 693   4                switch(state->event)
+ 694   4                {
+ 695   5                  case HOST_EVENT_SCAN_COMPLETE_IND:  
+ 696   5                    if(state->statedata != NULL)
+ 697   5                    {
+ 698   6                      GV701x_HPGPDriverUpdateNwkTable(state->statedata);
+ 699   6                    }
+ 700   5                  break;
+ 701   5                  
+ 702   5                  default:
+ 703   5                  break;
+ 704   5                }
+ 705   4              }       
+ 706   3            }
+ 707   2            else if(state->eventproto == APP_MAC_ID)
+ 708   2            {
+ 709   3              if(state->msg_hdr.type == APP_MSG_TYPE_APPEVENT)
+ 710   3              {
+ 711   4                switch(state->event)
+ 712   4                {       
+ 713   5                  /*Scan event*/
+ 714   5                  case HPGPDRV_SCAN_EVNT:           
+ 715   5                    if(hpgp_drv_data.scan.active == FALSE)
+ 716   5                    {
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 13  
+
+ 717   6                      hpgp_drv_data.scan.active = TRUE; 
+ 718   6                      hpgp_drv_data.scan.app_id = state->msg_hdr.src_app_id;  
+ 719   6                      GV701x_HPGPScanNetwork(hpgp_drv_data.scan.time);
+ 720   6                    }
+ 721   5                  break;  
+ 722   5      
+ 723   5                  /*Start event*/
+ 724   5                  case HPGPDRV_START_EVNT:
+ 725   5                    if(hpgp_drv_data.start.active == FALSE)
+ 726   5                    {
+ 727   6                      state->state = HPGPDRV_START;
+ 728   6                      hpgp_drv_data.start.active = TRUE;    
+ 729   6                      hpgp_drv_data.start.app_id = state->msg_hdr.src_app_id;
+ 730   6                      /*Exit previous state before starting*/
+ 731   6                      GV701x_HPGPNetExit();
+ 732   6                    }
+ 733   5                  break;
+ 734   5      
+ 735   5                  default:
+ 736   5                  break;
+ 737   5                }
+ 738   4              }
+ 739   3            }     
+ 740   2          break;  
+ 741   2      
+ 742   2          /*Started/Down State*/
+ 743   2          case HPGPDRV_START:
+ 744   2          case HPGPDRV_DOWN:                
+ 745   2            if(state->eventproto == APP_MAC_ID)
+ 746   2            {
+ 747   3              if(state->msg_hdr.type == APP_MSG_TYPE_APPEVENT)
+ 748   3              {
+ 749   4                switch(state->event)
+ 750   4                {       
+ 751   5                  /*Scan event*/
+ 752   5                  case HPGPDRV_SCAN_EVNT:           
+ 753   5                    if(hpgp_drv_data.scan.active == FALSE)
+ 754   5                    {
+ 755   6                      hpgp_drv_data.scan.active = TRUE; 
+ 756   6                      hpgp_drv_data.scan.app_id = state->msg_hdr.src_app_id;  
+ 757   6                      GV701x_HPGPScanNetwork(hpgp_drv_data.scan.time);
+ 758   6                    }
+ 759   5                  break;  
+ 760   5      
+ 761   5                  /*Start event*/
+ 762   5                  case HPGPDRV_START_EVNT:
+ 763   5                    if(hpgp_drv_data.start.active == FALSE)
+ 764   5                    {
+ 765   6                      state->state = HPGPDRV_START;
+ 766   6                      hpgp_drv_data.start.active = TRUE;    
+ 767   6                      hpgp_drv_data.start.app_id = state->msg_hdr.src_app_id;
+ 768   6                      /*Exit previous state before starting*/
+ 769   6                      GV701x_HPGPNetExit();
+ 770   6                    }
+ 771   5                  break;
+ 772   5      
+ 773   5                  /*Stop event*/
+ 774   5                  case HPGPDRV_STOP_EVNT:
+ 775   5                    hpgp_drv_data.start.active = FALSE;
+ 776   5                    hpgp_nwk_data.params.nwk.role = DEV_MODE_STA;
+ 777   5                    memcpy((u8*)hpgp_nwk_data.params.nwk.key.nid, 
+ 778   5                        (u8*)cco_nid, NID_LEN);             
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 14  
+
+ 779   5                    GV701x_HPGPNetExit();
+ 780   5                  break;
+ 781   5      
+ 782   5                  default:
+ 783   5                  break;
+ 784   5                }
+ 785   4              }
+ 786   3            }
+ 787   2            else if(state->eventproto == HPGP_MAC_ID)
+ 788   2            {
+ 789   3              if((state->eventclass == EVENT_CLASS_MGMT) && 
+ 790   3                (state->eventtype == MGMT_FRM_ID))
+ 791   3              {
+ 792   4                switch(state->event)
+ 793   4                {       
+ 794   5                  case HOST_CMD_SCANNETWORK_CNF:                    
+ 795   5                  break;    
+ 796   5      
+ 797   5                  case HOST_CMD_VENDORSPEC_CNF:
+ 798   5                  {
+ 799   6                    u8 startmode;
+ 800   6                    /*Finally Start attempt to Join/Start the device*/
+ 801   6                    if(hpgp_nwk_data.params.nwk.role == DEV_MODE_STA)           
+ 802   6                      startmode = NETWORK_JOIN;
+ 803   6                    else if(hpgp_nwk_data.params.nwk.role == DEV_MODE_CCO)
+ 804   6                      startmode = NETWORK_START;          
+ 805   6                    else
+ 806   6                      break;
+ 807   6                    
+ 808   6                    GV701x_HPGPStartNwk(startmode, hpgp_nwk_data.params.nwk.key.nid);
+ 809   6                  }
+ 810   5                  break;            
+ 811   5                
+ 812   5                  default:
+ 813   5                  break;
+ 814   5                }
+ 815   4              }
+ 816   3              else if((state->eventclass == EVENT_CLASS_CTRL) &&
+ 817   3                   (state->eventtype == CONTROL_FRM_ID))
+ 818   3              {
+ 819   4                switch(state->event)
+ 820   4                { 
+ 821   5                  case APCM_NET_EXIT_CNF:   
+ 822   5                    /*Continuation of Active Start sequence*/
+ 823   5                  break;
+ 824   5        
+ 825   5                  
+ 826   5                  case APCM_SET_KEY_CNF:    
+ 827   5                    /*Set the Vendor filed on the network incase when
+ 828   5                      the device starts the network, else just check 
+ 829   5                      what it is*/
+ 830   5                    if(hpgp_nwk_data.params.nwk.role == DEV_MODE_CCO)
+ 831   5                    {
+ 832   6                      GV701x_HPGPNwkVendorFieldAccess(ACTION_SET, hpgp_nwk_data.params.nwk.app_info.oem[0].ouid,
+ 833   6                            (u8*)hpgp_nwk_data.params.nwk.app_info.byte_arr);
+ 834   6                    }
+ 835   5                    else if(hpgp_nwk_data.params.nwk.role == DEV_MODE_STA)
+ 836   5                    {
+ 837   6                      GV701x_HPGPNwkVendorFieldAccess(ACTION_GET, NULL, NULL);                      
+ 838   6                    }
+ 839   5                  break;
+ 840   5        
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 15  
+
+ 841   5                  case APCM_SET_NETWORKS_CNF:
+ 842   5                  break;
+ 843   5      
+ 844   5                  default:
+ 845   5                  break;  
+ 846   5                }
+ 847   4              }
+ 848   3              else if(state->eventtype == EVENT_FRM_ID)
+ 849   3              {   
+ 850   4                switch(state->event)
+ 851   4                {
+ 852   5                  case HOST_EVENT_SCAN_COMPLETE_IND:  
+ 853   5                    if(state->statedata != NULL)
+ 854   5                    {
+ 855   6                      GV701x_HPGPDriverUpdateNwkTable(state->statedata);
+ 856   6                    }
+ 857   5                  break;
+ 858   5                          
+ 859   5                  /*Association Indication*/
+ 860   5                  case HOST_EVENT_TYPE_ASSOC_IND:
+ 861   5                    if(state->statedata) 
+ 862   5                    {
+ 863   6                      hostEvent_assocInd* assocInd = (hostEvent_assocInd*)state->statedata;
+ 864   6                      hpgp_nwk_data.params.nwk.tei = assocInd->tei;
+ 865   6                    }         
+ 866   5                  break;
+ 867   5      
+ 868   5                  case HOST_EVENT_NETWORK_IND:  
+ 869   5                    /*Demultiplexing the type of nwk event*/
+ 870   5                    if(state->statedata) 
+ 871   5                    {
+ 872   6                      hostEvent_NetworkId* nwkId = (hostEvent_NetworkId*)state->statedata;
+ 873   6      #if 0               
+                              FM_Printf(FM_APP, "\nIND: s %bu r %bu", nwkId->state, nwkId->reason);
+              #endif                
+ 876   6                      switch((u8)(nwkId->state))    
+ 877   6                      {           
+ 878   7                        case NWID_STATE_NET_DISC:
+ 879   7                        break;
+ 880   7          
+ 881   7                        /*Unassociated event*/
+ 882   7                        case NWID_STATE_INIT:
+ 883   7                        case NWID_STATE_UNASSOC_STA:
+ 884   7                        case NWID_STATE_UNASSOC_CCO:                    
+ 885   7                          switch(nwkId->reason)
+ 886   7                          {
+ 887   8                            case HOST_EVENT_NW_IND_REASON_NETEXIT_CMD:
+ 888   8                              /*Continue with start*/
+ 889   8                              if(hpgp_drv_data.start.active == TRUE)
+ 890   8                              {
+ 891   9                                GV701x_HPGPSetNetId(hpgp_nwk_data.params.nwk.key.nmk, 
+ 892   9                                      hpgp_nwk_data.params.nwk.key.nid);                      
+ 893   9                              }
+ 894   8                              else
+ 895   8                              {
+ 896   9                                state->state = HPGPDRV_DOWN;  
+ 897   9                                GV701x_HPGPSendEvent(HPGPDRV_DWN_IND, NWID_STATE_ASSOC_STA, 0);
+ 898   9                              }                       
+ 899   8                            break;
+ 900   8      
+ 901   8                            case HOST_EVENT_NW_IND_REASON_CCO_LEAVE_IND:
+ 902   8                            case HOST_EVENT_NW_IND_REASON_NO_AVLN:
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 16  
+
+ 903   8                            case HOST_EVENT_NW_IND_REASON_AUTH_FAIL:
+ 904   8                            case HOST_EVENT_NW_IND_REASON_ASSOC_FAIL:
+ 905   8                            case HOST_EVENT_NW_IND_REASON_BCNLOSS:
+ 906   8                            case HOST_EVENT_NW_IND_REASON_USERCMD:
+ 907   8                              /*Check if the event is valid in the context of 
+ 908   8                                operating role*/                  
+ 909   8                              state->state = HPGPDRV_DOWN;
+ 910   8                              GV701x_HPGPSendEvent(HPGPDRV_DWN_IND, nwkId->state, nwkId->reason);
+ 911   8                            break;
+ 912   8                            default:
+ 913   8                            break;
+ 914   8                          }
+ 915   7                        break;
+ 916   7          
+ 917   7                        /*Associated Event*/
+ 918   7                        //case NWID_STATE_ASSOC_STA:
+ 919   7                        case NWID_STATE_ASSOC_CCO:
+ 920   7                          /*Check if the event is valid in the context of 
+ 921   7                            operating role*/                
+ 922   7                          if((hpgp_nwk_data.params.nwk.role == DEV_MODE_CCO) &&
+ 923   7                            ((u8)(nwkId->state) == NWID_STATE_ASSOC_CCO))
+ 924   7                          {   
+ 925   8      #if 0                                  
+                                    FM_Printf(FM_APP, "\nHPGP Assoc");
+              #endif                      
+ 928   8                            state->state = HPGPDRV_UP;
+ 929   8                            GV701x_HPGPSendEvent(HPGPDRV_UP_IND, nwkId->state, nwkId->reason);                    
+ 930   8                          }
+ 931   7                        break;
+ 932   7                        
+ 933   7                        default:
+ 934   7                        break;
+ 935   7                      }           
+ 936   6                    }                             
+ 937   5                  break;  
+ 938   5      
+ 939   5                  /*Authentication Event*/
+ 940   5                  case HOST_EVENT_AUTH_COMPLETE:
+ 941   5                    if(hpgp_drv_data.start.active == TRUE)              
+ 942   5                    {
+ 943   6                      state->state = HPGPDRV_UP;   
+ 944   6      #if 0               
+                              FM_Printf(FM_APP, "\nHPGP DrvUp");
+              #endif                
+ 947   6                      GV701x_HPGPSendEvent(HPGPDRV_UP_IND, NWID_STATE_ASSOC_STA, 0);            
+ 948   6                    }
+ 949   5                  break;
+ 950   5      
+ 951   5                  default:
+ 952   5                  break;
+ 953   5                }
+ 954   4              }
+ 955   3            }
+ 956   2          break;    
+ 957   2      
+ 958   2          /*Up State*/
+ 959   2          case HPGPDRV_UP:
+ 960   2            if(state->eventproto == APP_MAC_ID)
+ 961   2            { 
+ 962   3              if(state->msg_hdr.type == APP_MSG_TYPE_APPEVENT)
+ 963   3              {
+ 964   4                switch(state->event)
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 17  
+
+ 965   4                {   
+ 966   5                  /*Start event*/
+ 967   5                  case HPGPDRV_START_EVNT:
+ 968   5                    if(hpgp_drv_data.start.active == FALSE)
+ 969   5                    {
+ 970   6                      hpgp_drv_start_evnt_msg_t* hpgp_start = 
+ 971   6                          (hpgp_drv_start_evnt_msg_t*)state->statedata;
+ 972   6                    
+ 973   6                      state->state = HPGPDRV_START;           
+ 974   6                      hpgp_drv_data.start.active = TRUE;            
+ 975   6                      hpgp_drv_data.start.app_id = state->msg_hdr.src_app_id;           
+ 976   6      #if 0               
+                              FM_HexDump(FM_APP,"\nStart Nid:",
+                                (u8*)hpgp_nwk_data.params.nwk.key.nid, NID_LEN);
+              #endif                  
+ 980   6                      /*Exit previous state before starting*/
+ 981   6                      GV701x_HPGPNetExit();
+ 982   6                    }
+ 983   5                  break;
+ 984   5                  
+ 985   5                  /*Scan event*/
+ 986   5                  case HPGPDRV_SCAN_EVNT:
+ 987   5                    if(hpgp_drv_data.scan.active == FALSE)
+ 988   5                    { 
+ 989   6                      hpgp_drv_data.scan.active = TRUE;
+ 990   6                      hpgp_drv_data.scan.app_id = state->msg_hdr.src_app_id;
+ 991   6                      GV701x_HPGPScanNetwork(hpgp_drv_data.scan.time);
+ 992   6                    }
+ 993   5                  break;  
+ 994   5      
+ 995   5                  /*Stop event*/
+ 996   5                  case HPGPDRV_STOP_EVNT:
+ 997   5                    hpgp_drv_data.start.active = FALSE;
+ 998   5                    hpgp_nwk_data.params.nwk.role = DEV_MODE_STA;
+ 999   5                    memcpy((u8*)hpgp_nwk_data.params.nwk.key.nid, 
+1000   5                        (u8*)cco_nid, NID_LEN);             
+1001   5                    GV701x_HPGPNetExit();
+1002   5                  break;  
+1003   5      
+1004   5                  default:
+1005   5                  break;
+1006   5                }
+1007   4              }
+1008   3            }
+1009   2            else if(state->eventproto == HPGP_MAC_ID)
+1010   2            {
+1011   3              if((state->eventclass == EVENT_CLASS_MGMT) && 
+1012   3                (state->eventtype == MGMT_FRM_ID))
+1013   3              {     
+1014   4                switch(state->event)
+1015   4                { 
+1016   5                  case HOST_CMD_SCANNETWORK_CNF:                    
+1017   5                  break;  
+1018   5      
+1019   5                  case HOST_CMD_PSAVLN_CNF:
+1020   5                  break;
+1021   5                  
+1022   5                  case HOST_CMD_PSSTA_CNF:
+1023   5                  break;
+1024   5                  
+1025   5                  case HOST_CMD_PEERINFO_CNF:
+1026   5                    if(state->statedata)          
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 18  
+
+1027   5                    {         
+1028   6                      u8 lclCount;
+1029   6                      hostCmdPeerinfo *peerinfo;
+1030   6                      peerinfodata *peer;
+1031   6                      peerinfo = (hostCmdPeerinfo *)(state->statedata);
+1032   6        
+1033   6                      if(peerinfo->result == STATUS_SUCCESS) 
+1034   6                      {
+1035   7                        peer = (peerinfodata *)(peerinfo + 1);
+1036   7                        for( lclCount=0; lclCount<(peerinfo->noofentries); lclCount++) 
+1037   7                        {
+1038   8                          peer = (peer + 1);                    
+1039   8                        }
+1040   7                      } 
+1041   6                    }
+1042   5                  break;  
+1043   5      
+1044   5                  default:
+1045   5                  break;
+1046   5                }
+1047   4              }
+1048   3              else if(state->eventtype == EVENT_FRM_ID)
+1049   3              {   
+1050   4                switch(state->event)
+1051   4                {       
+1052   5                  case HOST_EVENT_SCAN_COMPLETE_IND:
+1053   5                    if(state->statedata != NULL)
+1054   5                    {
+1055   6                      GV701x_HPGPDriverUpdateNwkTable(state->statedata);
+1056   6                    }
+1057   5                  break;
+1058   5      
+1059   5                  /*Beacon Loss*/
+1060   5                  case HOST_EVENT_BCN_LOSS: 
+1061   5      #if 0 
+                            FM_Printf(FM_APP, "\nHPGPbcnloss");
+                            //state->state = HPGPDRV_DOWN;      
+              #endif
+1065   5                  break;
+1066   5      
+1067   5                  case HOST_EVENT_NETWORK_IND:                  
+1068   5                    /*Demultiplexing the type of nwk event*/
+1069   5                    if(state->statedata) 
+1070   5                    {
+1071   6                      hostEvent_NetworkId* nwkId = (hostEvent_NetworkId*)state->statedata;
+1072   6                        switch((u8)(nwkId->state))    
+1073   6                        {     
+1074   7                          case NWID_STATE_NET_DISC:
+1075   7                        break;
+1076   7      
+1077   7                        case NWID_STATE_INIT:
+1078   7                        case NWID_STATE_UNASSOC_CCO:              
+1079   7                        case NWID_STATE_UNASSOC_STA:
+1080   7                          /*Check if the event is valid in the context of 
+1081   7                            operating role*/                
+1082   7                          switch(nwkId->reason)
+1083   7                          {                     
+1084   8                            case HOST_EVENT_NW_IND_REASON_NETEXIT_CMD:  
+1085   8                              if(hpgp_drv_data.start.active == TRUE)
+1086   8                              {
+1087   9                                GV701x_HPGPSetNetId(hpgp_nwk_data.params.nwk.key.nmk, 
+1088   9                                      hpgp_nwk_data.params.nwk.key.nid);                      
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 19  
+
+1089   9                              }
+1090   8                              else
+1091   8                              {
+1092   9                                state->state = HPGPDRV_DOWN;  
+1093   9                                GV701x_HPGPSendEvent(HPGPDRV_DWN_IND, NWID_STATE_ASSOC_STA, 0);
+1094   9                              }
+1095   8                            break;
+1096   8                            
+1097   8                            case HOST_EVENT_NW_IND_REASON_CCO_LEAVE_IND:
+1098   8                            case HOST_EVENT_NW_IND_REASON_NO_AVLN:
+1099   8                            case HOST_EVENT_NW_IND_REASON_AUTH_FAIL:
+1100   8                            case HOST_EVENT_NW_IND_REASON_ASSOC_FAIL:
+1101   8                            case HOST_EVENT_NW_IND_REASON_BCNLOSS: 
+1102   8      #if 0                   
+                                      FM_Printf(FM_APP, "\nHPGP Down");
+              #endif                        
+1105   8                              state->state = HPGPDRV_DOWN;  
+1106   8                              GV701x_HPGPSendEvent(HPGPDRV_DWN_IND, nwkId->state, nwkId->reason);
+1107   8                            break;
+1108   8                            
+1109   8                            default:
+1110   8                            break;
+1111   8                          }
+1112   7                        break;
+1113   7                                      
+1114   7                        default:
+1115   7                        break;
+1116   7                        }           
+1117   6                    }                 
+1118   5                  break;  
+1119   5      
+1120   5                  case HOST_EVENT_PEER_STA_LEAVE:     
+1121   5      #if 0         
+                            FM_Printf(FM_APP, "\nPeer Leave Ind");
+              #endif              
+1124   5                    //state->state = HPGPDRV_DOWN;            
+1125   5                  break;        
+1126   5      
+1127   5                  default:
+1128   5                  break;
+1129   5                }
+1130   4              }
+1131   3              else if((state->eventclass == EVENT_CLASS_CTRL) &&
+1132   3                   (state->eventtype == CONTROL_FRM_ID))
+1133   3              {
+1134   4                switch(state->event)
+1135   4                { 
+1136   5                  case APCM_NET_EXIT_CNF:
+1137   5                    //state->state = HPGPDRV_DOWN;                            
+1138   5                  break;
+1139   5      
+1140   5                  default:
+1141   5                  break;
+1142   5                }
+1143   4              }
+1144   3            }
+1145   2          break;
+1146   2          
+1147   2          default:
+1148   2          break;    
+1149   2        }
+1150   1      
+C51 COMPILER V9.53.0.0   GV701X_HPGPDRIVER                                                 11/04/2015 20:09:53 PAGE 20  
+
+1151   1        state->event = HPGPDRV_IDLE_EVENT;  
+1152   1        state->eventtype = 0;
+1153   1        state->eventclass = 0;
+1154   1        state->eventproto = 0;
+1155   1        state->statedata = NULL;  
+1156   1        state->statedatalen = 0;  
+1157   1        memset((u8*)&state->msg_hdr, 0x00, sizeof(gv701x_app_msg_hdr_t)); 
+1158   1      }
+1159          
+1160          /******************************************************************************
+1161           * @fn      GV701x_Nwk_CmdProcess
+1162           *
+1163           * @brief   It handles application command line requests
+1164           *
+1165           * @param   CmdBuf - command string
+1166           *
+1167           * @return  none
+1168           *
+1169           */
+1170          
+1171          void GV701x_HPGPDriver_CmdProcess(char* CmdBuf) 
+1172          {
+1173   1      #if 1
+1174   1        if(strcmp(CmdBuf, "state") == 0) 
+1175   1          printf("\nHpgp S %bu E %bu", hpgp_drv_data.state.state, hpgp_drv_data.state.event);
+1176   1        else if(strcmp(CmdBuf, "stats") == 0) 
+1177   1        {   
+1178   2          printf("\nHpgp: role %s", (hpgp_nwk_data.params.nwk.role == DEV_MODE_CCO) ? "CCO" : "STA");
+1179   2          FM_HexDump(FM_USER, "\nnid: ", hpgp_nwk_data.params.nwk.key.nid, NID_LEN);
+1180   2          FM_HexDump(FM_USER, "\rnmk: ", hpgp_nwk_data.params.nwk.key.nmk, ENC_KEY_LEN);
+1181   2          FM_HexDump(FM_USER, "\rouid: ", hpgp_nwk_data.params.nwk.app_info.oem[0].ouid, OUID_LEN);
+1182   2        } 
+1183   1        else if(strcmp(CmdBuf, "nvclear") == 0) 
+1184   1        {
+1185   2          GV701x_FlashErase(hpgp_drv_data.app_id);
+1186   2        } 
+1187   1      #else
+                CmdBuf = CmdBuf;
+              #endif  
+1190   1      } 
+1191          
+1192          
+1193          #endif /*HPGP_DRIVER_APP*/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   4335    ----
+   CONSTANT SIZE    =    166    ----
+   XDATA SIZE       =    295    3085
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

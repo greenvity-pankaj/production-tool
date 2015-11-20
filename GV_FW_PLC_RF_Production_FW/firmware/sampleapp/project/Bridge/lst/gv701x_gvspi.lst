@@ -1,0 +1,104 @@
+C51 COMPILER V9.53.0.0   GV701X_GVSPI                                                      11/04/2015 20:09:45 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE GV701X_GVSPI
+OBJECT MODULE PLACED IN .\obj\gv701x_gvspi.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\components\drivers\gvspi\src\gv701x_gvspi.c LARGE OBJECTADVA
+                    -NCED OPTIMIZE(9,SPEED) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\
+                    -include;..\..\..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\fir
+                    -mware\hpgp\src\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nm
+                    -a;..\..\..\..\firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\.
+                    -.\firmware\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\ut
+                    -ilities\event\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\c
+                    -omponents\hpgp\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmw
+                    -are\app_support;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\co
+                    -mponents\drivers\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\
+                    -..\components;..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\
+                    -inc;..\..\..\..\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\co
+                    -mponents\drivers\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\com
+                    -ponents\utilities;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\comp
+                    -onents\drivers\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..
+                    -\..\inc;..\..\..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51
+                    -,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_
+                    -SAP,NMA,NEW_SYNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_T
+                    -ABLE,B2,FREQ_DETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UA
+                    -RT_GPIO_INTERRUPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_A
+                    -PP,RTOPO_APP,REGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\gv701
+                    -x_gvspi.lst) TABS(2) OBJECT(.\obj\gv701x_gvspi.obj)
+
+line level    source
+
+   1          /* ========================================================
+   2           *
+   3           * @file:  led_board_spi.c
+   4           * 
+   5           * @brief: This file implements the SPI read/write functions 
+   6           *       for the Led board
+   7           *
+   8           *  Copyright (C) 2010-2015, Greenvity Communications, Inc.
+   9           *  All Rights Reserved
+  10           *  
+  11           * =========================================================*/
+  12          
+  13          /****************************************************************************** 
+  14            * Includes
+  15            ******************************************************************************/
+  16          
+  17          #include <stdio.h>
+  18          #include "papdef.h"
+  19          #include "utils.h"
+  20          #include "gv701x_gvspi.h"
+  21          
+  22          /****************************************************************************** 
+  23            * Defines
+  24            ******************************************************************************/
+  25          
+  26          static u8 xdata gvspi_cs_reg _at_     REG_SPI_CS; 
+  27          static u8 xdata gvspi_addr_reg _at_   REG_SPI_ADDR;
+  28          static u8 xdata gvspi_data_reg _at_   REG_SPI_DATA;
+  29          static u8 xdata gvspi_value_reg _at_  REG_SPI_VAL;
+  30          
+  31          /******************************************************************************
+  32           * @fn      gv701x_gvspi_write
+  33           *
+  34           * @brief   Writes to the GVSPI interface
+C51 COMPILER V9.53.0.0   GV701X_GVSPI                                                      11/04/2015 20:09:45 PAGE 2   
+
+  35           *
+  36           * @param   spi_addr - the spi register address
+  37           *      spi_data - the spi data value
+  38           *      val - the value to be written
+  39           *
+  40           * @return  none
+  41           */
+  42          
+  43          void gv701x_gvspi_write(u16 spi_addr, u16 spi_data, u16 val)
+  44          {
+  45   1          spi_addr &= 0x00FF;
+  46   1          spi_data &= 0xFFFF;
+  47   1      
+  48   1          gvspi_addr_reg = spi_addr;
+  49   1          gvspi_data_reg = spi_data;    
+  50   1          gvspi_value_reg = val;
+  51   1          gvspi_cs_reg = 0x01;
+  52   1      
+  53   1        mac_utils_delay_ms(1);
+  54   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     23    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

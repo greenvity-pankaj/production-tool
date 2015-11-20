@@ -1,0 +1,1118 @@
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE MAC_BEACON
+OBJECT MODULE PLACED IN .\obj\mac_beacon.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\zigbee\mac_beacon.c LARGE OBJECTADVANCED OPTIMIZE(9
+                    -,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..
+                    -\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\h
+                    -al;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\fi
+                    -rmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbe
+                    -e;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\in
+                    -c;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\i
+                    -nc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;
+                    -..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers
+                    -\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..
+                    -\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\
+                    -components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers
+                    -\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilitie
+                    -s;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\n
+                    -wk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..
+                    -\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII
+                    -_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC
+                    -,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DET
+                    -ECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUP
+                    -T,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REG
+                    -ISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\mac_beacon.lst) TABS(
+                    -2) OBJECT(.\obj\mac_beacon.obj)
+
+line level    source
+
+   1          /**
+   2           * @file mac_beacon.c
+   3           *
+   4           * Implements the building of beacon frames and initiates transmission via
+   5           * CSMA-CA after reception of a beacon request frame in a nonbeacon-enabled PAN.
+   6           * Also processing the received beacon frame from the coordinator
+   7           *
+   8           * Copyright (c) 2011, Greenvity Communication All rights reserved.
+   9           *
+  10           */
+  11          #ifdef HYBRII_802154
+  12          
+  13          /* === Includes ============================================================= */
+  14          
+  15          #include <string.h>
+  16          #include "papdef.h"
+  17          #include "timer.h"
+  18          #include "hal_common.h"
+  19          #include "return_val.h"
+  20          #include "bmm.h"
+  21          #include "qmm.h"
+  22          #include "mac_const.h"
+  23          #include "mac_msgs.h"
+  24          #include "mac_data_structures.h"
+  25          #include "mac_hal.h"
+  26          #include "mac_api.h"
+  27          #include "mac_internal.h"
+  28          #include "mac.h"
+  29          #include "utils_fw.h"
+  30          #include "mac_security.h"
+  31          #include "timer.h"
+  32          #include "list.h"
+  33          #include "stm.h"
+  34          
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 2   
+
+  35          /* === Macros =============================================================== */
+  36          
+  37          /*
+  38           * Time in (advance) symbols before beacon interval when beacon is prepared
+  39           */
+  40          #define ADVNC_BCN_PREP_TIME                 (50)
+  41          
+  42          /*
+  43           * (Minimal) Beacon payload length
+  44           * 2 octets Superframe Spec
+  45           * At least 1 octet GTS fields
+  46           * At least 1 octet Pending Address fields
+  47           */
+  48          #define BEACON_PAYLOAD_LEN                  (4)
+  49          
+  50          /*
+  51           * Maximum number of pending extended and/short addresses to be added to
+  52           * Beacon frame indicating pending data.
+  53           */
+  54          #define BEACON_MAX_PEND_ADDR_CNT            (7)
+  55          
+  56          /*
+  57           * Extract the beacon order from the Superframe Spec.
+  58           */
+  59          #define GET_BEACON_ORDER(spec)          ((spec) & 0x000F)
+  60          
+  61          /*
+  62           * Extract the superframe order from the Superframe Spec.
+  63           */
+  64          #define GET_SUPERFRAME_ORDER(spec)      (((spec) & 0x00F0) >> 4)
+  65          
+  66          /*
+  67           * Extract the final CAP slot from Superframe Spec.
+  68           */
+  69          #define GET_FINAL_CAP(spec)             (((spec) & 0x0F00) >> 8)
+  70          
+  71          /* === Globals ============================================================== */
+  72          
+  73          /*
+  74           * Static buffer used for beacon transmission
+  75           */
+  76          static uint8_t beacon_buffer[BUFFER_SIZE];
+  77          
+  78          /* Pointer used for adding pending addresses to the beacon frame. */
+  79          static uint8_t *beacon_ptr;
+  80          
+  81          /* Variable to hold number the pending addresses. */
+  82          static uint8_t pending_address_count;
+  83          
+  84          static bool first_beacon_pkt = FALSE;
+  85          
+  86          uint32_t beacon_time_to_send = 0;
+  87          
+  88          /* === Prototypes =========================================================== */
+  89          
+  90          extern tTimerId poll_wait_timer;
+  91          
+  92          /* === Implementation ======================================================= */
+  93          /*
+  94           *
+  95           * This function appends pending extended addresses in the indirect queue
+  96           * to the beacon.
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 3   
+
+  97           *
+  98           * buf_ptr - Pointer to the indirect data in the indirect queue
+  99           * handle  - Callback parameter
+ 100           *
+ 101           * return false to traverse through the full indirect queue
+ 102           *
+ 103           */
+ 104          bool mac_beacon_add_pending_extended_address_cb (void xdata *buf_ptr,
+ 105                                                           void xdata *handle)
+ 106          {
+ 107   1          frame_info_t *frame_p = (frame_info_t *)buf_ptr;
+ 108   1      
+ 109   1          /* Only 7 extended addresses are allowed in one Beacon frame. */
+ 110   1          if (pending_address_count < BEACON_MAX_PEND_ADDR_CNT) {
+ 111   2              /*
+ 112   2               * Only if the destination addressing mode is extended address mode
+ 113   2               * then the indirect data is used to populate the beacon buffer 
+ 114   2               * with extended destination address.
+ 115   2               */
+ 116   2              if (FCF_LONG_ADDR == 
+ 117   2                  ((frame_p->mpdu_p[PL_POS_FCF_2] >> FCF_2_DEST_ADDR_OFFSET) & 
+ 118   2                   FCF_ADDR_MASK)) {
+ 119   3                  beacon_ptr -= sizeof(uint64_t);
+ 120   3                  memcpy(beacon_ptr, &frame_p->mpdu_p[PL_POS_DST_ADDR_START],
+ 121   3                         sizeof(uint64_t));
+ 122   3                  pending_address_count++;
+ 123   3              }
+ 124   2          }
+ 125   1          handle = handle;
+ 126   1      
+ 127   1          return (false);  /* Continue next record in the indirect queue */ 
+ 128   1      }
+ 129          
+ 130          /*
+ 131           * This function appends the pending short addresses to the beacon based
+ 132           * on frames currently in the indirect queue.
+ 133           *
+ 134           * buf_ptr - Pointer to the indirect data in the indirect queue
+ 135           * handle  - Callback parameter
+ 136           *
+ 137           * return false to traverse through the full indirect queue
+ 138           *
+ 139           */
+ 140          bool mac_beacon_add_pending_short_address_cb (void xdata *buf_ptr,
+ 141                                                        void xdata *handle)
+ 142          {
+ 143   1          frame_info_t *frame_p = (frame_info_t *)buf_ptr;
+ 144   1      
+ 145   1          /* Only 7 short addresses are allowed in one Beacon frame. */
+ 146   1          if (pending_address_count < BEACON_MAX_PEND_ADDR_CNT) {
+ 147   2              /*
+ 148   2               * Only if the destination addressing mode is short address mode 
+ 149   2               * then the indirect data is used to populate the beacon buffer
+ 150   2               * with short destination address.
+ 151   2               */
+ 152   2              if (FCF_SHORT_ADDR == 
+ 153   2                  ((frame_p->mpdu_p[PL_POS_FCF_2] >> FCF_2_DEST_ADDR_OFFSET) &
+ 154   2                    FCF_ADDR_MASK)) {
+ 155   3                  beacon_ptr -= sizeof(uint16_t);
+ 156   3                  memcpy(beacon_ptr, &frame_p->mpdu_p[PL_POS_DST_ADDR_START],
+ 157   3                         sizeof(uint16_t));
+ 158   3                  pending_address_count++;
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 4   
+
+ 159   3              }
+ 160   2          }
+ 161   1          handle = handle;
+ 162   1          return (false);  /* Continue next record in the indirect queue */ 
+ 163   1      }
+ 164          
+ 165          /*
+ 166           * @brief Populates the beacon frame with pending addresses
+ 167           *
+ 168           * This function populates the beacon frame with pending addresses by
+ 169           * traversing through the indirect queue.
+ 170           *
+ 171           * buf_ptr - Pointer to the location in the beacon frame buffer where the
+ 172           * pending addresses are to be updated
+ 173           *
+ 174           * return Number of bytes added in the beacon frame as a result of pending
+ 175           * address
+ 176           */
+ 177          static uint8_t mac_buffer_add_pending (uint8_t *buf_ptr)
+ 178          {
+ 179   1          search_t find_buf;
+ 180   1          uint8_t  number_of_ext_address = 0;
+ 181   1      
+ 182   1          /*
+ 183   1           * Set pointer to beacon to proper place. Currently it is still
+ 184   1           * pointing at the first octet of the beacon payload (if there
+ 185   1           * is any)
+ 186   1           * The beacon_ptr pointer will be updated (i.e. decreased) in
+ 187   1           * the functions mac_beacon_add_pending_short_address_cb() &
+ 188   1           * add_pending_extended_address_cb() according to the included
+ 189   1           * octets containing the pending addresses.
+ 190   1           *
+ 191   1           * Note: Since the pending addresses is filled from the back,
+ 192   1           * the extended are filled in first.
+ 193   1           */
+ 194   1          beacon_ptr = buf_ptr;
+ 195   1      
+ 196   1          /* Initialize extended address count. */
+ 197   1          pending_address_count = 0;
+ 198   1      
+ 199   1          /*
+ 200   1           * This callback function traverses through the indirect queue and
+ 201   1           * updates the beacon buffer with the pending extended addresses.
+ 202   1           */
+ 203   1      #ifdef CALLBACK
+                  find_buf.compare_func = mac_beacon_add_pending_extended_address_cb;
+              #else
+ 206   1          find_buf.compare_func_id = MAC_BEACON_ADD_PENDING_EXT_ADDR;
+ 207   1      #endif
+ 208   1      
+ 209   1          /*
+ 210   1           * At the end of this function call (qmm_queue_read), the beacon buffer
+ 211   1           * will be updated with the short address (if any) of the indirect
+ 212   1           * data (if any) present in the indirect queue.
+ 213   1           */
+ 214   1          qmm_queue_read(&indirect_data_q, &find_buf);
+ 215   1      
+ 216   1          /*
+ 217   1           * The count of extended addresses added in the beacon frame is backed up
+ 218   1           * (as the same variable will be used to count the number of added
+ 219   1           * short addresses).
+ 220   1           */
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 5   
+
+ 221   1          number_of_ext_address = pending_address_count;
+ 222   1      
+ 223   1          /* Initialize extended address count. */
+ 224   1          pending_address_count = 0;
+ 225   1      
+ 226   1          /*
+ 227   1           * This callback function traverses through the indirect queue and
+ 228   1           * updates the beacon buffer with the pending short addresses.
+ 229   1           */
+ 230   1      #ifdef CALLBACK
+                  find_buf.compare_func = mac_beacon_add_pending_short_address_cb;
+              #else
+ 233   1          find_buf.compare_func_id = MAC_BEACON_ADD_PENDING_SHORT_ADDR;
+ 234   1      #endif
+ 235   1      
+ 236   1          /*
+ 237   1           * At the end of this function call (qmm_queue_read), the beacon buffer
+ 238   1           * will be updated with the extended address (if any) of the indirect
+ 239   1           * data (if any) present in the indirect queue.
+ 240   1           */
+ 241   1          qmm_queue_read(&indirect_data_q, &find_buf);
+ 242   1      
+ 243   1          /*
+ 244   1           * Update buf_ptr to current position of beginning of
+ 245   1           * pending address specifications filled above.
+ 246   1           * Fill in Pending Address Specification (see IEEE 802.15.4-2006 Table 46).
+ 247   1           * In order to this buf_ptr needs to be decremented.
+ 248   1           */
+ 249   1          buf_ptr = beacon_ptr - 1;
+ 250   1          *buf_ptr = (pending_address_count) | (number_of_ext_address  << 4);
+ 251   1      
+ 252   1      
+ 253   1          /*
+ 254   1           * Total number of bytes used for pending address in beacon frame.
+ 255   1           * Note: The length of the one octet for the Pending Address Specification
+ 256   1           * is already included in the default beacon frame length
+ 257   1           * (see BEACON_PAYLOAD_LEN).
+ 258   1           */
+ 259   1          pending_address_count = (pending_address_count * sizeof(uint16_t)) +
+ 260   1                                  (number_of_ext_address * sizeof(uint64_t));
+ 261   1      
+ 262   1          return (pending_address_count);
+ 263   1      }
+ 264          
+ 265          /**
+ 266           *
+ 267           * This function is called to build a beacon frame. For beaconless network
+ 268           * this function also transmits the generated beacon frame.
+ 269           *
+ 270           * beacon_enabled Flag indicating the mode of beacon transmission
+ 271           **/
+ 272          void mac_build_and_tx_beacon (bool beacon_enabled, security_info_t *sec_info_p)
+ 273          {
+ 274   1          frame_info_t *tx_frame_p;
+ 275   1          uint16_t     superframe_spec = 0;
+ 276   1          uint16_t     fcf = 0;
+ 277   1          uint8_t      frame_len;
+ 278   1          uint8_t      *frame_ptr;
+ 279   1          bool         encrypt = FALSE;
+ 280   1          retval_t     status;
+ 281   1          /*
+ 282   1           * The frame is given to the HAL in the 'frame_info_t' format,
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 6   
+
+ 283   1           * hence an instance of the frame_info_t is created.
+ 284   1           */
+ 285   1          tx_frame_p = (frame_info_t *)beacon_buffer;
+ 286   1      
+ 287   1          /* Buffer header not required in BEACON since static buffer is used */
+ 288   1          tx_frame_p->buffer_header_p = NULL;
+ 289   1      
+ 290   1          tx_frame_p->msg_type = BEACON_MESSAGE;
+ 291   1      
+ 292   1          /* Update the payload length. */
+ 293   1          frame_len = BEACON_PAYLOAD_LEN +
+ 294   1                      PAN_ID_LEN         +
+ 295   1                      FCF_LEN            +
+ 296   1                      SEQ_NUM_LEN;
+ 297   1      
+ 298   1          /* Get the payload pointer. */
+ 299   1          frame_ptr = (uint8_t *)tx_frame_p + BUFFER_SIZE;
+ 300   1       
+ 301   1          /* Build the beacon payload if it exists. */
+ 302   1          if (mac_pib_macBeaconPayloadLength > 0) {
+ 303   2              frame_ptr -= mac_pib_macBeaconPayloadLength;
+ 304   2              frame_len += mac_pib_macBeaconPayloadLength;
+ 305   2      
+ 306   2              memcpy(frame_ptr, mac_beacon_payload, mac_pib_macBeaconPayloadLength);
+ 307   2          }
+ 308   1      
+ 309   1      
+ 310   1          /*
+ 311   1           * Check if the indirect queue has entries, otherwise there is nothing
+ 312   1           * to add as far as pending addresses is concerned.
+ 313   1           */
+ 314   1          if (indirect_data_q.size > 0) {
+ 315   2              uint8_t pending_addr_octets = mac_buffer_add_pending(frame_ptr);
+ 316   2              frame_len += pending_addr_octets;
+ 317   2              frame_ptr -= pending_addr_octets + 1;
+ 318   2          } else {
+ 319   2              /* No pending data available. */
+ 320   2              /* len was added as part of BEACON_PAYLOAD_LEN */
+ 321   2              frame_ptr--;
+ 322   2              *frame_ptr = 0;
+ 323   2          }
+ 324   1      
+ 325   1          /* frame_ptr now points to the Pending Address Specification (Octet 1). */
+ 326   1          /* Build the (empty) GTS fields. */
+ 327   1          /* FIXME - GTS support to be added */
+ 328   1          frame_ptr--;
+ 329   1          *frame_ptr = 0;
+ 330   1      
+ 331   1      
+ 332   1          /* The superframe specification field is updated. */
+ 333   1          superframe_spec = hal_pib_BeaconOrder;
+ 334   1          superframe_spec |= (hal_pib_SuperFrameOrder << 4);
+ 335   1          superframe_spec |= (mac_final_cap_slot << 8);
+ 336   1      
+ 337   1          if (hal_pib_BattLifeExt) {
+ 338   2              superframe_spec |= (1U << BATT_LIFE_EXT_BIT_POS);
+ 339   2          }
+ 340   1      
+ 341   1          if (MAC_PAN_COORD_STARTED == mac_state) {
+ 342   2              superframe_spec |= (1U << PAN_COORD_BIT_POS);
+ 343   2          }
+ 344   1      
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 7   
+
+ 345   1          if (mac_pib_macAssociationPermit) {
+ 346   2              superframe_spec |= (1U << ASSOC_PERMIT_BIT_POS);
+ 347   2          }
+ 348   1      
+ 349   1          /* Set the Superframe Specification Field. */
+ 350   1          /* len was added as part of BEACON_PAYLOAD_LEN */
+ 351   1          frame_ptr -= SUPER_FRAME_SPEC_LEN;
+ 352   1          mac_utils_16_bit_to_byte_array(superframe_spec, frame_ptr);
+ 353   1          
+ 354   1          if (sec_info_p->SecurityLevel > 0) {
+ 355   2              if (mac_pib_macSecurityEnabled == TRUE) {
+ 356   3      
+ 357   3                  status = mac_build_aux_sec_header(&frame_ptr, sec_info_p,
+ 358   3                                                    &frame_len);
+ 359   3                  if (MAC_SUCCESS != status) {
+ 360   4                      return;
+ 361   4                  }
+ 362   3                  fcf = FCF_SECURITY_ENABLED | FCF_FRAME_VERSION_2006;
+ 363   3                  encrypt = TRUE;
+ 364   3              } else {
+ 365   3                  return;
+ 366   3              }
+ 367   2          }
+ 368   1      
+ 369   1          /*
+ 370   1           * Source address.
+ 371   1           */
+ 372   1          if (MAC_NO_SHORT_ADDR_VALUE == hal_pib_ShortAddress) {
+ 373   2              frame_ptr -= EXT_ADDR_LEN;
+ 374   2              frame_len += EXT_ADDR_LEN;
+ 375   2              mac_utils_64_bit_to_byte_array(hal_pib_IeeeAddress, frame_ptr);
+ 376   2      
+ 377   2              fcf |= FCF_SET_SOURCE_ADDR_MODE((uint16_t)FCF_LONG_ADDR);
+ 378   2          } else {
+ 379   2              frame_ptr -= SHORT_ADDR_LEN;
+ 380   2              frame_len += SHORT_ADDR_LEN;
+ 381   2              mac_utils_16_bit_to_byte_array(hal_pib_ShortAddress, frame_ptr);
+ 382   2      
+ 383   2              fcf |= FCF_SET_SOURCE_ADDR_MODE((uint16_t)FCF_SHORT_ADDR);
+ 384   2          }
+ 385   1      
+ 386   1          /* Source PAN-Id */
+ 387   1          frame_ptr -= PAN_ID_LEN;
+ 388   1          mac_utils_16_bit_to_byte_array(hal_pib_PANId, frame_ptr);
+ 389   1      
+ 390   1          /* Set BSN. */
+ 391   1          frame_ptr -= SEQ_NUM_LEN;
+ 392   1          *frame_ptr = mac_pib_macBSN++;
+ 393   1      
+ 394   1          fcf = fcf | FCF_SET_FRAMETYPE(FCF_FRAMETYPE_BEACON);
+ 395   1      
+ 396   1          /*
+ 397   1           * In case
+ 398   1           * 1) the node is a PAN Coordinator or Coordinator, and
+ 399   1           * 2) this is beacon-enabled network, and
+ 400   1           * 3) there is a broadcast frame to be transmitted,
+ 401   1           * the frame pending bit in the frame control field of the beacon frame
+ 402   1           * to be transmitted needs to be set in order to indicate this to all
+ 403   1           * listening children nodes.
+ 404   1           */
+ 405   1          if (((MAC_PAN_COORD_STARTED == mac_state) ||
+ 406   1               (MAC_COORDINATOR == mac_state)) &&
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 8   
+
+ 407   1              (hal_pib_BeaconOrder < NON_BEACON_NWK) &&
+ 408   1              (broadcast_q.size > 0)) {
+ 409   2              fcf |= FCF_FRAME_PENDING;
+ 410   2          }
+ 411   1      
+ 412   1          /* Set the FCF. */
+ 413   1          frame_ptr -= FCF_LEN;
+ 414   1          mac_utils_16_bit_to_byte_array(fcf, frame_ptr);
+ 415   1      
+ 416   1      
+ 417   1          /* First element shall be length of PHY frame. */
+ 418   1          frame_ptr -= LENGTH_FIELD_LEN;
+ 419   1          *frame_ptr = frame_len;
+ 420   1      
+ 421   1          /* Finished building of frame. */
+ 422   1          tx_frame_p->mpdu_p = frame_ptr;
+ 423   1          if (TRUE == encrypt) {
+ 424   2              wpan_addr_spec_t dst_addr_spec;
+ 425   2      
+ 426   2              dst_addr_spec.AddrMode = FCF_NO_ADDR;
+ 427   2              status = mac_secure(sec_info_p, &dst_addr_spec);
+ 428   2              if (MAC_SUCCESS != status) {
+ 429   3                  return;
+ 430   3              }
+ 431   2          }
+ 432   1          if (beacon_enabled == FALSE) {
+ 433   2              /*
+ 434   2               * In a beaconless network the beacon is transmitted with
+ 435   2               * unslotted CSMA-CA.
+ 436   2               */
+ 437   2              mac_hal_tx_frame(tx_frame_p, CSMA_UNSLOTTED, encrypt);
+ 438   2      
+ 439   2              MAC_BUSY();
+ 440   2      
+ 441   2          }
+ 442   1          /*
+ 443   1           * In case beaconing mode is enabled, the beacon will be transmitted
+ 444   1           * using function hal_tx_beacon once the beacon timer has expired.
+ 445   1           * Therefore there is nothing to be done here.
+ 446   1           */
+ 447   1      }
+ 448          
+ 449          /*
+ 450           * @brief Callback function of the beacon preparation time timer
+ 451           *
+ 452           * This is the calback function of the timer started with timeout
+ 453           * value equal to ADVNC_BCN_PREP_TIME symbols less than beacon interval.
+ 454           *
+ 455           * In case of the beacon enabled network the beacon frame is created and
+ 456           * stored at the TAL. After preparing the beacon, the timer is restarted for
+ 457           * the next beacon interval less the beacon preparation time.
+ 458           *
+ 459           * @param callback_parameter Callback parameter
+ 460           */
+ 461          static void mac_beacon_prepare_beacon_cb (void *callback_parameter)
+ 462          {
+ 463   1          security_info_t  sec;
+ 464   1      
+ 465   1          /* Wake up radio first */
+ 466   1          mac_trx_wakeup();
+ 467   1      
+ 468   1          /* FIXME - */
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 9   
+
+ 469   1          sec.SecurityLevel   = (uint8_t)0;
+ 470   1          sec.KeyIdMode       = (uint8_t)0;
+ 471   1          sec.KeyIndex        = (uint8_t)0;
+ 472   1      
+ 473   1          /* For a beacon enabled network, the beacon is stored at the HAL. */
+ 474   1          mac_build_and_tx_beacon(true, &sec);
+ 475   1      
+ 476   1          callback_parameter = callback_parameter;  /* Keep compiler happy. */
+ 477   1      }
+ 478          
+ 479          
+ 480          
+ 481          /*
+ 482           * @brief Handles transmission of pending broadcast data
+ 483           *
+ 484           * This function handles the transmission of pending broadcast data
+ 485           * frames in a beacon-enabled network, which need to be transmitted
+ 486           * immediately after the beacon transmission.
+ 487           * As defined by 802.15.4-2006 exactly one broadcast data frame is
+ 488           * transmitted at one point of time. Further pending broadcast frames
+ 489           * are transmitted after the next beacon frame.
+ 490           */
+ 491          void mac_tx_pending_bc_data (void)
+ 492          {
+ 493   1          buffer_t     *buf_ptr;
+ 494   1          frame_info_t *tx_frame_p;
+ 495   1          retval_t     tx_status;
+ 496   1      
+ 497   1          buf_ptr = qmm_queue_remove(&broadcast_q, NULL);
+ 498   1      
+ 499   1          if (NULL == buf_ptr) {
+ 500   2              /* Nothing ot be done. */
+ 501   2              return;
+ 502   2          }
+ 503   1      
+ 504   1          /* Broadcast data present and to be sent. */
+ 505   1          tx_frame_p = (frame_info_t *)BMM_BUFFER_POINTER(buf_ptr);
+ 506   1      
+ 507   1          tx_frame_p->buffer_header_p = buf_ptr;
+ 508   1      
+ 509   1          tx_status = mac_hal_tx_frame(tx_frame_p, NO_CSMA, FALSE);
+ 510   1      
+ 511   1          if (MAC_SUCCESS == tx_status) {
+ 512   2              MAC_BUSY();
+ 513   2          } else {
+ 514   2              mac_gen_mcps_data_conf((buffer_t *)tx_frame_p->buffer_header_p,
+ 515   2                                     (uint8_t)MAC_CHANNEL_ACCESS_FAILURE,
+ 516   2                                     tx_frame_p->msduHandle,
+ 517   2                                     0);
+ 518   2          }
+ 519   1      }
+ 520          
+ 521          /**
+ 522           *
+ 523           *  This function is called when a beacon request frame has been received by
+ 524           *  a coordinator. In a nonbeacon-enabled PAN the generation of a beacon frame
+ 525           *  using CSMA-CA is initiated. In a beacon-enabled PAN no extra beacon frame
+ 526           *  will be transmitted apart from the standard beacon frames.
+ 527           *
+ 528           *  msg Pointer to the buffer in which the beaocn request was received
+ 529           */
+ 530          void mac_process_beacon_request (buffer_t *msg_p)
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 10  
+
+ 531          {
+ 532   1          /*
+ 533   1           * The buffer in which the beacon request was received is freed up.
+ 534   1           * This is only done in a BEACON build, since a static buffer is used
+ 535   1           * to transmit the beacon frame.
+ 536   1           */
+ 537   1          bmm_buffer_free(msg_p);
+ 538   1      
+ 539   1          /*
+ 540   1           * If the network is a beacon enabled network then the beacons will not be
+ 541   1           * transmitted.
+ 542   1           */ 
+ 543   1          if (hal_pib_BeaconOrder == NON_BEACON_NWK) {
+ 544   2        security_info_t  sec;
+ 545   2      
+ 546   2              /* FIXME - */
+ 547   2              sec.SecurityLevel   = (uint8_t)0;
+ 548   2              sec.KeyIdMode       = (uint8_t)0;
+ 549   2              sec.KeyIndex        = (uint8_t)0;
+ 550   2      
+ 551   2              /* The beacon is transmitted using CSMA-CA. */
+ 552   2              mac_build_and_tx_beacon(false, &sec);
+ 553   2          }
+ 554   1      }
+ 555          
+ 556          /*
+ 557           * Transmits beacon frame after beacon interval
+ 558           */
+ 559          void mac_beacon_send_cb (void)
+ 560          {
+ 561   1          retval_t status = MAC_FAILURE;
+ 562   1          /*
+ 563   1           * This check here is done in order to stop beacon timing in case
+ 564   1           * the network has transitioned from a beacon-enabled network to
+ 565   1           * nonbeacon-enabled network.
+ 566   1           */
+ 567   1          if (hal_pib_BeaconOrder < NON_BEACON_NWK) {
+ 568   2              /*
+ 569   2               * In case the node is currently scanning, no beacon will be
+ 570   2               * transmitted.
+ 571   2               */
+ 572   2              if (MAC_SCAN_IDLE == mac_scan_state) {
+ 573   3                  /*
+ 574   3                   * The frame is given to the TAL in the 'frame_info_t' format,
+ 575   3                   * hence an instance of the frame_info_t is created.
+ 576   3                   */
+ 577   3                  frame_info_t *tx_frame_p = (frame_info_t *)beacon_buffer;
+ 578   3      
+ 579   3                  if (first_beacon_pkt == TRUE) {
+ 580   4                      mac_hal_tx_frame(tx_frame_p, CSMA_UNSLOTTED, FALSE);
+ 581   4                  } else {
+ 582   4                    security_info_t  sec;
+ 583   4      
+ 584   4                      /* FIXME - Add beacon secure support */
+ 585   4                      sec.SecurityLevel   = (uint8_t)0;
+ 586   4                      sec.KeyIdMode       = (uint8_t)0;
+ 587   4                      sec.KeyIndex        = (uint8_t)0;
+ 588   4      
+ 589   4                      mac_build_and_tx_beacon(true, &sec);
+ 590   4                      mac_hal_tx_beacon(tx_frame_p, FALSE);
+ 591   4                  }
+ 592   3                  /*
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 11  
+
+ 593   3                   * We do not want to set the MAC_BUSY as beacon to be sent
+ 594   3                   * in CSMA_SLOTTED can take some times to transmit. In the mean
+ 595   3                   * time, other packets still can be sent
+ 596   3                   */
+ 597   3              }
+ 598   2      
+ 599   2              /*
+ 600   2               * Transmit pending broadcast frame will be transmitted.
+ 601   2               * Of course this is only done if the node is not scanning.
+ 602   2               */
+ 603   2              if (MAC_SCAN_IDLE == mac_scan_state) {
+ 604   3                  /*
+ 605   3                   * Check for pending broadcast data frames in the broadcast queue
+ 606   3                   * and transmit exactly one broadcast data frame in case there
+ 607   3                   * are pending broadcast frames.
+ 608   3                   */
+ 609   3                  if (broadcast_q.size > 0) {
+ 610   4                      mac_tx_pending_bc_data();
+ 611   4                  }
+ 612   3              }
+ 613   2          }
+ 614   1      }
+ 615          
+ 616          /**
+ 617           *
+ 618           * This function is called during MLME_START.request operation to start the
+ 619           * timers for beacon transmission in case the network is of type beacon enabled,
+ 620           * or to start the timer to count the transcation presistence time of indirect
+ 621           * data in case the network is nonbeacon enabled.
+ 622           *
+ 623           * The timers started for a beacon enabled and nonbeacon enabled networks are
+ 624           * different with different timeout values.
+ 625           *
+ 626           * In case of a beacon enabled network two timers are started. The first timer
+ 627           * prepares the beacon and second timer sends the beacon. In case of the
+ 628           * nonbeacon enabled network, only a single timer is started with timeout as
+ 629           * the beacon interval.
+ 630           *
+ 631           * For a beacon enabled network the first beacon of the network is prepared and
+ 632           * sent in this function and the subsequent beacons are sent in the callback
+ 633           * function of the timer.
+ 634           */
+ 635          void mac_start_beacon_timer (void)
+ 636          {
+ 637   1          uint32_t beacon_tx_time;
+ 638   1          uint32_t beacon_int_symbols;
+ 639   1          security_info_t  sec;
+ 640   1      
+ 641   1          /* FIXME - */
+ 642   1          sec.SecurityLevel   = (uint8_t)0;
+ 643   1          sec.KeyIdMode       = (uint8_t)0;
+ 644   1          sec.KeyIndex        = (uint8_t)0;
+ 645   1      
+ 646   1          /*
+ 647   1           * This is a beacon enabled network.
+ 648   1           * The First beacon in a beacon enabled network is transmitted
+ 649   1           * directly without CSMA-CA. Call mac_build_and_tx_beacon with 
+ 650   1           * beacon_enable = true so that the beacon frame is built but 
+ 651   1           * is not sent
+ 652   1           */
+ 653   1          mac_build_and_tx_beacon(true, &sec);
+ 654   1      
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 12  
+
+ 655   1          /*
+ 656   1           * For the first beacon the current time is used as beacon transmission
+ 657   1           * time. For consecutive beacon transmissions, this beacon transmission
+ 658   1           * time is added to the beacon interval and then used.
+ 659   1           * beacon_tx_time is in symbols
+ 660   1           */
+ 661   1          mac_hal_get_current_time(&beacon_tx_time);
+ 662   1      
+ 663   1          /* 
+ 664   1           * Since the PIB attribute macBeaconTxTime is supposed to hold the time
+ 665   1           * of the last transmitted beacon frame, but we are going to transmit
+ 666   1           * our first beacon frame just now (in the subsequentially called function
+ 667   1           * mac_beacon_send_cb(), we need to actually substract the time of one
+ 668   1           * entire beacon period from this time.
+ 669   1           * Otherwise we would leave out the second beacon in function
+ 670   1           * mac_beacon_send_cb().
+ 671   1           */
+ 672   1          beacon_int_symbols = HAL_GET_BEACON_INTERVAL_TIME(hal_pib_BeaconOrder);
+ 673   1      
+ 674   1          beacon_tx_time = mac_hal_sub_time_symbols(beacon_tx_time,
+ 675   1                                                    beacon_int_symbols);
+ 676   1      
+ 677   1          mac_hal_pib_set(macBeaconTxTime, (void *)&beacon_tx_time);
+ 678   1      
+ 679   1          /*
+ 680   1           * Indicate to the mac_beacon_send_cb() that this is the 1st beacon to
+ 681   1           * be transmitted.
+ 682   1           */
+ 683   1          first_beacon_pkt = TRUE;
+ 684   1          mac_beacon_send_cb();
+ 685   1          first_beacon_pkt = FALSE;
+ 686   1      } /* mac_start_beacon_timer() */
+ 687          
+ 688          /**
+ 689           *
+ 690           * This function processes a received beacon frame.
+ 691           * When the system is scanning it records PAN descriptor information
+ 692           * contained in the beacon. These PAN descriptors will be reported to the
+ 693           * next higher layer via MLME_SCAN.confirm.
+ 694           * Also this routine constructs the MLME_BEACON_NOTIFY.indication.
+ 695           * Additionally when a device is synced with the coordinator, it tracks beacon
+ 696           * frames, checks whether the coordinator does have pending data and will
+ 697           * initiate the transmission of a data request frame.
+ 698           * The routine uses global "parse_data" structure.
+ 699           * The PAN descriptors are stored in the mlme_scan_conf_t structure.
+ 700           *
+ 701           * beacon_p - Pointer to the buffer in which the beacon was received
+ 702           *
+ 703           */
+ 704          void mac_process_beacon_frame (buffer_t *beacon_p)
+ 705          {
+ 706   1          bool matchflag;
+ 707   1          pandescriptor_t *pan_desc_list_p = NULL;
+ 708   1          pandescriptor_t pan_desc;
+ 709   1          mlme_scan_conf_t *msc_p = NULL;
+ 710   1          uint8_t numaddrshort;
+ 711   1          uint8_t numaddrlong;
+ 712   1          uint8_t index;
+ 713   1      
+ 714   1          /*
+ 715   1           * Extract the superframe parameters of the beacon frame only if
+ 716   1           * scanning is NOT ongoing.
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 13  
+
+ 717   1           */
+ 718   1          if (MAC_SCAN_IDLE == mac_scan_state) { 
+ 719   2              /* Beacon frames are not of interest for a PAN coordinator. */
+ 720   2              if (MAC_PAN_COORD_STARTED != mac_state) {
+ 721   3                  uint8_t superframe_order;
+ 722   3                  uint8_t beacon_order;
+ 723   3      
+ 724   3                  /*
+ 725   3                   * For a device, the parameters obtained from the beacons are
+ 726   3                   * used to update the HAL's PIBs
+ 727   3                   */
+ 728   3                  beacon_order =
+ 729   3                      GET_BEACON_ORDER(mac_parse_data.mac_payload_data.\
+ 730   3                                       beacon_data.superframe_spec);
+ 731   3      
+ 732   3                  set_hal_pib_internal(macBeaconOrder, (void *)&beacon_order);
+ 733   3      
+ 734   3                  superframe_order =
+ 735   3                      GET_SUPERFRAME_ORDER(mac_parse_data.mac_payload_data.\
+ 736   3                                           beacon_data.superframe_spec);
+ 737   3                  set_hal_pib_internal(macSuperframeOrder,
+ 738   3                                       (void *)&superframe_order);
+ 739   3      
+ 740   3                  mac_final_cap_slot =
+ 741   3                      GET_FINAL_CAP(mac_parse_data.mac_payload_data.\
+ 742   3                                    beacon_data.superframe_spec);
+ 743   3      
+ 744   3              }  /* (MAC_PAN_COORD_STARTED != mac_state) */
+ 745   2          }  /* (MAC_SCAN_IDLE == mac_scan_state) */
+ 746   1      
+ 747   1          /*
+ 748   1           * The following section needs to be done when we are
+ 749   1           * either scanning (and look for a new PAN descriptor to be returned
+ 750   1           * as part of the scan confirm message),
+ 751   1           * or we need to create a beacon notification (in which case we are
+ 752   1           * interested in any beacon, but omit the generation of scan confirm).
+ 753   1           *
+ 754   1           * If we are scanning a scan confirm needs to be created.
+ 755   1           *
+ 756   1           * According to 802.15.4-2006 this is only done in case the PIB
+ 757   1           * attribute macAutoRequest is true. Otherwise the PAN descriptor will
+ 758   1           * NOT be put into the PAN descriptor list of the Scan confirm message.
+ 759   1           */
+ 760   1           if (((MAC_SCAN_ACTIVE == mac_scan_state)   || 
+ 761   1                (MAC_SCAN_PASSIVE == mac_scan_state)) && mac_pib_macAutoRequest) {
+ 762   2              /*
+ 763   2               * mac_conf_buf_ptr points to the buffer allocated for scan
+ 764   2               * confirmation.
+ 765   2               */
+ 766   2               msc_p =  (mlme_scan_conf_t *)BMM_BUFFER_POINTER(
+ 767   2                              ((buffer_t *)mac_conf_buf_ptr));
+ 768   2      
+ 769   2              /*
+ 770   2               * The PAN descriptor list is updated with the PANDescriptor of the
+ 771   2               * received beacon
+ 772   2               */
+ 773   2              pan_desc_list_p = (pandescriptor_t *)&msc_p->scan_result_list;
+ 774   2          }
+ 775   1      
+ 776   1          /*
+ 777   1           * The beacon data received from the parse variable is arranged
+ 778   1           * into a PAN descriptor structure style
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 14  
+
+ 779   1           */ 
+ 780   1          pan_desc.CoordAddrSpec.AddrMode = mac_parse_data.src_addr_mode;
+ 781   1          pan_desc.CoordAddrSpec.PANId    = mac_parse_data.src_panid;
+ 782   1      
+ 783   1          if (FCF_SHORT_ADDR == pan_desc.CoordAddrSpec.AddrMode) {
+ 784   2              /* Initially clear the complete address. */
+ 785   2              EXT_ADDR_CLEAR(pan_desc.CoordAddrSpec.Addr.long_address);
+ 786   2              ADDR_COPY_DST_SRC_16(pan_desc.CoordAddrSpec.Addr.short_address,
+ 787   2                                   mac_parse_data.src_addr.short_address);
+ 788   2          } else {
+ 789   2              ADDR_COPY_DST_SRC_64(pan_desc.CoordAddrSpec.Addr.long_address,
+ 790   2                                   mac_parse_data.src_addr.long_address);
+ 791   2          }
+ 792   1      
+ 793   1          pan_desc.LogicalChannel = hal_pib_CurrentChannel;
+ 794   1          pan_desc.ChannelPage    = hal_pib_CurrentPage;
+ 795   1          pan_desc.SuperframeSpec = mac_parse_data.mac_payload_data.\
+ 796   1                                    beacon_data.superframe_spec;
+ 797   1          pan_desc.GTSPermit      = mac_parse_data.mac_payload_data.\
+ 798   1                                    beacon_data.gts_spec >> 7;
+ 799   1          pan_desc.LinkQuality    = mac_parse_data.ppdu_link_quality;
+ 800   1          pan_desc.TimeStamp      = mac_parse_data.time_stamp;
+ 801   1      
+ 802   1          /*
+ 803   1           * If we are scanning we need to check whether this is a new
+ 804   1           * PAN descriptor. Check for pan_desc_list_p instead since it
+ 805   1           * is set only when in scanning state
+ 806   1           *
+ 807   1           * According to 802.15.4-2006 this is only done in case the PIB
+ 808   1           * attribute macAutoRequest is true. Otherwise the PAN descriptor will
+ 809   1           * NOT be put into the PAN descriptor list of the Scan confirm message.
+ 810   1           */
+ 811   1          if (pan_desc_list_p != NULL) {
+ 812   2              /*
+ 813   2               * This flag is used to indicate a match of the current (received) PAN
+ 814   2               * descriptor with one of those present already in the list.
+ 815   2               */
+ 816   2              matchflag = false;
+ 817   2      
+ 818   2              /*
+ 819   2               * The beacon frame PAN descriptor is compared with the PAN descriptors
+ 820   2               * present in the list and determine if the current PAN
+ 821   2               * descriptor is to be taken as a valid one. A PAN is considered to be
+ 822   2               * the same as an existing one, if all, the PAN Id, the coordinator
+ 823   2               * address mode, the coordinator address, and the Logical Channel
+ 824   2               * are same.
+ 825   2               */
+ 826   2              for (index = 0; index < msc_p->ResultListSize; index++) {
+ 827   3                  if ((pan_desc.CoordAddrSpec.PANId ==
+ 828   3                       pan_desc_list_p->CoordAddrSpec.PANId) &&
+ 829   3                      (pan_desc.CoordAddrSpec.AddrMode ==
+ 830   3                       pan_desc_list_p->CoordAddrSpec.AddrMode) &&
+ 831   3                      (pan_desc.LogicalChannel ==
+ 832   3                       pan_desc_list_p->LogicalChannel) &&
+ 833   3                      (pan_desc.ChannelPage == pan_desc_list_p->ChannelPage)) {
+ 834   4                      if (pan_desc.CoordAddrSpec.AddrMode == WPAN_ADDRMODE_SHORT) {
+ 835   5                          if (pan_desc.CoordAddrSpec.Addr.short_address ==
+ 836   5                              pan_desc_list_p->CoordAddrSpec.Addr.short_address) {
+ 837   6                              /* Beacon with same parameters already received */
+ 838   6                              matchflag = true;
+ 839   6                              break;
+ 840   6                          }
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 15  
+
+ 841   5                      } else {
+ 842   5                          if (EXT_ADDR_MATCH(pan_desc.CoordAddrSpec.Addr.long_address,
+ 843   5                              pan_desc_list_p->CoordAddrSpec.Addr.long_address)) {
+ 844   6                              /* Beacon with same parameters already received */
+ 845   6                              matchflag = true;
+ 846   6                              break;
+ 847   6                          }
+ 848   5                      }
+ 849   4                  }
+ 850   3                  pan_desc_list_p++;  /* Next pan desc in the result list */
+ 851   3              }
+ 852   2      
+ 853   2              /*
+ 854   2               * If the PAN descriptor is not in the current list, and there is space
+ 855   2               * left, it is put into the list
+ 856   2               */
+ 857   2              if ((matchflag == FALSE) &&
+ 858   2                  (msc_p->ResultListSize < MAX_PANDESCRIPTORS)) {            
+ 859   3                  memcpy(pan_desc_list_p, &pan_desc, sizeof(pan_desc));
+ 860   3                  msc_p->ResultListSize++;
+ 861   3              }
+ 862   2          }
+ 863   1      
+ 864   1      
+ 865   1          /* The short and extended pending addresses are extracted from the beacon */
+ 866   1          numaddrshort =
+ 867   1              NUM_SHORT_PEND_ADDR(mac_parse_data.mac_payload_data.\
+ 868   1                                  beacon_data.pending_addr_spec);
+ 869   1      
+ 870   1          numaddrlong =
+ 871   1              NUM_LONG_PEND_ADDR(mac_parse_data.mac_payload_data.\
+ 872   1                                 beacon_data.pending_addr_spec);
+ 873   1      
+ 874   1          /*
+ 875   1           * In all cases (PAN or device) if the payload is not equal to zero
+ 876   1           * or macAutoRequest is false, MLME_BEACON_NOTIFY.indication is
+ 877   1           * generated
+ 878   1           */ 
+ 879   1          if ((mac_parse_data.mac_payload_data.beacon_data.beacon_payload_len > 0) ||
+ 880   1              (mac_pib_macAutoRequest == FALSE)) {        
+ 881   2              mlme_beacon_notify_ind_t *mbni = (mlme_beacon_notify_ind_t *)
+ 882   2                                           BMM_BUFFER_POINTER(((buffer_t *)beacon_p));
+ 883   2       
+ 884   2              /* The beacon notify indication structure is built */
+ 885   2              mbni->cmdcode       = MLME_BEACON_NOTIFY_INDICATION;
+ 886   2              mbni->BSN           = mac_parse_data.sequence_number;
+ 887   2              mbni->PANDescriptor = pan_desc;
+ 888   2              mbni->PendAddrSpec  = mac_parse_data.mac_payload_data.\
+ 889   2                                    beacon_data.pending_addr_spec;
+ 890   2      
+ 891   2              if ((numaddrshort > 0) || (numaddrlong > 0)) {
+ 892   3                  mbni->AddrList = mac_parse_data.mac_payload_data.\
+ 893   3                                   beacon_data.pending_addr_list_p;
+ 894   3              }
+ 895   2      
+ 896   2              mbni->sduLength = mac_parse_data.mac_payload_data.\
+ 897   2                                beacon_data.beacon_payload_len;
+ 898   2              mbni->sdu = mac_parse_data.mac_payload_data.\
+ 899   2                          beacon_data.beacon_payload_p;
+ 900   2      
+ 901   2      #if (defined UM) && (!defined ZBMAC_DIAG)   
+ 902   2          mlme_send_to_host(beacon_p);
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 16  
+
+ 903   2      #else
+                  mlme_beacon_notify_ind(beacon_p);
+              #endif        
+ 906   2          } else {
+ 907   2              /* Payload is not present, hence the buffer is freed here */
+ 908   2              bmm_buffer_free(beacon_p);
+ 909   2          }
+ 910   1      
+ 911   1      
+ 912   1          /* Handling of ancounced broadcast traffic by the parent. */
+ 913   1          if (MAC_SCAN_IDLE == mac_scan_state) {
+ 914   2              /*
+ 915   2               * In case this is a beaconing network, and this node is not scanning,
+ 916   2               * and the FCF indicates pending data thus indicating broadcast data at
+ 917   2               * parent, the node needs to be awake until the received broadcast
+ 918   2               * data has been received.
+ 919   2               */
+ 920   2              if (mac_parse_data.fcf & FCF_FRAME_PENDING) {
+ 921   3                  mac_bc_data_indicated = true;
+ 922   3      
+ 923   3                  /*
+ 924   3                   * Start timer since the broadcast frame is expected within
+ 925   3                   * macMaxFrameTotalWaitTime symbols.
+ 926   3                   */
+ 927   3                  if (MAC_POLL_IDLE == mac_poll_state) {
+ 928   4                      /*
+ 929   4                       * If the poll state is not idle, there is already an
+ 930   4                       * indirect transaction ongoing.
+ 931   4                       * Since the T_Poll_Wait_Time is going to be re-used,
+ 932   4                       * this timer can only be started, if we are not in
+ 933   4                       * a polling state other than idle.
+ 934   4                       */
+ 935   4                      uint32_t response_timer = mac_pib_macMaxFrameTotalWaitTime;
+ 936   4                      response_timer = HAL_CONVERT_SYMBOLS_TO_US(response_timer) / 1000;
+ 937   4      
+ 938   4                      /*
+ 939   4                       * Schedule a Polling timer to call 
+ 940   4                       * mac_t_wait_for_bc_time_cb at response_timer
+ 941   4                       */
+ 942   4                      if (STATUS_SUCCESS != 
+ 943   4                          STM_StartTimer(poll_wait_timer, response_timer)) {
+ 944   5                          mac_poll_wait_time_cb(NULL);
+ 945   5                      }
+ 946   4                  } else {
+ 947   4                      /*
+ 948   4                       * Any indirect poll operation is ongoing, so the timer will
+ 949   4                       * not be started, i.e. nothing to be done here.
+ 950   4                       * Once this ongoing indirect transaction has finished, this
+ 951   4                       * node will go back to sleep anyway.
+ 952   4                       */
+ 953   4                  }
+ 954   3              } else {
+ 955   3                  mac_bc_data_indicated = false;
+ 956   3              }
+ 957   2          }   /* (MAC_SCAN_IDLE == mac_scan_state) */
+ 958   1      
+ 959   1      
+ 960   1          /* Handling of presented indirect traffic by the parent for this node. */
+ 961   1          if (MAC_SCAN_IDLE == mac_scan_state) {
+ 962   2              /*
+ 963   2               * If this node is NOT scanning, and is doing a mlme_sync_request,
+ 964   2               * then the pending address list of the beacon is examined to see
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 17  
+
+ 965   2               * if the node's parent has data for this node.
+ 966   2               */
+ 967   2              if (mac_pib_macAutoRequest) {
+ 968   3                  if (MAC_SYNC_NEVER != mac_sync_state) {
+ 969   4                      uint8_t index;
+ 970   4                      uint16_t cur_short_addr;
+ 971   4                      uint64_t cur_long_addr;
+ 972   4      
+ 973   4                      /*
+ 974   4                       * Short address of the device is compared with the
+ 975   4                       * pending short address in the beacon frame
+ 976   4                       */
+ 977   4      
+ 978   4                      /*
+ 979   4                       * PAN-ID and CoordAddress does not have to be checked here,
+ 980   4                       * since the device is already synced with the coordinator,
+ 981   4                       * and only beacon frames passed from data_ind.c (where
+ 982   4                       * the first level filtering is already done) are received.
+ 983   4                       * The pending addresses in the beacon frame are compared
+ 984   4                       * with the device address. If a match is found, it indicates
+ 985   4                       * that a data belonging to this deivce is present with the
+ 986   4                       * coordinator and hence a data request is sent to the 
+ 987   4                       * coordinator.
+ 988   4                       */
+ 989   4      
+ 990   4                      for (index = 0; index < numaddrshort; index++) {
+ 991   5                          cur_short_addr = mac_utils_byte_array_to_16_bit(
+ 992   5                                            (mac_parse_data.mac_payload_data.\
+ 993   5                                             beacon_data.pending_addr_list_p +
+ 994   5                                             index * sizeof(uint16_t)));
+ 995   5                          if (cur_short_addr == hal_pib_ShortAddress) {
+ 996   6                              /*
+ 997   6                               * Device short address matches with one of the address
+ 998   6                               * in the beacon address list. Implicit poll (using the
+ 999   6                               * device short address) is done to get the pending
+1000   6                               * data
+1001   6                               */
+1002   6                              mac_data_build_and_tx_data_req(false, false, 0, NULL,
+1003   6                                                             0);
+1004   6                              return;
+1005   6                          }
+1006   5                      }
+1007   4      
+1008   4                      /*
+1009   4                       * Extended address of the device is compared with
+1010   4                       * the pending extended address in the beacon frame
+1011   4                       */
+1012   4      
+1013   4                      for (index = 0; index < numaddrlong; index++) {
+1014   5                          cur_long_addr = mac_utils_byte_array_to_64_bit(
+1015   5                                          (mac_parse_data.mac_payload_data.\
+1016   5                                           beacon_data.pending_addr_list_p +
+1017   5                                           numaddrshort * sizeof(uint16_t) +
+1018   5                                           index * sizeof(uint64_t)));
+1019   5      
+1020   5                          if (EXT_ADDR_MATCH(cur_long_addr,hal_pib_IeeeAddress)) {
+1021   6                              /*
+1022   6                               * Device extended address matches with one of the
+1023   6                               * address in the beacon address list. Implicit poll
+1024   6                               * (using the device extended address) is done to get
+1025   6                               * the pending data
+1026   6                               */
+C51 COMPILER V9.53.0.0   MAC_BEACON                                                        11/04/2015 20:09:51 PAGE 18  
+
+1027   6                              mac_data_build_and_tx_data_req(false, true, 0, NULL, 0);
+1028   6                              return;
+1029   6                          }
+1030   5                      }
+1031   4                  }
+1032   3              }   /* (mac_pib_macAutoRequest) */
+1033   2          }   /* (MAC_SCAN_IDLE == mac_scan_state) */
+1034   1      }
+1035          
+1036          #endif // HYBRII_802154
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3042    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    201     153
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

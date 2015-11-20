@@ -1,0 +1,961 @@
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE MAC_SCAN
+OBJECT MODULE PLACED IN .\obj\mac_scan.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\zigbee\mac_scan.c LARGE OBJECTADVANCED OPTIMIZE(9,S
+                    -IZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\.
+                    -.\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\hal
+                    -;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\firm
+                    -ware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee;
+                    -..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;
+                    -..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\inc
+                    -;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;..
+                    -\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\h
+                    -pgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\.
+                    -.\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\co
+                    -mponents\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\f
+                    -lash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities;
+                    -..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nwk
+                    -\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\.
+                    -.\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8
+                    -051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,U
+                    -M,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETEC
+                    -T,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT,
+                    -MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGIS
+                    -TER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\mac_scan.lst) TABS(2) O
+                    -BJECT(.\obj\mac_scan.obj)
+
+line level    source
+
+   1          /**
+   2           * @file mac_scan.c
+   3           *
+   4           * MLME_SCAN primitives.
+   5           *
+   6           * This file implements functions to handle all MLME-SCAN primitives and the
+   7           * corresponding scan options: ED, Active, Passive and Orphan
+   8           *
+   9           * $Id: mac_scan.c,v 1.6 2014/11/26 13:19:41 ranjan Exp $
+  10           *
+  11           * Copyright (c) 2012, Greenvity Communication All rights reserved. 
+  12           *
+  13           */
+  14          #ifdef HYBRII_802154
+  15          
+  16          /* === Includes ============================================================ */
+  17          
+  18          #include <stdio.h>
+  19          #include <string.h>
+  20          #include "papdef.h" 
+  21          #include "timer.h"
+  22          #include "return_val.h"
+  23          #include "bmm.h"
+  24          #include "qmm.h"
+  25          #include "mac_msgs.h"
+  26          #include "mac_hal.h"
+  27          #include "mac_const.h"
+  28          #include "mac_api.h"
+  29          #include "mac_data_structures.h"
+  30          #include "mac_internal.h"
+  31          #include "mac.h"
+  32          #include "utils_fw.h"
+  33          #include "fm.h"
+  34          
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 2   
+
+  35          /* === Macros =============================================================== */
+  36          
+  37          /**
+  38           * Scan duration formula: aBaseSuperframeDuration (2^SD + 1)
+  39           * where 0 <= SD <= 14
+  40           */
+  41          #define MAC_CALCULATE_SYMBOL_TIME_SCANDURATION(SD) \
+  42              (aBaseSuperframeDuration * ((1UL << (SD)) + 1))
+  43          
+  44          /*
+  45           * Max beacon Order in beacon-enabled network
+  46           */
+  47          #define BEACON_NETWORK_MAX_BO              (14)
+  48          
+  49          /*
+  50           * Beacon Request and Orphan Notification command frame payload length
+  51           */
+  52          #define BEAC_REQ_ORPH_NOT_PAYLOAD_LEN       (1)
+  53          
+  54          
+  55          /* === Globals ============================================================= */
+  56          
+  57          static uint32_t scan_channels;
+  58          static uint8_t  scan_curr_channel;
+  59          static uint8_t  scan_type;
+  60          static uint8_t  scan_curr_page;
+  61          static uint8_t  scan_duration;
+  62          
+  63          /* === Prototypes ========================================================== */
+  64          
+  65          static void mac_scan_set_complete(retval_t set_status);
+  66          
+  67          /* === Implementation ====================================================== */
+  68          
+  69          /*
+  70           * Check for Scanning is running
+  71           */
+  72          bool mac_scan_is_running (void)
+  73          {
+  74   1          if (MAC_SCAN_IDLE == mac_scan_state) {
+  75   2              return (FALSE);
+  76   2          }
+  77   1          return (TRUE);
+  78   1      }
+  79          
+  80          /*
+  81           * Clean-up for scanning
+  82           *
+  83           * This is a helper function for clean-up functionality during the end of
+  84           * scanning.
+  85           *
+  86           * buffer_p - Pointer to mlme_scan_conf_t structure
+  87           */
+  88          static void mac_scan_clean_up (buffer_t *buffer_p)
+  89          {
+  90   1          mac_scan_state = MAC_SCAN_IDLE;
+  91   1          /* Send the scan confirm message into the internal event queue */
+  92   1      #if (defined UM) && (!defined ZBMAC_DIAG)
+  93   1        mlme_send_to_host(buffer_p);
+  94   1      #else
+                mlme_scan_conf(buffer_p);
+              #endif    
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 3   
+
+  97   1      
+  98   1          /* Set original channel page and channel. */
+  99   1          scan_curr_page = mac_scan_orig_page;
+ 100   1      
+ 101   1          set_hal_pib_internal(phyCurrentPage, (void *)&scan_curr_page);
+ 102   1      
+ 103   1          scan_curr_channel = mac_scan_orig_channel;
+ 104   1      
+ 105   1          set_hal_pib_internal(phyCurrentChannel, (void *)&scan_curr_channel);
+ 106   1      
+ 107   1          /* Set radio to sleep if allowed */
+ 108   1          mac_trx_sleep();
+ 109   1      }
+ 110          
+ 111          /**
+ 112           * Send a beacon request or orphan notification command frame
+ 113           *
+ 114           * This function sends a beacon request or orphan notification command frame.
+ 115           * An MPDU containing either a beacon request or an orphan notification command
+ 116           * frame is constructed and sent.
+ 117           *
+ 118           * beacon_req - True  -> Send beacon request
+ 119           *              False -> Send orphan notification command frame
+ 120           *
+ 121           */
+ 122          static bool mac_scan_send_scan_cmd (bool beacon_req)
+ 123          {
+ 124   1          retval_t tx_status;
+ 125   1          uint8_t  frame_len;
+ 126   1          uint8_t  *frame_ptr;
+ 127   1          uint16_t fcf;
+ 128   1          uint16_t bc_addr = BROADCAST;
+ 129   1      
+ 130   1          /*
+ 131   1           * mac_scan_cmd_buf_ptr holds the buffer allocated for sending beacon
+ 132   1           * request or orphan notification command. In active scan the scan request
+ 133   1           * buffer is used to send a beacon request. In orphan scan new buffer is
+ 134   1           * allocated to send an orphan notification.
+ 135   1           */
+ 136   1          frame_info_t *transmit_frame_p =
+ 137   1              (frame_info_t *)BMM_BUFFER_POINTER((buffer_t*)mac_scan_cmd_buf_ptr);
+ 138   1      
+ 139   1          /* Get the payload pointer. */
+ 140   1          frame_ptr = (uint8_t *)transmit_frame_p +
+ 141   1                      BUFFER_SIZE -
+ 142   1                      BEAC_REQ_ORPH_NOT_PAYLOAD_LEN;
+ 143   1      
+ 144   1          transmit_frame_p->buffer_header_p = (buffer_t *)mac_scan_cmd_buf_ptr;
+ 145   1      
+ 146   1          if (beacon_req) {
+ 147   2              fcf = FCF_SET_FRAMETYPE(FCF_FRAMETYPE_MAC_CMD) |
+ 148   2                    FCF_SET_DEST_ADDR_MODE(FCF_SHORT_ADDR)   |
+ 149   2                    FCF_SET_SOURCE_ADDR_MODE(FCF_NO_ADDR);
+ 150   2      
+ 151   2              frame_len = BEAC_REQ_ORPH_NOT_PAYLOAD_LEN +
+ 152   2                          SHORT_ADDR_LEN                + /* short Dest Address */
+ 153   2                          PAN_ID_LEN                    + /* Dest PAN-Id */
+ 154   2                          FCS_LEN                       + /* DSN  */
+ 155   2                          SEQ_NUM_LEN;                    /* SEQ */
+ 156   2      
+ 157   2              *frame_ptr = transmit_frame_p->msg_type = BEACONREQUEST;
+ 158   2          } else {
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 4   
+
+ 159   2              /* Orphan Notification command */
+ 160   2              fcf = FCF_SET_FRAMETYPE(FCF_FRAMETYPE_MAC_CMD) |
+ 161   2                    FCF_SET_DEST_ADDR_MODE(FCF_SHORT_ADDR) |
+ 162   2                    FCF_SET_SOURCE_ADDR_MODE(FCF_LONG_ADDR) |
+ 163   2                    FCF_PAN_ID_COMPRESSION;
+ 164   2      
+ 165   2              /* Update the length. */
+ 166   2              frame_len = BEAC_REQ_ORPH_NOT_PAYLOAD_LEN +
+ 167   2                          SHORT_ADDR_LEN                + /* short Dest Address */
+ 168   2                          PAN_ID_LEN                    + /* Dest PAN-Id */
+ 169   2                          EXT_ADDR_LEN                  + /* Ext Src Address */
+ 170   2                          FCS_LEN                       + /* DSN  */
+ 171   2                          SEQ_NUM_LEN;                    /* SEQ */
+ 172   2      
+ 173   2              *frame_ptr = transmit_frame_p->msg_type = ORPHANNOTIFICATION;
+ 174   2      
+ 175   2              /* Orphan notification contains long source address. */
+ 176   2              frame_ptr -= EXT_ADDR_LEN;
+ 177   2              mac_utils_64_bit_to_byte_array(hal_pib_IeeeAddress, frame_ptr);
+ 178   2          }
+ 179   1      
+ 180   1          /* Destination address */
+ 181   1          frame_ptr -= SHORT_ADDR_LEN;
+ 182   1          mac_utils_16_bit_to_byte_array(bc_addr, frame_ptr);
+ 183   1      
+ 184   1          /* Destination PANid */
+ 185   1          frame_ptr -= PAN_ID_LEN;
+ 186   1          mac_utils_16_bit_to_byte_array(bc_addr, frame_ptr);
+ 187   1      
+ 188   1      
+ 189   1          /* Set DSN. */
+ 190   1          frame_ptr--;
+ 191   1          *frame_ptr = mac_pib_macDSN++;
+ 192   1      
+ 193   1      
+ 194   1          /* Set the FCF. */
+ 195   1          frame_ptr -= FCS_LEN;
+ 196   1          mac_utils_16_bit_to_byte_array(fcf, frame_ptr);
+ 197   1      
+ 198   1      
+ 199   1          /* First element shall be length of PHY frame. */
+ 200   1          frame_ptr--;
+ 201   1          *frame_ptr = frame_len;
+ 202   1      
+ 203   1          /* Finished building of frame. */
+ 204   1          transmit_frame_p->mpdu_p = frame_ptr;
+ 205   1      
+ 206   1          /* Transmit data with unslotted CSMA-CA and no frame retry. */
+ 207   1          tx_status = mac_hal_tx_frame(transmit_frame_p, CSMA_UNSLOTTED, false);
+ 208   1      
+ 209   1          if (MAC_SUCCESS == tx_status) {
+ 210   2              MAC_BUSY();
+ 211   2              return (TRUE);
+ 212   2          } else {
+ 213   2              return (FALSE);
+ 214   2          }
+ 215   1      }
+ 216          
+ 217          /*
+ 218           * Proceed with a scan request
+ 219           *
+ 220           * This function proceeds with the scanning.
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 5   
+
+ 221           * The current channel is incremented. It checked if the channel belongs to the
+ 222           * list of channels to scan. If so, start scanning. If all channels done,
+ 223           * send out the MLME_SCAN.confirm message.
+ 224           *
+ 225           * scan_type - The type of the scan operation to proceed with.
+ 226           * buf_p     - Buffer to send mlme scan confirm to NHLE.
+ 227           */
+ 228          static void mac_scan_proceed (uint8_t scan_type, buffer_t *buf_p)
+ 229          {
+ 230   1          retval_t set_status;
+ 231   1          mlme_scan_conf_t *msc_p = (mlme_scan_conf_t *)BMM_BUFFER_POINTER(buf_p);
+ 232   1      
+ 233   1          /* Set the channel page to perform scan */
+ 234   1          set_status = set_hal_pib_internal(phyCurrentPage,
+ 235   1                                            (void *)&scan_curr_page);
+ 236   1      
+ 237   1          /* Loop over all channels the MAC has been requested to scan */
+ 238   1          for (; scan_curr_channel <= MAX_CHANNEL; scan_curr_channel++) {
+ 239   2              if (((MAC_SCAN_ACTIVE == mac_scan_state) ||
+ 240   2                   (MAC_SCAN_PASSIVE == mac_scan_state)) &&
+ 241   2                    mac_pib_macAutoRequest) {
+ 242   3                  /*
+ 243   3                   * According to 802.15.4-2006 PAN descriptor are only present
+ 244   3                   * in the scan confirm message in case the PIB attribute
+ 245   3                   * macAutoRequest is true.
+ 246   3                   */
+ 247   3                  if (msc_p->ResultListSize >= MAX_PANDESCRIPTORS) {
+ 248   4                      break;
+ 249   4                  }
+ 250   3              }
+ 251   2              if (MLME_SCAN_TYPE_ORPHAN == scan_type) {
+ 252   3                  /*
+ 253   3                   * In an orphan scan, terminate if any coordinator
+ 254   3                   * realignment packet has been received.
+ 255   3                   */
+ 256   3                  if (msc_p->ResultListSize) {
+ 257   4                      break;
+ 258   4                  }
+ 259   3              }
+ 260   2      
+ 261   2              if ((msc_p->UnscannedChannels & (1UL << scan_curr_channel)) != 0) {
+ 262   3                  if (MLME_SCAN_TYPE_ACTIVE == scan_type) {
+ 263   4                      mac_scan_state = MAC_SCAN_ACTIVE;
+ 264   4                  }
+ 265   3                  if (MLME_SCAN_TYPE_PASSIVE == scan_type) {
+ 266   4                      mac_scan_state = MAC_SCAN_PASSIVE;
+ 267   4                  }
+ 268   3                  if (MLME_SCAN_TYPE_ORPHAN == scan_type) {
+ 269   4                      mac_scan_state = MAC_SCAN_ORPHAN;
+ 270   4                  }
+ 271   3      
+ 272   3                  /* Set the channel to perform scan */
+ 273   3                  set_status = set_hal_pib_internal(phyCurrentChannel,
+ 274   3                                                    (void *)&scan_curr_channel);
+ 275   3      
+ 276   3                  if (MAC_SUCCESS != set_status) {
+ 277   4                      /*
+ 278   4                       * Free the buffer used for sending orphan notification command
+ 279   4                       */
+ 280   4                      bmm_buffer_free((buffer_t *)mac_scan_cmd_buf_ptr);
+ 281   4      
+ 282   4                      mac_scan_cmd_buf_ptr = NULL;
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 6   
+
+ 283   4      
+ 284   4                      /* Set radio to sleep if allowed */
+ 285   4                      mac_trx_sleep();
+ 286   4      
+ 287   4                      msc_p->status = MAC_NO_BEACON;
+ 288   4      
+ 289   4                      /* Orphan scan does not return any list. */
+ 290   4                      msc_p->ResultListSize = 0;
+ 291   4      
+ 292   4                      /* Send scan confirm message */
+ 293   4      #if (defined UM) && (!defined ZBMAC_DIAG)
+ 294   4              mlme_send_to_host(buf_p);
+ 295   4      #else
+                      mlme_scan_conf(buf_p);
+              #endif            
+ 298   4      
+ 299   4                      mac_scan_state = MAC_SCAN_IDLE;
+ 300   4                   }
+ 301   3                  /* Continue scanning, after setting channel */ 
+ 302   3                  mac_scan_set_complete(set_status);
+ 303   3                  return;
+ 304   3              }
+ 305   2          }
+ 306   1      
+ 307   1          /* All channels were scanned. The confirm needs to be prepared */
+ 308   1          switch (scan_type) {
+ 309   2          case MLME_SCAN_TYPE_ED:
+ 310   2              msc_p->status = MAC_SUCCESS;
+ 311   2              mac_scan_clean_up(buf_p);
+ 312   2              break;
+ 313   2      
+ 314   2          case MLME_SCAN_TYPE_ACTIVE:
+ 315   2              /*
+ 316   2               * Free the buffer which was received from scan request and reused
+ 317   2               * for beacon request frame transmission.
+ 318   2               */
+ 319   2              bmm_buffer_free((buffer_t *)mac_scan_cmd_buf_ptr);
+ 320   2      
+ 321   2              mac_scan_cmd_buf_ptr = NULL;
+ 322   2      
+ 323   2              if (!mac_pib_macAutoRequest) {
+ 324   3                  msc_p->status = MAC_SUCCESS;
+ 325   3              } else if (msc_p->ResultListSize >= MAX_PANDESCRIPTORS) {
+ 326   3                  msc_p->status = MAC_LIMIT_REACHED;
+ 327   3              } else if (msc_p->ResultListSize) {
+ 328   3                  msc_p->status = MAC_SUCCESS;
+ 329   3              } else {
+ 330   3                  msc_p->status = MAC_NO_BEACON;
+ 331   3              }
+ 332   2      
+ 333   2              /* Restore macPANId after active scan completed. */
+ 334   2              set_hal_pib_internal(macPANId, (void *)&mac_scan_orig_panid);
+ 335   2      
+ 336   2              /* Done with scanning */
+ 337   2              mac_scan_clean_up((buffer_t *)mac_conf_buf_ptr);
+ 338   2              break;
+ 339   2      
+ 340   2          case MLME_SCAN_TYPE_PASSIVE:
+ 341   2              if (!mac_pib_macAutoRequest) {
+ 342   3                  msc_p->status = MAC_SUCCESS;
+ 343   3              } else if (msc_p->ResultListSize >= MAX_PANDESCRIPTORS) {
+ 344   3                  msc_p->status = MAC_LIMIT_REACHED;
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 7   
+
+ 345   3              } else if (msc_p->ResultListSize) {
+ 346   3                  msc_p->status = MAC_SUCCESS;
+ 347   3              } else {
+ 348   3                  msc_p->status = MAC_NO_BEACON;
+ 349   3              }
+ 350   2      
+ 351   2              /* Restore macPANId after passive scan completed. */
+ 352   2              set_status =
+ 353   2                  set_hal_pib_internal(macPANId, (void *)&mac_scan_orig_panid);
+ 354   2      
+ 355   2              mac_scan_clean_up(buf_p);
+ 356   2              break;
+ 357   2      
+ 358   2      
+ 359   2          case MLME_SCAN_TYPE_ORPHAN:
+ 360   2              /* Free the buffer used for sending orphan notification command */
+ 361   2              bmm_buffer_free((buffer_t *)mac_scan_cmd_buf_ptr);
+ 362   2      
+ 363   2              mac_scan_cmd_buf_ptr = NULL;
+ 364   2      
+ 365   2              if (msc_p->ResultListSize > 0) {
+ 366   3                  msc_p->status = MAC_SUCCESS;
+ 367   3              } else {
+ 368   3                  msc_p->status = MAC_NO_BEACON;
+ 369   3              }
+ 370   2      
+ 371   2              /* Orphan scan does not return any list. */
+ 372   2              msc_p->ResultListSize = 0;
+ 373   2      
+ 374   2              mac_scan_clean_up(buf_p);
+ 375   2              break;
+ 376   2      
+ 377   2          default:
+ 378   2              break;
+ 379   2          }
+ 380   1      }
+ 381          
+ 382          /*
+ 383           * MAC scan timer callback
+ 384           *
+ 385           * callback_parameter - Callback parameter.
+ 386           */
+ 387          
+ 388          void mac_scan_duration_cb (void *callback_parameter)
+ 389          {
+ 390   1          /* mac_conf_buf_ptr holds the buffer for scan confirm */
+ 391   1          mlme_scan_conf_t *msc_p =
+ 392   1              (mlme_scan_conf_t *)BMM_BUFFER_POINTER((buffer_t *)mac_conf_buf_ptr);
+ 393   1      
+ 394   1          switch (mac_scan_state) {
+ 395   2          case MAC_SCAN_ACTIVE:
+ 396   2          case MAC_SCAN_PASSIVE:
+ 397   2          case MAC_SCAN_ORPHAN: 
+ 398   2              msc_p->UnscannedChannels &= ~(1UL << scan_curr_channel);
+ 399   2              mac_scan_proceed(scan_type, (buffer_t *)mac_conf_buf_ptr);
+ 400   2              break;
+ 401   2      
+ 402   2          default:
+ 403   2              break;
+ 404   2          }
+ 405   1      
+ 406   1          callback_parameter = callback_parameter;
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 8   
+
+ 407   1      }
+ 408          
+ 409          /**
+ 410           * Continue scanning after setting of PIB attributes
+ 411           *
+ 412           * This functions continues scanning once the corresponding PIB
+ 413           * attribute change has been completed depending on the status.
+ 414           *
+ 415           * set_status Status of the Request to change the PIB attribute
+ 416           */
+ 417          static void mac_scan_set_complete (retval_t set_status)
+ 418          {
+ 419   1          switch (mac_scan_state) {
+ 420   2          case MAC_SCAN_ED:
+ 421   2              if (MAC_SUCCESS == set_status) {
+ 422   3                  MAC_BUSY();
+ 423   3                  mac_hal_ed_start(scan_duration);
+ 424   3              } else {
+ 425   3                  /* Channel not supported, continue. */
+ 426   3                  scan_curr_channel++;
+ 427   3              }
+ 428   2              break;
+ 429   2      
+ 430   2      
+ 431   2          case MAC_SCAN_ACTIVE:
+ 432   2              if (MAC_SUCCESS == set_status) {
+ 433   3                  /* Send an beacon request command */
+ 434   3                  if (!mac_scan_send_scan_cmd(true)) {
+ 435   4      
+ 436   4                      /*
+ 437   4                       * Beacon request could not be transmitted
+ 438   4                       * since there is no buffer available stop scanning
+ 439   4                       */
+ 440   4                      //FIXME - Add code to handle this
+ 441   4                  }
+ 442   3              } else {
+ 443   3                  /* Channel not supported, continue. */
+ 444   3                  scan_curr_channel++;
+ 445   3              }
+ 446   2              break;
+ 447   2      
+ 448   2      
+ 449   2          case MAC_SCAN_PASSIVE:
+ 450   2              if (MAC_SUCCESS == set_status) {
+ 451   3                  uint8_t status = mac_hal_hw_control(PHY_RX_ON);
+ 452   3      
+ 453   3                  if (PHY_RX_ON == status) {
+ 454   4      #ifdef RTX51_TINY_OS
+ 455   4                      eStatus timer_status;
+ 456   4      #endif
+ 457   4                      uint32_t tmr;
+ 458   4      
+ 459   4                      tmr = MAC_CALCULATE_SYMBOL_TIME_SCANDURATION(scan_duration);
+ 460   4      #ifdef RTX51_TINY_OS
+ 461   4                      timer_status = STM_StartTimer(scan_duration_timer,
+ 462   4                                           HAL_CONVERT_SYMBOLS_TO_US(tmr) / 1000);
+ 463   4                      if (STATUS_SUCCESS != timer_status) {
+ 464   5                          /*
+ 465   5                           * Scan duration timer could not be started 
+ 466   5                           */
+ 467   5                          //FIXME - Add code to handle this
+ 468   5                      }
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 9   
+
+ 469   4      #endif
+ 470   4                  } else {
+ 471   4                      scan_curr_channel++;
+ 472   4                      mac_scan_proceed(MLME_SCAN_TYPE_PASSIVE,
+ 473   4                                       (buffer_t *)mac_conf_buf_ptr);
+ 474   4                  }
+ 475   3              } else {
+ 476   3                  /* Channel not supported, continue. */
+ 477   3                  scan_curr_channel++;
+ 478   3              }
+ 479   2              break;
+ 480   2      
+ 481   2      
+ 482   2          case MAC_SCAN_ORPHAN:
+ 483   2              if (MAC_SUCCESS == set_status) {
+ 484   3                  /* Send an orphan notification command */
+ 485   3                  if (!mac_scan_send_scan_cmd(false)) {
+ 486   4                      /*
+ 487   4                       * Orphan notification could not be transmitted. 
+ 488   4                       * Stop scanning
+ 489   4                       */
+ 490   4                      //FIXME - Add code to handle this
+ 491   4                  }
+ 492   3              } else {
+ 493   3                  /* Channel not supported, continue. */
+ 494   3                  scan_curr_channel++;
+ 495   3              }
+ 496   2              break;
+ 497   2      
+ 498   2          default:
+ 499   2              break;
+ 500   2          }
+ 501   1      }
+ 502          
+ 503          /*
+ 504           * Continues handling of MLME_SCAN.request once the radio is awake
+ 505           *
+ 506           * scan_buf_p - Pointer to Scan request buffer.
+ 507           */
+ 508          static void mac_scan_awake_scan (buffer_t *scan_buf_p)
+ 509          {
+ 510   1          mlme_scan_conf_t *msc_p;
+ 511   1          uint16_t broadcast_panid = BROADCAST;
+ 512   1          retval_t set_status;
+ 513   1      
+ 514   1          msc_p = (mlme_scan_conf_t *)BMM_BUFFER_POINTER(scan_buf_p);
+ 515   1      
+ 516   1          /* Set the first channel at which the scan is started */
+ 517   1          scan_curr_channel = MIN_CHANNEL;
+ 518   1      
+ 519   1          switch (scan_type) {
+ 520   2          case MLME_SCAN_TYPE_ED:
+ 521   2              msc_p->scan_result_list[0].ed_value[1] = 0;
+ 522   2              mac_scan_state = MAC_SCAN_ED; 
+ 523   2              mac_scan_proceed(MLME_SCAN_TYPE_ED, (buffer_t *)scan_buf_p);
+ 524   2              break;
+ 525   2      
+ 526   2          case MLME_SCAN_TYPE_ACTIVE:
+ 527   2          case MLME_SCAN_TYPE_PASSIVE:
+ 528   2              /*
+ 529   2               * Before commencing an active or passive scan, the MAC sublayer
+ 530   2               * shall store the value of macPANId and then set it to 0xFFFF for
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 10  
+
+ 531   2               * the duration of the scan. This enables the receive filter to
+ 532   2               * accept all beacons rather than just the beacons from its
+ 533   2               * current PAN (see 7.5.6.2). On completion of the scan, the
+ 534   2               * MAC sublayer shall restore the value of macPANId to the
+ 535   2               * value stored before the scan began.
+ 536   2               */
+ 537   2              mac_scan_orig_panid = hal_pib_PANId;
+ 538   2      
+ 539   2              set_status =
+ 540   2                  set_hal_pib_internal(macPANId, (void *)&broadcast_panid);
+ 541   2      
+ 542   2              if (MLME_SCAN_TYPE_ACTIVE == scan_type) {
+ 543   3                  /*
+ 544   3                   * In active scan reuse the scan request buffer for
+ 545   3                   * sending beacon request.
+ 546   3                   */
+ 547   3                  mac_scan_cmd_buf_ptr = (uint8_t *)scan_buf_p;
+ 548   3              }
+ 549   2      
+ 550   2              /* Allocate a large size buffer for scan confirm. */
+ 551   2              mac_conf_buf_ptr = (uint8_t *)bmm_buffer_alloc(BUFFER_SIZE);
+ 552   2      
+ 553   2              if (NULL == mac_conf_buf_ptr) {
+ 554   3                  /*
+ 555   3                   * Buffer is not available for sending scan confirmation,
+ 556   3                   * hence the scan request buffer (small buffer) is used to send
+ 557   3                   * the scan confirmation.
+ 558   3                   */
+ 559   3                  FM_Printf(FM_APP, "\nba:scan2F");
+ 560   3                  msc_p->status = MAC_INVALID_PARAMETER;
+ 561   3      
+ 562   3                  /* Send scan confirm message */
+ 563   3      #if (defined UM) && (!defined ZBMAC_DIAG)
+ 564   3            mlme_send_to_host(scan_buf_p);
+ 565   3      #else
+                    mlme_scan_conf(scan_buf_p);
+              #endif      
+ 568   3      
+ 569   3                  /* Set radio to sleep if allowed */
+ 570   3                  mac_trx_sleep();
+ 571   3                  return;
+ 572   3              }
+ 573   2      
+ 574   2              if (MLME_SCAN_TYPE_PASSIVE == scan_type) {
+ 575   3                  /* Free the scan request buffer when in passive scan. */
+ 576   3                  bmm_buffer_free(scan_buf_p);
+ 577   3              }
+ 578   2      
+ 579   2              msc_p = (mlme_scan_conf_t *)
+ 580   2                      BMM_BUFFER_POINTER((buffer_t *)mac_conf_buf_ptr);
+ 581   2      
+ 582   2              msc_p->cmdcode = MLME_SCAN_CONFIRM;
+ 583   2              msc_p->ScanType = scan_type;
+ 584   2              msc_p->ChannelPage = scan_curr_page;
+ 585   2              msc_p->UnscannedChannels = scan_channels;
+ 586   2              msc_p->ResultListSize = 0;
+ 587   2              msc_p->scan_result_list[0].ed_value[0] = 0;
+ 588   2       
+ 589   2              mac_scan_proceed(scan_type, (buffer_t *)mac_conf_buf_ptr);
+ 590   2              break;
+ 591   2      
+ 592   2          case MLME_SCAN_TYPE_ORPHAN:
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 11  
+
+ 593   2              /* Buffer allocated for orphan notification command */
+ 594   2              mac_scan_cmd_buf_ptr = (uint8_t *)bmm_buffer_alloc(BUFFER_SIZE);
+ 595   2      
+ 596   2              if (NULL == mac_scan_cmd_buf_ptr) {
+ 597   3            FM_Printf(FM_APP, "\nba:scanF");
+ 598   3                  msc_p->status = MAC_INVALID_PARAMETER;
+ 599   3      
+ 600   3                  /* Send scan confirm message */
+ 601   3      #if (defined UM) && (!defined ZBMAC_DIAG)
+ 602   3            mlme_send_to_host(scan_buf_p);
+ 603   3      #else
+                    mlme_scan_conf(scan_buf_p);
+              #endif      
+ 606   3      
+ 607   3                  /* Set radio to sleep if allowed */
+ 608   3                  mac_trx_sleep();
+ 609   3                  return;
+ 610   3              }
+ 611   2      
+ 612   2              mac_scan_proceed(MLME_SCAN_TYPE_ORPHAN,
+ 613   2                               (buffer_t *)mac_conf_buf_ptr);
+ 614   2              break;
+ 615   2      
+ 616   2      
+ 617   2          default:
+ 618   2              msc_p->status = MAC_INVALID_PARAMETER;
+ 619   2              /* Send scan confirm message */
+ 620   2      #if (defined UM) && (!defined ZBMAC_DIAG)
+ 621   2          mlme_send_to_host(scan_buf_p);
+ 622   2      #else
+                  mlme_scan_conf(scan_buf_p);
+              #endif      
+ 625   2      
+ 626   2              /* Set radio to sleep if allowed */
+ 627   2              mac_trx_sleep();
+ 628   2              break;
+ 629   2          }
+ 630   1      }
+ 631          
+ 632          /**
+ 633           * Continue scanning after the completion of frame transmission.
+ 634           *
+ 635           * This functions continues the corresponding scaning depending on status
+ 636           * from the transmission of a beacon request or orphan notification frame.
+ 637           *
+ 638           * status - Status of transmission
+ 639           */
+ 640          void mac_scan_send_complete (retval_t status)
+ 641          {
+ 642   1      #ifdef RTX51_TINY_OS
+ 643   1          eStatus timer_status;
+ 644   1      #endif
+ 645   1      
+ 646   1          mac_pib_macDSN++;
+ 647   1      
+ 648   1          if (MAC_SUCCESS == status) {
+ 649   2              uint32_t tmr = 0;
+ 650   2      
+ 651   2              if (MAC_SCAN_ACTIVE == mac_scan_state) {
+ 652   3                  tmr = MAC_CALCULATE_SYMBOL_TIME_SCANDURATION(scan_duration);
+ 653   3              } else {
+ 654   3                  tmr = mac_pib_macResponseWaitTime;
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 12  
+
+ 655   3              }
+ 656   2      #ifdef RTX51_TINY_OS
+ 657   2              timer_status = STM_StartTimer(scan_duration_timer,
+ 658   2                                            HAL_CONVERT_SYMBOLS_TO_US(tmr) / 1000);
+ 659   2              if (STATUS_SUCCESS != timer_status) {
+ 660   3                  /*
+ 661   3                   * Scan duration timer could not be started, so we call
+ 662   3                   * the timer callback function directly. This will basically
+ 663   3                   * shorten scanning without having really scanned.
+ 664   3                   */           
+ 665   3                  mac_scan_duration_cb(NULL);
+ 666   3              }
+ 667   2      #endif
+ 668   2          } else {
+ 669   2              /* Did not work, continue. */
+ 670   2              scan_curr_channel++;
+ 671   2              mac_scan_proceed(scan_type, (buffer_t *)mac_conf_buf_ptr);
+ 672   2          }
+ 673   1      }
+ 674          
+ 675          
+ 676          /**
+ 677           * The MLME-SCAN.request primitive makes a request for a node to
+ 678           * start a scan procedure.
+ 679           *
+ 680           * See 802.15.4. Section 7.1.11.1.
+ 681           *
+ 682           * msg_p - The MLME_SCAN.request message
+ 683           */
+ 684          void mlme_scan_request (buffer_t *buf_p)
+ 685          {
+ 686   1          mlme_scan_conf_t *msc_p;
+ 687   1          mlme_scan_req_t *msr_p =
+ 688   1              (mlme_scan_req_t *)BMM_BUFFER_POINTER(buf_p);
+ 689   1       
+ 690   1          /* Save the original channel. */
+ 691   1          mac_scan_orig_channel = hal_pib_CurrentChannel;
+ 692   1      
+ 693   1          /* Save the original channel page. */
+ 694   1          mac_scan_orig_page = hal_pib_CurrentPage;
+ 695   1      
+ 696   1          /* Save the scan request parameters */
+ 697   1          scan_duration = msr_p->ScanDuration;
+ 698   1          scan_type = msr_p->ScanType;
+ 699   1          scan_channels = msr_p->ScanChannels;
+ 700   1          scan_curr_page = msr_p->ChannelPage;
+ 701   1      
+ 702   1          msc_p = (mlme_scan_conf_t *)msr_p;
+ 703   1      
+ 704   1          /*
+ 705   1           * Store the scan request buffer reused to create the corresponding
+ 706   1           * scan confirmation
+ 707   1           */
+ 708   1          mac_conf_buf_ptr = (uint8_t *)buf_p;
+ 709   1      
+ 710   1          msc_p->cmdcode = MLME_SCAN_CONFIRM;
+ 711   1          msc_p->ScanType = scan_type;
+ 712   1          msc_p->UnscannedChannels = scan_channels;
+ 713   1          msc_p->ChannelPage = scan_curr_page;
+ 714   1          msc_p->ResultListSize = 0;
+ 715   1          msc_p->scan_result_list[0].ed_value[0] = 0;
+ 716   1      
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 13  
+
+ 717   1          if ((MAC_POLL_IDLE != mac_poll_state) ||
+ 718   1              (MAC_SCAN_IDLE != mac_scan_state)) {
+ 719   2              /* Ignore scan request while being in a polling state or scanning. */
+ 720   2              msc_p->status = MAC_INVALID_PARAMETER;
+ 721   2      
+ 722   2              /* Send Scan Confirm with error status */
+ 723   2      #if (defined UM) && (!defined ZBMAC_DIAG)
+ 724   2          mlme_send_to_host(buf_p);
+ 725   2      #else
+                  mlme_scan_conf(buf_p);
+              #endif      
+ 728   2      
+ 729   2              return;
+ 730   2          }
+ 731   1      
+ 732   1          /*
+ 733   1           * Check for invalid channels to scan.
+ 734   1           * This can be either an emtpy scan mask, or a scan mask that contains
+ 735   1           * invalid channels for this band.
+ 736   1           */
+ 737   1          /*
+ 738   1           * Checck also for a scan duration that is lower than
+ 739   1           * the max. beacon order.
+ 740   1           */
+ 741   1          if ((0 == scan_channels) ||
+ 742   1              ((scan_channels & INVERSE_CHANNEL_MASK) != 0) ||
+ 743   1              (scan_duration > BEACON_NETWORK_MAX_BO)) {
+ 744   2              msc_p->status = MAC_INVALID_PARAMETER;
+ 745   2      
+ 746   2              /* Send the scan confirm message */
+ 747   2      #if (defined UM) && (!defined ZBMAC_DIAG)
+ 748   2          mlme_send_to_host(buf_p);
+ 749   2      #else
+                  mlme_scan_conf(buf_p);
+              #endif  
+ 752   2      
+ 753   2              return;
+ 754   2          }
+ 755   1      
+ 756   1          /* wake up radio first */
+ 757   1          mac_trx_wakeup();
+ 758   1          mac_hal_hw_control(PHY_RX_ON);
+ 759   1       
+ 760   1          mac_scan_awake_scan(buf_p);
+ 761   1      }
+ 762          
+ 763          
+ 764          /**
+ 765           * ED scan callback function.
+ 766           *
+ 767           * This function is a callback function from the HAL after ED scan
+ 768           * is performed on a specified channel.
+ 769           *
+ 770           * energy_level - Energy level on the channel
+ 771           */
+ 772          void mac_scan_ed_end_cb (uint8_t energy_level)
+ 773          {
+ 774   1      
+ 775   1          mlme_scan_conf_t *msc_p;
+ 776   1          uint8_t n_eds;
+ 777   1      
+ 778   1          MAC_NOT_BUSY();
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 14  
+
+ 779   1      
+ 780   1          /*
+ 781   1           * Scan request buffer is used to generate a scan confirm for the ED scan
+ 782   1           * which is stored in mac_conf_buf_ptr.
+ 783   1           */
+ 784   1          msc_p = (mlme_scan_conf_t *)
+ 785   1                  BMM_BUFFER_POINTER((buffer_t *)mac_conf_buf_ptr);
+ 786   1      
+ 787   1      
+ 788   1          n_eds = msc_p->ResultListSize;
+ 789   1          msc_p->scan_result_list[0].ed_value[n_eds] = energy_level;
+ 790   1          msc_p->ResultListSize++;
+ 791   1          msc_p->scan_result_list[0].ed_value[n_eds + 1] = 0;
+ 792   1          msc_p->UnscannedChannels &= ~(1UL << scan_curr_channel);
+ 793   1      
+ 794   1          /* Continue with next channel */
+ 795   1          mac_scan_proceed(MLME_SCAN_TYPE_ED, (buffer_t *)mac_conf_buf_ptr);
+ 796   1      }
+ 797          
+ 798          
+ 799          /**
+ 800           * Processing a coordinator realignment command frame during Orphan scan
+ 801           *
+ 802           * This function processes a coordinator realignment command frame received
+ 803           * as a response to the reception of an orphan notification
+ 804           * command frame (i.e. while being in the middle of an orphan scan procedure).
+ 805           * The PAN ID, coord. short address, logical channel, and the device's new
+ 806           * short address will be written to the PIB.
+ 807           *
+ 808           * buf_ptr - Frame reception buffer
+ 809           */
+ 810          void mac_scan_process_orphan_realign (buffer_t *buf_ptr)
+ 811          {
+ 812   1          retval_t set_status;
+ 813   1          mlme_scan_conf_t *msc_p;
+ 814   1      
+ 815   1          /* Device received a coordinator realignment during an orphan scan */
+ 816   1      
+ 817   1          /* Free the buffer used for sending orphan notification command */
+ 818   1          bmm_buffer_free((buffer_t *)mac_scan_cmd_buf_ptr);
+ 819   1          mac_scan_cmd_buf_ptr = NULL;
+ 820   1      
+ 821   1          /*
+ 822   1           * Scan confirm with scan type orphan is given to the NHLE using the
+ 823   1           * scan request buffer, which was stored in mac_conf_buf_ptr.
+ 824   1           */
+ 825   1          msc_p = (mlme_scan_conf_t*)BMM_BUFFER_POINTER((buffer_t *)mac_conf_buf_ptr);
+ 826   1      
+ 827   1          msc_p->cmdcode = MLME_SCAN_CONFIRM;
+ 828   1          msc_p->status = MAC_SUCCESS;
+ 829   1          msc_p->ScanType = MLME_SCAN_TYPE_ORPHAN;
+ 830   1          msc_p->UnscannedChannels = 0;
+ 831   1          msc_p->ResultListSize = 0;
+ 832   1      
+ 833   1      
+ 834   1          /* Send the scan confirmation message */ 
+ 835   1      #if (defined UM) && (!defined ZBMAC_DIAG)
+ 836   1        mlme_send_to_host((buffer_t *)mac_conf_buf_ptr);
+ 837   1      #else
+                mlme_scan_conf((buffer_t *)mac_conf_buf_ptr);
+              #endif    
+ 840   1      
+C51 COMPILER V9.53.0.0   MAC_SCAN                                                          11/04/2015 20:09:51 PAGE 15  
+
+ 841   1          mac_scan_state = MAC_SCAN_IDLE;
+ 842   1      
+ 843   1          /* Set radio to sleep if allowed */
+ 844   1          mac_trx_sleep();
+ 845   1      
+ 846   1          /*
+ 847   1           * The buffer in which the coordinator realignment is received is
+ 848   1           * freed up
+ 849   1           */
+ 850   1          bmm_buffer_free(buf_ptr);
+ 851   1      
+ 852   1          /* Set the appropriate PIB entries */
+ 853   1          set_status =
+ 854   1              set_hal_pib_internal(macPANId, (void *)
+ 855   1                  &mac_parse_data.mac_payload_data.coord_realign_data.pan_id);
+ 856   1      
+ 857   1          if (BROADCAST !=
+ 858   1              mac_parse_data.mac_payload_data.coord_realign_data.short_addr) {
+ 859   2              /* Short address only to be set if not broadcast address */
+ 860   2              set_status = 
+ 861   2              set_hal_pib_internal(macShortAddress, (void *)
+ 862   2                  &mac_parse_data.mac_payload_data.coord_realign_data.short_addr);
+ 863   2          }
+ 864   1      
+ 865   1          mac_pib_macCoordShortAddress =
+ 866   1              mac_parse_data.mac_payload_data.coord_realign_data.coord_short_addr;
+ 867   1      
+ 868   1          /*
+ 869   1           * If frame version subfield indicates a 802.15.4-2006 compatible frame,
+ 870   1           * the channel page is appended as additional information element.
+ 871   1           */
+ 872   1          if (mac_parse_data.fcf & FCF_FRAME_VERSION_2006) {
+ 873   2              set_status =
+ 874   2              set_hal_pib_internal(phyCurrentPage, (void *)
+ 875   2                  &mac_parse_data.mac_payload_data.coord_realign_data.channel_page);
+ 876   2          }
+ 877   1      
+ 878   1          set_status =
+ 879   1          set_hal_pib_internal(phyCurrentChannel, (void *)
+ 880   1              &mac_parse_data.mac_payload_data.coord_realign_data.logical_channel);
+ 881   1      
+ 882   1          mac_scan_set_complete(set_status);
+ 883   1      }
+ 884          
+ 885          #endif //HYBRII_802154
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2632    ----
+   CONSTANT SIZE    =     21    ----
+   XDATA SIZE       =      8      54
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

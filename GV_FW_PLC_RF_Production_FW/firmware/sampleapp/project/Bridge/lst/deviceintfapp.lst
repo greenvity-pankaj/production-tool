@@ -1,0 +1,489 @@
+C51 COMPILER V9.53.0.0   DEVICEINTFAPP                                                     11/04/2015 20:09:43 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE DEVICEINTFAPP
+OBJECT MODULE PLACED IN .\obj\deviceintfapp.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\sampleapp\src\deviceintfapp.c LARGE OBJECTADVANCED OPTIMIZE(
+                    -9,SPEED) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\
+                    -..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src
+                    -\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\
+                    -firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zig
+                    -bee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\
+                    -inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp
+                    -\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_suppor
+                    -t;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drive
+                    -rs\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;
+                    -..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\.
+                    -.\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drive
+                    -rs\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilit
+                    -ies;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers
+                    -\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\
+                    -..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBR
+                    -II_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SY
+                    -NC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_D
+                    -ETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERR
+                    -UPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,R
+                    -EGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\deviceintfapp.lst) 
+                    -TABS(2) OBJECT(.\obj\deviceintfapp.obj)
+
+line level    source
+
+   1          /* ========================================================
+   2           *
+   3           * @file:  deviceintfapp.c
+   4           * 
+   5           * @brief: This file implements a simple peripheral interfacing
+   6           *       layer for drivers to be pulgged in
+   7           *
+   8           *  Copyright (C) 2010-2015, Greenvity Communications, Inc.
+   9           *  All Rights Reserved
+  10           *  
+  11           * =========================================================*/
+  12          #ifdef DEVICEINTF_APP
+  13          
+  14          /****************************************************************************** 
+  15            * Includes
+  16            ******************************************************************************/
+  17            
+  18          #include <stddef.h>
+  19          #include "string.h"
+  20          #include "stdio.h"
+  21          #include "stdlib.h"
+  22          #include "gv701x_includes.h"
+  23          #include "deviceintfapp.h"
+  24          #ifdef LLP_APP
+  25          #include "llpapp.h"
+  26          #endif
+  27          #if ((defined SMARTLIGHT_APP) && ((defined LED_RGB_LIGHT) || (defined LED_WNC_LIGHT) \
+  28            || (defined LED_WHITE_LIGHT) || (defined LED_SMART_LIGHT)))
+  29          #include "smartlightapp.h"
+  30          #endif
+  31          #ifdef SENSOR_DRIVER
+              #include "sensor_driver.h"
+              #endif
+  34          #ifdef SMARTPLUG_DRIVER
+C51 COMPILER V9.53.0.0   DEVICEINTFAPP                                                     11/04/2015 20:09:43 PAGE 2   
+
+              #include "smartplug_driver.h"
+              #endif
+  37          #ifdef SMARTGRID_APP
+              #include "smartgridapp.h" 
+              #endif
+  40          #ifdef RGB_FADING_DEMO
+              #include "rgbfading.h"
+              #endif
+  43          #ifdef MOTION_DRIVER
+              #include "motion_driver.h"
+              #endif
+  46          
+  47          /****************************************************************************** 
+  48            * Global Data
+  49            ******************************************************************************/
+  50          
+  51          gv701x_state_t deviceintf_state;      
+  52          deviceintf_data_t deviceintf_data;
+  53          device_list_t dev_list[] =  
+  54          { 
+  55          #ifdef LED_RGB_LIGHT
+                {"RGBLight", DEVINTF_1, DEVINTF_NONE, &led_rgb_io_list},  
+              #endif  
+  58          #ifdef LED_WNC_LIGHT
+                {"WNCLight", DEVINTF_2, DEVINTF_NONE, &led_temp_io_list},
+              #endif  
+  61          #ifdef LED_WHITE_LIGHT
+                {"WhiteLight", DEVINTF_3, DEVINTF_NONE, &led_dim_io_list},
+              #endif  
+  64          #ifdef SENSOR_DRIVER  
+                {"Sensor", DEVINTF_4, DEVINTF_NONE, &sensor_io_list},    
+              #endif  
+  67          #ifdef SMARTPLUG_DRIVER
+                {"SmartPlug", DEVINTF_5, DEVINTF_NONE, &smartplug_io_list},    
+              #endif  
+  70          #ifdef LED_SMART_LIGHT
+  71            {"SmartLight", DEVINTF_6, DEVINTF_NONE, &led_smartlight_io_list},    
+  72          #endif
+  73          #ifdef SMARTGRID_APP
+                {"SmartGrid", DEVINTF_20, DEVINTF_NONE, &smartgrid_io_list},     
+              #endif  
+  76            {"None", DEVINTF_NONE, DEVINTF_NONE, NULL}  
+  77          };
+  78          
+  79          /******************************************************************************
+  80            * Funtion prototypes
+  81            ******************************************************************************/
+  82          
+  83          /******************************************************************************
+  84           * @fn      DeviceIntfApp_Init
+  85           *
+  86           * @brief   Initializes Device Interfacing Layer
+  87           *
+  88           * @param   app_id - application identification number
+  89           *
+  90           * @return  none
+  91           */
+  92           
+  93          void DeviceIntfApp_Init(u8 app_id) 
+  94          { 
+  95   1      #if 0 
+                u8 i;
+C51 COMPILER V9.53.0.0   DEVICEINTFAPP                                                     11/04/2015 20:09:43 PAGE 3   
+
+              #endif
+  98   1        
+  99   1        deviceintf_data.app_id = app_id;  
+ 100   1        deviceintf_data.dev_list = dev_list;
+ 101   1      
+ 102   1        SLIST_Init(&deviceintf_data.queues.appRxQueue);
+ 103   1        FM_Printf(FM_USER, "\nInit DevIntf (app id %bu)", app_id);
+ 104   1      
+ 105   1        /*Initializing the State machine*/
+ 106   1        memset(&deviceintf_state, 0x00, sizeof(gv701x_state_t));
+ 107   1        deviceintf_state.state = DEVINTF_IO_NONE;
+ 108   1        deviceintf_state.event = DEVINTF_IO_NONE; 
+ 109   1        deviceintf_state.statedata = NULL;
+ 110   1        deviceintf_state.statedatalen = 0;
+ 111   1      
+ 112   1      #if 0
+                for(i = 0; (dev_list[i].type != DEVINTF_NONE); i++)
+                {
+                  FM_Printf(FM_APP, "\n(%bu.)Device Type %s(%bu)", i, dev_list[i].name, dev_list[i].type);
+                }
+              #endif  
+ 118   1      }
+ 119          
+ 120          /******************************************************************************
+ 121           * @fn      DeviceIntfApp_RxAppMsg
+ 122           *
+ 123           * @brief   Receives a message from another app/fw
+ 124           *
+ 125           * @params  msg_buf - message buffer
+ 126           *
+ 127           * @return  none
+ 128           */
+ 129          
+ 130          void DeviceIntfApp_RxAppMsg(sEvent* event)
+ 131          {
+ 132   1        gv701x_app_msg_hdr_t* msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;
+ 133   1        hostHdr_t* hybrii_hdr;
+ 134   1        hostEventHdr_t* evnt_hdr;
+ 135   1      
+ 136   1        hybrii_hdr = (hostHdr_t*)(msg_hdr + 1);
+ 137   1      
+ 138   1        if(msg_hdr->dst_app_id == deviceintf_data.app_id)
+ 139   1        {
+ 140   2          memcpy(&deviceintf_state.msg_hdr, msg_hdr, sizeof(gv701x_app_msg_hdr_t));
+ 141   2          deviceintf_state.eventproto = hybrii_hdr->protocol;
+ 142   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 143   2            (hybrii_hdr->type == EVENT_FRM_ID))
+ 144   2          {
+ 145   3            evnt_hdr = (hostEventHdr_t*)(hybrii_hdr + 1);
+ 146   3            deviceintf_state.event = evnt_hdr->type;  
+ 147   3            deviceintf_state.statedata = (u8*)(evnt_hdr + 1);
+ 148   3            deviceintf_state.statedatalen = (u16)(hybrii_hdr->length - sizeof(hostEventHdr_t));   
+ 149   3          }
+ 150   2          else
+ 151   2          {
+ 152   3            deviceintf_state.event = (u8)(*((u8*)(hybrii_hdr + 1)));
+ 153   3            deviceintf_state.statedata = (u8*)(hybrii_hdr + 1);
+ 154   3            deviceintf_state.statedatalen = (u16)hybrii_hdr->length;
+ 155   3          }   
+ 156   2          deviceintf_state.eventtype = hybrii_hdr->type;
+ 157   2          deviceintf_state.eventclass = event->eventHdr.eventClass;
+ 158   2      
+C51 COMPILER V9.53.0.0   DEVICEINTFAPP                                                     11/04/2015 20:09:43 PAGE 4   
+
+ 159   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 160   2            (hybrii_hdr->type == EVENT_FRM_ID) &&
+ 161   2            (deviceintf_state.event == HOST_EVENT_APP_TIMER))
+ 162   2          {     
+ 163   3            return;
+ 164   3          }   
+ 165   2          else if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 166   2            (hybrii_hdr->type == EVENT_FRM_ID) &&
+ 167   2            (deviceintf_state.event == HOST_EVENT_APP_CMD))
+ 168   2          {     
+ 169   3            DeviceIntfApp_CmdProcess((char*)(evnt_hdr + 1)); 
+ 170   3            return;
+ 171   3          }     
+ 172   2        } 
+ 173   1        else if(msg_hdr->dst_app_id == APP_BRDCST_MSG_APPID)
+ 174   1        {
+ 175   2          u8 *event = (u8*)(hybrii_hdr + 1);
+ 176   2          return;
+ 177   2        }   
+ 178   1        DeviceIntfApp_SM(&deviceintf_state);    
+ 179   1      }
+ 180          
+ 181          /******************************************************************************
+ 182           * @fn      DeviceIntfApp_SM
+ 183           *
+ 184           * @brief   Services all application events in all possible states 
+ 185           *
+ 186           * @param   state - State machine structure containing current
+ 187           *            state and current event to be serviced
+ 188           *
+ 189           * @return  none
+ 190           *
+ 191           * @note    This is not a polling function. It is called asynchronously 
+ 192           *          as and when and event occurs.
+ 193           */
+ 194          
+ 195          void DeviceIntfApp_SM(gv701x_state_t* state) 
+ 196          {
+ 197   1        static u8 idx = 0;
+ 198   1        static u8 jdx = 0;    
+ 199   1      
+ 200   1        if(state == NULL)
+ 201   1          return;
+ 202   1      
+ 203   1      #if 0
+                if(state->event != DEVINTF_IO_NONE)
+                  FM_Printf(FM_APP,"\nDevice State %bu Event %bu P %bu C %bu E %bu Da %bu Sa %bu T %bu", 
+                      state->state, state->event,
+                      state->eventproto, state->eventclass, state->eventtype, 
+                      state->msg_hdr.dst_app_id, state->msg_hdr.src_app_id, state->msg_hdr.type);
+              #endif  
+ 210   1        switch(state->state)
+ 211   1        {
+ 212   2          case DEVINTF_IO_NONE:
+ 213   2            if(state->eventproto == APP_MAC_ID)
+ 214   2            {       
+ 215   3              switch(state->event)
+ 216   3              {
+ 217   4                case DEVINTF_IO_NONE:
+ 218   4                break;
+ 219   4                
+ 220   4                case DEVINTF_IO_INSTRUCTION:                      
+C51 COMPILER V9.53.0.0   DEVICEINTFAPP                                                     11/04/2015 20:09:43 PAGE 5   
+
+ 221   4                  state->state = DEVINTF_IO_INSTRUCTION;
+ 222   4                break;
+ 223   4                case DEVINTF_IO_OFF:
+ 224   4                  {
+ 225   5                    u8 dev_type;
+ 226   5                    
+ 227   5                device_inst_msg_t *device_inst = (device_inst_msg_t*)state->statedata;
+ 228   5                        
+ 229   5                        dev_type = device_inst->dev_type;
+ 230   5                      
+ 231   5                       for(idx = 0; (deviceintf_data.dev_list[idx].type != DEVINTF_NONE); idx++)
+ 232   5                      {
+ 233   6                            //if(deviceintf_data.dev_list[idx].type != DEVINTF_NONE)
+ 234   6                            if(deviceintf_data.dev_list[idx].type == dev_type)
+ 235   6                        {
+ 236   7                                for(jdx = 0; (deviceintf_data.dev_list[idx].io_list[jdx].type != DEVINTF_IO_NONE)
+             -; jdx++) 
+ 237   7                        {   
+ 238   8                    //      if(deviceintf_data.dev_list[idx].io_list[jdx].trigger == TRUE)
+ 239   8                          {
+ 240   9                            deviceintf_data.dev_list[idx].io_list[jdx].trigger = FALSE;
+ 241   9                                        *((u8*)deviceintf_data.dev_list[idx].io_list[jdx].p_val) = 0;
+ 242   9                            //state->state = deviceintf_data.dev_list[idx].io_list[jdx].type;
+ 243   9      #if ((defined SMARTLIGHT_APP) && ((defined LED_RGB_LIGHT) || (defined LED_WNC_LIGHT) \
+ 244   9          || (defined LED_WHITE_LIGHT) || (defined LED_SMART_LIGHT)))   
+ 245   9                                  led_driver_control(deviceintf_data.dev_list[idx].io_list[jdx].type);      
+ 246   9      
+ 247   9      
+ 248   9      #endif                
+ 249   9                          //  break;
+ 250   9                          }
+ 251   8                        }
+ 252   7                                
+ 253   7                          break;
+ 254   7                        }
+ 255   6                            
+ 256   6                      }
+ 257   5                jdx = 0;
+ 258   5                idx = 0;
+ 259   5                state->state = DEVINTF_IO_NONE;
+ 260   5                state->event = DEVINTF_IO_NONE;               
+ 261   5                        break;
+ 262   5      
+ 263   5                  }
+ 264   4                default:  
+ 265   4                break;
+ 266   4              }
+ 267   3            }
+ 268   2          break;
+ 269   2      
+ 270   2          case DEVINTF_IO_INSTRUCTION:
+ 271   2          { 
+ 272   3            if(deviceintf_data.dev_list[idx].type != DEVINTF_NONE)
+ 273   3            {
+ 274   4              for(jdx = 0; (deviceintf_data.dev_list[idx].io_list[jdx].type != DEVINTF_IO_NONE); jdx++) 
+ 275   4              {   
+ 276   5                if(deviceintf_data.dev_list[idx].io_list[jdx].trigger == TRUE)
+ 277   5                {
+ 278   6                  deviceintf_data.dev_list[idx].io_list[jdx].trigger = FALSE;
+ 279   6                  state->state = deviceintf_data.dev_list[idx].io_list[jdx].type;
+ 280   6                  break;
+ 281   6                }
+C51 COMPILER V9.53.0.0   DEVICEINTFAPP                                                     11/04/2015 20:09:43 PAGE 6   
+
+ 282   5              }
+ 283   4              if(deviceintf_data.dev_list[idx].io_list[jdx].type == DEVINTF_IO_NONE)
+ 284   4              {
+ 285   5                jdx = 0;
+ 286   5                idx = 0;
+ 287   5                state->state = DEVINTF_IO_NONE;
+ 288   5                state->event = DEVINTF_IO_NONE;               
+ 289   5              }         
+ 290   4            }
+ 291   3            else
+ 292   3            {
+ 293   4              idx = 0;
+ 294   4              jdx = 0;
+ 295   4              state->state = DEVINTF_IO_NONE;
+ 296   4              state->event = DEVINTF_IO_NONE;     
+ 297   4            }     
+ 298   3          }
+ 299   2          break;
+ 300   2      
+ 301   2          case DEVINTF_IO_1:
+ 302   2          case DEVINTF_IO_2:
+ 303   2          case DEVINTF_IO_3:
+ 304   2          case DEVINTF_IO_4:
+ 305   2          case DEVINTF_IO_5:
+ 306   2          case DEVINTF_IO_6:
+ 307   2          case DEVINTF_IO_7:
+ 308   2          case DEVINTF_IO_8:
+ 309   2          case DEVINTF_IO_9:
+ 310   2          case DEVINTF_IO_10:
+ 311   2          case DEVINTF_IO_11:
+ 312   2          case DEVINTF_IO_12:
+ 313   2          case DEVINTF_IO_13:
+ 314   2          case DEVINTF_IO_14:
+ 315   2          case DEVINTF_IO_15:
+ 316   2          case DEVINTF_IO_16:
+ 317   2          case DEVINTF_IO_17:
+ 318   2          case DEVINTF_IO_18:
+ 319   2          case DEVINTF_IO_19:
+ 320   2          case DEVINTF_IO_20:
+ 321   2          case DEVINTF_IO_21:
+ 322   2          case DEVINTF_IO_22:
+ 323   2          case DEVINTF_IO_23:
+ 324   2          case DEVINTF_IO_24:
+ 325   2          case DEVINTF_IO_25:
+ 326   2          case DEVINTF_IO_26:
+ 327   2          case DEVINTF_IO_27:
+ 328   2          case DEVINTF_IO_28:
+ 329   2          case DEVINTF_IO_29:
+ 330   2          case DEVINTF_IO_30:
+ 331   2          case DEVINTF_IO_31:
+ 332   2          case DEVINTF_IO_32:
+ 333   2          case DEVINTF_IO_33:       
+ 334   2          case DEVINTF_IO_34:       
+ 335   2          case DEVINTF_IO_35:
+ 336   2            
+ 337   2            /* Place Led control Api here */
+ 338   2      #if ((defined SMARTLIGHT_APP) && ((defined LED_RGB_LIGHT) || (defined LED_WNC_LIGHT) \
+ 339   2          || (defined LED_WHITE_LIGHT) || (defined LED_SMART_LIGHT)))
+ 340   2            led_driver_control(state->state);     
+ 341   2      #endif    
+ 342   2            /* Place Sensor control Api here */
+ 343   2      #ifdef SENSOR_DRIVER      
+C51 COMPILER V9.53.0.0   DEVICEINTFAPP                                                     11/04/2015 20:09:43 PAGE 7   
+
+                    sensor_driver_control(state->state);
+              #endif
+ 346   2            /* Place Smartplug control Api here */
+ 347   2      #ifdef SMARTPLUG_DRIVER     
+                    smartplug_driver_control(state->state);
+              #endif      
+ 350   2      #ifdef SMARTGRID_APP      
+                    smartgridApp_io_control(state->state);
+              #endif  
+ 353   2            state->state = DEVINTF_IO_INSTRUCTION;
+ 354   2      
+ 355   2          break;
+ 356   2          
+ 357   2          default:
+ 358   2          break;  
+ 359   2        }
+ 360   1      
+ 361   1        state->event = DEVINTF_IO_NONE;
+ 362   1        state->eventtype = 0;
+ 363   1        state->eventclass = 0;
+ 364   1        state->eventproto = 0;
+ 365   1        state->statedata = NULL;  
+ 366   1        state->statedatalen = 0;  
+ 367   1        memset((u8*)&state->msg_hdr, 0x00, sizeof(gv701x_app_msg_hdr_t)); 
+ 368   1      }
+ 369          
+ 370          /******************************************************************************
+ 371           * @fn      DeviceIntfApp_CmdProcess
+ 372           *
+ 373           * @brief   It handles application command line requests
+ 374           *
+ 375           * @param   CmdBuf - command string
+ 376           *
+ 377           * @return  none
+ 378           *
+ 379           */
+ 380          
+ 381          void DeviceIntfApp_CmdProcess(char* CmdBuf) 
+ 382          {
+ 383   1        if(strcmp(CmdBuf, "state") == 0) 
+ 384   1        {
+ 385   2          printf("\nDevintf S %bu E %bu ", deviceintf_state.state, deviceintf_state.event);
+ 386   2        }
+ 387   1        else if(strcmp(CmdBuf, "stats") == 0) 
+ 388   1        {
+ 389   2          u8 idx, jdx, devtype;   
+ 390   2          char* subcmd = NULL;
+ 391   2                  
+ 392   2          subcmd = strtok(CmdBuf, " ");
+ 393   2          subcmd = strtok(NULL, "\0");
+ 394   2      
+ 395   2          if((subcmd != NULL) ? (sscanf(subcmd, "%bu", &devtype) >= 1) : (FALSE))
+ 396   2          {
+ 397   3            if(devtype == DEVINTF_NONE)
+ 398   3              return;
+ 399   3          }
+ 400   2          
+ 401   2          for(idx = 0; (deviceintf_data.dev_list[idx].type != DEVINTF_NONE); idx++)
+ 402   2          {
+ 403   3            if((subcmd != NULL) ? (deviceintf_data.dev_list[idx].type != devtype) : (FALSE))        
+ 404   3              continue;
+ 405   3            
+C51 COMPILER V9.53.0.0   DEVICEINTFAPP                                                     11/04/2015 20:09:43 PAGE 8   
+
+ 406   3            printf("\ndevtype[%bu] %bu ", idx, deviceintf_data.dev_list[idx].type);
+ 407   3            for (jdx = 0; (deviceintf_data.dev_list[idx].io_list[jdx].type != DEVINTF_IO_NONE); jdx++) 
+ 408   3            {
+ 409   4              printf("\n IO[%bu] %s type %bu len %bu trigger %bu", jdx,
+ 410   4                  deviceintf_data.dev_list[idx].io_list[jdx].name,
+ 411   4                  deviceintf_data.dev_list[idx].io_list[jdx].type,
+ 412   4                  deviceintf_data.dev_list[idx].io_list[jdx].len,
+ 413   4                  deviceintf_data.dev_list[idx].io_list[jdx].trigger);        
+ 414   4              FM_HexDump(FM_USER, "\nval: ", (u8*)deviceintf_data.dev_list[idx].io_list[jdx].p_val, 
+ 415   4                  deviceintf_data.dev_list[idx].io_list[jdx].len);                            
+ 416   4            }
+ 417   3          }   
+ 418   2        }
+ 419   1        else if(strcmp(CmdBuf, "nvclear") == 0) 
+ 420   1        {
+ 421   2          GV701x_FlashErase(deviceintf_data.app_id);
+ 422   2        }   
+ 423   1      } 
+ 424          
+ 425          #endif /*DEVICEINTF_APP*/
+ 426          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2261    ----
+   CONSTANT SIZE    =    145    ----
+   XDATA SIZE       =     66      32
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

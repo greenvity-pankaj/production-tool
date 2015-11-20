@@ -1,0 +1,2542 @@
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE LINKL
+OBJECT MODULE PLACED IN .\obj\linkl.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\hpgp\src\link\linkl.c LARGE OBJECTADVANCED OPTIMIZE
+                    -(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\
+                    -..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src
+                    -\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\
+                    -firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zig
+                    -bee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\
+                    -inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp
+                    -\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_suppor
+                    -t;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drive
+                    -rs\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;
+                    -..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\.
+                    -.\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drive
+                    -rs\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilit
+                    -ies;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers
+                    -\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\
+                    -..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBR
+                    -II_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SY
+                    -NC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_D
+                    -ETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERR
+                    -UPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,R
+                    -EGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\linkl.lst) TABS(2) 
+                    -OBJECT(.\obj\linkl.obj)
+
+line level    source
+
+   1          /** =========================================================
+   2           *
+   3           *  @file linkl.c
+   4           * 
+   5           *  @brief Link Layer
+   6           *
+   7           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           *  =======================================================*/
+  11          #ifdef RTX51_TINY_OS
+  12          #include <rtx51tny.h>
+  13          #endif
+  14          #include <string.h>
+  15          #include <stdio.h>
+  16          #include <stdlib.h>
+  17          #include "papdef.h"
+  18          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  21          #include "list.h"
+  22          #include "event.h"
+  23          #include "nma.h"
+  24          #include "nma_fw.h"
+  25          #include "green.h"
+  26          #include "fm.h"
+  27          #include "ism.h"
+  28          #include "linkl.h"
+  29          #include "hpgpdef.h"
+  30          #include "hpgpapi.h"
+  31          #include "muxl.h"
+  32          #include "hal.h"
+  33          #include "akm.h"
+  34          #include "timer.h"
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 2   
+
+  35          #include "stm.h"
+  36          #include "hybrii_tasks.h"
+  37          #include "hal_common.h"
+  38          #include "green.h"
+  39          #include "crm.h"
+  40          #include "sys_common.h"
+  41          #include "event_fw.h"
+  42          #ifdef NO_HOST
+  43          #include "gv701x_flash.h"
+  44          #endif
+  45          #include "gv701x_flash_fw.h"
+  46          #include "hpgp_msgs.h"
+  47          #ifdef NO_HOST
+  48          #include "gv701x_osal.h"
+  49          #endif
+  50          
+  51          #define MAXSNID                        16
+  52          #ifdef FREQ_DETECT
+  53          extern u32 PLC_DC_LINE_CYCLE_FREQENCY;
+  54          #endif 
+  55          #ifdef SIMU
+              void LINKL_BcnTimerHandler(u16 type, void* cookie);
+              #endif
+  58          extern u8 opMode;
+  59          #ifdef LOG_FLASH
+              extern u16 scbFreeReason;
+              #endif
+  62          extern sHomePlugCb HomePlug;
+  63          
+  64          sysProfile_t gSysProfile;
+  65          
+  66          #ifdef ROUTE
+              extern void ROUTE_initLrtEntry(sScb *scb);
+              #endif
+  69          extern void SCB_GetDiscNetList(hostEventScanList* list,u8 * listCnt);
+  70          extern void Host_SendIndication(u8 eventId, u8 protocol, u8 *payload, u8 length);
+  71          extern void SCB_ClearAgeDiscLists();
+  72          
+  73          #ifdef STA_FUNC
+  74          
+  75          /* -----------
+  76           *  STA Mode
+  77           *  ---------- */
+  78          void ConfigParams()
+  79          {
+  80   1        sLinkLayer *linkLayer =(sLinkLayer*)&HomePlug.hpgpCtrl.linkLayer;
+  81   1        
+  82   1          
+  83   1        sStaInfo *staInfo = &linkLayer->staInfo;
+  84   1      
+  85   1        
+  86   1        
+  87   1        memset(staInfo, 0, sizeof(sStaInfo));
+  88   1      
+  89   1        memcpy(gHpgpHalCB.nid, gSysProfile.nid, NID_LEN);
+  90   1        memcpy(staInfo->nid, gSysProfile.nid, NID_LEN);
+  91   1        memcpy(staInfo->nmk, gSysProfile.nmk, ENC_KEY_LEN);
+  92   1      //  memcpy(staInfo->hfid, gSysProfile.systemName, MAX_SYSTEM_NAME);
+  93   1      
+  94   1        staInfo->staCap.byte = 0;
+  95   1        staInfo->staCap.fields.ccoCap = gSysProfile.cap.fields.ccoCap;
+  96   1        staInfo->staCap.fields.backupCcoCap = gSysProfile.cap.fields.backupCcoCap;
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 3   
+
+  97   1        staInfo->staCap.fields.proxyNetCap = gSysProfile.cap.fields.proxyNetCap;
+  98   1      
+  99   1        staInfo->secLevel = gSysProfile.secLevel;
+ 100   1      
+ 101   1        memcpy(HAL_GetMacAddr(HOMEPLUG_GetHal()),
+ 102   1            gSysProfile.macAddress, MAC_ADDR_LEN);
+ 103   1      
+ 104   1        staInfo->identifyCaps.efl = 0;
+ 105   1        staInfo->identifyCaps.greenPHYCap = gSysProfile.cap.fields.greenPhyCap;
+ 106   1        staInfo->identifyCaps.HPAVVer = gSysProfile.cap.fields.HPAVVersion;
+ 107   1        staInfo->identifyCaps.powerSaveCap = gSysProfile.cap.fields.powerSaveCap;
+ 108   1        staInfo->identifyCaps.routingCap = gSysProfile.cap.fields.repeaterRouting;
+ 109   1        staInfo->bridgeSupported = gSysProfile.cap.fields.bridgeSupported;
+ 110   1      
+ 111   1          staInfo->lastUserAppCCOState = gSysProfile.lastUserAppCCOState;
+ 112   1      
+ 113   1      //  memcpy(staInfo->devicePassword, gSysProfile.devicePassword, MAX_DPW_LEN);
+ 114   1      
+ 115   1        staInfo->ukeEnable = gSysProfile.ukeEnable;
+ 116   1      
+ 117   1        gHpgpHalCB.devMode = gSysProfile.devMode;
+ 118   1      
+ 119   1        gHpgpHalCB.lastdevMode = gSysProfile.lastdevMode;
+ 120   1      
+ 121   1        gHpgpHalCB.lineFreq = gSysProfile.lineFreq;
+ 122   1        gHpgpHalCB.lineMode = gSysProfile.lineMode;
+ 123   1        
+ 124   1      #ifdef FREQ_DETECT
+ 125   1        if (gHpgpHalCB.lineFreq == FREQUENCY_50HZ)
+ 126   1          PLC_DC_LINE_CYCLE_FREQENCY = DC_50HZ;
+ 127   1        else
+ 128   1          PLC_DC_LINE_CYCLE_FREQENCY = DC_60HZ;
+ 129   1      #endif
+ 130   1        
+ 131   1       
+ 132   1       
+ 133   1      }
+ 134          
+ 135          
+ 136          
+ 137          u8 LINKL_DetermineStaTrans(sEvent *event)
+ 138          {
+ 139   1          u8 trans = LINKL_TRANS_UNKNOWN;
+ 140   1          if(event->eventHdr.eventClass == EVENT_CLASS_MSG)
+ 141   1          {
+ 142   2              switch(event->eventHdr.type)
+ 143   2              {
+ 144   3                  case EVENT_TYPE_CM_UNASSOC_STA_IND:
+ 145   3                  case EVENT_TYPE_CC_DISCOVER_LIST_REQ:
+ 146   3      #ifdef UKE      
+                          case EVENT_TYPE_CM_SC_JOIN_REQ:                
+                          case EVENT_TYPE_CM_SC_JOIN_CNF:
+              #endif    
+ 150   3                  
+ 151   3      #ifdef ROUTE
+                          case EVENT_TYPE_CM_ROUTE_INFO_REQ:
+                          case EVENT_TYPE_CM_ROUTE_INFO_CNF:
+                          case EVENT_TYPE_CM_ROUTE_INFO_IND:
+                          case EVENT_TYPE_CM_UNREACHABLE_IND:
+              #endif
+ 157   3                  {
+ 158   4      
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 4   
+
+ 159   4                      trans = LINKL_TRANS_SNSM;
+ 160   4                      break;
+ 161   4                  }
+ 162   3      #ifdef STA_ID
+              
+              
+                          case EVENT_TYPE_CM_STA_IDENTIFY_REQ:
+                          case EVENT_TYPE_CM_STA_IDENTIFY_CNF:
+                          case EVENT_TYPE_CM_STA_IDENTIFY_RSP:
+              #endif        
+ 169   3                  case EVENT_TYPE_CC_ASSOC_CNF:
+ 170   3                  case EVENT_TYPE_CC_LEAVE_CNF:
+ 171   3                  case EVENT_TYPE_CC_LEAVE_IND:
+ 172   3                  case EVENT_TYPE_CC_SET_TEI_MAP_IND:
+ 173   3      #ifdef APPOINT
+                          case EVENT_TYPE_CC_CCO_APPOINT_CNF: 
+              #endif
+ 176   3            case EVENT_TYPE_CC_BACKUP_APPOINT_REQ:
+ 177   3                  {
+ 178   4      
+ 179   4                      trans = LINKL_TRANS_SNAM;
+ 180   4                      break;
+ 181   4                  }
+ 182   3                  case EVENT_TYPE_CM_ENCRY_PAYLOAD_IND:                
+ 183   3                  case EVENT_TYPE_CM_ENCRY_PAYLOAD_RSP:
+ 184   3                  case EVENT_TYPE_CM_GET_KEY_CNF:
+ 185   3      #ifdef UKE      
+                          case EVENT_TYPE_CM_GET_KEY_REQ:
+              #endif      
+ 188   3                  {
+ 189   4                      trans = LINKL_TRANS_AKM;
+ 190   4                      break;
+ 191   4                  }
+ 192   3      #ifdef HOM
+                          case EVENT_TYPE_CC_HANDOVER_REQ:
+                          case EVENT_TYPE_CC_HANDOVER_INFO_IND:
+                          {
+              
+                              trans = LINKL_TRANS_SHOM;
+                              break;
+                          }
+              #endif
+ 201   3      #ifdef POWERSAVE
+                    case EVENT_TYPE_CC_PWR_SAVE_CNF:
+                    case EVENT_TYPE_CC_PWR_SAVE_EXIT_CNF:
+                    case EVENT_TYPE_CC_STOP_PWR_SAVE_REQ:
+                    {
+              
+                              trans = LINKL_TRANS_SPSM;
+                              break;
+                          }
+              #endif      
+ 211   3                  default:
+ 212   3                      trans = LINKL_TRANS_UNKNOWN;
+ 213   3              }
+ 214   2          }
+ 215   1          else  //control
+ 216   1          {
+ 217   2              switch(event->eventHdr.type)
+ 218   2              {
+ 219   3                  case EVENT_TYPE_SNSM_START:
+ 220   3                  case EVENT_TYPE_SNSM_STOP:
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 5   
+
+ 221   3                  case EVENT_TYPE_TIMER_BBT_IND:
+ 222   3                  case EVENT_TYPE_TIMER_USTT_IND:
+ 223   3                  case EVENT_TYPE_TIMER_DISC_AGING_IND:     
+ 224   3                  case EVENT_TYPE_TIMER_BEACON_LOSS_IND:
+ 225   3                  case EVENT_TYPE_CC_BCN_IND:
+ 226   3                  case EVENT_TYPE_SET_SEC_MODE:  
+ 227   3      #ifdef SW_RECOVERY              
+ 228   3            case EVENT_TYPE_TIMER_DISC_STALL_IND:
+ 229   3            case EVENT_TYPE_TIMER_BCN_STALL_IND:
+ 230   3      #endif            
+ 231   3            case EVENT_TYPE_TIMER_JOIN_TIMEOUT:
+ 232   3      
+ 233   3      
+ 234   3      #ifdef ROUTE           
+                          case EVENT_TYPE_ROUTE_UPDATE_TIMEOUT:
+                          case EVENT_TYPE_ROUTE_HD_DURATION_TIMEOUT:
+              #endif
+ 238   3            case EVENT_TYPE_BCN_MISS_IND :
+ 239   3                  {
+ 240   4      
+ 241   4                      trans = LINKL_TRANS_SNSM;
+ 242   4                      break;
+ 243   4                  }
+ 244   3                  case EVENT_TYPE_SNAM_START:
+ 245   3                  case EVENT_TYPE_SNAM_STOP:
+ 246   3                  case EVENT_TYPE_NET_ACC_REQ:
+ 247   3                  case EVENT_TYPE_NET_LEAVE_REQ:
+ 248   3                  case EVENT_TYPE_AUTH_RSP:
+ 249   3                  case EVENT_TYPE_TIMER_TEI_IND:
+ 250   3                  case EVENT_TYPE_TIMER_ACC_IND:
+ 251   3                  case EVENT_TYPE_TIMER_APPT_IND:
+ 252   3                  case EVENT_TYPE_CCO_HO_IND:
+ 253   3                  case EVENT_TYPE_CCO_DISC_IND:
+ 254   3      #ifdef APPOINT
+                          case EVENT_TYPE_CCO_APPOINT_REQ:
+              #endif
+ 257   3      #ifdef STA_ID       
+                          case EVENT_TYPE_IDENTIFY_CAP_TIMEOUT:
+              #endif        
+ 260   3              
+ 261   3                  case EVENT_TYPE_AUTH_CPLT:
+ 262   3      #ifdef KEEP_ALIVE       
+ 263   3                  case EVENT_TYPE_TIMER_KEEP_LIVE_IND:
+ 264   3      #endif      
+ 265   3      
+ 266   3                  {
+ 267   4      
+ 268   4                      trans = LINKL_TRANS_SNAM;
+ 269   4                      break;
+ 270   4                  }
+ 271   3                  case EVENT_TYPE_AKM_START:
+ 272   3                  case EVENT_TYPE_AUTH_REQ:
+ 273   3                  case EVENT_TYPE_TIMER_KEY_IND:
+ 274   3      #ifdef UKE      
+                          case EVENT_TYPE_TIMER_TEK_IND:
+                          case EVENT_TYPE_ASSOC_IND:
+              #endif      
+ 278   3                  {
+ 279   4                      trans = LINKL_TRANS_AKM;
+ 280   4                      break;
+ 281   4                  }
+ 282   3      #ifdef HOM
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 6   
+
+                          case EVENT_TYPE_CCO_HO_REQ:
+                          {
+              
+                              trans = LINKL_TRANS_SHOM;
+                              break;
+                          }
+              #endif
+ 290   3      #ifdef POWERSAVE
+                    case EVENT_TYPE_STA_START_PS:
+                    case EVENT_TYPE_STA_STOP_PS:
+                    case EVENT_TYPE_STA_PS_EXIT_REQ:
+                    case EVENT_TYPE_TIMER_ACK_IND:
+                          {
+              
+                              trans = LINKL_TRANS_SPSM;
+                              break;
+                          }
+              #endif      
+ 301   3                  default:
+ 302   3                      trans = LINKL_TRANS_UNKNOWN;
+ 303   3              break;
+ 304   3              }
+ 305   2          }
+ 306   1          return trans;
+ 307   1      }
+ 308          
+ 309          void LINKL_PreProcStaEvent(sLinkLayer *linkLayer, sEvent *event)
+ 310          {
+ 311   1          //get transaction
+ 312   1          sHpgpHdr *hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+ 313   1          
+ 314   1          if(hpgpHdr->scb == NULL)
+ 315   1          {
+ 316   2              //(1) get STA control block
+ 317   2              if (hpgpHdr->tei != 0xFF)
+ 318   2              {
+ 319   3                  hpgpHdr->scb = CRM_GetScb(&linkLayer->ccoRm, (u8)hpgpHdr->tei);
+ 320   3              }
+ 321   2          }
+ 322   1          
+ 323   1          event->eventHdr.trans = LINKL_DetermineStaTrans(event);
+ 324   1      } 
+ 325          
+ 326          
+ 327          void LINKL_ProcStaEvent(sLinkLayer *linkLayer, sEvent *event)
+ 328          {
+ 329   1          switch(event->eventHdr.trans)
+ 330   1          {
+ 331   2              case LINKL_TRANS_SNSM:
+ 332   2              {
+ 333   3                  SNSM_ProcEvent(&linkLayer->staNsm, event);
+ 334   3                  break;
+ 335   3              }
+ 336   2              case LINKL_TRANS_SNAM:
+ 337   2              {
+ 338   3                  SNAM_ProcEvent(&linkLayer->staNam, event);
+ 339   3                  break;
+ 340   3              }
+ 341   2      #ifdef AKM    
+                      case LINKL_TRANS_AKM:
+                      {
+                          AKM_ProcEvent(&linkLayer->akm, event);
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 7   
+
+                          break;
+                      }
+              #endif    
+ 348   2      #ifdef HOM
+                      case LINKL_TRANS_SHOM:
+                      {
+                          SHOM_ProcEvent(&linkLayer->staHom, event);
+                          break;
+                      }
+              #endif
+ 355   2      #ifdef POWERSAVE
+                      case LINKL_TRANS_SPSM:
+                      {
+                          SPSM_ProcEvent(&linkLayer->staPsm, event);
+                          break;
+                      }
+              #endif
+ 362   2              default:
+ 363   2              {
+ 364   3            break;
+ 365   3              }
+ 366   2          }
+ 367   1      }
+ 368          
+ 369          
+ 370          #endif /* STA_FUNC */
+ 371          
+ 372          
+ 373          #ifdef CCO_FUNC
+ 374          /* -----------
+ 375           *  CCO Mode
+ 376           *  ---------- */
+ 377          
+ 378          eStatus LINKL_BcnUpdateActive()
+ 379          {
+ 380   1          sLinkLayer *linkl = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 381   1      
+ 382   1          return(CNSM_BcnUpdateActive(&linkl->ccoNsm));
+ 383   1      }
+ 384          
+ 385          
+ 386          void LINKL_UpdateBeacon()//sLinkLayer *linkLayer)
+ 387          {
+ 388   1          sLinkLayer *linkl = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 389   1      
+ 390   1      
+ 391   1          if (linkl->ccoNsm.bcnUpdate)
+ 392   1          {
+ 393   2              linkl->ccoNsm.bcnUpdateProgress = 1;
+ 394   2      
+ 395   2              LINKL_BcnTxHandler(linkl);
+ 396   2      
+ 397   2              linkl->ccoNsm.bcnUpdateProgress = 0;
+ 398   2      
+ 399   2          }    
+ 400   1      
+ 401   1      }
+ 402          
+ 403          u8 LINKL_DetermineCcoTrans(sEvent *event)
+ 404          {
+ 405   1          u8 trans = LINKL_TRANS_UNKNOWN;
+ 406   1          if(event->eventHdr.eventClass == EVENT_CLASS_MSG)
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 8   
+
+ 407   1          {
+ 408   2              switch(event->eventHdr.type)
+ 409   2              {
+ 410   3                case EVENT_TYPE_NN_INL_REQ:
+ 411   3            case EVENT_TYPE_NN_INL_CNF:             
+ 412   3                  case EVENT_TYPE_CC_DISCOVER_LIST_CNF:
+ 413   3                  case EVENT_TYPE_CC_DISCOVER_LIST_IND:
+ 414   3      #ifdef UKE      
+                          case EVENT_TYPE_CM_SC_JOIN_REQ:
+              #endif    
+ 417   3                  
+ 418   3      #ifdef ROUTE
+                          case EVENT_TYPE_CM_ROUTE_INFO_REQ:
+                          case EVENT_TYPE_CM_ROUTE_INFO_CNF:
+                          case EVENT_TYPE_CM_ROUTE_INFO_IND:
+                          case EVENT_TYPE_CM_UNREACHABLE_IND:
+              #endif
+ 424   3                  case EVENT_TYPE_CM_UNASSOC_STA_IND:
+ 425   3                  {
+ 426   4      
+ 427   4                      trans = LINKL_TRANS_CNSM;
+ 428   4                      break;
+ 429   4                  }
+ 430   3      #ifdef STA_ID     
+                          case EVENT_TYPE_CM_STA_IDENTIFY_REQ:
+                          case EVENT_TYPE_CM_STA_IDENTIFY_CNF:
+                          case EVENT_TYPE_CM_STA_IDENTIFY_IND:
+              #endif        
+ 435   3              
+ 436   3                  case EVENT_TYPE_CC_ASSOC_REQ:
+ 437   3      #ifdef APPOINT
+                          case EVENT_TYPE_CC_CCO_APPOINT_REQ:
+              #endif
+ 440   3                  case EVENT_TYPE_CC_LEAVE_REQ:
+ 441   3            case EVENT_TYPE_CC_BACKUP_APPOINT_CNF:
+ 442   3      #ifdef KEEP_ALIVE       
+ 443   3            case EVENT_TYPE_VENDOR_KEEP_ALIVE_IND:
+ 444   3      #endif
+ 445   3      
+ 446   3                  {
+ 447   4      
+ 448   4                      trans = LINKL_TRANS_CNAM;
+ 449   4                      break;
+ 450   4                  }
+ 451   3                  case EVENT_TYPE_CM_ENCRY_PAYLOAD_IND:
+ 452   3                  case EVENT_TYPE_CM_ENCRY_PAYLOAD_RSP:
+ 453   3                  case EVENT_TYPE_CM_GET_KEY_REQ:
+ 454   3      #ifdef UKE      
+                          case EVENT_TYPE_CM_GET_KEY_CNF:
+              #endif      
+ 457   3                  {
+ 458   4      
+ 459   4                      trans = LINKL_TRANS_AKM;
+ 460   4                      break;
+ 461   4                  }
+ 462   3      #ifdef HOM
+                          case EVENT_TYPE_CC_HANDOVER_CNF:
+                          case EVENT_TYPE_CC_HANDOVER_INFO_RSP:
+                          {
+              
+                              trans = LINKL_TRANS_CHOM;
+                              break;
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 9   
+
+                          }
+              #endif            
+ 471   3      #ifdef POWERSAVE
+                    case EVENT_TYPE_CC_PWR_SAVE_REQ:
+                    case EVENT_TYPE_CC_PWR_SAVE_EXIT_REQ:
+                    case EVENT_TYPE_CC_STOP_PWR_SAVE_CNF:
+                          {
+              
+                              trans = LINKL_TRANS_CPSM;
+                              break;
+                          }
+              #endif      
+ 481   3                  default:
+ 482   3                      trans = LINKL_TRANS_UNKNOWN;
+ 483   3              }
+ 484   2          }
+ 485   1          else  //control messages
+ 486   1          {
+ 487   2              switch(event->eventHdr.type)
+ 488   2              {
+ 489   3                  case EVENT_TYPE_CNSM_START:
+ 490   3                  case EVENT_TYPE_TIMER_DISC_IND:
+ 491   3                  case EVENT_TYPE_TIMER_DISC_AGING_IND:
+ 492   3                  case EVENT_TYPE_TIMER_BCN_TX_IND:
+ 493   3                  case EVENT_TYPE_CC_BCN_IND:            
+ 494   3                  case EVENT_TYPE_CNSM_STOP_REQ:
+ 495   3                      
+ 496   3      #ifdef ROUTE
+                          case EVENT_TYPE_ROUTE_UPDATE_TIMEOUT:
+                          case EVENT_TYPE_ROUTE_HD_DURATION_TIMEOUT:
+              #endif
+ 500   3      #ifdef MCCO
+ 501   3            case EVENT_TYPE_TIMER_CCO_BBT_IND:        
+ 502   3            case EVENT_TYPE_TIMER_BEACON_LOSS_IND:
+ 503   3      #endif        
+ 504   3      #if 1 //def AC_TO_DC
+ 505   3                  case EVENT_TYPE_TIMER_AC_DC_IND:
+ 506   3      #endif
+ 507   3              
+ 508   3                  {
+ 509   4      
+ 510   4                      trans = LINKL_TRANS_CNSM;
+ 511   4                      break;
+ 512   4                  }
+ 513   3                  case EVENT_TYPE_TIMER_TEI_IND:
+ 514   3                  case EVENT_TYPE_CCO_SELECT_IND:
+ 515   3      #ifdef HOM
+                          case EVENT_TYPE_CCO_HO_RSP:
+              #endif
+ 518   3                  case EVENT_TYPE_AUTH_IND:
+ 519   3            case EVENT_TYPE_STA_AGEOUT:
+ 520   3            case EVENT_TYPE_CNAM_STOP_REQ:
+ 521   3      #ifdef KEEP_ALIVE             
+ 522   3            case EVENT_TYPE_TIMER_KEEP_LIVE_IND:
+ 523   3      #endif        
+ 524   3      //            case EVENT_TYPE_TIMER_TEI_REUSE_IND:
+ 525   3                  {
+ 526   4      
+ 527   4                      trans = LINKL_TRANS_CNAM;
+ 528   4                      break;
+ 529   4                  }
+ 530   3                  case EVENT_TYPE_AKM_START:
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 10  
+
+ 531   3                  case EVENT_TYPE_TIMER_KEY_IND:
+ 532   3                  case EVENT_TYPE_AUTH_REQ:            
+ 533   3      #ifdef UKE      
+                          case EVENT_TYPE_TIMER_TEK_IND:
+                          case EVENT_TYPE_ASSOC_IND:
+              #endif      
+ 537   3                  {
+ 538   4                      trans = LINKL_TRANS_AKM;
+ 539   4                      break;
+ 540   4                  }
+ 541   3      #ifdef HOM
+                          case EVENT_TYPE_CCO_HO_REQ:
+                          case EVENT_TYPE_CCO_HO_IND:
+                          case EVENT_TYPE_TIMER_HO_IND:
+                          {
+              
+                              trans = LINKL_TRANS_CHOM;
+                              break;
+                          }
+              #endif
+ 551   3      #ifdef POWERSAVE
+                    case EVENT_TYPE_CCO_SND_STOP_PS_REQ:
+                          {
+                              trans = LINKL_TRANS_CPSM;
+                              break;
+                          }
+              #endif      
+ 558   3                  default:
+ 559   3                      trans = LINKL_TRANS_UNKNOWN;
+ 560   3              }
+ 561   2          }
+ 562   1      
+ 563   1          return trans;
+ 564   1      }
+ 565          
+ 566          
+ 567          void LINKL_PreProcCcoEvent(sLinkLayer *linkLayer, sEvent *event)
+ 568          {
+ 569   1          sHpgpHdr *hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+ 570   1          if(hpgpHdr->scb == NULL)
+ 571   1          {
+ 572   2              //(1) get STA control block
+ 573   2              if (hpgpHdr->tei != 0xFF)
+ 574   2              {
+ 575   3                  hpgpHdr->scb = CRM_GetScb(&linkLayer->ccoRm, (u8)hpgpHdr->tei);
+ 576   3              }
+ 577   2          }
+ 578   1          //(2) determine transaction
+ 579   1          event->eventHdr.trans = LINKL_DetermineCcoTrans(event);
+ 580   1      } 
+ 581          
+ 582          
+ 583          
+ 584              
+ 585          void LINKL_ProcCcoEvent(sLinkLayer *linkLayer, sEvent *event)
+ 586          {
+ 587   1          switch(event->eventHdr.trans)
+ 588   1          {
+ 589   2              case LINKL_TRANS_CNSM:
+ 590   2              {
+ 591   3                  CNSM_ProcEvent(&linkLayer->ccoNsm, event);
+ 592   3                  break;
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 11  
+
+ 593   3              }
+ 594   2              case LINKL_TRANS_CNAM:
+ 595   2              {
+ 596   3                  CNAM_ProcEvent(&linkLayer->ccoNam, event);
+ 597   3                  break;
+ 598   3              }
+ 599   2      #ifdef AKM
+                      case LINKL_TRANS_AKM:
+                      {
+                          AKM_ProcEvent(&linkLayer->akm, event);
+                          break;
+                      }
+              #endif    
+ 606   2      #ifdef HOM
+                      case LINKL_TRANS_CHOM:
+                      {
+                          CHOM_ProcEvent(&linkLayer->ccoHom, event);
+                          break;
+                      }
+              #endif
+ 613   2      #ifdef POWERSAVE
+                      case LINKL_TRANS_CPSM:
+                      {
+                          CPSM_ProcEvent(&linkLayer->ccoPsm, event);
+                          break;
+                      }
+              #endif
+ 620   2              default:
+ 621   2              {
+ 622   3              }
+ 623   2          }
+ 624   1      
+ 625   1      }
+ 626          
+ 627          #endif /* CCO_FUNC */
+ 628          
+ 629          
+ 630          
+ 631          
+ 632          u8 LINKL_Proc(void *cookie)
+ 633          {
+ 634   1          sEvent *event = NULL;
+ 635   1          sSlink *slink = NULL;
+ 636   1          u8      ret = 0;
+ 637   1          sLinkLayer *linkLayer = (sLinkLayer *) cookie;
+ 638   1          while(!SLIST_IsEmpty(&linkLayer->eventQueue) 
+ 639   1      #ifndef RTX51_TINY_OS
+                   &&!(ret = SCHED_IsPreempted(&linkLayer->task))
+              #endif
+ 642   1          )
+ 643   1          {
+ 644   2      #ifdef P8051
+ 645   2      __CRIT_SECTION_BEGIN__
+ 646   2      #else
+                      SEM_WAIT(&linkLayer->linkSem);
+              #endif
+ 649   2              slink = SLIST_Pop(&linkLayer->eventQueue);
+ 650   2      #ifdef P8051
+ 651   2      __CRIT_SECTION_END__
+ 652   2      #else
+                      SEM_POST(&linkLayer->linkSem);
+              #endif
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 12  
+
+ 655   2      
+ 656   2          if (slink == NULL)
+ 657   2            return ret;
+ 658   2          
+ 659   2              event = SLIST_GetEntry(slink, sEvent, link);
+ 660   2      
+ 661   2      
+ 662   2          ///FM_HexDump(FM_CTRL|FM_MINFO, "LINKL: \n", (u8*)&event->eventHdr.type,2);
+ 663   2          
+ 664   2              if(linkLayer->mode == LINKL_STA_MODE_CCO)
+ 665   2              {
+ 666   3      #ifdef CCO_FUNC
+ 667   3                  //CCO mode
+ 668   3                  LINKL_PreProcCcoEvent(linkLayer, event);
+ 669   3                  LINKL_ProcCcoEvent(linkLayer, event);
+ 670   3      #endif 
+ 671   3              }
+ 672   2              else 
+ 673   2              {
+ 674   3      #ifdef STA_FUNC
+ 675   3                  //default STA mode
+ 676   3                  LINKL_PreProcStaEvent(linkLayer, event);
+ 677   3                  LINKL_ProcStaEvent(linkLayer, event);
+ 678   3      #endif 
+ 679   3              }
+ 680   2          event->eventHdr.status = EVENT_STATUS_COMPLETE;
+ 681   2           
+ 682   2              if(event->eventHdr.status == EVENT_STATUS_COMPLETE)
+ 683   2              {
+ 684   3                  EVENT_Free(event);
+ 685   3              }
+ 686   2      
+ 687   2              while(!SLIST_IsEmpty(&linkLayer->intEventQueue))
+ 688   2              {
+ 689   3                  //no need for sync protection
+ 690   3                  slink = SLIST_Pop(&linkLayer->intEventQueue);
+ 691   3                  event = SLIST_GetEntry(slink, sEvent, link);
+ 692   3      
+ 693   3                  if(linkLayer->mode == LINKL_STA_MODE_CCO)
+ 694   3                  {
+ 695   4      #ifdef CCO_FUNC
+ 696   4                      //CCO mode
+ 697   4                      LINKL_PreProcCcoEvent(linkLayer, event);
+ 698   4                      LINKL_ProcCcoEvent(linkLayer, event);
+ 699   4      #endif
+ 700   4                  }
+ 701   3                  else 
+ 702   3                  {
+ 703   4      #ifdef STA_FUNC
+ 704   4                      //default STA mode
+ 705   4                      LINKL_PreProcStaEvent(linkLayer, event);
+ 706   4                      LINKL_ProcStaEvent(linkLayer, event);
+ 707   4      #endif
+ 708   4                  }
+ 709   3           
+ 710   3                  if(event->eventHdr.status == EVENT_STATUS_COMPLETE)
+ 711   3                  {
+ 712   4                      EVENT_Free(event);
+ 713   4                  }
+ 714   3              }
+ 715   2          }
+ 716   1          return ret;
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 13  
+
+ 717   1      }
+ 718          
+ 719          #ifdef UKE
+              eStatus LINKL_SendMgmtMsg(sStaInfo *staInfo, u16 mmType, u8 *macAddr)
+              {
+                  eStatus          status = STATUS_FAILURE;
+                  sEvent      xdata    *newEvent;
+                  sHpgpHdr        *hpgpHdr = NULL;
+                  sCmJoinReq      *cmJoinReq = NULL;
+                  sCmJoinCnf      *cmJoinCnf = NULL;
+                  u8               i = 0;
+                  u16              eventSize = 0;
+                  
+                  switch(mmType)
+                  {
+                      
+                      case EVENT_TYPE_CM_SC_JOIN_REQ:
+                      {
+              #ifndef RELEASE
+                          FM_Printf(FM_MMSG, ">>>CM_SC_JOIN_REQ\n");
+              #endif
+                          eventSize = MAX(sizeof(sCmJoinReq), HPGP_DATA_PAYLOAD_MIN); 
+                          newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+                          if(newEvent == NULL)
+                          {
+                              FM_Printf(FM_ERROR, "EAF\n");
+                              return STATUS_FAILURE;
+                          }
+                          newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+                          newEvent->eventHdr.type = EVENT_TYPE_CM_SC_JOIN_REQ;
+                     
+                     
+                          
+                          LINKL_FillHpgpHdr((sHpgpHdr *)newEvent->buffDesc.buff,
+                                          0xFF,
+                                          bcAddr,
+                                          staInfo->snid,
+                                          1,
+                                          HPGP_EKS_NONE);
+                          
+              
+                          cmJoinReq = (sCmJoinReq *)newEvent->buffDesc.dataptr; 
+                          cmJoinReq->ccoCapability = staInfo->staCap.fields.ccoCap;
+                          newEvent->buffDesc.datalen += eventSize;
+                          
+                          break;
+                      }
+                      case EVENT_TYPE_CM_SC_JOIN_CNF:
+                      {              
+                          FM_Printf(FM_MMSG, "SNSM:>>>CM_SC_JOIN.CNF\n");
+                          eventSize = MAX(sizeof(sCmJoinCnf), HPGP_DATA_PAYLOAD_MIN); 
+                          newEvent = EVENT_MgmtAlloc(eventSize, EVENT_HPGP_MSG_HEADROOM);
+                          if(newEvent == NULL)
+                          {
+                              FM_Printf(FM_ERROR, "EAF\n");
+                              return STATUS_FAILURE;
+                          }
+                          newEvent->eventHdr.eventClass = EVENT_CLASS_MSG;
+                          newEvent->eventHdr.type = EVENT_TYPE_CM_SC_JOIN_CNF;
+              
+                          
+                          LINKL_FillHpgpHdr((sHpgpHdr *)newEvent->buffDesc.buff,
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 14  
+
+                                          0xFF,
+                                          macAddr,
+                                          staInfo->snid,
+                                          1,
+                                          HPGP_EKS_NONE);
+                                      
+                          cmJoinCnf = (sCmJoinCnf *)newEvent->buffDesc.dataptr; 
+                          memcpy(cmJoinCnf->nid, staInfo->nid, NID_LEN);
+                        
+                          cmJoinCnf->staCap = staInfo->staCap;
+                          newEvent->buffDesc.datalen += eventSize;
+                          
+                          break;
+                      }
+                      default:
+                      {
+                          return status;
+                      }
+                  }
+                  EVENT_Assert(newEvent);
+                  //transmit the mgmt msg
+                  status =  MUXL_TransmitMgmtMsg(newEvent);
+                  //the event will be freed by MUXL if the TX is successful
+                  if(status == STATUS_FAILURE)
+                  {
+                      EVENT_Free(newEvent);
+                  }
+                  
+                  return status;
+              }
+              
+              #endif
+ 811          
+ 812          void LINKL_RecvMgmtMsg(void* cookie,  sEvent *event)
+ 813          {
+ 814   1          sLinkLayer *linkl = (sLinkLayer *)cookie;
+ 815   1      
+ 816   1      #ifdef P8051
+ 817   1      __CRIT_SECTION_BEGIN__
+ 818   1      #else
+                  SEM_WAIT(&linkl->linkSem);
+              #endif
+ 821   1      
+ 822   1          //place the event to the queue
+ 823   1          SLIST_Put(&linkl->eventQueue, &event->link);
+ 824   1      
+ 825   1      #ifdef P8051
+ 826   1      __CRIT_SECTION_END__
+ 827   1      #else
+                  SEM_POST(&linkl->linkSem);
+              #endif
+ 830   1          /* schedule the task */
+ 831   1      #ifndef RTX51_TINY_OS
+                  SCHED_Sched(&linkl->task);
+              #else
+ 834   1        //  os_set_ready(HPGP_TASK_ID_LINK);
+ 835   1      
+ 836   1        os_set_ready(HPGP_TASK_ID_CTRL);
+ 837   1      
+ 838   1      #endif
+ 839   1      }
+ 840          
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 15  
+
+ 841          
+ 842          
+ 843          void LINKL_RegisterEventCallback(sLinkLayer *linkl, 
+ 844              void (*callback)(void XDATA *cookie, sEvent XDATA *event),
+ 845              void *cookie)
+ 846          {
+ 847   1          /*Compiler warning suppression*/
+ 848   1          callback = callback;
+ 849   1      #ifdef CALLBACK
+                  linkl->deliverEvent = callback;
+              #endif
+ 852   1          linkl->eventcookie = cookie;
+ 853   1      }
+ 854          
+ 855          u8 LINKL_GetMode(sLinkLayer *linkLayer)
+ 856          {
+ 857   1          return linkLayer->mode;
+ 858   1      }
+ 859          
+ 860          #if 0
+              sStaInfo* LINKL_GetStaInfo(sLinkLayer *linkLayer)
+              {
+                  return &linkLayer->staInfo;
+              }
+              
+              sCrm* LINKL_GetCrm(sLinkLayer *linkLayer)
+              {
+                  return &linkLayer->ccoRm;
+              }
+              
+              sCnsm* LINKL_GetCnsm(sLinkLayer *linkLayer)
+              {
+                  return &linkLayer->ccoNsm;
+              }
+              
+              sSnsm* LINKL_GetSnsm(sLinkLayer *linkLayer)
+              {
+                  return &linkLayer->staNsm;
+              }
+              
+              sCnam* LINKL_GetCnam(sLinkLayer *linkLayer)
+              {
+                  return &linkLayer->ccoNam;
+              }
+              
+              sSnam* LINKL_GetSnam(sLinkLayer *linkLayer)
+              {
+                  return &linkLayer->staNam;
+              }
+              
+              #endif
+ 892          
+ 893          
+ 894          void LINKL_SetCCoCap(sLinkLayer *linkLayer, u8 ccoCap)
+ 895          {
+ 896   1          linkLayer->staInfo.staCap.fields.ccoCap = ccoCap;
+ 897   1      }
+ 898          
+ 899          
+ 900          
+ 901          
+ 902          
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 16  
+
+ 903          #if 1
+ 904          //STA general configuration
+ 905          void LINKL_InitStaInfo(sLinkLayer *linkLayer)
+ 906          {
+ 907   1         sStaInfo *staInfo = &linkLayer->staInfo;
+ 908   1         
+ 909   1         staInfo->hm = HYBRID_MODE_SHARED_CSMA;//Shared CSMA hybrid mode   
+ 910   1      
+ 911   1         staInfo->nekEks = HPGP_EKS_NONE;
+ 912   1      //   staInfo->ppekEks = HPGP_EKS_NONE;
+ 913   1      
+ 914   1         staInfo->secMode = SEC_MODE_SC;
+ 915   1      
+ 916   1         /* point to the memory in the HAL */
+ 917   1         staInfo->macAddr = HAL_GetMacAddr(HOMEPLUG_GetHal());
+ 918   1      
+ 919   1         staInfo->staScb = NULL;
+ 920   1         staInfo->ccoScb = NULL;
+ 921   1      #if 0
+                staInfo->staCap.byte = 0;
+                   staInfo->staCap.fields.ccoCap = CCO_CAP_LEVEL0;
+                   staInfo->staCap.fields.backupCcoCap = 1;
+                   
+                   staInfo->staStatus.byte = 0;
+                   staInfo->staStatus.fields.greenPhyStatus = 1;   //HPGP 1.0 capable
+              
+                staInfo->identifyCaps.efl = 0;
+                staInfo->identifyCaps.greenPHYCap = 1;
+                staInfo->identifyCaps.HPAVVer = 0;
+                staInfo->identifyCaps.powerSaveCap = 0;
+                staInfo->identifyCaps.routingCap = TRUE;
+              
+                #endif
+ 936   1      }
+ 937          #else
+              void LINKL_InitStaInfo(sLinkLayer *linkLayer)
+              {
+                  sStaInfo *staInfo = &linkLayer->staInfo;
+              
+                  memset(staInfo, 0, sizeof(sStaInfo));
+              
+                  //set a default NID, which should be set by the user later
+                  memcpy(staInfo->nid, gSysProfile.defaultNID, NID_LEN);
+                  memcpy(staInfo->nmk, gSysProfile.defaultNMK, ENC_KEY_LEN);
+                  memcpy(staInfo->hfid, gSysProfile.systemName, MAX_SYSTEM_NAME);
+                  staInfo->hm = HYBRID_MODE_SHARED_CSMA;//Shared CSMA hybrid mode
+               
+                  staInfo->staCap.byte = 0;
+                  staInfo->staCap.fields.ccoCap = gSysProfile.cap.fields.ccoCap;
+                  staInfo->staCap.fields.backupCcoCap = gSysProfile.cap.fields.backupCcoCap;
+                  staInfo->staCap.fields.proxyNetCap = gSysProfile.cap.fields.proxyNetCap;
+                  
+                  staInfo->staStatus.byte = 0;
+               //   staInfo->staStatus.fields.greenPhyStatus = 1;     //HPGP 1.0 capable
+               
+                  staInfo->nekEks = HPGP_EKS_NONE;
+                  staInfo->ppekEks = HPGP_EKS_NONE;
+               
+                  staInfo->secMode = SEC_MODE_SC;
+                  
+                  staInfo->secLevel = gSysProfile.secLevel;
+                  /* point to the memory in the HAL */
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 17  
+
+                  staInfo->macAddr = HAL_GetMacAddr(HOMEPLUG_GetHal());
+               
+                  staInfo->staScb = NULL;
+                  staInfo->ccoScb = NULL;
+               
+              
+                  staInfo->identifyCaps.efl = 0;
+                  staInfo->identifyCaps.greenPHYCap = gSysProfile.cap.fields.greenPhyCap;
+                  staInfo->identifyCaps.HPAVVer = gSysProfile.cap.fields.HPAVVersion;
+                  staInfo->identifyCaps.powerSaveCap = gSysProfile.cap.fields.powerSaveCap;
+                  staInfo->identifyCaps.routingCap = gSysProfile.cap.fields.repeaterRouting;
+                  staInfo->bridgeSupported = gSysProfile.cap.fields.bridgeSupported;
+              }
+              #endif
+ 979          void LINKL_CommitStaProfile(sLinkLayer *linkLayer)
+ 980          {
+ 981   1          sStaInfo *staInfo = &linkLayer->staInfo;
+ 982   1      
+ 983   1        
+ 984   1          memcpy(gSysProfile.nid, staInfo->nid, NID_LEN);
+ 985   1          memcpy(gSysProfile.nmk, staInfo->nmk, ENC_KEY_LEN);
+ 986   1          memcpy(gSysProfile.systemName, staInfo->hfid, MAX_SYSTEM_NAME);
+ 987   1       
+ 988   1          gSysProfile.cap.fields.ccoCap = staInfo->staCap.fields.ccoCap;
+ 989   1          gSysProfile.cap.fields.backupCcoCap = staInfo->staCap.fields.backupCcoCap;
+ 990   1          gSysProfile.cap.fields.proxyNetCap = staInfo->staCap.fields.proxyNetCap;
+ 991   1              
+ 992   1          gSysProfile.secLevel = staInfo->secLevel;
+ 993   1          memcpy(gSysProfile.macAddress, linkLayer->hal->macAddr, MAC_ADDR_LEN);
+ 994   1         
+ 995   1          gSysProfile.cap.fields.greenPhyCap = staInfo->identifyCaps.greenPHYCap;
+ 996   1          gSysProfile.cap.fields.HPAVVersion = staInfo->identifyCaps.HPAVVer;
+ 997   1          gSysProfile.cap.fields.powerSaveCap = staInfo->identifyCaps.powerSaveCap;
+ 998   1          gSysProfile.cap.fields.repeaterRouting = staInfo->identifyCaps.routingCap;
+ 999   1          gSysProfile.cap.fields.bridgeSupported = staInfo->bridgeSupported;
+1000   1          gSysProfile.lastUserAppCCOState = staInfo->lastUserAppCCOState;
+1001   1          
+1002   1        gSysProfile.devMode =  gHpgpHalCB.devMode;
+1003   1        gSysProfile.lastdevMode = gHpgpHalCB.devMode;
+1004   1      
+1005   1          gSysProfile.lineFreq = gHpgpHalCB.lineFreq;
+1006   1        gSysProfile.lineMode =  gHpgpHalCB.lineMode;
+1007   1      
+1008   1        gSysProfile.ukeEnable = staInfo->ukeEnable;
+1009   1        
+1010   1      
+1011   1          /******************************************************/
+1012   1      #ifdef B_ASICPLC
+1013   1        flashWrite_config((u8 *)&gSysProfile, 
+1014   1                  FLASH_SYS_CONFIG_OFFSET, sizeof(gSysProfile));
+1015   1      #endif
+1016   1          /*********************************************************/
+1017   1      }
+1018          
+1019          eStatus LINKL_SetLineMode(sLinkLayer *linkLayer, eLineMode lineMd)
+1020          {
+1021   1         //sHaLayer *hal = HOMEPLUG_GetHal();// Kiran Optimization
+1022   1         sStaInfo *staInfo = &linkLayer->staInfo;
+1023   1         gHpgpHalCB.lineMode = lineMd;
+1024   1      
+1025   1         HHAL_SetDevMode(DEV_MODE_STA, lineMd);
+1026   1         return STATUS_SUCCESS;
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 18  
+
+1027   1      }
+1028          eStatus LINKL_SetKey(sLinkLayer *linkLayer, u8 *nmk, u8 *nid)
+1029          {
+1030   1          sStaInfo *staInfo = &linkLayer->staInfo;
+1031   1          u8 secLevel;
+1032   1      
+1033   1          memcpy(staInfo->nmk, nmk, ENC_KEY_LEN);
+1034   1          memcpy(staInfo->nid, nid, NID_LEN);
+1035   1          memcpy(gHpgpHalCB.nid, nid, NID_LEN);
+1036   1          staInfo->nid[NID_LEN-1] &= NID_EXTRA_BIT_MASK;
+1037   1      
+1038   1          secLevel =  ( staInfo->nid[NID_LEN-1] & 0x30 );
+1039   1      
+1040   1          if (secLevel == SECLV_SC)
+1041   1          {
+1042   2              LINKL_SetSecurityMode(linkLayer, SEC_MODE_SC );
+1043   2          }
+1044   1          else
+1045   1          {
+1046   2              LINKL_SetSecurityMode(linkLayer, SEC_MODE_HS);
+1047   2          }
+1048   1      #ifndef RELEASE
+1049   1          FM_Printf(FM_LINK, "LINK:NID:%2x %2x %2x %2x %2x %2x %2x\n", 
+1050   1                        nid[0], nid[1], nid[2], nid[3], nid[4], nid[5], nid[6]);
+1051   1          FM_HexDump(FM_LINK, "LINK:NMK", nmk, ENC_KEY_LEN);
+1052   1      #endif
+1053   1          return STATUS_SUCCESS;
+1054   1      }
+1055          
+1056          
+1057          
+1058          eStatus LINKL_GetKey(sLinkLayer *linkLayer, u8 *nmk, u8 *nid)
+1059          {
+1060   1         sStaInfo *staInfo = &linkLayer->staInfo;
+1061   1      
+1062   1         memcpy(nmk, staInfo->nmk, ENC_KEY_LEN);
+1063   1         memcpy(nid, staInfo->nid, NID_LEN);
+1064   1         return STATUS_SUCCESS;
+1065   1      }
+1066          
+1067          
+1068          eStatus LINKL_SetSecurityMode(sLinkLayer *linkLayer, u8 secMode)
+1069          {
+1070   1          sStaInfo *staInfo = &linkLayer->staInfo;
+1071   1          u8 secLevel = staInfo->nid[NID_LEN-1] & 0x30;
+1072   1          
+1073   1          //   sCtrlLayer *ctrll = HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+1074   1      
+1075   1          // if current sec mode  is HS then do not change sec mode
+1076   1          
+1077   1      
+1078   1      #if 0
+                  if(staInfo->secMode == SEC_MODE_HS)
+                  {
+                      return STATUS_FAILURE;
+                  }
+              
+              
+                  if(staInfo->secMode == secMode)
+                  {
+                      return STATUS_SUCCESS;
+                  }
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 19  
+
+              
+                  if (secMode == SEC_MODE_HS)
+                  {
+                      staInfo->nid[NID_LEN-1] &= SECLV_MASK;   
+                      staInfo->nid[NID_LEN-1] |= (SECLV_HS << SECLV_OFFSET); // 2013 : Security level fix by default SC
+              
+                  }
+                  else if (secMode == SEC_MODE_SC || secMode == SEC_MODE_SC_JOIN || secMode == SEC_MODE_SC_ADD)
+                  {
+                      staInfo->nid[NID_LEN-1] &= SECLV_MASK;
+                      staInfo->nid[NID_LEN-1] |= (SECLV_SC << SECLV_OFFSET);
+                  } 
+                  else
+                  {
+                      return STATUS_FAILURE;
+                  }   
+              
+              #else
+1107   1          if (secMode == SEC_MODE_SC || secMode == SEC_MODE_SC_JOIN || secMode == SEC_MODE_SC_ADD)
+1108   1          {
+1109   2              if (secLevel != SECLV_SC)
+1110   2              {
+1111   3      #ifndef RELEASE
+1112   3                  FM_Printf(FM_ERROR, "SC Mismatch\n");
+1113   3      #endif
+1114   3                  return STATUS_FAILURE;
+1115   3              }
+1116   2          }
+1117   1          else
+1118   1          if (secMode == SEC_MODE_HS)
+1119   1          {
+1120   2              if (!(secLevel & SECLV_HS))
+1121   2              {
+1122   3      #ifndef RELEASE
+1123   3                  //FM_Printf(FM_ERROR, "HS Mismatch\n");
+1124   3      #endif
+1125   3                  return STATUS_FAILURE;
+1126   3              }
+1127   2          }
+1128   1      
+1129   1      
+1130   1      
+1131   1      #endif
+1132   1      
+1133   1          staInfo->secMode = secMode;
+1134   1          return STATUS_SUCCESS;
+1135   1      }
+1136          
+1137          
+1138          eStatus LINKL_GetSecurityMode(sLinkLayer *linkLayer, u8 *secMode)
+1139          {
+1140   1         sStaInfo *staInfo = &linkLayer->staInfo;
+1141   1         *secMode = staInfo->secMode;
+1142   1         return STATUS_SUCCESS;
+1143   1      }
+1144          
+1145          #ifdef APPOINT
+              eStatus LINKL_StartAuth(sLinkLayer *linkLayer, u8 *nmk, u8 *dak, u8* macAddr, u8 sl)
+              {
+                 /* set them in the AKM */
+              
+                 return STATUS_SUCCESS;
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 20  
+
+              }
+              
+              
+              eStatus LINKL_ApptCCo(sLinkLayer *linkLayer, u8 *macAddr, u8 reqType)
+              {
+                  sCcoApptReqEvent  *ccoApptReq = NULL;
+                  sEvent           xdata *event = NULL;
+              
+                  event = EVENT_Alloc(sizeof(sCcoApptReqEvent), 0);
+                  if(event == NULL)
+                  {
+                      FM_Printf(FM_ERROR, "EAF\n");
+                      return STATUS_FAILURE;
+                  }
+              
+                  event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                  event->eventHdr.type = EVENT_TYPE_CCO_APPOINT_REQ;
+              
+                  ccoApptReq = (sCcoApptReqEvent *)event->buffDesc.dataptr;
+                  ccoApptReq->reqType = reqType;
+                  memcpy(ccoApptReq->macAddr, macAddr, MAC_ADDR_LEN);
+                  event->buffDesc.datalen = sizeof(sCcoApptReqEvent);
+                  /* place the event into the external queue */
+                  return LINKL_SendEvent(linkLayer, event);
+              }
+              
+              
+              eStatus LINKL_SetPpKeys(sLinkLayer *linkLayer, u8 *ppEks, u8 *ppek, u8* macAddr)
+              {
+              
+                  return STATUS_SUCCESS;
+              }
+              
+              #endif
+1185          
+1186          //CeO general confinuration
+1187          /*
+1188          void LINKL_InitCcoInfo(sLinkLayer *linkLayer)
+1189          {
+1190             sCcoInfo *ccoInfo = &linkLayer->ccoInfo;
+1191             ccoInfo->ccoScb = NULL;
+1192          }
+1193          */
+1194          
+1195          #ifdef STA_FUNC
+1196          /* ---------------
+1197           *  STA Mode
+1198           *  -------------- */
+1199          
+1200          void LINKL_SendBcnLossInd(u8 type)
+1201          {
+1202   1      
+1203   1        sLinkLayer   *linkl  = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1204   1        sEvent xdata *event;
+1205   1      
+1206   1      #ifdef POWERSAVE
+                  sStaInfo      *staInfo = LINKL_GetStaInfo(linkl);
+                sScb *scb;
+              
+                  if (linkl->mode == LINKL_STA_MODE_CCO)
+                {
+                  // this station is CCO
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 21  
+
+                  scb = staInfo->ccoScb;
+                }
+                else
+                {
+                  // this station is STA
+                  scb = staInfo->staScb;
+                }
+                if (scb->psState == PSM_PS_STATE_ON)
+                {
+                  // ?? must find a time limit for this case
+              //    printf("LINKL_SendBcnLossInd: PS mode is ON, pss = 0x%bx\n", scb->pss);
+                  return;
+                }
+              #endif
+1227   1        //send event CCO_SEL_IND to the ctrl    
+1228   1        event = EVENT_Alloc(1, EVENT_HPGP_CTRL_HEADROOM);
+1229   1        
+1230   1        if(event == NULL)
+1231   1        {
+1232   2          FM_Printf(FM_ERROR, "EAF\n");
+1233   2              return;
+1234   2        }
+1235   1        
+1236   1        
+1237   1        event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1238   1        event->eventHdr.type = EVENT_TYPE_BCN_MISS_IND;
+1239   1        
+1240   1        
+1241   1        *event->buffDesc.dataptr = type;
+1242   1      
+1243   1      #ifdef P8051
+1244   1        __CRIT_SECTION_BEGIN__
+1245   1      #else
+                  SEM_WAIT(&linkl->linkSem);
+              #endif
+1248   1        
+1249   1          //place the event to the queue
+1250   1          SLIST_Put(&linkl->intEventQueue, &event->link);
+1251   1        
+1252   1      #ifdef P8051
+1253   1        __CRIT_SECTION_END__
+1254   1      #else
+                  SEM_POST(&linkl->linkSem);
+              #endif
+1257   1          //  os_set_ready(HPGP_TASK_ID_LINK);
+1258   1        
+1259   1          os_set_ready(HPGP_TASK_ID_CTRL);
+1260   1        
+1261   1      }
+1262            
+1263          void LINKL_SetStaMode(sLinkLayer *linkLayer)
+1264          {
+1265   1          linkLayer->mode = LINKL_STA_MODE_STA;
+1266   1          /* call the HAL to set the STA mode in the LMAC */
+1267   1      #ifdef HPGP_HAL
+1268   1          ISM_DisableMacIrq(MAC_INT_IRQ_PLC_BCN_TX);
+1269   1          ISM_EnableMacIrq(MAC_INT_IRQ_PLC_BCN_RX);
+1270   1        // FIXME : This call is iterfering with ongoing bcn sync. as this routine gets called repeatedly.
+1271   1        //         Hence need to comment this out to get Bcn sync to work.
+1272   1          //HHAL_SetDevMode(DEV_MODE_STA, LINE_MODE_DC);
+1273   1      #else
+                  HAL_SetDevMode(linkLayer->hal, DEV_MODE_STA);
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 22  
+
+              #endif
+1276   1      
+1277   1      #ifdef MCCO
+1278   1        HHAL_DisablePassSnid();
+1279   1      #endif
+1280   1          
+1281   1          HAL_RegisterProcBcnCallback(HOMEPLUG_GetHal(),
+1282   1              LINKL_StaProcBcnHandler,
+1283   1              linkLayer);
+1284   1      
+1285   1      }
+1286          
+1287          void LINKL_SetKeyDone(sLinkLayer *linkl)
+1288          {
+1289   1        sAuthInd  authInd;
+1290   1          sStaInfo    *staInfo = LINKL_GetStaInfo(linkl); 
+1291   1        sEvent      xdata  *event = NULL;
+1292   1        u8      *pos; 
+1293   1      
+1294   1        authInd.keyType = KEY_TYPE_NEK;
+1295   1          authInd.secMode  = staInfo->secMode;
+1296   1          authInd.result = STATUS_SUCCESS;
+1297   1      
+1298   1        event = EVENT_Alloc(sizeof(uEventBody), 0);
+1299   1        if(event == NULL)
+1300   1        {
+1301   2          FM_Printf(FM_ERROR, "Linkl:EAF\n");
+1302   2          return;
+1303   2        }
+1304   1        event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1305   1        event->eventHdr.type = EVENT_TYPE_AUTH_IND;
+1306   1      
+1307   1        pos = event->buffDesc.dataptr;
+1308   1        memcpy(pos, &authInd, sizeof(sAuthInd));
+1309   1        event->buffDesc.datalen = sizeof(sAuthInd);
+1310   1      
+1311   1          
+1312   1        /* deliver the event to the upper layer */
+1313   1      #ifdef CALLBACK
+                linkl->deliverEvent(linkl->eventcookie, event);
+              #else
+1316   1        CTRLL_ReceiveEvent(linkl->eventcookie, event);
+1317   1      #endif
+1318   1      
+1319   1      }
+1320          
+1321          void LINKL_SetHpgpNetworkKey(sLinkLayer *linkLayer)
+1322          {
+1323   1        u8 i;
+1324   1        u8      pwd[32];
+1325   1        sStaInfo *staInfo = &linkLayer->staInfo;
+1326   1        u8 salt[16] = {0x08, 0x85, 0x6D, 0xAF, 0x7C, 0xF5, 0x81, 0x85,
+1327   1                0x08, 0x85, 0x6D, 0xAF, 0x7C, 0xF5, 0x81, 0x85};
+1328   1      
+1329   1        /*Compiler warning suppression*/
+1330   1        i = i;
+1331   1        pwd[0] = pwd[0];
+1332   1                
+1333   1        staInfo->nekEks = 0;
+1334   1        staInfo->staStatus.fields.authStatus = 1; 
+1335   1      
+1336   1        memcpy(staInfo->nek, salt, ENC_KEY_LEN);
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 23  
+
+1337   1        
+1338   1      #ifdef HPGP_HAL
+1339   1              /* set the NEK to the LMAC for the CCo */
+1340   1          HHAL_AddNEK(staInfo->nekEks, staInfo->nek);
+1341   1      #endif
+1342   1      
+1343   1      }
+1344          
+1345          void LINKL_StartSta(sLinkLayer *linkLayer, u8 staType)
+1346          {
+1347   1          u8        snsmStaType = staType;
+1348   1          sStaInfo *staInfo = &linkLayer->staInfo;
+1349   1          if(linkLayer->mode != LINKL_STA_MODE_STA)
+1350   1              return;
+1351   1      
+1352   1          if (staType == LINKL_STA_TYPE_NETDISC)
+1353   1          {
+1354   2              if (staInfo->secMode == SEC_MODE_SC_JOIN)
+1355   2                  snsmStaType = LINKL_STA_TYPE_SC_JOIN;
+1356   2              else if (staInfo->secMode == SEC_MODE_SC_ADD)
+1357   2                  snsmStaType = LINKL_STA_TYPE_SC_ADD;
+1358   2          }
+1359   1      #ifdef HPGP_HAL
+1360   1        else
+1361   1        {
+1362   2            //HHAL_SetSnid(staInfo->snid);
+1363   2        }
+1364   1      #endif
+1365   1      
+1366   1      #ifdef AKM
+                  AKM_Start(&linkLayer->akm, LINKL_STA_MODE_STA, 0);
+              #else
+1369   1        
+1370   1      #endif
+1371   1          showStaType(LINKL_STA_MODE_STA, staType);
+1372   1          SNSM_Start(&linkLayer->staNsm, snsmStaType);
+1373   1          SNAM_Start(&linkLayer->staNam, staType);
+1374   1      #ifdef POWERSAVE
+                  SPSM_Start(&linkLayer->staPsm);
+              #endif
+1377   1      
+1378   1      
+1379   1      
+1380   1      }
+1381          
+1382          
+1383          void LINKL_StopSta(sLinkLayer *linkLayer)
+1384          {
+1385   1          sStaInfo *staInfo = &linkLayer->staInfo;
+1386   1          sCrm          *crm = LINKL_GetCrm(linkLayer);
+1387   1          if(staInfo->ccoScb != NULL)
+1388   1          {
+1389   2      #ifdef LOG_FLASH
+                      scbFreeReason = MCTRL_TRIG;
+              #endif
+1392   2              CRM_FreeScb(&linkLayer->ccoRm, staInfo->ccoScb);
+1393   2          }
+1394   1          staInfo->ccoScb = NULL;
+1395   1          
+1396   1          if(linkLayer->mode == LINKL_STA_MODE_STA)
+1397   1          {
+1398   2              SNSM_Stop(&linkLayer->staNsm);
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 24  
+
+1399   2              SNAM_Stop(&linkLayer->staNam);
+1400   2      #ifdef POWERSAVE
+                      SPSM_Stop(&linkLayer->staPsm);
+              #endif
+1403   2          }
+1404   1        
+1405   1        staInfo->tei = 0;
+1406   1      
+1407   1      
+1408   1        HAL_SetTei(HOMEPLUG_GetHal(), 0);
+1409   1      
+1410   1      
+1411   1        //CRM_FreeScb(crm, staInfo->staScb);
+1412   1        //Remove the TEI MAP
+1413   1        CRM_Init(crm);
+1414   1        staInfo->staScb = NULL;
+1415   1        staInfo->ccoScb = NULL;
+1416   1      
+1417   1        gHpgpHalCB.gFreqCB.freqDetected = 0;
+1418   1      
+1419   1        gHpgpHalCB.halStats.BcnSyncCnt = 0;
+1420   1          
+1421   1      
+1422   1      }
+1423          
+1424          #ifdef HOM
+              u8 LINKL_DetermineStaRole(sLinkLayer *linkLayer)
+              {
+                  if(linkLayer->mode != LINKL_STA_MODE_STA)
+                      return STA_ROLE_UNKNOWN;
+              
+                  return SNSM_DetermineStaRole(&linkLayer->staNsm);
+              }
+              
+              
+              void LINKL_CcoHandover(sLinkLayer *linkl)
+              {
+                  sEvent *event = NULL;
+                  //Generate a event
+                  event = EVENT_Alloc(EVENT_DEFAULT_SIZE, 0);
+                  if(event == NULL)
+                  {
+                      FM_Printf(FM_ERROR, "EAF\n");
+                      return;
+                  }
+                  event->eventHdr.type = EVENT_TYPE_CCO_HO_REQ;
+              #ifdef P8051
+              __CRIT_SECTION_BEGIN__
+              #else
+                  SEM_WAIT(&linkl->linkSem);
+              #endif
+              
+                  //post the event to the event queue
+                  SLIST_Put(&linkl->eventQueue, &event->link);
+              
+              #ifdef P8051
+              __CRIT_SECTION_END__
+              #else
+                  SEM_POST(&linkl->linkSem);
+              #endif
+              }
+              #endif
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 25  
+
+1461          #endif /* STA_FUNC */
+1462          
+1463          
+1464          #ifdef CCO_FUNC
+1465          /* ---------------
+1466           *  CCO Mode
+1467           *  -------------- */
+1468          //#define HPGP_INIT_CCO_TEI  0x1
+1469          
+1470          
+1471          void LINKL_ClearBcnInit()
+1472          {
+1473   1          HHAL_ClearBcnInit();
+1474   1      }
+1475          
+1476          void LINKL_SetBcnInit()
+1477          {
+1478   1          HHAL_SetBcnInit();
+1479   1      }
+1480          
+1481          void LINKL_SetCcoMode(sLinkLayer *linkLayer)
+1482          {
+1483   1        u8 i,j;
+1484   1          sStaInfo *staInfo = &linkLayer->staInfo;
+1485   1      
+1486   1        /*Compiler warning suppression*/
+1487   1        i = i;
+1488   1        j = j;
+1489   1        
+1490   1          linkLayer->mode = LINKL_STA_MODE_CCO;
+1491   1          
+1492   1          if(staInfo->ccoScb == NULL)
+1493   1          {
+1494   2              staInfo->ccoScb = CRM_AllocScb(&linkLayer->ccoRm);
+1495   2              if(staInfo->ccoScb == NULL)
+1496   2              {
+1497   3                  FM_Printf(FM_ERROR, "Can't alloc SCB for CCo\n");
+1498   3                  return;
+1499   3              }
+1500   2              staInfo->staScb = staInfo->ccoScb;
+1501   2      #ifdef ROUTE
+                      ROUTE_initLrtEntry(staInfo->ccoScb);
+                      staInfo->ccoScb->lrtEntry.nTei = staInfo->ccoScb->tei;
+                      staInfo->ccoScb->lrtEntry.rnh = 0;
+              #endif
+1506   2      
+1507   2              // reset discoverd sta count
+1508   2              staInfo->numDiscSta = 0;
+1509   2              staInfo->ccoScb->staCap.byte = staInfo->staCap.byte;
+1510   2      #ifdef LINK_PRINT   
+              #ifdef P8051
+              FM_Printf(FM_ERROR, "tei:%bu, staCap %x\n", 
+                       staInfo->ccoScb->tei, staInfo->ccoScb->staCap.byte);
+              #else
+              FM_Printf(FM_ERROR, "tei:%d, staCap %x\n", 
+                       staInfo->ccoScb->tei, staInfo->ccoScb->staCap.byte);
+              #endif
+              #endif
+1519   2              
+1520   2              memcpy(staInfo->ccoScb->macAddr, staInfo->macAddr, MAC_ADDR_LEN);
+1521   2      
+1522   2          staInfo->tei = staInfo->ccoScb->tei;
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 26  
+
+1523   2          
+1524   2              HAL_SetTei(linkLayer->hal, staInfo->ccoScb->tei);
+1525   2              /* generate a snid */
+1526   2      #if 0   
+                      srand(STM_GetTick());
+                  staInfo->snid = rand()&0xF;
+              #else
+1530   2      
+1531   2      #ifndef MCCO
+                       for(j=1; j<MAXSNID; j++)
+                      {
+                    for(i=0; i< AVLN_LIST_MAX; i++)
+                          {
+                        if((staInfo->discNetInfo[i].valid) &&
+                        (staInfo->discNetInfo[i].snid == j))
+                              {
+                                  break;
+                              }
+                          }
+                    if(i == AVLN_LIST_MAX)
+                          {                
+                              staInfo->snid = j;                
+                              break;
+                    }
+                          }
+                      }
+              #endif
+1550   2      
+1551   2      #endif
+1552   2      
+1553   2          }
+1554   1        staInfo->ccoScb->staStatus.byte = staInfo->staStatus.byte;
+1555   1      
+1556   1        staInfo->ccoScb->staCap.fields.ccoStatus = 1;
+1557   1        staInfo->ccoScb->staCap.fields.backupCcoCap = 1;
+1558   1        staInfo->ccoScb->staCap.fields.backupCcoStatus = 0;
+1559   1        staInfo->ccoScb->staCap.fields.pcoStatus = 0;
+1560   1      #ifdef POWERSAVE
+                  PSM_resetScbPs(staInfo->ccoScb);  // set SCB's PS data to init state 
+              #endif
+1563   1      
+1564   1      #if 0
+              
+              #ifdef HPGP_HAL
+                      /* set the snid */
+                      HHAL_SetSnid(staInfo->snid);
+              #ifdef MCCO   
+                  /* set CCo Mode to the LMAC */
+                  //HHAL_SetDevMode(linkLayer->hal, DEV_MODE_CCO, LINE_MODE_DC);
+              
+                if (gHpgpHalCB.devMode == DEV_MODE_PCCO)
+                {
+                  HHAL_SetDevMode(DEV_MODE_PCCO, gHpgpHalCB.lineMode);
+                }
+                else      
+                {
+                  HHAL_SetDevMode(DEV_MODE_CCO, gHpgpHalCB.lineMode);
+                }
+              
+              #else
+                      
+                HHAL_SetDevMode(DEV_MODE_CCO, gHpgpHalCB.lineMode);
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 27  
+
+              
+              #endif //Endif of MCO
+              
+              #else
+                      HAL_SetDevMode(linkLayer->hal, DEV_MODE_CCO);
+              #endif
+              
+              #endif
+1593   1      
+1594   1          HAL_RegisterXmitBcnCallback(HOMEPLUG_GetHal(),
+1595   1              LINKL_BcnTxHandler,
+1596   1              linkLayer);
+1597   1          HAL_RegisterProcBcnCallback(HOMEPLUG_GetHal(),
+1598   1              LINKL_CcoProcBcnHandler,
+1599   1              linkLayer);
+1600   1      }
+1601          
+1602          
+1603          void LINKL_StartCco(sLinkLayer *linkLayer, u8 ccoType)
+1604          {
+1605   1          sStaInfo *staInfo = &linkLayer->staInfo;
+1606   1      
+1607   1          if(linkLayer->mode == LINKL_STA_MODE_CCO)
+1608   1          {        
+1609   2              showStaType(LINKL_STA_MODE_CCO, ccoType);
+1610   2              CNSM_Start(&linkLayer->ccoNsm, ccoType);
+1611   2              CNAM_Start(&linkLayer->ccoNam, ccoType);
+1612   2      #ifdef POWERSAVE
+                      CPSM_Start(&linkLayer->ccoPsm);
+              #endif
+1615   2      #ifdef LLP_POWERSAVE
+                  if (ccoType == LINKL_CCO_TYPE_UNASSOC)
+                  {
+                    PSM_resetScbPs(staInfo->ccoScb);  // set SCB's PS data to init state 
+                    PSM_copy_PS_from_HalCB(staInfo->ccoScb);  // copy saved PS data from HALCB
+                    PSM_cvrtPss_Awd(staInfo->ccoScb->pss, &staInfo->ccoScb->commAwd);
+                  }
+              #endif 
+1623   2      #ifdef AKM
+                  if (ccoType == LINKL_CCO_TYPE_HO)
+                      {
+                          AKM_Start(&linkLayer->akm, LINKL_STA_MODE_CCO, AKM_KEEP_NEK);
+                      }
+                      else //if(ccoType == LINKL_CCO_TYPE_HO)
+                      {
+                       //   AKM_Start(&linkLayer->akm, LINKL_STA_MODE_CCO, AKM_KEEP_NEK);
+                      }
+              #endif    
+1633   2      
+1634   2          }
+1635   1      }
+1636          
+1637          void LINKL_PostStopCCo(sLinkLayer *linkLayer)
+1638          {
+1639   1      
+1640   1        sStaInfo *staInfo = &linkLayer->staInfo;
+1641   1        HAL_SetTei(HOMEPLUG_GetHal(), 0);
+1642   1      
+1643   1        staInfo->tei = 0;
+1644   1      
+1645   1        LINKL_ClearBcnInit();
+1646   1        
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 28  
+
+1647   1          CNSM_PostStop(LINKL_GetCnsm(linkLayer));
+1648   1      
+1649   1      #ifdef MCCO
+1650   1        HHAL_DisablePassSnid();
+1651   1      #endif
+1652   1      
+1653   1        HHAL_SetDevMode(DEV_MODE_STA,gHpgpHalCB.lineMode);
+1654   1          
+1655   1        if(staInfo->ccoScb != NULL)
+1656   1        {
+1657   2      #ifdef LOG_FLASH
+                      scbFreeReason = MCTRL_TRIG;
+              #endif
+1660   2          CRM_FreeScb(&linkLayer->ccoRm, staInfo->ccoScb);
+1661   2      
+1662   2          staInfo->ccoScb = NULL;
+1663   2        }
+1664   1      
+1665   1      
+1666   1        LINKL_SetStaMode(linkLayer);
+1667   1      
+1668   1      
+1669   1      }
+1670          
+1671          
+1672          eStatus LINKL_StopCco(sLinkLayer *linkLayer)
+1673          {
+1674   1      
+1675   1          sStaInfo *staInfo = &linkLayer->staInfo;
+1676   1      
+1677   1          CNSM_Stop(LINKL_GetCnsm(linkLayer));
+1678   1      
+1679   1          CNAM_Stop(LINKL_GetCnam(linkLayer));
+1680   1        
+1681   1      #ifdef POWERSAVE
+              //        CPSM_Stop(LINKL_GetCnsm(linkLayer));
+              #endif
+1684   1      #ifdef ROUTE
+                  ROUTE_stopUpdateTimer();
+              #endif
+1687   1          
+1688   1          return STATUS_SUCCESS;
+1689   1      }
+1690          
+1691          /*
+1692          void LINKL_EnableAssocNotification(sLinkLayer *linkLayer)
+1693          {
+1694              if(linkLayer->mode != LINKL_STA_MODE_CCO)
+1695                  return;
+1696              CNAM_EnableAssocNotification(&linkLayer->ccoNam);
+1697          }
+1698          */
+1699          
+1700          
+1701          u8 LINKL_QueryAnySta(sLinkLayer *linkLayer)
+1702          {
+1703   1          u8 cnt = 0;
+1704   1          if(linkLayer->mode != LINKL_STA_MODE_CCO)
+1705   1              return FALSE;
+1706   1          cnt = CRM_GetScbNum(&linkLayer->ccoRm);
+1707   1          if(cnt <= 0) // Invalid condition crm should have one scb for CCO.
+1708   1          {
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 29  
+
+1709   2              return FALSE;
+1710   2          }
+1711   1          if((CRM_GetScbNum(&linkLayer->ccoRm) - 1))        
+1712   1          {
+1713   2              return TRUE;
+1714   2          }
+1715   1          else
+1716   1          {
+1717   2              return FALSE;
+1718   2          }
+1719   1      }
+1720          
+1721          
+1722          #endif /* CCO_FUNC */
+1723          
+1724          u8 LINKL_QueryAnyAlvn(sLinkLayer *linkLayer)
+1725          {
+1726   1          if(linkLayer->mode != LINKL_STA_MODE_CCO)
+1727   1              return 0;
+1728   1      
+1729   1      #ifdef CCO_FUNC
+1730   1          return CNSM_QueryAnyAlvn(&linkLayer->ccoNsm);
+1731   1      #endif
+1732   1      
+1733   1      }
+1734          
+1735          eStatus LINKL_SendEvent(sLinkLayer *linkl, sEvent *event) __REENTRANT__
+1736          {
+1737   1          if(event == NULL)
+1738   1          {
+1739   2              return STATUS_FAILURE;
+1740   2          }
+1741   1      
+1742   1      #ifdef P8051
+1743   1      __CRIT_SECTION_BEGIN__
+1744   1      #else
+                  SEM_WAIT(&linkl->linkSem);
+              #endif
+1747   1      
+1748   1          SLIST_Put(&linkl->eventQueue, &event->link);
+1749   1      
+1750   1      #ifdef P8051
+1751   1      __CRIT_SECTION_END__
+1752   1      #else
+                  SEM_POST(&linkl->linkSem);
+              #endif
+1755   1          /* schedule the task */
+1756   1      #ifndef RTX51_TINY_OS
+                  return SCHED_Sched(&linkl->task);
+              #else
+1759   1         // os_set_ready(HPGP_TASK_ID_LINK);
+1760   1      
+1761   1        os_set_ready(HPGP_TASK_ID_CTRL);
+1762   1      
+1763   1        return STATUS_SUCCESS;
+1764   1      #endif
+1765   1          
+1766   1      }
+1767          
+1768          eStatus LINKL_Init(sLinkLayer *linkLayer)
+1769          {
+1770   1          eStatus    status = STATUS_SUCCESS;
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 30  
+
+1771   1          sStaInfo *staInfo = &linkLayer->staInfo;
+1772   1      
+1773   1          
+1774   1          LINKL_InitStaInfo(linkLayer);
+1775   1      //    LINKL_InitCcoInfo(linkLayer);
+1776   1      
+1777   1          linkLayer->muxl = (sMuxLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_MUX);
+1778   1          linkLayer->hal = HOMEPLUG_GetHal();
+1779   1          linkLayer->mode = LINKL_STA_MODE_STA;
+1780   1      #ifdef STA_FUNC
+1781   1          //STA mode
+1782   1          SNSM_Init(&linkLayer->staNsm, linkLayer);
+1783   1          SNAM_Init(&linkLayer->staNam, linkLayer);
+1784   1      #ifdef HOM
+                  SHOM_Init(&linkLayer->staHom, linkLayer);
+              #endif
+1787   1      #endif
+1788   1      #ifdef POWERSAVE
+                  SPSM_Init(&linkLayer->staPsm, linkLayer);
+              #ifdef LINK_PRINT 
+                  FM_Printf(FM_MINFO, "Link Layer:after SPSM_Init\n");
+              #endif
+              #endif
+1794   1      
+1795   1      #ifdef CCO_FUNC
+1796   1          //CCO mode
+1797   1          CNSM_Init(&linkLayer->ccoNsm, linkLayer);
+1798   1          CNAM_Init(&linkLayer->ccoNam, linkLayer);
+1799   1      #ifdef HOM
+                  CHOM_Init(&linkLayer->ccoHom, linkLayer);
+              #endif
+1802   1      #endif
+1803   1      
+1804   1      #ifdef AKM
+                  AKM_Init(&linkLayer->akm);
+              #endif
+1807   1          CRM_Init(&linkLayer->ccoRm);
+1808   1      #ifdef POWERSAVE
+                  CPSM_Init(&linkLayer->ccoPsm, linkLayer);
+              #ifdef LINK_PRINT 
+                  FM_Printf(FM_MINFO, "Link Layer:after CPSM_Init\n");
+              #endif
+              #endif
+1814   1      
+1815   1      #ifndef P8051
+              #if defined(WIN32) || defined(_WIN32)
+                  linkLayer->linkSem = CreateSemaphore(
+                      NULL,           // default security attributes
+                      SEM_COUNT,      // initial count
+                      SEM_COUNT,      // maximum count
+                      NULL);          // unnamed semaphore
+                  if(linkLayer->linkSem == NULL)
+              #else
+                  if(sem_init(&linkLayer->linkSem, 0, SEM_COUNT))
+              #endif
+                  {
+                      status = STATUS_FAILURE;
+                  }
+              #endif
+1830   1      
+1831   1          SLIST_Init(&linkLayer->eventQueue);
+1832   1          SLIST_Init(&linkLayer->intEventQueue);
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 31  
+
+1833   1      #ifdef RTX51_TINY_OS
+1834   1        //  os_create_task(HPGP_TASK_ID_LINK);
+1835   1      #else
+                  SCHED_InitTask(&linkLayer->task, HPGP_TASK_ID_LINK, "LINK", 
+                                 HPGP_TASK_PRI_LINK, LINKL_Proc, linkLayer);
+              #endif
+1839   1          MUXL_RegisterMgmtMsgCallback(linkLayer->muxl, 
+1840   1                                       LINKL_RecvMgmtMsg, 
+1841   1                                       (void*) linkLayer);
+1842   1      #ifdef HPGP_HAL
+1843   1          if(opMode == LOWER_MAC)
+1844   1          {
+1845   2              HHAL_SetDevMode(DEV_MODE_CCO, LINE_MODE_DC);
+1846   2          }
+1847   1          else
+1848   1          {
+1849   2              HHAL_SetDevMode(DEV_MODE_STA, gHpgpHalCB.lineMode);
+1850   2          }
+1851   1      #else
+                  HAL_SetDevMode(linkLayer->hal, DEV_MODE_STA);
+              #endif
+1854   1      #ifdef STA_FUNC
+1855   1          HAL_RegisterProcBcnCallback(HOMEPLUG_GetHal(),
+1856   1              LINKL_StaProcBcnHandler,
+1857   1              linkLayer);
+1858   1      #endif
+1859   1      
+1860   1        linkLayer->scanTimer = STM_AllocTimer(HP_LAYER_TYPE_LINK, 
+1861   1                      EVENT_TYPE_TIMER_SCAN_TIMEOUT_IND,
+1862   1                      linkLayer);
+1863   1      
+1864   1          if(linkLayer->scanTimer == STM_TIMER_INVALID_ID)
+1865   1          {
+1866   2            FM_Printf(FM_MINFO, "Link:Scan timer fail\n");    
+1867   2          }
+1868   1      
+1869   1          //FM_Printf(FM_MINFO, "Link:Init\n");
+1870   1          return status;
+1871   1      }
+1872          
+1873          
+1874          void LINKL_TimerHandler(u16 type, void *cookie)
+1875          {
+1876   1          u8          headroom = 0;
+1877   1          sEvent     *event = NULL;
+1878   1          sHpgpHdr   *hpgpHdr = NULL;
+1879   1          sLinkLayer *linkl = (sLinkLayer *)cookie;
+1880   1      
+1881   1      #ifdef SIMU
+                  if (type == EVENT_TYPE_TIMER_BCN_TX_IND)
+                  {
+                      LINKL_BcnTimerHandler(type, cookie);
+                      return;
+                  }
+              #endif
+1888   1      
+1889   1        if(type == EVENT_TYPE_TIMER_SCAN_TIMEOUT_IND)
+1890   1        { 
+1891   2          u8 i;
+1892   2          u8 idx;
+1893   2          u8 nwCnt;
+1894   2              
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 32  
+
+1895   2          hostEvent_ScanInd_t scanList; 
+1896   2          sLinkLayer* linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1897   2          sStaInfo *staInfo = &linkl->staInfo;
+1898   2        
+1899   2          /*Compiler warning suppression*/
+1900   2          i = i;
+1901   2          
+1902   2          //SCB_GetDiscNetList(&scanList.networkList, &scanList.noOfEntries);   
+1903   2          idx=0;
+1904   2          nwCnt=0;
+1905   2          
+1906   2          for(idx=0;idx<DISC_NET_LIST_MAX;idx++)
+1907   2          {
+1908   3            if(staInfo->discNetInfo[idx].valid)
+1909   3              {
+1910   4                scanList.networkList[nwCnt].valid = 
+1911   4                      staInfo->discNetInfo[idx].valid;
+1912   4                
+1913   4                scanList.networkList[nwCnt].bcnRxCnt = 
+1914   4                      staInfo->discNetInfo[idx].bcnRxCnt;
+1915   4                scanList.networkList[nwCnt].rssi = 
+1916   4                      staInfo->discNetInfo[idx].rssi;
+1917   4                scanList.networkList[nwCnt].lqi = 
+1918   4                      staInfo->discNetInfo[idx].lqi;
+1919   4                memcpy((u8*)&scanList.networkList[nwCnt].nid,
+1920   4                    (u8*)&staInfo->discNetInfo[idx].nid,
+1921   4                    NID_LEN);
+1922   4                scanList.networkList[nwCnt].snid = 
+1923   4                      staInfo->discNetInfo[idx].snid;
+1924   4      
+1925   4                
+1926   4                scanList.networkList[nwCnt].numOfSta = 
+1927   4                      staInfo->discNetInfo[idx].numOfSta;
+1928   4      
+1929   4                memcpy((u8*)&scanList.networkList[nwCnt].vendor_ota,
+1930   4                    (u8*)&staInfo->discNetInfo[idx].vendor_ota,
+1931   4                    sizeof(staInfo->discNetInfo[idx].vendor_ota));
+1932   4      
+1933   4                nwCnt++;
+1934   4      
+1935   4              }
+1936   3      
+1937   3          }
+1938   2          ///memcpy((u8*)scanList.networkList, (u8*)staInfo->discNetInfo, 
+1939   2          //  DISC_NET_LIST_MAX*sizeof(sDiscNetInfo));
+1940   2          
+1941   2          scanList.noOfEntries = nwCnt;
+1942   2          
+1943   2          //FM_HexDump(FM_ERROR,"\nNetlist:",&scanList.networkList,DISC_NET_LIST_MAX*sizeof(sDiscNetInfo));   
+1944   2          //printf("noOfEntries %bu\n", scanList.noOfEntries);
+1945   2          Host_SendIndication(HOST_EVENT_SCAN_COMPLETE_IND, HPGP_MAC_ID, (u8*)&scanList,
+1946   2                      sizeof(hostEvent_ScanInd_t));   
+1947   2        }
+1948   1        
+1949   1          if ( (type == EVENT_TYPE_TIMER_TEI_IND ) ||
+1950   1             (type == EVENT_TYPE_TIMER_KEY_IND)  || 
+1951   1           (type == EVENT_TYPE_TIMER_TEK_IND)
+1952   1      #ifdef CCO_FUNC
+1953   1               || (type == EVENT_TYPE_TIMER_HO_IND) 
+1954   1      #endif
+1955   1             )
+1956   1          {
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 33  
+
+1957   2              headroom = EVENT_HPGP_CTRL_HEADROOM;
+1958   2          } 
+1959   1      
+1960   1          event = EVENT_Alloc(0, headroom);
+1961   1          if(event == NULL)
+1962   1          {
+1963   2              FM_Printf(FM_ERROR, "EAF\n");
+1964   2              return;
+1965   2          }
+1966   1      
+1967   1          event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1968   1          event->eventHdr.type = type;
+1969   1         
+1970   1          if ( (type == EVENT_TYPE_TIMER_TEI_IND ) 
+1971   1      #ifdef CCO_FUNC
+1972   1               || (type == EVENT_TYPE_TIMER_HO_IND) 
+1973   1      #endif
+1974   1             )
+1975   1          {
+1976   2              hpgpHdr = (sHpgpHdr *)event->buffDesc.buff;
+1977   2              hpgpHdr->scb = (sScb *)cookie;
+1978   2              linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1979   2          }
+1980   1      
+1981   1          /* post the event to the external event queue */
+1982   1          LINKL_SendEvent(linkl, event);
+1983   1      }
+1984          
+1985          extern void SCB_AgeDiscLists(sScb *scb);
+1986          
+1987          void LINKL_StartScan(tTime scanTime)
+1988          {
+1989   1        u8 i;
+1990   1          sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1991   1        sStaInfo *staInfo = &linkl->staInfo;
+1992   1        sScb* scb = linkl->staNsm.staInfo->staScb;
+1993   1        
+1994   1        /*Compiler warning suppression*/
+1995   1        i = i;
+1996   1      
+1997   1      #if 0
+              
+                  for(i = 0; i < DISC_NET_LIST_MAX; i++)
+                  {
+                      if(staInfo->discStaInfo[i].valid == TRUE)
+                      {
+                          memset(&staInfo->discNetInfo[i], 0, sizeof(sDiscStaInfo));
+                      }
+                  }
+              #endif      
+2007   1        SCB_ClearAgeDiscLists();
+2008   1        STM_StopTimer(linkl->scanTimer);
+2009   1        STM_StartTimer(linkl->scanTimer, scanTime);   
+2010   1      }
+2011          
+2012          #if 1
+2013          
+2014          #ifdef RTX51_TINY_OS
+2015          void LINK_Task (void)// _task_ HPGP_TASK_ID_LINK  
+2016          {
+2017   1          sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+2018   1      #ifdef UM
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 34  
+
+2019   1        sNma* nma = (sNma*)HOMEPLUG_GetNma();
+2020   1      #endif
+2021   1          while (1) {
+2022   2      #ifdef UART_HOST_INTF
+2023   2          os_switch_task();
+2024   2      #else 
+                      //os_wait1(K_SIG);
+                  os_switch_task();
+              
+              #endif    
+2029   2              LINKL_Proc(linkl);
+2030   2      #ifdef UM
+2031   2          NMA_Proc(nma);
+2032   2      #endif
+2033   2          }
+2034   1      }
+2035          #endif
+2036          
+2037          #endif
+2038          
+2039          /** =========================================================
+2040           *
+2041           * Edit History
+2042           *
+2043           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/link/linkl.c,v $
+2044           *
+2045           * $Log: linkl.c,v $
+2046           * Revision 1.36  2015/01/02 14:55:36  kiran
+2047           * 1) Timer Leak fixed while freeing SCB fixed
+2048           * 2) Software broadcast supported for LG
+2049           * 3) UART Loopback supported for LG
+2050           * 4) Keep Alive feature to ageout defunctional STA
+2051           * 5) Improved flash API's for NO Host Solution
+2052           * 6) Imporved PLC Hang recovery mechanism
+2053           * 7) Reduced nested call tree of common path functions
+2054           * 8) Code optimization and cleanup (unused arguments, unused local variables)
+2055           * 9) Work around for UART hardware interrupt issues (unintended interrupts and no interrupts)
+2056           * 10) Use of memory specific pointers instead of generic pointers
+2057           *
+2058           * Revision 1.35  2014/12/09 07:09:08  ranjan
+2059           * - multicco feature under MCCO flag
+2060           *
+2061           * Revision 1.34  2014/11/11 14:52:58  ranjan
+2062           * 1.New Folder Architecture espically in /components
+2063           * 2.Modular arrangment of functionality in new files
+2064           *    anticipating the need for exposing them as FW App
+2065           *    development modules
+2066           * 3.Other improvisation in code and .h files
+2067           *
+2068           * Revision 1.33  2014/10/28 16:27:43  kiran
+2069           * 1) Software recovery using Watchdog Timer
+2070           * 2) Hardware recovery monitor and policies
+2071           * 3) Timer Polling in Control Task and Frame task for better accuracy
+2072           * 4) Common memory optimized by reducing prints
+2073           * 5) Discovered netlist corruption fixed
+2074           * 6) VCO fix in HHAL_AFEInit()
+2075           * 7) Idata optimized by removing floating point operation
+2076           * 8) Fixed EVENT_TYPE_CC_BCN_IND false indication during association @ CCO
+2077           * 9) Beacon processing protected from interrupts
+2078           * 10) Corrupted Beacons are dropped
+2079           * 11) Some unused arguments removed to improve code size
+2080           *
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 35  
+
+2081           * Revision 1.32  2014/09/30 21:47:18  tri
+2082           * Added LLP PS
+2083           *
+2084           * Revision 1.31  2014/09/05 09:28:18  ranjan
+2085           * 1. uppermac cco-sta switching feature fix
+2086           * 2. general stability fixes for many station associtions
+2087           * 3. changed mgmt memory pool for many STA support
+2088           *
+2089           * Revision 1.30  2014/08/25 07:37:34  kiran
+2090           * 1) RSSI & LQI support
+2091           * 2) Fixed Sync related issues
+2092           * 3) Fixed timer 0 timing drift for SDK
+2093           * 4) MMSG & Error Logging in Flash
+2094           *
+2095           * Revision 1.29  2014/08/12 08:45:43  kiran
+2096           * 1) Event fixes
+2097           * 2) API to change UART line control parameters
+2098           *
+2099           * Revision 1.28  2014/07/22 10:03:52  kiran
+2100           * 1) SDK Supports Power Save
+2101           * 2) Uart_Driver.c cleanup
+2102           * 3) SDK app memory pool optimization
+2103           * 4) Prints from STM.c are commented
+2104           * 5) Print messages are trimmed as common no memory left in common
+2105           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+2106           *
+2107           * Revision 1.27  2014/07/16 10:47:40  kiran
+2108           * 1) Updated SDK
+2109           * 2) Fixed Diag test in SDK
+2110           * 3) Ethernet and SPI interfaces removed from SDK as common memory is less
+2111           * 4) GPIO access API's added in SDK
+2112           * 5) GV701x chip reset command supported
+2113           * 6) Start network and Join network supported in SDK (Forced CCo and STA)
+2114           * 7) Some bug fixed in SDK (CP free, p app command issue etc.)
+2115           *
+2116           * Revision 1.26  2014/07/05 09:16:27  prashant
+2117           * 100 Devices support- only association tested, memory adjustments
+2118           *
+2119           * Revision 1.25  2014/07/01 09:49:57  kiran
+2120           * memory (xdata) improvement
+2121           *
+2122           * Revision 1.24  2014/06/26 17:59:42  ranjan
+2123           * -fixes to make uppermac more robust for n/w change
+2124           *
+2125           * Revision 1.23  2014/06/24 16:26:45  ranjan
+2126           * -zigbee frame_handledata fix.
+2127           * -added reason code for uppermac host events
+2128           * -small cleanups
+2129           *
+2130           * Revision 1.22  2014/06/23 06:56:44  prashant
+2131           * Ssn reset fix upon device reset, Duplicate SNID fix
+2132           *
+2133           * Revision 1.21  2014/06/19 17:13:19  ranjan
+2134           * -uppermac fixes for lvnet and reset command for cco and sta mode
+2135           * -backup cco working
+2136           *
+2137           * Revision 1.20  2014/06/19 07:16:02  prashant
+2138           * Region fix, frequency setting fix
+2139           *
+2140           * Revision 1.19  2014/06/12 13:15:43  ranjan
+2141           * -separated bcn,mgmt,um event pools
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 36  
+
+2142           * -fixed datapath issue due to previous checkin
+2143           * -work in progress. neighbour cco detection
+2144           *
+2145           * Revision 1.18  2014/06/11 13:17:47  kiran
+2146           * UART as host interface and peripheral interface supported.
+2147           *
+2148           * Revision 1.17  2014/06/05 08:38:41  ranjan
+2149           * -flash function enabled for uppermac
+2150           * - commit command after any change would flash systemprofiles
+2151           * - verfied upper mac
+2152           *
+2153           * Revision 1.16  2014/05/28 10:58:59  prashant
+2154           * SDK folder structure changes, Uart changes, removed htm (UI) task
+2155           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+2156           *
+2157           * Revision 1.15  2014/05/21 23:03:08  tri
+2158           * more PS
+2159           *
+2160           * Revision 1.14  2014/05/16 08:52:30  kiran
+2161           * - System Profile Flashing API's Added. Upper MAC functionality tested
+2162           *
+2163           * Revision 1.13  2014/05/12 08:09:57  prashant
+2164           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+2165           *
+2166           * Revision 1.12  2014/04/30 22:28:43  tri
+2167           * more PS
+2168           *
+2169           * Revision 1.11  2014/04/09 21:09:04  tri
+2170           * more PS
+2171           *
+2172           * Revision 1.10  2014/03/27 23:52:23  tri
+2173           * more PS
+2174           *
+2175           * Revision 1.9  2014/03/20 23:20:04  tri
+2176           * more PS
+2177           *
+2178           * Revision 1.8  2014/03/12 09:41:22  ranjan
+2179           * 1. added ageout event to cco cnam,backupcco ageout handling
+2180           * 2.  fix linking issue in zb_lx51_asic due to backup cco checkin
+2181           *
+2182           * Revision 1.7  2014/03/10 05:58:10  ranjan
+2183           * 1. added HomePlug BackupCCo feature. verified C&I test.(passed.) (bug 176)
+2184           *
+2185           * Revision 1.6  2014/03/08 18:15:26  tri
+2186           * added more PS code
+2187           *
+2188           * Revision 1.5  2014/02/27 10:42:47  prashant
+2189           * Routing code added
+2190           *
+2191           * Revision 1.4  2014/02/19 10:22:41  ranjan
+2192           * - common sync for hal_tst and upper mac project
+2193           * - ism.c is MAC interrupt handler for hhal_tst and upper mac.
+2194           *    chal_ext1isr function   is removed
+2195           * - verified : lower mac sync, upper mac sync data traffic.
+2196           *
+2197           * Revision 1.3  2014/01/28 17:46:40  tri
+2198           * Added Power Save code
+2199           *
+2200           * Revision 1.2  2014/01/10 17:17:53  yiming
+2201           * check in Rajan 1/8/2014 code release
+2202           *
+2203           * Revision 1.5  2014/01/08 10:53:54  ranjan
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 37  
+
+2204           * Changes for LM OS support.
+2205           * New Datapath FrameTask
+2206           * LM and UM  datapath, feature verified.
+2207           *
+2208           * known issues : performance numbers needs revisit
+2209           *
+2210           * review : pending.
+2211           *
+2212           * Revision 1.4  2013/09/04 14:51:01  yiming
+2213           * New changes for Hybrii_A code merge
+2214           *
+2215           * Revision 1.34  2013/07/12 08:56:36  ranjan
+2216           * -UKE Push Button Security Feature.
+2217           * Verified : DirectEntry Security Works.Datapath Works.
+2218           *                 command SetSecMode for UKE works.
+2219           * Added against bug-160
+2220           *
+2221           * Revision 1.33  2013/05/21 18:47:41  kripa
+2222           * *** empty log message ***
+2223           *
+2224           * Revision 1.32  2013/05/16 08:38:41  prashant
+2225           * "p starttest" command merged in upper mac
+2226           * Dignostic mode added in upper mac
+2227           *
+2228           * Revision 1.31  2013/03/26 12:07:26  ranjan
+2229           * -added  host sw reset command
+2230           * - fixed issue in bcn update
+2231           *
+2232           * Revision 1.30  2013/03/22 12:21:49  prashant
+2233           * default FM_MASK and FM_Printf modified for USER INFO
+2234           *
+2235           * Revision 1.29  2013/03/14 11:49:18  ranjan
+2236           * 1.handled cases  for CCo toSTA switch and  viceversa
+2237           * 2.UM uses bcntemplate
+2238           *
+2239           * Revision 1.28  2013/02/05 10:19:57  ranjan
+2240           * Fix compilation issue and unresolved extern
+2241           *
+2242           * Revision 1.27  2012/11/19 07:46:23  ranjan
+2243           * Changes for Network discovery modes
+2244           *
+2245           * Revision 1.26  2012/10/11 06:21:00  ranjan
+2246           * ChangeLog:
+2247           * 1. Added HPGP_MAC_SAP to support linux host data and command path.
+2248           *     define HPGP_MAC_SAP, NMA needs to be added in project.
+2249           *
+2250           * 2. Added 'p ping' command in htm.c . Feature is under AUTO_PING macro.
+2251           *
+2252           * 3. Extended  'p key' command to include PPEK support.
+2253           *
+2254           * verified :
+2255           *   1. Datapath ping works overnite after association,auth
+2256           *   2. HAL TEST project is intact
+2257           *
+2258           * Revision 1.25  2012/07/08 18:42:20  yuanhua
+2259           * (1)fixed some issues when ctrl layer changes its state from the UCC to ACC. (2) added a event CNSM_STAR
+             -T.
+2260           *
+2261           * Revision 1.24  2012/06/30 23:36:26  yuanhua
+2262           * return the success status for LINKL_SendEvent() when RTX51 OS is used.
+2263           *
+2264           * Revision 1.23  2012/06/29 03:01:58  kripa
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 38  
+
+2265           * Adding setLineMode routine.
+2266           * Committed on the Free edition of March Hare Software CVSNT Client.
+2267           * Upgrade to CVS Suite for more features and support:
+2268           * http://march-hare.com/cvsnt/
+2269           *
+2270           * Revision 1.22  2012/06/20 17:55:58  kripa
+2271           *  CVS: Enter Log.  Lines beginning with `CVS:' are removed automatically
+2272           * Adding SetBcntInit() routine.
+2273           * Commenting out SetDevMode() call from LINKL_SetStaMode(), to get Bcn sync to work.
+2274           * (Repeated calling of this routine was interfering with bcn sync)
+2275           * Committed on the Free edition of March Hare Software CVSNT Client.
+2276           * Upgrade to CVS Suite for more features and support:
+2277           * http://march-hare.com/cvsnt/
+2278           *
+2279           * Revision 1.21  2012/06/15 04:35:21  yuanhua
+2280           * add a STA type of passive unassoc STA. With this STA type, the device acts as a STA during the network 
+             -discovery. It performs the network scan for beacons from the CCO, but does not transmit the UNASSOC_STA.IND and does not
+             - involve in the CCO selection process. Thus, it joins the existing network.
+2281           *
+2282           * Revision 1.20  2012/06/13 06:24:31  yuanhua
+2283           * add code for tx bcn interrupt handler integration and data structures for region entry schedule. But th
+             -ey are not in execution yet.
+2284           *
+2285           * Revision 1.19  2012/06/08 05:50:57  yuanhua
+2286           * added snid function.
+2287           *
+2288           * Revision 1.18  2012/06/05 22:37:12  son
+2289           * UART console does not get initialized due to task ID changed
+2290           *
+2291           * Revision 1.17  2012/06/05 07:25:59  yuanhua
+2292           * (1) add a scan call to the MAC during the network discovery. (2) add a tiny task in ISM for interrupt p
+             -olling (3) modify the frame receiving integration. (4) modify the tiny task in STM.
+2293           *
+2294           * Revision 1.16  2012/06/04 23:34:02  son
+2295           * Added RTX51 OS support
+2296           *
+2297           * Revision 1.15  2012/05/24 05:08:18  yuanhua
+2298           * define sendEvent functions in CTRL/LINK layer as reentrant.
+2299           *
+2300           * Revision 1.14  2012/05/21 04:20:59  yuanhua
+2301           * enable/disable MAC interrupts when STA/CCO starts.
+2302           *
+2303           * Revision 1.13  2012/05/19 20:32:17  yuanhua
+2304           * added non-callback option for the protocol stack.
+2305           *
+2306           * Revision 1.12  2012/05/19 05:05:15  yuanhua
+2307           * optimized the timer handlers in CTRL and LINK layers.
+2308           *
+2309           * Revision 1.11  2012/05/17 05:05:58  yuanhua
+2310           * (1) added the option for timer w/o callback (2) added task id and name.
+2311           *
+2312           * Revision 1.10  2012/05/14 05:22:29  yuanhua
+2313           * support the SCHED without using callback functions.
+2314           *
+2315           * Revision 1.9  2012/05/01 04:51:09  yuanhua
+2316           * added compiler flags STA_FUNC and CCO_FUNC in link and ctrl layers.
+2317           *
+2318           * Revision 1.8  2012/04/30 04:05:57  yuanhua
+2319           * (1) integrated the HAL mgmt Tx. (2) various updates
+2320           *
+2321           * Revision 1.7  2012/04/17 23:09:50  yuanhua
+2322           * fixed compiler errors for the hpgp hal test due to the integration changes.
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 39  
+
+2323           *
+2324           * Revision 1.6  2012/04/15 20:35:09  yuanhua
+2325           * integrated beacon RX changes in HAL and added HTM for on board test.
+2326           *
+2327           * Revision 1.5  2012/04/13 06:15:11  yuanhua
+2328           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+2329           *
+2330           * Revision 1.4  2012/03/11 17:02:24  yuanhua
+2331           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+2332           *
+2333           * Revision 1.3  2011/09/18 01:32:08  yuanhua
+2334           * designed the AKM for both STA and CCo.
+2335           *
+2336           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+2337           * migrate the firmware code from the greenchip to the hybrii.
+2338           *
+2339           * Revision 1.13  2011/08/12 23:13:21  yuanhua
+2340           * (1)Added Control Layer (2) Fixed bugs for user-selected CCo handover (3) Made changes to SNAM/CNAM and 
+             -SNSM/CNSM for CCo handover switch (from CCo to STA, from STA to CCo, and from STA to STA but with different CCo) and pos
+             -t CCo handover
+2341           *
+2342           * Revision 1.12  2011/08/09 22:45:44  yuanhua
+2343           * changed to event structure, seperating HPGP-related events from the general event defination so that th
+             -e general event could be used for other purposes than the HPGP.
+2344           *
+2345           * Revision 1.11  2011/08/08 22:05:41  yuanhua
+2346           * user-selected CCo handover fix
+2347           *
+2348           * Revision 1.10  2011/08/05 17:06:29  yuanhua
+2349           * (1) added an internal queue in Link Layer for communication btw modules within Link Layer (2) Fixed bug
+             -s in CCo Handover. Now, CCo handover could be triggered by auto CCo selection, CCo handover messages work fine (3) Made 
+             -some modifications in SHAL.
+2350           *
+2351           * Revision 1.9  2011/08/02 16:06:00  yuanhua
+2352           * (1) Fixed a bug in STM (2) Made STA discovery work according to the standard, including aging timer. (3
+             -) release the resource after the STA leave (4) STA will switch to the backup CCo if the CCo failure occurs (5) At this p
+             -oint, the CCo could work with multiple STAs correctly, including CCo association/leave, TEI renew, TEI map updating, dis
+             -covery beacon scheduling, discovery STA list updating ang aging, CCo failure, etc.
+2353           *
+2354           * Revision 1.8  2011/07/30 02:43:35  yuanhua
+2355           * (1) Split the beacon process into two parts: one requiring an immdiate response, the other tolerating t
+             -he delay (2) Changed the API btw the MUX and SHAL for packet reception (3) Fixed bugs in various modules. Now, multiple 
+             -STAs could successfully associate/leave the CCo
+2356           *
+2357           * Revision 1.7  2011/07/22 18:51:04  yuanhua
+2358           * (1) added the hardware timer tick simulation (hts.h/hts.c) (2) Added semaphors for sync in simulation a
+             -nd defined macro for critical section (3) Fixed some bugs in list.h and CRM (4) Modified and fixed bugs in SHAL (5) Chan
+             -ged SNSM/CNSM and SNAM/CNAM for bug fix (6) Added debugging prints, and more.
+2359           *
+2360           * Revision 1.6  2011/07/16 17:11:23  yuanhua
+2361           * (1)Implemented SHOM and CHOM modules, including handover procedure, SCB resource updating for HO (2) Up
+             -date SNAM and CNAM modules to support uer-appointed CCo handover (3) Made the SCB resources to support the TEI MAP for t
+             -he STA mode and management of associated STA resources (e.g. TEI) (4) Modified SNSM and CNSM to perform all types of han
+             -dover switch (CCo handover to the new STA, STA taking over the CCo, STA switching to the new CCo)
+2362           *
+2363           * Revision 1.5  2011/07/08 22:23:48  yuanhua
+2364           * (1) Implemented CNSM, including its state machine, beacon transmission and process, discover beacon sch
+             -eduling, auto CCo selection, discover list, handover countdown, etc. (2) Updated SNSM, including discover list processin
+             -g, triggering a switch to the new CCo, etc. (3) Updated CNAM and SNAM, adding the connection state in the SNAM, switch t
+             -o the new CCo, etc. (4) Other updates
+2365           *
+C51 COMPILER V9.53.0.0   LINKL                                                             11/04/2015 20:09:46 PAGE 40  
+
+2366           * Revision 1.4  2011/07/02 22:09:01  yuanhua
+2367           * Implemented both SNAM and CNAM modules, including network join and leave procedures, systemm resource (
+             -such as TEI) allocation and release, TEI renew/release timers, and TEI reuse timer, etc.
+2368           *
+2369           * Revision 1.3  2011/06/24 14:33:18  yuanhua
+2370           * (1) Changed event structure (2) Implemented SNSM, including the state machines in network discovery and
+             - connection states, becaon process, discover process, and handover detection (3) Integrated the HPGP and SHAL
+2371           *
+2372           * Revision 1.2  2011/05/28 06:31:19  kripa
+2373           * Combining corresponding STA and CCo modules.
+2374           *
+2375           * Revision 1.1  2011/05/06 19:10:12  kripa
+2376           * Adding link layer files to new source tree.
+2377           *
+2378           * Revision 1.3  2011/04/24 17:53:28  kripa
+2379           * *** empty log message ***
+2380           *
+2381           * Revision 1.2  2011/04/23 17:38:57  kripa
+2382           * u8 LINKL_DetermineCcoTrans(sLinkLayer *linkLayer, sEvent *event); changed event->class to event->eventC
+             -lass
+2383           *
+2384           * Revision 1.1  2011/04/08 21:42:45  yuanhua
+2385           * Framework
+2386           *
+2387           *
+2388           * =========================================================*/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   6660    ----
+   CONSTANT SIZE    =    139    ----
+   XDATA SIZE       =    182     482
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

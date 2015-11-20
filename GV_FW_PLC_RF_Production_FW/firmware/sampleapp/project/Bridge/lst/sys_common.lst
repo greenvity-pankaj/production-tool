@@ -1,0 +1,254 @@
+C51 COMPILER V9.53.0.0   SYS_COMMON                                                        11/04/2015 20:09:43 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE SYS_COMMON
+OBJECT MODULE PLACED IN .\obj\sys_common.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\common\sys_common.c LARGE OBJECTADVANCED OPTIMIZE(9
+                    -,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..
+                    -\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\h
+                    -al;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\fi
+                    -rmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbe
+                    -e;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\in
+                    -c;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\i
+                    -nc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;
+                    -..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers
+                    -\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..
+                    -\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\
+                    -components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers
+                    -\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilitie
+                    -s;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\n
+                    -wk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..
+                    -\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII
+                    -_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC
+                    -,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DET
+                    -ECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUP
+                    -T,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REG
+                    -ISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\sys_common.lst) TABS(
+                    -2) OBJECT(.\obj\sys_common.obj)
+
+line level    source
+
+   1          
+   2          /** =======================================================
+   3           * @file sys_common.c
+   4           * 
+   5           *  @brief system common file
+   6           *
+   7           *  Copyright (C) 2013-2014, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ========================================================*/
+  11          
+  12          
+  13          #include <stdlib.h>
+  14          #include <string.h> 
+  15          #include <stdio.h>
+  16          #include "fm.h"
+  17          #include "ism.h"
+  18          #include "hal_reg.h"
+  19          #include "hal_common.h"
+  20          #include "sys_common.h"
+  21          
+  22          #define VAL(str) #str
+  23          #define TOSTRING(str) VAL(str)
+  24          #ifdef LOG_FLASH
+              u8 log[600];
+              u16 *logLen = &log[2];
+              u16 *blockId = &log[0];
+              u32 logIndx = 4;
+              
+              
+              u32 STM_GetTick();
+              #endif
+  33          #ifdef Flash_Config
+              void System_Config(u8);
+C51 COMPILER V9.53.0.0   SYS_COMMON                                                        11/04/2015 20:09:43 PAGE 2   
+
+              #endif
+  36          #ifdef VERSION
+              u8 gVersion[20] = TOSTRING (VERSION);
+              #else
+  39          #if defined(HYBRII_HPGP) && defined(HYBRII_802154) && defined(POWER_SAVE)
+              u8 gVersion[20] = "ZP-V2.20.9.9\0";
+              #elif defined(HYBRII_HPGP) && defined(HYBRII_802154)
+  42          u8 gVersion[20] = "ZP-V2.20.11.7.11\0";
+  43          #elif defined(HPGP_HAL_TEST) && defined(POWER_SAVE) 
+              u8 gVersion[20] = "P-V1.10.2.3\0";
+              #elif defined(HPGP_HAL_TEST) && defined(MPER)
+              u8 gVersion[20] = "P-V2.9.1.7\0";
+              #elif defined(UM)
+              u8 gVersion[20] = "P-V2.20.8\0";
+              #else
+              u8 gVersion[20] = "P-V1.10.1.5\0";
+              #endif
+  52          #endif
+  53          
+  54          u8 *get_Version()
+  55          {
+  56   1        return gVersion;
+  57   1      }
+  58          #ifdef LOG_FLASH
+              
+              void getTime(sTime *t)
+              {
+              
+                  u32 tick, time;
+                  tick = STM_GetTick();
+                  time = tick/50;
+                  t->hr = time/3600;
+                  t->min = (time%3600)/60;
+                  t->sec = (time%60); 
+                  t->msec = (tick % 100);
+              
+              }
+              
+              void tickToTime(sTime *t, u32 tick)
+              {
+              
+                  u32 time;
+                  time = tick/50;
+                  t->hr = time/3600;
+                  t->min = (time%3600)/60;
+                  t->sec = (time%60); 
+                  t->msec = (tick % 100);
+              
+              }
+              #endif
+  85          
+  86          #ifdef Flash_Config
+              //***************************************************************
+              //System_Config ();
+              //Load/Set configuration data into the data ram @ 0xE000 or Set configuration data to register
+              //Input:
+              //         SCommand = 0: Load configuration data to configuration data structure
+              //                         = 1: configuration data to register
+              //                         = others: reserved. Do nothing 
+              //***************************************************************
+              void System_Config(u8 SCommand)
+              {
+C51 COMPILER V9.53.0.0   SYS_COMMON                                                        11/04/2015 20:09:43 PAGE 3   
+
+                
+                if (SCommand == 0)
+                  printf("\n --> Reload configuration data\n");
+                else
+                  printf("\n --> Set configuration data to register");
+                
+                  if (SCommand == 0)
+                  {     
+                    Load_Config_Data(1, (u8 *)&sysConfig);      
+                  }
+                  else
+                  {
+                      unsigned int k=0;
+                    
+                   for (k=0; k< 8; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.SeqNum[k]);
+                   }
+                   printf("\n");
+                   for (k=0; k< 8; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.systemName[k]);
+                   }
+                   printf("\n");
+                   for (k=0; k< 6; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.macAddress[k]);
+                   }
+                   printf("\n");
+                   printf("default NID ");
+                   for (k=0; k< 7; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.defaultNID[k]);
+                   }
+                   printf("\n");
+                   //for (k=0; k< 6; k++)
+                   {
+                       printf("STEI = %bx, DTEI = %bx", (u8) sysConfig.defaultSTEI, (u8) sysConfig.defaultDTEI);
+                   }
+                   printf("\n");
+                   for (k=0; k< 8; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.zigbeeAddr[k]);
+                   }
+                   printf("\n");
+                   //for (k=0; k< 8; k++)
+                   {
+                       printf("SysConfig: default channel = %bx ", (u8) sysConfig.defaultCH);
+                   }
+                   printf("\n");
+                   printf("default LO leak reg 23,24 setting");
+                   {
+                       printf("Reg23 = %bx, Reg24 = %bx ", (u8) sysConfig.defaultLOLeak23, (u8) sysConfig.defaultLOLeak24)
+             -;
+                   }
+                   printf("\n");
+                   printf("Channel VCO calibration value\n");
+                   for (k=0; k< 16; k++)
+                   {
+                       printf("%bx ", (u8) sysConfig.VCOCal[k]);
+                   }
+                   printf("\n");
+C51 COMPILER V9.53.0.0   SYS_COMMON                                                        11/04/2015 20:09:43 PAGE 4   
+
+                  } 
+                
+                return;
+              }
+              #endif
+ 163          #ifdef LOG_FLASH
+              
+              void logEvent(u8 id, u8 subId, u16 evntId, void *buff, u8 len)
+              {
+                  sTime t;
+                  sEventLog *event;
+                  getTime(&t);
+                  event = (sEventLog*)&log[logIndx];
+                  event->id = id;
+                  event->len = len + 8;
+                  event->subId = subId;
+                  event->eventId = evntId;
+                  memcpy((u8*)&event->tm, (u8*)&t, sizeof(sTime));
+                  logIndx += sizeof(sEventLog);
+                  if(len != 0)
+                  {
+                      memcpy((u8*)&log[logIndx], (u8*)buff, len);
+                      logIndx += len;
+                  }
+              
+                  if(logIndx >= 230)
+                  {   
+                      if(*blockId >= 3500)
+                      {
+                    FM_Printf(FM_USER, "Logging stoped: Mem full - Erase Logs\n");
+                          return;//*blockId = 0;
+                      }
+                      // flash logIndx logs
+                      LogToFlash( log, *blockId, *logLen);
+                      (*blockId)++;
+                      
+                      logIndx = 4;
+                  }
+              
+                  *logLen = logIndx;
+              }
+              #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =      7    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     20    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

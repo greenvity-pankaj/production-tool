@@ -1,0 +1,755 @@
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE GV701X_OSAL
+OBJECT MODULE PLACED IN .\obj\gv701x_osal.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\components\osal\src\gv701x_osal.c LARGE OBJECTADVANCED OPTIM
+                    -IZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\
+                    -..\..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\
+                    -src\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\
+                    -..\firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\
+                    -zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\eve
+                    -nt\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\h
+                    -pgp\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_sup
+                    -port;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\dr
+                    -ivers\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\componen
+                    -ts;..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\.
+                    -.\..\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\dr
+                    -ivers\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\uti
+                    -lities;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\driv
+                    -ers\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\
+                    -..\..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,H
+                    -YBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW
+                    -_SYNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FRE
+                    -Q_DETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INT
+                    -ERRUPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_AP
+                    -P,REGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\gv701x_osal.lst)
+                    - TABS(2) OBJECT(.\obj\gv701x_osal.obj)
+
+line level    source
+
+   1          /* ========================================================
+   2           *
+   3           * @file: gv701x_osal.c
+   4           * 
+   5           * @brief: This file contains the initialization routine and task context 
+   6           *         in which the application needs to place its appropriate functions 
+   7           *
+   8           *  Copyright (C) 2010-2015, Greenvity Communications, Inc.
+   9           *  All Rights Reserved
+  10           *  
+  11           * =========================================================*/
+  12          
+  13          /****************************************************************************** 
+  14            * Includes
+  15            ******************************************************************************/
+  16              
+  17          #include <string.h>
+  18          #include "stdio.h"
+  19          #include "gv701x_includes.h"
+  20          #ifdef LRWPAN_DRIVER_APP
+  21          #include "gv701x_lrwpandriver.h"
+  22          #endif
+  23          #ifdef SMARTMETER_APP
+              #include "smapp.h"
+              #endif
+  26          #ifdef UART_APP
+              #include "uartapp_new.h"
+              #endif
+  29          #ifdef UART_OLD_APP
+              #include "uartapp.h"
+              #endif
+  32          #ifdef LLP_APP
+  33          #include "llpapp.h"
+  34          #endif
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 2   
+
+  35          #ifdef REGISTER_APP
+  36          #include "register.h"
+  37          #endif
+  38          #ifdef RTOPO_APP
+  39          #include "route_topo.h"
+  40          #endif
+  41          #ifdef ROUTE_APP
+  42          #include "route.h"
+  43          #endif
+  44          #ifdef HPGP_DRIVER_APP
+  45          #include "gv701x_hpgpdriver.h"
+  46          #endif
+  47          #ifdef NWKSTARTUP_APP
+  48          #include "gv701x_nwkstartup.h"
+  49          #endif
+  50          #ifdef DEVICEINTF_APP
+  51          #include "deviceintfapp.h"
+  52          #endif
+  53          #ifdef SENSOR_DRIVER
+              #include "sensor_driver.h"
+              #endif
+  56          #ifdef SMARTPLUG_DRIVER
+              #include "smartplug_driver.h"
+              #endif
+  59          #ifdef SMARTGRID_APP
+              #include "smartgridapp.h" 
+              #endif
+  62          #if ((defined SMARTLIGHT_APP) && ((defined LED_RGB_LIGHT) || (defined LED_WNC_LIGHT) \
+  63            || (defined LED_WHITE_LIGHT) || (defined LED_SMART_LIGHT)))
+  64          #include "smartlightapp.h"
+  65          #endif
+  66          #ifdef RGB_FADING_DEMO
+              #include "rgbfading.h"
+              #endif
+  69          #ifdef MOTION_DRIVER
+              #include "motion_driver.h"
+              #endif
+  72          
+  73          /****************************************************************************** 
+  74            * Global Data
+  75            ******************************************************************************/
+  76          
+  77          gv701x_aps_queue_t* NwkIntfQueue;
+  78          gv701x_app_queue_t AppIntfQueue;
+  79          
+  80          code gv701x_app_queue_lookup_t AppQueueLookup[APP_MAX_APPLICATIONS] = {
+  81            {0, NULL, NULL},
+  82          #ifdef HPGP_DRIVER_APP    
+  83            {1, GV701x_HPGPDriverRxAppMsg, &hpgp_drv_data.queues},
+  84          #else
+                  {1, NULL, NULL},
+              #endif
+  87          #ifdef BRIDGE
+  88          #ifdef LRWPAN_DRIVER_APP    
+  89            {2, GV701x_LrwpanDriverRxAppMsg, &lrwpan_db.queues},
+  90          #else
+                  {2, NULL, NULL},
+              #endif
+  93          #else
+                {2, NULL, NULL},
+              #endif
+  96          #ifdef NWKSTARTUP_APP   
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 3   
+
+  97            {3, GV701x_NwkRxAppMsg, &nwkstartup_data.queues},
+  98          #else
+                  {3, NULL, NULL},
+              #endif
+ 101          #ifdef RTOPO_APP    
+ 102            {4, rtopo_RxAppMsg, &rtopo_queues},
+ 103          #else
+                  {4, NULL, NULL},
+              #endif
+ 106          #ifdef ROUTE_APP    
+ 107            {5, RouteApp_RxAppMsg, &route_queues},
+ 108          #else
+                  {5, NULL, NULL},
+              #endif
+ 111          #ifdef REGISTER_APP   
+ 112            {6, RegisterApp_RxAppMsg, &register_queues},
+ 113          #else
+                  {6, NULL, NULL},
+              #endif
+ 116          #ifdef LLP_APP    
+ 117            {7, LlpApp_RxAppMsg, &node_queues},
+ 118          #else
+                  {7, NULL, NULL},
+              #endif
+ 121          #ifdef DEVICEINTF_APP   
+ 122            {8, DeviceIntfApp_RxAppMsg, &deviceintf_data.queues},
+ 123          #else
+                  {8, NULL, NULL},
+              #endif
+ 126          #ifdef SMARTPLUG_DRIVER   
+                {9, smartplug_driver_rxappmsg, &sp_queues},
+              #else
+ 129              {9, NULL, NULL},
+ 130          #endif
+ 131            {10, GV701x_I2C_RxAppMsg, &i2c_data.queues},
+ 132          #if ((defined SMARTLIGHT_APP) && ((defined LED_RGB_LIGHT) || (defined LED_WNC_LIGHT) \
+ 133            || (defined LED_WHITE_LIGHT) || (defined LED_SMART_LIGHT)))
+ 134            {11, led_driver_rxappmsg, &led_drv_db.queues},
+ 135          #else
+                  {11, NULL, NULL},
+              #endif
+ 138          #ifdef MOTION_DRIVER  
+                {12, motion_driver_rxappmsg, &motion_driver_db.queue},
+              #else
+ 141            {12, NULL, NULL},
+ 142          #endif
+ 143          #ifdef RGB_FADING_DEMO
+                {13, NULL, NULL},
+              #else
+ 146              {13, NULL, NULL},
+ 147          #endif
+ 148          #ifdef SMARTGRID_APP
+                {14, NULL, NULL},
+              #else
+ 151              {14, NULL, NULL},
+ 152          #endif
+ 153          #ifdef SENSOR_DRIVER  
+                {15, SensorApp_RxAppMsg, &sensor_queue},
+              #else
+ 156            {15, NULL, NULL},
+ 157          #endif
+ 158            
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 4   
+
+ 159          };
+ 160          
+ 161          /****************************************************************************** 
+ 162            * External Data
+ 163            ******************************************************************************/
+ 164            
+ 165          /******************************************************************************
+ 166            * External Funtion prototypes
+ 167            ******************************************************************************/
+ 168            
+ 169          /******************************************************************************
+ 170            * Funtion prototypes
+ 171            ******************************************************************************/
+ 172          
+ 173          /******************************************************************************
+ 174           * @fn      GV701x_TaskInit
+ 175           *
+ 176           * @brief   Initialization function where the application 
+ 177           *        needs to place its initialization code  
+ 178           *
+ 179           * @param   nwkIntfQueue - Firmware passes a reference to the Tx Rx Data/event/response 
+ 180           *        queues that the application would use to send/receive messages to the MAC
+ 181           * 
+ 182           *      app_id - Identifier numnber for Application (used while starting timers, etc)
+ 183           *
+ 184           * @return  none
+ 185           */
+ 186          
+ 187          void GV701x_TaskInit(gv701x_aps_queue_t* nwkIntfQueue)
+ 188          {
+ 189   1        /*memset(&AppQueueLookup, 0x00, 
+ 190   1          sizeof(gv701x_app_queue_lookup_t)*APP_MAX_APPLICATIONS);*/
+ 191   1        
+ 192   1        NwkIntfQueue = nwkIntfQueue;
+ 193   1        SLIST_Init(&AppIntfQueue.appRxQueue);
+ 194   1      
+ 195   1      #ifdef HPGP_DRIVER_APP      
+ 196   1        GV701x_HPGPDriverInit(AppQueueLookup[1].app_id);  
+ 197   1      #endif
+ 198   1      #ifdef LRWPAN_DRIVER_APP
+ 199   1        GV701x_LrwpanDriverInit(AppQueueLookup[2].app_id);
+ 200   1      #endif
+ 201   1      #ifdef NWKSTARTUP_APP         
+ 202   1        GV701x_NwkInit(AppQueueLookup[3].app_id); 
+ 203   1      #endif
+ 204   1      #ifdef SMARTMETER_APP
+                SMApp_Init(AppQueueLookup[3].app_id);
+              #endif
+ 207   1      #ifdef UART_APP
+                UartApp_Init(AppQueueLookup[3].app_id);
+              #endif
+ 210   1      #ifdef RTOPO_APP
+ 211   1        rtopo_init(AppQueueLookup[4].app_id);
+ 212   1      #endif
+ 213   1      #ifdef ROUTE_APP
+ 214   1        RouteApp_Init(AppQueueLookup[5].app_id);
+ 215   1      #endif
+ 216   1      #ifdef REGISTER_APP
+ 217   1        RegisterApp_Init(AppQueueLookup[6].app_id);
+ 218   1      #endif
+ 219   1      #ifdef LLP_APP
+ 220   1        LlpApp_Init(AppQueueLookup[7].app_id);
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 5   
+
+ 221   1      #endif
+ 222   1      #ifdef DEVICEINTF_APP
+ 223   1        DeviceIntfApp_Init(AppQueueLookup[8].app_id);
+ 224   1      #endif
+ 225   1      #ifdef SMARTPLUG_DRIVER
+                smartplug_driver_init(AppQueueLookup[9].app_id);
+              #endif
+ 228   1        GV701x_I2C_Init(AppQueueLookup[10].app_id);
+ 229   1      #if ((defined SMARTLIGHT_APP) && ((defined LED_RGB_LIGHT) || (defined LED_WNC_LIGHT) \
+ 230   1        || (defined LED_WHITE_LIGHT) || (defined LED_SMART_LIGHT)))
+ 231   1        led_driver_init(AppQueueLookup[11].app_id);
+ 232   1      #endif
+ 233   1      #ifdef MOTION_DRIVER
+                motion_driver_init(AppQueueLookup[12].app_id);
+              #endif
+ 236   1      #ifdef RGB_FADING_DEMO
+                rgbfading_init(AppQueueLookup[13].app_id);
+              #endif
+ 239   1      #ifdef SMARTGRID_APP
+                smartgridApp_init(AppQueueLookup[14].app_id);
+              #endif
+ 242   1      #ifdef SENSOR_DRIVER
+                sensor_driver_init(AppQueueLookup[15].app_id);
+              #endif
+ 245   1      }
+ 246          
+ 247          /******************************************************************************
+ 248           * @fn      GV701x_Task
+ 249           *
+ 250           * @brief   Task body in which application places any perodic or polling routines
+ 251           *
+ 252           * @param   none
+ 253           *
+ 254           * @return  none
+ 255           *
+ 256           * @note here APP_TASK_ID is the task id. It SHOULD NOT be changed
+ 257           */
+ 258          #ifdef RTX51_TINY_OS
+ 259          void GV701x_Task(void) _task_ APP_TASK_ID
+ 260          #else
+              void GV701x_Task(void)
+              #endif
+ 263          {
+ 264   1        while(1) 
+ 265   1        {
+ 266   2          os_switch_task();
+ 267   2          
+ 268   2          GV701x_ReadQueue();
+ 269   2      
+ 270   2          GV701x_ReadAppQueue();
+ 271   2          
+ 272   2          /*Place the all application polling routines here*/
+ 273   2      #ifdef RTOPO_APP
+ 274   2          rtopo_poll();
+ 275   2      #endif
+ 276   2      #ifdef ROUTE_APP      
+ 277   2          RouteApp_Poll();
+ 278   2      #endif    
+ 279   2      #ifdef DEVICEINTF_APP
+ 280   2          DeviceIntfApp_SM(&deviceintf_state);
+ 281   2      #endif
+ 282   2      #ifdef SMARTPLUG_DRIVER
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 6   
+
+                  //smartplug_driver_sm(&sp_state); 
+                  smartplug_poll();   
+              #endif
+ 286   2      #ifdef SENSOR_DRIVER
+                  GV701x_I2C_Poll();
+                  sensor_driver_i2c_poll();
+              #endif
+ 290   2      #ifdef MOTION_DRIVER
+                  motion_driver_poll();
+              #endif
+ 293   2        }
+ 294   1      }
+ 295          
+ 296          /******************************************************************************
+ 297           * @fn      GV701x_ReadQueue
+ 298           *
+ 299           * @brief   Reads the firmware data and event queues
+ 300           *
+ 301           * @param   none
+ 302           *
+ 303           * @return  none
+ 304           *
+ 305           */
+ 306          
+ 307          void GV701x_ReadQueue(void)
+ 308          {
+ 309   1          sEvent *event = NULL;
+ 310   1          sSlink *slink = NULL;
+ 311   1          u8 ret = 0;     
+ 312   1      
+ 313   1        /*Read Data Queue*/
+ 314   1        while(!SLIST_IsEmpty(&(NwkIntfQueue->rxQueue)))
+ 315   1        {
+ 316   2      __CRIT_SECTION_BEGIN__
+ 317   2          slink = SLIST_Pop(&(NwkIntfQueue->rxQueue));
+ 318   2      __CRIT_SECTION_END__
+ 319   2          event = SLIST_GetEntry(slink, sEvent, link);
+ 320   2      
+ 321   2          if(event == NULL)
+ 322   2          {
+ 323   3            break;
+ 324   3          }
+ 325   2      
+ 326   2          if((event->buffDesc.dataptr == NULL) || 
+ 327   2            (event->buffDesc.datalen == 0) )
+ 328   2          {
+ 329   3            EVENT_Free(event);  
+ 330   3            break; 
+ 331   3          }
+ 332   2          
+ 333   2          if(event->eventHdr.eventClass != EVENT_CLASS_DATA)
+ 334   2          {
+ 335   3            EVENT_Free(event);  
+ 336   3            break;
+ 337   3          }
+ 338   2      
+ 339   2          if(event->eventHdr.trans == APP_PORT_PLC)
+ 340   2          {
+ 341   3            /*Place application sata handlers here*/    
+ 342   3      #ifdef ROUTE_APP          
+ 343   3            route_handle_rx_from_ll (event->buffDesc.dataptr, 
+ 344   3                 event->buffDesc.datalen, POWER_LINE, 0);
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 7   
+
+ 345   3      #endif    
+ 346   3      #ifdef SMARTMETER_APP
+                    SMApp_Rx(event->eventHdr.trans, event->buffDesc.dataptr, 
+                         event->buffDesc.datalen);
+              #endif
+ 350   3          }
+ 351   2          
+ 352   2          if(event->eventHdr.trans == APP_PORT_ZIGBEE)
+ 353   2          {
+ 354   3      #ifdef SMARTMETER_APP
+                    SMApp_Rx(event->eventHdr.trans, event->buffDesc.dataptr, 
+                         event->buffDesc.datalen);
+              #endif
+ 358   3          }
+ 359   2          
+ 360   2          if(event->eventHdr.trans == APP_PORT_PERIPHERAL)
+ 361   2          {
+ 362   3      #ifdef DEVICEINTF_APP   
+ 363   3      #ifdef SMARTPLUG_DRIVER
+                    smartplug_driver_rx(event->buffDesc.dataptr,
+                            event->buffDesc.datalen);
+              #endif
+ 367   3      #ifdef SMARTGRID_APP
+                    smartgridApp_intf_rx(event->buffDesc.dataptr,
+                            event->buffDesc.datalen);
+              #endif
+ 371   3      #endif
+ 372   3      #ifdef UART_APP
+                    UartApp_Rx(event->eventHdr.trans, event->buffDesc.dataptr,
+                          event->buffDesc.datalen);
+              #endif    
+ 376   3          }
+ 377   2      
+ 378   2          EVENT_Free(event);  
+ 379   2          break;
+ 380   2        }
+ 381   1      }
+ 382          
+ 383          /******************************************************************************
+ 384           * @fn      GV701x_SendData
+ 385           *
+ 386           * @brief   Adds to the Firmware Queue the Data to be sent
+ 387           *
+ 388           * @param   port - Port to which data is to be sent (PLC or IEEE 802.15.4) 
+ 389           *          databuf - Data to be sent
+ 390           *        len - Length of Data 
+ 391           *      options - Transmit options (defined in gv701x_osal.h)
+ 392           *
+ 393           * @return  eStatus - status (STATUS_SUCCESS - if success, STATUS_FAILURE - on failure)
+ 394           */
+ 395           
+ 396          eStatus GV701x_SendData(u8 port, void* databuf, u16 len, u8 options)
+ 397          {
+ 398   1          sEvent* event = NULL;
+ 399   1      
+ 400   1        if((databuf == NULL) || (len == 0))
+ 401   1        {
+ 402   2          return STATUS_FAILURE;
+ 403   2        }
+ 404   1            
+ 405   1        event = GV701x_EVENT_Alloc(len, 0);
+ 406   1        
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 8   
+
+ 407   1          if(event == NULL) 
+ 408   1          {
+ 409   2            return STATUS_FAILURE;
+ 410   2          }
+ 411   1      
+ 412   1          event->eventHdr.eventClass = EVENT_CLASS_DATA;
+ 413   1          event->eventHdr.type = 0;
+ 414   1          event->eventHdr.trans = port; 
+ 415   1        event->eventHdr.status = 0;
+ 416   1          
+ 417   1        if(options & APP_DATA_TX_SWBCST_OPT)      
+ 418   1          event->eventHdr.status |= APP_DATA_TX_SWBCST_OPT; 
+ 419   1        
+ 420   1        memcpy((u8*)(event->buffDesc.dataptr), databuf, len);     
+ 421   1        event->buffDesc.datalen = len;  
+ 422   1      
+ 423   1          /*Enqueue data into the firmware queue*/
+ 424   1        SLIST_Put(&(NwkIntfQueue->txQueue), &event->link);      
+ 425   1          return STATUS_SUCCESS;       
+ 426   1      }
+ 427          
+ 428          /******************************************************************************
+ 429           * @fn      GV701x_SendAppEvent
+ 430           *
+ 431           * @brief   Adds to the Application/fw Queue the event to be sent
+ 432           *
+ 433           * @param   src_app_id - source application 
+ 434           *          dst_app_id - destination application
+ 435           *        msg_type - event/message type (in gv701x_osal.h)
+ 436           *      protocol - protocol type of the message/event (in nma.h)
+ 437           *      evnt_class - the event type of the message/event (in event.h)
+ 438           *      type - the frame type of the message/event (in nma.h)
+ 439           *      databuf - the reference to the data to be sent
+ 440           *      len - the length of the message/event
+ 441           *      options - the queuing options (eg. priority etc. in gv701x_osal.h)
+ 442           *
+ 443           * @return  eStatus - status (STATUS_SUCCESS - if success, STATUS_FAILURE - on failure)
+ 444           */
+ 445           
+ 446          eStatus GV701x_SendAppEvent(u8 src_app_id, u8 dst_app_id, u8 msg_type, u8 protocol, u8 evnt_class,
+ 447                        u8 type, void* databuf, u8 len, u8 options)
+ 448          {
+ 449   1          sEvent* event = NULL;
+ 450   1        sSlist* txqueue = NULL;
+ 451   1        gv701x_app_msg_hdr_t* msg_hdr = NULL;
+ 452   1        hostHdr_t* pHostHdr;  
+ 453   1      
+ 454   1        if((databuf == NULL) || (len == 0) || 
+ 455   1           ((src_app_id > APP_MAX_APPLICATIONS) ? 
+ 456   1           ((src_app_id == APP_FW_MSG_APPID) ? (FALSE) : (TRUE)) : (FALSE)))  
+ 457   1        {
+ 458   2          return STATUS_FAILURE;
+ 459   2        }
+ 460   1      
+ 461   1        if((protocol != HPGP_MAC_ID) && (protocol != IEEE802_15_4_MAC_ID) &&
+ 462   1          (protocol != APP_MAC_ID) && (protocol != SYS_MAC_ID))
+ 463   1          return STATUS_FAILURE;    
+ 464   1      
+ 465   1        if((evnt_class != EVENT_CLASS_CTRL) && (evnt_class != EVENT_CLASS_MGMT))
+ 466   1          return STATUS_FAILURE;
+ 467   1      
+ 468   1        if(protocol == APP_MAC_ID)    
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 9   
+
+ 469   1        {
+ 470   2          if(dst_app_id <= APP_MAX_APPLICATIONS)
+ 471   2          {
+ 472   3            if(AppQueueLookup[dst_app_id].queues == NULL)
+ 473   3              return STATUS_FAILURE;
+ 474   3            
+ 475   3            txqueue = &AppQueueLookup[dst_app_id].queues->appRxQueue;   
+ 476   3          }
+ 477   2          else if(dst_app_id == APP_BRDCST_MSG_APPID)
+ 478   2            txqueue = &AppIntfQueue.appRxQueue;
+ 479   2        }
+ 480   1        else if((protocol == HPGP_MAC_ID) || (protocol == SYS_MAC_ID) ||
+ 481   1            (protocol == IEEE802_15_4_MAC_ID))
+ 482   1          txqueue = NwkIntfQueue->reqTxQueue;   
+ 483   1      
+ 484   1        event = GV701x_EVENT_Alloc(len + sizeof(gv701x_app_msg_hdr_t) + sizeof(hostHdr_t), 0);
+ 485   1        if(event == NULL) 
+ 486   1          return STATUS_FAILURE;
+ 487   1        
+ 488   1        event->eventHdr.eventClass = evnt_class;
+ 489   1        event->eventHdr.type = 0;
+ 490   1        event->eventHdr.trans = APP_PORT_APPLICATION;     
+ 491   1        
+ 492   1        msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr; 
+ 493   1        memcpy((u8*)(&event->buffDesc.dataptr[sizeof(gv701x_app_msg_hdr_t) + sizeof(hostHdr_t)]),
+ 494   1            databuf, len);    
+ 495   1        event->buffDesc.datalen = len + sizeof(gv701x_app_msg_hdr_t) + sizeof(hostHdr_t); 
+ 496   1      
+ 497   1        /*Fill the app msg header*/
+ 498   1        msg_hdr->dst_app_id = dst_app_id;
+ 499   1        msg_hdr->src_app_id = src_app_id;
+ 500   1        msg_hdr->type = msg_type;
+ 501   1        msg_hdr->len = len + sizeof(hostHdr_t);
+ 502   1        
+ 503   1        /*Fill the hybrii header*/
+ 504   1        pHostHdr = (hostHdr_t*)(msg_hdr + 1);
+ 505   1        pHostHdr->protocol = protocol;
+ 506   1        pHostHdr->type = type;    
+ 507   1        pHostHdr->length = len;
+ 508   1        pHostHdr->rsvd = 0;   
+ 509   1      
+ 510   1        if((dst_app_id <= APP_BRDCST_MSG_APPID) || (dst_app_id == APP_FW_MSG_APPID))
+ 511   1        {
+ 512   2      #if 0 
+                  FM_Printf(FM_APP, "\nQ to App src %bu dst %bu len %u q %p", src_app_id, dst_app_id, 
+                      pHostHdr->length, txqueue);     
+              #endif
+ 516   2        } 
+ 517   1      
+ 518   1        if(options & APP_EVNT_TX_CRITICAL_OPT)
+ 519   1          SLIST_Push(txqueue, &event->link);      
+ 520   1        else
+ 521   1          SLIST_Put(txqueue, &event->link);     
+ 522   1          
+ 523   1        return STATUS_SUCCESS;  
+ 524   1      }
+ 525          
+ 526          /******************************************************************************
+ 527           * @fn      GV701x_ReadAppQueue
+ 528           *
+ 529           * @brief   Reads the application event queues
+ 530           *
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 10  
+
+ 531           * @param   none
+ 532           *
+ 533           * @return  none
+ 534           *
+ 535           */
+ 536          
+ 537          void GV701x_ReadAppQueue(void)
+ 538          {
+ 539   1          sEvent *event = NULL;
+ 540   1          sSlink *slink = NULL;
+ 541   1          u8 ret = 0;     
+ 542   1        u8 i;
+ 543   1        gv701x_app_msg_hdr_t* msg_hdr = NULL;
+ 544   1      
+ 545   1        for(i = 1; i < APP_MAX_APPLICATIONS; i++)
+ 546   1        {
+ 547   2          if((AppQueueLookup[i].app_rx_handler == NULL) ||
+ 548   2            (AppQueueLookup[i].queues == NULL) ||
+ 549   2            (AppQueueLookup[i].app_id == 0) || 
+ 550   2            (AppQueueLookup[i].app_id > APP_MAX_APPLICATIONS))
+ 551   2            continue;
+ 552   2          
+ 553   2          /*Read App Data Queue*/
+ 554   2          while(!SLIST_IsEmpty(&AppQueueLookup[i].queues->appRxQueue))
+ 555   2          {
+ 556   3      __CRIT_SECTION_BEGIN__
+ 557   3            slink = SLIST_Pop(&AppQueueLookup[i].queues->appRxQueue);
+ 558   3      __CRIT_SECTION_END__
+ 559   3            event = SLIST_GetEntry(slink, sEvent, link);
+ 560   3      
+ 561   3            if(event == NULL)
+ 562   3            {
+ 563   4              break;
+ 564   4            }
+ 565   3      
+ 566   3            if((event->buffDesc.dataptr == NULL) || (event->buffDesc.datalen == 0)  ||        
+ 567   3              (event->eventHdr.trans != APP_PORT_APPLICATION))
+ 568   3            {
+ 569   4              EVENT_Free(event);  
+ 570   4              break; 
+ 571   4            }
+ 572   3            
+ 573   3            msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;   
+ 574   3      #if 0     
+                    FM_Printf(FM_APP, "\nApp Q pop (app id %bu src id %bu dst id %bu )", i,
+                      msg_hdr->src_app_id, msg_hdr->dst_app_id);
+              #endif
+ 578   3      
+ 579   3            if((msg_hdr->dst_app_id <= APP_MAX_APPLICATIONS) &&
+ 580   3              (msg_hdr->src_app_id <= APP_MAX_APPLICATIONS) && 
+ 581   3              (i == msg_hdr->dst_app_id))
+ 582   3            {
+ 583   4      #if 0     
+                      FM_Printf(FM_APP, "\ni %bu Handlr %p", i, AppQueueLookup[i].app_rx_handler);        
+              #endif
+ 586   4              AppQueueLookup[i].app_rx_handler(event);    
+ 587   4            } 
+ 588   3            EVENT_Free(event);  
+ 589   3            break;
+ 590   3          }   
+ 591   2        }
+ 592   1      
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 11  
+
+ 593   1        while(!SLIST_IsEmpty(&AppIntfQueue.appRxQueue))
+ 594   1        {
+ 595   2      __CRIT_SECTION_BEGIN__
+ 596   2          slink = SLIST_Pop(&AppIntfQueue.appRxQueue);
+ 597   2      __CRIT_SECTION_END__
+ 598   2          event = SLIST_GetEntry(slink, sEvent, link);
+ 599   2          
+ 600   2          if(event == NULL)
+ 601   2            break; 
+ 602   2      
+ 603   2          if((event->buffDesc.dataptr == NULL) || (event->buffDesc.datalen == 0)  ||    
+ 604   2            (event->eventHdr.trans != APP_PORT_APPLICATION))
+ 605   2          {
+ 606   3            EVENT_Free(event);  
+ 607   3            break; 
+ 608   3          }
+ 609   2          
+ 610   2          msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;
+ 611   2          
+ 612   2          if(msg_hdr->dst_app_id == APP_BRDCST_MSG_APPID)
+ 613   2          {
+ 614   3            for(i = 1; i < APP_MAX_APPLICATIONS; i++)
+ 615   3            {
+ 616   4              if((AppQueueLookup[i].app_rx_handler == NULL) ||
+ 617   4                (AppQueueLookup[i].queues == NULL) ||
+ 618   4                (AppQueueLookup[i].app_id == 0) || 
+ 619   4                (AppQueueLookup[i].app_id > APP_MAX_APPLICATIONS))
+ 620   4                continue;
+ 621   4              
+ 622   4              if(AppQueueLookup[i].app_id != msg_hdr->src_app_id)
+ 623   4              {
+ 624   5      #if 0       
+                        FM_Printf(FM_APP, "\nBrdcst App Q pop (app id %bu src id %bu dst id %bu %p)", i,
+                              msg_hdr->src_app_id, msg_hdr->dst_app_id, 
+                              AppQueueLookup[i].app_rx_handler);              
+              #endif
+ 629   5                AppQueueLookup[i].app_rx_handler(event);              
+ 630   5              }
+ 631   4            }
+ 632   3          } 
+ 633   2          EVENT_Free(event);  
+ 634   2          break;
+ 635   2        }  
+ 636   1      
+ 637   1        /*Read Event Queue*/
+ 638   1        while(!SLIST_IsEmpty(&(NwkIntfQueue->rspEvntRxQueue)))
+ 639   1        {
+ 640   2      __CRIT_SECTION_BEGIN__
+ 641   2          slink = SLIST_Pop(&(NwkIntfQueue->rspEvntRxQueue));
+ 642   2      __CRIT_SECTION_END__
+ 643   2          event = SLIST_GetEntry(slink, sEvent, link);
+ 644   2      
+ 645   2          if(event == NULL)
+ 646   2            break;
+ 647   2      
+ 648   2          if((event->buffDesc.dataptr == NULL) || (event->buffDesc.datalen == 0))     
+ 649   2          {
+ 650   3            EVENT_Free(event);  
+ 651   3            break; 
+ 652   3          }
+ 653   2      
+ 654   2          msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;
+C51 COMPILER V9.53.0.0   GV701X_OSAL                                                       11/04/2015 20:09:50 PAGE 12  
+
+ 655   2      #if 0   
+                  FM_Printf(FM_APP, "\nFW Q pop (src id %bu dst id %bu )", msg_hdr->src_app_id, msg_hdr->dst_app_id);         
+             -  
+              #endif
+ 658   2          if(msg_hdr->src_app_id == APP_FW_MSG_APPID)
+ 659   2          {
+ 660   3            for(i = 1; i < APP_MAX_APPLICATIONS; i++)
+ 661   3            {
+ 662   4              if((AppQueueLookup[i].app_rx_handler == NULL) ||
+ 663   4                (AppQueueLookup[i].queues == NULL) ||
+ 664   4                (AppQueueLookup[i].app_id == 0) || 
+ 665   4                (AppQueueLookup[i].app_id > APP_MAX_APPLICATIONS))
+ 666   4                continue;
+ 667   4      
+ 668   4              if(msg_hdr->dst_app_id == APP_BRDCST_MSG_APPID)
+ 669   4                AppQueueLookup[i].app_rx_handler(event);
+ 670   4              else if((msg_hdr->dst_app_id <= APP_MAX_APPLICATIONS) && (i == msg_hdr->dst_app_id))
+ 671   4              {     
+ 672   5      #if 0
+                        FM_Printf(FM_APP, "\ni %bu app id %bu Handlr %p", i, msg_hdr->dst_app_id,
+                          AppQueueLookup[i].app_rx_handler);        
+              #endif
+ 676   5                AppQueueLookup[i].app_rx_handler(event);
+ 677   5                break;
+ 678   5              }
+ 679   4            }
+ 680   3          }
+ 681   2          EVENT_Free(event);       
+ 682   2          break;
+ 683   2        } 
+ 684   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2507    ----
+   CONSTANT SIZE    =    140    ----
+   XDATA SIZE       =      9      51
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

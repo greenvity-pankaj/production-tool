@@ -1,0 +1,1002 @@
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE MAC_MCPS_DATA
+OBJECT MODULE PLACED IN .\obj\mac_mcps_data.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\zigbee\mac_mcps_data.c LARGE OBJECTADVANCED OPTIMIZ
+                    -E(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..
+                    -\..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\sr
+                    -c\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..
+                    -\firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zi
+                    -gbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event
+                    -\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpg
+                    -p\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_suppo
+                    -rt;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\driv
+                    -ers\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components
+                    -;..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\
+                    -..\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\driv
+                    -ers\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utili
+                    -ties;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\driver
+                    -s\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..
+                    -\..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYB
+                    -RII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_S
+                    -YNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_
+                    -DETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTER
+                    -RUPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,
+                    -REGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\mac_mcps_data.lst)
+                    - TABS(2) OBJECT(.\obj\mac_mcps_data.obj)
+
+line level    source
+
+   1          /**
+   2           * @file mac_mcps_data.c
+   3           *
+   4           * Handles MCPS related primitives
+   5           *
+   6           * $Id: mac_mcps_data.c,v 1.7 2014/11/26 13:19:41 ranjan Exp $
+   7           *
+   8           * Copyright (c) 2011, Greenvity Communication All rights reserved.
+   9           */
+  10          
+  11          #ifdef HYBRII_802154
+  12          
+  13          /* === Includes ============================================================ */
+  14          
+  15          #include <string.h>
+  16          #include "papdef.h"
+  17          #include "timer.h"
+  18          #include "return_val.h"
+  19          #include "bmm.h"
+  20          #include "qmm.h"
+  21          #include "mac_const.h"
+  22          #include "mac_msgs.h"
+  23          #include "mac_data_structures.h"
+  24          #include "mac_hal.h"
+  25          #include "mac_internal.h"
+  26          #include "mac.h"
+  27          #include "mac_security.h"
+  28          #include "utils_fw.h"
+  29          #include "timer.h"
+  30          #include "list.h"
+  31          #include "stm.h"
+  32          #include <stdio.h>
+  33          /* === Implementation ====================================================== */
+  34          
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 2   
+
+  35          /*
+  36           * Checks whether MSDU handle matches
+  37           *
+  38           * buf_p    - Pointer to indirect data buffer
+  39           * handle_p - MSDU handle to be searched
+  40           *
+  41           * Return TRUE if MSDU handle matches with the indirect data, FALSE otherwise
+  42           */
+  43          bool check_msdu_handle_cb (void xdata *buf_p, void xdata *handle_p)
+  44          {
+  45   1          frame_info_t *frame_p = (frame_info_t *)buf_p;
+  46   1          uint8_t msdu;
+  47   1      
+  48   1          msdu = *((uint8_t *)handle_p);
+  49   1      
+  50   1          /* Compare the MSDU handle */
+  51   1          if (frame_p->msduHandle == msdu) {
+  52   2              return (TRUE);
+  53   2          }
+  54   1          return (FALSE);
+  55   1      }
+  56          
+  57          /*
+  58           * Purges a buffer that match the MSDU handle
+  59           *
+  60           * This function tries to purge a given msdu by finding its msdu handle.
+  61           * If the handle is found, that buffer is freed up for further use.
+  62           * This routine will typically be called from the mlme_purge_request routine.
+  63           *
+  64           * msdu_handle - The MSDU handle
+  65           *
+  66           * True if the MSDU handle is found in the indirect queue and removed
+  67           * successfully, false otherwise.
+  68           */
+  69          static bool mac_buffer_purge (uint8_t msdu_handle)
+  70          {
+  71   1          uint8_t *buf_ptr;
+  72   1          search_t find_buf;
+  73   1          uint8_t handle = msdu_handle;
+  74   1      
+  75   1          /*
+  76   1           * Callback function  for searching the data having MSDU handle
+  77   1           * given by purge request
+  78   1           */
+  79   1      #ifdef CALLBACK
+                  find_buf.compare_func = check_msdu_handle_cb;
+              #else
+  82   1          find_buf.compare_func_id = MAC_FIND_MSDU;
+  83   1      #endif
+  84   1      
+  85   1          /* Update the MSDU handle to be searched */
+  86   1          find_buf.handle = &handle;
+  87   1      
+  88   1          /* Remove from indirect queue if the short address matches */
+  89   1          buf_ptr = (uint8_t *)qmm_queue_remove(&indirect_data_q, &find_buf);
+  90   1      
+  91   1          if (NULL != buf_ptr) {
+  92   2              /* Free the buffer allocated, after purging */
+  93   2              bmm_buffer_free((buffer_t *)buf_ptr);
+  94   2      
+  95   2              return (TRUE);
+  96   2          }
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 3   
+
+  97   1         
+  98   1          /* No data available in the indirect queue with the MSDU handle. */
+  99   1          mac_hal_frame_pending(false);  /* Tell h/w no more pending frame */
+ 100   1      
+ 101   1          return (FALSE);
+ 102   1      }
+ 103          
+ 104          /*
+ 105           * Builds MCPS data frame
+ 106           *
+ 107           * This function builds the data frame.
+ 108           *
+ 109           * mdr_p   - Poiinter to data request parameters
+ 110           * frame_p - Pointer to transmission frame
+ 111           */
+ 112          static retval_t build_data_frame (mcps_data_req_t *mdr_p,
+ 113                                            frame_info_t *tx_frame_p)
+ 114          {
+ 115   1          uint8_t  frame_len;
+ 116   1          uint8_t  *frame_p;
+ 117   1          uint16_t fcf = 0;
+ 118   1          uint8_t  *mac_payload_p;
+ 119   1      
+ 120   1          frame_len = mdr_p->msduLength + FCF_LEN + SEQ_NUM_LEN;
+ 121   1      
+ 122   1          /*
+ 123   1           * Payload pointer points to data, which was already been copied
+ 124   1           * into buffer
+ 125   1           */
+ 126   1          frame_p = (uint8_t *)tx_frame_p + BUFFER_SIZE - mdr_p->msduLength;
+ 127   1      
+ 128   1          mac_payload_p = frame_p;
+ 129   1          /*
+ 130   1           * Note: The value of the payload_length parameter will be updated
+ 131   1           *       if security needs to be applied.
+ 132   1           */
+ 133   1          if (mdr_p->Security.SecurityLevel > 0) {
+ 134   2              retval_t build_sec = mac_build_aux_sec_header(&frame_p,
+ 135   2                                                            &mdr_p->Security,
+ 136   2                                                            &frame_len);
+ 137   2              if (MAC_SUCCESS != build_sec) {
+ 138   3                  return (build_sec);
+ 139   3              }
+ 140   2          }
+ 141   1      
+ 142   1          /*
+ 143   1           * Set Source Address.
+ 144   1           */
+ 145   1          if (FCF_SHORT_ADDR == mdr_p->SrcAddrMode) {
+ 146   2              frame_p   -= SHORT_ADDR_LEN;
+ 147   2              frame_len += SHORT_ADDR_LEN;
+ 148   2              mac_utils_16_bit_to_byte_array(hal_pib_ShortAddress, frame_p);
+ 149   2          } else if (FCF_LONG_ADDR == mdr_p->SrcAddrMode) {
+ 150   2              frame_p   -= EXT_ADDR_LEN;
+ 151   2              frame_len += EXT_ADDR_LEN;
+ 152   2              mac_utils_64_bit_to_byte_array(hal_pib_IeeeAddress, frame_p);
+ 153   2          }
+ 154   1      
+ 155   1          /* Shall the Intra-PAN bit set? */
+ 156   1          if ((hal_pib_PANId == mdr_p->DstPANId)    &&
+ 157   1              (FCF_NO_ADDR   != mdr_p->SrcAddrMode) &&
+ 158   1              (FCF_NO_ADDR   != mdr_p->DstAddrMode)) {
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 4   
+
+ 159   2              /*
+ 160   2               * Both address are present and both PAN-Ids are identical.
+ 161   2               * Set intra-PAN bit.
+ 162   2               */
+ 163   2              fcf |= FCF_PAN_ID_COMPRESSION;
+ 164   2          } else if (FCF_NO_ADDR != mdr_p->SrcAddrMode) {
+ 165   2              /* Set Source PAN-Id. */
+ 166   2              frame_p   -= PAN_ID_LEN;
+ 167   2              frame_len += PAN_ID_LEN;
+ 168   2              mac_utils_16_bit_to_byte_array(hal_pib_PANId, frame_p);
+ 169   2          }
+ 170   1      
+ 171   1          /* Set the Destination Addressing fields. */
+ 172   1          if (FCF_NO_ADDR != mdr_p->DstAddrMode) {
+ 173   2              if (FCF_SHORT_ADDR == mdr_p->DstAddrMode) {
+ 174   3                  frame_p   -= SHORT_ADDR_LEN;
+ 175   3                  frame_len += SHORT_ADDR_LEN;
+ 176   3                  mac_utils_16_bit_to_byte_array((uint16_t)mdr_p->DstAddr.lo_u32,
+ 177   3                                                 frame_p);
+ 178   3              } else {
+ 179   3                  frame_p   -= EXT_ADDR_LEN;
+ 180   3                  frame_len += EXT_ADDR_LEN;
+ 181   3                  mac_utils_64_bit_to_byte_array(mdr_p->DstAddr, frame_p);
+ 182   3              }
+ 183   2      
+ 184   2              frame_p   -= PAN_ID_LEN;
+ 185   2              frame_len += PAN_ID_LEN;
+ 186   2              mac_utils_16_bit_to_byte_array(mdr_p->DstPANId, frame_p);
+ 187   2          }
+ 188   1      
+ 189   1          /* Set DSN. */
+ 190   1          frame_p--;
+ 191   1          *frame_p = mac_pib_macDSN++;
+ 192   1      
+ 193   1          /* Set the FCF. */
+ 194   1          fcf |= FCF_SET_FRAMETYPE(FCF_FRAMETYPE_DATA);
+ 195   1      
+ 196   1          if (mdr_p->Security.SecurityLevel > 0) {
+ 197   2              fcf |= FCF_SECURITY_ENABLED | FCF_FRAME_VERSION_2006;
+ 198   2          }
+ 199   1      
+ 200   1          if (mdr_p->TxOptions & TX_CAP_ACK) {
+ 201   2              fcf |= FCF_ACK_REQUEST;
+ 202   2          }
+ 203   1      
+ 204   1          /*
+ 205   1           * 802.15.4-2006 section 7.1.1.1.3:
+ 206   1           *
+ 207   1           * If the msduLength parameter is greater than aMaxMACSafePayloadSize,
+ 208   1           * the MAC sublayer will set the Frame Version subfield of the
+ 209   1           * Frame Control field to one.
+ 210   1           */
+ 211   1          if (mdr_p->msduLength > aMaxMACSafePayloadSize) {
+ 212   2              fcf |= FCF_FRAME_VERSION_2006;
+ 213   2          }
+ 214   1      
+ 215   1          /* Set FCFs address mode */
+ 216   1          fcf |= FCF_SET_SOURCE_ADDR_MODE(mdr_p->SrcAddrMode);
+ 217   1          fcf |= FCF_SET_DEST_ADDR_MODE(mdr_p->DstAddrMode);
+ 218   1      
+ 219   1          frame_p -= FCF_LEN;
+ 220   1          mac_utils_16_bit_to_byte_array(fcf, frame_p);
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 5   
+
+ 221   1      
+ 222   1          /*
+ 223   1           * In case the frame gets too large, return error.
+ 224   1           */
+ 225   1          if (frame_len > aMaxPHYPacketSize) {
+ 226   2             return MAC_FRAME_TOO_LONG;
+ 227   2          }
+ 228   1      
+ 229   1          /* First element shall be length of PHY frame. */
+ 230   1          frame_p -= LENGTH_FIELD_LEN;
+ 231   1          *frame_p = frame_len;
+ 232   1      
+ 233   1          /* Finished building of frame. */
+ 234   1          tx_frame_p->mpdu_p = frame_p;
+ 235   1      
+ 236   1          if (mdr_p->Security.SecurityLevel > 0) {
+ 237   2              if (mac_pib_macSecurityEnabled == TRUE) {
+ 238   3                  wpan_addr_spec_t dst_addr_spec;
+ 239   3      
+ 240   3                  dst_addr_spec.AddrMode          = mdr_p->DstAddrMode; 
+ 241   3                  dst_addr_spec.PANId             = mdr_p->DstPANId; 
+ 242   3                  dst_addr_spec.Addr.long_address = mdr_p->DstAddr; 
+ 243   3      
+ 244   3                  return (mac_secure(&mdr_p->Security, &dst_addr_spec));
+ 245   3              } else {
+ 246   3                  return (MAC_UNSUPPORTED_SECURITY);
+ 247   3              }
+ 248   2          }
+ 249   1      
+ 250   1          return MAC_SUCCESS;
+ 251   1      }
+ 252          
+ 253          /*
+ 254           * This function creates the mcps data confirm structure,
+ 255           * and appends it into internal event queue.
+ 256           *
+ 257           * buf Buffer for mcps data confirmation.
+ 258           * status Data transmission status.
+ 259           * handle MSDU handle.
+ 260           * timestamp Time in symbols at which the data were transmitted
+ 261           */
+ 262          void mac_gen_mcps_data_conf (buffer_t *buff_p, uint8_t status, uint8_t handle,
+ 263                                       uint32_t timestamp)
+ 264          {
+ 265   1          frame_info_t     *tx_frame_p;
+ 266   1          mcps_data_conf_t *mdc_p;
+ 267   1          
+ 268   1          tx_frame_p = (frame_info_t     *)BMM_BUFFER_POINTER(buff_p);
+ 269   1          mdc_p      = (mcps_data_conf_t *)BMM_BUFFER_POINTER(buff_p);
+ 270   1      
+ 271   1          mdc_p->cmdcode    = MCPS_DATA_CONFIRM;
+ 272   1          mdc_p->msduHandle = handle;
+ 273   1          mdc_p->status     = status;
+ 274   1          mdc_p->Timestamp  = timestamp;
+ 275   1      
+ 276   1          switch (status) {
+ 277   2          case MAC_NO_ACK:
+ 278   2              mac_stats_g.tx_pkts_no_ack++;
+ 279   2              break;
+ 280   2          case MAC_CHANNEL_ACCESS_FAILURE:
+ 281   2              mac_stats_g.tx_pkts_no_cca++;
+ 282   2              mac_stats_g.tx_errors++;
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 6   
+
+ 283   2              break;
+ 284   2          case HAL_FRAME_PENDING:
+ 285   2              mac_stats_g.frame_pending++;
+ 286   2              break;
+ 287   2          case MAC_SUCCESS:
+ 288   2              break;
+ 289   2          default:
+ 290   2              mac_stats_g.tx_errors++;
+ 291   2              break;
+ 292   2          }
+ 293   1      
+ 294   1      #if (defined UM) && (!defined ZBMAC_DIAG)
+ 295   1        mlme_send_to_host(buff_p);
+ 296   1      #else
+                mcps_data_conf(buff_p);
+              #endif  
+ 299   1      }
+ 300          
+ 301          /**
+ 302           * This function builds the data frame for transmission.
+ 303           * The NWK App layer has supplied the parameters.
+ 304           * The frame_info_t data type is constructed and filled in.
+ 305           * Also the FCF is constructed based on the parameters passed.
+ 306           *
+ 307           * msg - Pointer to the MCPS-DATA.request parameter
+ 308           */
+ 309          uint32_t data_req_g = 0;
+ 310          void mcps_data_request (buffer_t *buf_p)
+ 311          {
+ 312   1          mcps_data_req_t mdr;
+ 313   1          frame_info_t    *tx_frame_p;
+ 314   1          retval_t        status = MAC_FAILURE;
+ 315   1      
+ 316   1          data_req_g ++;
+ 317   1          memcpy(&mdr, BMM_BUFFER_POINTER(buf_p),
+ 318   1                 sizeof(mcps_data_req_t));
+ 319   1      
+ 320   1          if ((mdr.TxOptions & TX_INDIRECT) == 0) {
+ 321   2              /*
+ 322   2               * Data Requests for a coordinator using direct transmission are
+ 323   2               * accepted in all non-transient states (no polling and no scanning
+ 324   2               * is ongoing).
+ 325   2               */
+ 326   2              if ((MAC_POLL_IDLE != mac_poll_state) ||
+ 327   2                  (MAC_SCAN_IDLE != mac_scan_state)) {
+ 328   3                  mac_gen_mcps_data_conf(buf_p,
+ 329   3                                         (uint8_t)MAC_CHANNEL_ACCESS_FAILURE,
+ 330   3                                         mdr.msduHandle,
+ 331   3                                         0);
+ 332   3                  return;
+ 333   3              }
+ 334   2          }
+ 335   1      
+ 336   1      
+ 337   1          /* Check whether somebody requests an ACK of broadcast frames */
+ 338   1          if ((mdr.TxOptions & TX_CAP_ACK) &&
+ 339   1              (FCF_SHORT_ADDR == mdr.DstAddrMode) &&
+ 340   1               (BROADCAST == mdr.DstAddr.lo_u32)) {
+ 341   2              mac_gen_mcps_data_conf(buf_p,
+ 342   2                                 (uint8_t)MAC_INVALID_PARAMETER,
+ 343   2                                 mdr.msduHandle,
+ 344   2                                 0);
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 7   
+
+ 345   2              return;
+ 346   2          }
+ 347   1      
+ 348   1          /* Check whether both Src and Dst Address are not present */
+ 349   1          if ((FCF_NO_ADDR == mdr.SrcAddrMode) &&
+ 350   1              (FCF_NO_ADDR == mdr.DstAddrMode)) {
+ 351   2              mac_gen_mcps_data_conf(buf_p,
+ 352   2                                     (uint8_t)MAC_INVALID_ADDRESS,
+ 353   2                                     mdr.msduHandle,
+ 354   2                                     0);
+ 355   2              return;
+ 356   2          }
+ 357   1      
+ 358   1          /* Check whether Src or Dst Address indicate reserved values */
+ 359   1          if ((FCF_RESERVED_ADDR == mdr.SrcAddrMode) ||
+ 360   1              (FCF_RESERVED_ADDR == mdr.DstAddrMode)) {
+ 361   2              mac_gen_mcps_data_conf(buf_p,
+ 362   2                                     (uint8_t)MAC_INVALID_PARAMETER,
+ 363   2                                     mdr.msduHandle,
+ 364   2                                     0);
+ 365   2              return;
+ 366   2          }
+ 367   1      
+ 368   1          tx_frame_p = (frame_info_t *)BMM_BUFFER_POINTER(buf_p);
+ 369   1      
+ 370   1          /* Store the message type */
+ 371   1          tx_frame_p->msg_type   = MCPS_MESSAGE;
+ 372   1          tx_frame_p->msduHandle = mdr.msduHandle;
+ 373   1      
+ 374   1          tx_frame_p->indirect_in_transit = false;
+ 375   1      
+ 376   1          status = build_data_frame(&mdr, tx_frame_p);
+ 377   1      
+ 378   1          if (MAC_SUCCESS != status) {
+ 379   2              /* The frame is too long. */
+ 380   2              mac_gen_mcps_data_conf(buf_p,
+ 381   2                                     (uint8_t)status,
+ 382   2                                     mdr.msduHandle,
+ 383   2                                     0);
+ 384   2              return;
+ 385   2          }
+ 386   1      
+ 387   1          /*
+ 388   1           * Broadcast transmission in a beacon-enabled network intiated by a
+ 389   1           * PAN Coordinator or Coordinator is put into the broadcast queue..
+ 390   1           */
+ 391   1          if (((MAC_PAN_COORD_STARTED == mac_state) || 
+ 392   1              (MAC_COORDINATOR == mac_state)) &&
+ 393   1              (hal_pib_BeaconOrder < NON_BEACON_NWK) &&
+ 394   1              (FCF_SHORT_ADDR == mdr.DstAddrMode) &&
+ 395   1              (BROADCAST == mdr.DstAddr.lo_u32)) {
+ 396   2              /* Append the MCPS data request into the broadcast queue */
+ 397   2              if (FALSE == qmm_queue_append(&broadcast_q, buf_p)) {
+ 398   3                  mac_gen_mcps_data_conf(buf_p,
+ 399   3                                         (uint8_t)MAC_CHANNEL_ACCESS_FAILURE,
+ 400   3                                         mdr.msduHandle,
+ 401   3                                         0);
+ 402   3                  return;
+ 403   3              }
+ 404   2          }
+ 405   1      
+ 406   1          /*
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 8   
+
+ 407   1           * Indirect transmission is only allowed if we are
+ 408   1           * a PAN coordinator or coordinator.
+ 409   1           */
+ 410   1          if ((mdr.TxOptions & TX_INDIRECT) &&
+ 411   1              ((MAC_PAN_COORD_STARTED == mac_state) ||
+ 412   1               (MAC_COORDINATOR == mac_state))) {
+ 413   2              /* Append the MCPS data request into the indirect data queue */
+ 414   2              if (FALSE == qmm_queue_append(&indirect_data_q, buf_p)) {
+ 415   3                  mac_gen_mcps_data_conf(buf_p,
+ 416   3                                         (uint8_t)MAC_TRANSACTION_OVERFLOW,
+ 417   3                                         mdr.msduHandle,
+ 418   3                                         0);
+ 419   3                  return;
+ 420   3              }
+ 421   2      
+ 422   2              /*
+ 423   2               * If an FFD does have pending data,
+ 424   2               * the MAC persistence timer needs to be started.
+ 425   2               */
+ 426   2              tx_frame_p->persistence_time = mac_pib_macTransactionPersistenceTime;
+ 427   2              tx_frame_p->persistence_time = 200;  // son nguyen // Kiran added during merge
+ 428   2              mac_start_persistence_timer();
+ 429   2          } else {
+ 430   2              /* Transmission should be done with CSMA-CA and with frame retries. */
+ 431   2              tx_mode_t tx_mode;
+ 432   2      
+ 433   2              /*
+ 434   2               * We are NOT indirect, so we need to transmit using
+ 435   2               * CSMA_CA in the CAP (for beacon enabled) or immediately (for
+ 436   2               * a non-beacon enabled).
+ 437   2               */
+ 438   2              mac_trx_wakeup();
+ 439   2      
+ 440   2              tx_frame_p->buffer_header_p = buf_p;
+ 441   2      
+ 442   2              if (NON_BEACON_NWK == hal_pib_BeaconOrder) {
+ 443   3                  /* In Nonbeacon network the frame is sent with unslotted CSMA-CA. */
+ 444   3                  tx_mode = CSMA_UNSLOTTED;
+ 445   3              } else {
+ 446   3                  /* In Beacon network the frame is sent with slotted CSMA-CA. */
+ 447   3                  tx_mode = CSMA_SLOTTED;
+ 448   3              }
+ 449   2      
+ 450   2              status = mac_hal_tx_frame(tx_frame_p, tx_mode,
+ 451   2                                        (mdr.Security.SecurityLevel > 0) ? TRUE:FALSE);
+ 452   2      
+ 453   2              if (MAC_SUCCESS == status) {
+ 454   3                  MAC_BUSY();
+ 455   3              } else {
+ 456   3                  /* Transmission to TAL failed, generate confirmation message. */
+ 457   3                  mac_gen_mcps_data_conf(buf_p,
+ 458   3                                         (uint8_t)MAC_CHANNEL_ACCESS_FAILURE,
+ 459   3                                         mdr.msduHandle,
+ 460   3                                         0);
+ 461   3      
+ 462   3                  /* Set radio to sleep if allowed */
+ 463   3                  mac_trx_sleep();
+ 464   3              }
+ 465   2          }
+ 466   1      } /* mcps_data_request() */
+ 467          
+ 468          
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 9   
+
+ 469          /**
+ 470           *
+ 471           * This functions processes a MCPS-PURGE.request from the NHLE.
+ 472           * The MCPS-PURGE.request primitive allows the next higher layer
+ 473           * to purge an MSDU from the transaction queue.
+ 474           * On receipt of the MCPS-PURGE.request primitive, the MAC sublayer
+ 475           * attempts to find in its transaction queue the MSDU indicated by the
+ 476           * msduHandle parameter. If an MSDU matching the given handle is found,
+ 477           * the MSDU is discarded from the transaction queue, and the MAC
+ 478           * sublayer issues the MCPSPURGE. confirm primitive with a status of
+ 479           * MAC_SUCCESS. If an MSDU matching the given handle is not found, the MAC
+ 480           * sublayer issues the MCPS-PURGE.confirm primitive with a status of
+ 481           * INVALID_HANDLE.
+ 482           *
+ 483           * @param msg Pointer to the MCPS-PURGE.request parameter
+ 484           */
+ 485          void mcps_purge_request (buffer_t *buf_p)
+ 486          {
+ 487   1          mcps_purge_req_t *mpr_p =
+ 488   1              (mcps_purge_req_t *)BMM_BUFFER_POINTER(buf_p);
+ 489   1      
+ 490   1          mcps_purge_conf_t *mpc_p = (mcps_purge_conf_t *)mpr_p;
+ 491   1      
+ 492   1          uint8_t purge_handle = mpr_p->msduHandle;
+ 493   1      
+ 494   1          /* Update the purge confirm structure */
+ 495   1          mpc_p->cmdcode = MCPS_PURGE_CONFIRM;
+ 496   1          mpc_p->msduHandle = purge_handle;
+ 497   1      
+ 498   1          if (mac_buffer_purge(purge_handle)) {
+ 499   2              mpc_p->status = MAC_SUCCESS;
+ 500   2          } else {
+ 501   2              mpc_p->status = MAC_INVALID_HANDLE;
+ 502   2          }
+ 503   1      
+ 504   1      #if (defined UM) && (!defined ZBMAC_DIAG)
+ 505   1        mlme_send_to_host(buf_p);
+ 506   1      #else
+                mcps_purge_conf(buf_p);
+              #endif    
+ 509   1      }
+ 510          
+ 511          /**
+ 512           *
+ 513           * This function processes the data frames received and sends
+ 514           * mcps_data_indication to the NHLE.
+ 515           *
+ 516           * buf_ptr - Pointer to receive buffer of the data frame
+ 517           */
+ 518          void mac_process_data_frame (buffer_t *buf_ptr)
+ 519          {
+ 520   1          mcps_data_ind_t *mdi_p = (mcps_data_ind_t *)BMM_BUFFER_POINTER(buf_ptr);
+ 521   1      
+ 522   1          if (mac_parse_data.mac_payload_length == 0) {
+ 523   2              /*
+ 524   2               * A null frame is neither indicated to the higher layer
+ 525   2               * nor checked for for frame pending bit set, since
+ 526   2               * null data frames with frame pending bit set are nonsense.
+ 527   2               */
+ 528   2              /* Since no indication is generated, the frame buffer is released. */
+ 529   2              bmm_buffer_free(buf_ptr);
+ 530   2      
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 10  
+
+ 531   2              /* Set radio to sleep if allowed */
+ 532   2              mac_trx_sleep();
+ 533   2          } else {
+ 534   2              /* Build the MLME_Data_indication parameters. */
+ 535   2              mdi_p->DSN = mac_parse_data.sequence_number;
+ 536   2              mdi_p->Timestamp = mac_parse_data.time_stamp;
+ 537   2      
+ 538   2              /* Source address info */
+ 539   2              mdi_p->SrcAddrMode = mac_parse_data.src_addr_mode;
+ 540   2              mdi_p->SrcPANId = mac_parse_data.src_panid;
+ 541   2      
+ 542   2              if (FCF_LONG_ADDR == mdi_p->SrcAddrMode ||
+ 543   2                  FCF_SHORT_ADDR == mdi_p->SrcAddrMode) {
+ 544   3                  EXT_ADDR_CLEAR(mdi_p->SrcAddr);
+ 545   3                  if (FCF_SHORT_ADDR == mdi_p->SrcAddrMode) {
+ 546   4                      ADDR_COPY_DST_SRC_16(mdi_p->SrcAddr.lo_u32,
+ 547   4                                           mac_parse_data.src_addr.short_address);
+ 548   4                  } else if (FCF_LONG_ADDR == mdi_p->SrcAddrMode) {
+ 549   4                      ADDR_COPY_DST_SRC_64(mdi_p->SrcAddr,
+ 550   4                                           mac_parse_data.src_addr.long_address);
+ 551   4                  }
+ 552   3              } else {
+ 553   3                  /*
+ 554   3                   * Even if the Source address mode is zero, and the source address
+ 555   3                   * informationis ís not present, the values are cleared to prevent
+ 556   3                   * the providing of trash information.
+ 557   3                   */
+ 558   3                  mdi_p->SrcPANId = 0;
+ 559   3                  EXT_ADDR_CLEAR(mdi_p->SrcAddr);
+ 560   3              }
+ 561   2      
+ 562   2      
+ 563   2              /* Start of duplicate detection. */
+ 564   2              if ((mdi_p->DSN == mac_last_dsn) &&
+ 565   2                  (EXT_ADDR_MATCH(mdi_p->SrcAddr, mac_last_src_addr))) {
+ 566   3      #ifndef DUP_CNT
+ 567   3                  /*
+ 568   3                   * Don't count duplicate packets per Hung/Rachel request
+ 569   3                   */
+ 570   3                  mac_stats_g.rx_pkts_count--;
+ 571   3                  mac_stats_g.rx_bytes_count -= mac_parse_data.mpdu_length;
+ 572   3      #endif
+ 573   3                  /*
+ 574   3                   * This is a duplicated frame.
+ 575   3                   * It will not be indicated to the next higher layer,
+ 576   3                   * but nevetheless the frame pending bit needs to be
+ 577   3                   * checked and acted upon.
+ 578   3                   */
+ 579   3                  bmm_buffer_free(buf_ptr);
+ 580   3              } else {
+ 581   3                  /* Generate data indication to next higher layer. */
+ 582   3      
+ 583   3                  /* Store required information for perform subsequent
+ 584   3                   * duplicate detections.
+ 585   3                   */
+ 586   3                  mac_last_dsn = mdi_p->DSN;
+ 587   3                  mac_last_src_addr = mdi_p->SrcAddr;
+ 588   3      
+ 589   3                  /* Destination address info */
+ 590   3                  mdi_p->DstAddrMode = mac_parse_data.dest_addr_mode;
+ 591   3                  /*
+ 592   3                   * Setting the address to zero is required for a short address
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 11  
+
+ 593   3                   * and in case no address is included. Therefore the address
+ 594   3                   * is first always set to zero to reduce code size.
+ 595   3                   */
+ 596   3                  EXT_ADDR_CLEAR(mdi_p->DstAddr);
+ 597   3                  /*
+ 598   3                   * Setting the PAN-Id to the Destiantion PAN-Id is required
+ 599   3                   * for a both short and long address, but not in case no address
+ 600   3                   * is included. Therefore the PAN-ID is first always set to
+ 601   3                   * the Destination PAN-IDto reduce code size.
+ 602   3                   */
+ 603   3                  mdi_p->DstPANId = mac_parse_data.dest_panid;
+ 604   3                  if (FCF_LONG_ADDR == mdi_p->DstAddrMode) {
+ 605   4                      ADDR_COPY_DST_SRC_64(mdi_p->DstAddr,
+ 606   4                                           mac_parse_data.dest_addr.long_address);
+ 607   4                  } else if (FCF_SHORT_ADDR == mdi_p->DstAddrMode) {
+ 608   4                      ADDR_COPY_DST_SRC_16(mdi_p->DstAddr.lo_u32,
+ 609   4                                           mac_parse_data.dest_addr.short_address);
+ 610   4                  } else {
+ 611   4                      /*
+ 612   4                       * Even if the Destination address mode is zero,
+ 613   4                       * and the destination address information is ís not present,
+ 614   4                       * the values are cleared to prevent the providing of
+ 615   4                       * trash information.
+ 616   4                       * The Desintation address was already cleared above.
+ 617   4                       */
+ 618   4                      mdi_p->DstPANId = 0;
+ 619   4                  }
+ 620   3      
+ 621   3                  mdi_p->mpduLinkQuality = mac_parse_data.ppdu_link_quality;
+ 622   3                  mdi_p->Security.SecurityLevel = mac_parse_data.sec_ctrl.sec_level;
+ 623   3                  mdi_p->Security.KeyIdMode = mac_parse_data.sec_ctrl.key_id_mode;
+ 624   3                  if (mac_parse_data.sec_ctrl.key_id_mode == 1) {
+ 625   4                      mdi_p->Security.KeyIndex = mac_parse_data.key_id[0];
+ 626   4                  } else if (mac_parse_data.sec_ctrl.key_id_mode == 2) {
+ 627   4                      memcpy(mdi_p->Security.KeySource, mac_parse_data.key_id,
+ 628   4                             4);
+ 629   4                      mdi_p->Security.KeyIndex = mac_parse_data.key_id[4];
+ 630   4                  } else if (mac_parse_data.sec_ctrl.key_id_mode == 3) {
+ 631   4                      memcpy(mdi_p->Security.KeySource, mac_parse_data.key_id,
+ 632   4                             8);
+ 633   4                      mdi_p->Security.KeyIndex = mac_parse_data.key_id[8];
+ 634   4                  }
+ 635   3      
+ 636   3                  mdi_p->msduLength = mac_parse_data.mac_payload_length;
+ 637   3      
+ 638   3                  /* Set pointer to data frame payload. */
+ 639   3                  mdi_p->msdu_p =
+ 640   3                      mac_parse_data.mac_payload_data.payload_data.payload_p;
+ 641   3      
+ 642   3                  mdi_p->cmdcode = MCPS_DATA_INDICATION;
+ 643   3      
+ 644   3      #if (defined UM) && (!defined ZBMAC_DIAG)
+ 645   3            mlme_send_to_host(buf_ptr);
+ 646   3      #else
+                    mcps_data_ind(buf_ptr);
+              #endif                      
+ 649   3              }
+ 650   2      
+ 651   2      
+ 652   2              /* 
+ 653   2               * Continue with checking the frame pending bit in the received
+ 654   2               * data frame.
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 12  
+
+ 655   2               */
+ 656   2              if (mac_parse_data.fcf & FCF_FRAME_PENDING) {
+ 657   3                  /* An node that is not PAN coordinator may poll for pending data. */
+ 658   3                  if (MAC_PAN_COORD_STARTED != mac_state) {
+ 659   4                      address_field_t src_addr;
+ 660   4      
+ 661   4                      /* Build command frame due to implicit poll request */
+ 662   4                      /*
+ 663   4                       * No explicit destination address attached, so use current
+ 664   4                       * values of PIB attributes macCoordShortAddress or
+ 665   4                       * macCoordExtendedAddress.
+ 666   4                       */
+ 667   4                      /*
+ 668   4                       * This implicit poll (i.e. corresponding data request
+ 669   4                       * frame) is to be sent to the same node that we have received
+ 670   4                       * this data frame. Therefore the source address information
+ 671   4                       * from this data frame needs to be extracted, and used for the
+ 672   4                       * data request frame appropriately.
+ 673   4                       * Use this as destination address expclitily and
+ 674   4                       * feed this to the function mac_build_and_tx_data_req
+ 675   4                       */
+ 676   4                      if (FCF_SHORT_ADDR == mac_parse_data.src_addr_mode) {
+ 677   5                          ADDR_COPY_DST_SRC_16(src_addr.short_address,
+ 678   5                                               mac_parse_data.src_addr.short_address);
+ 679   5      
+ 680   5                          mac_data_build_and_tx_data_req(false, false, FCF_SHORT_ADDR,
+ 681   5                                                      (address_field_t *)&(src_addr),
+ 682   5                                                      mac_parse_data.src_panid);
+ 683   5                      } else if (FCF_LONG_ADDR == mac_parse_data.src_addr_mode) {
+ 684   5                          ADDR_COPY_DST_SRC_64(src_addr.long_address,
+ 685   5                                               mac_parse_data.src_addr.long_address);
+ 686   5      
+ 687   5                          mac_data_build_and_tx_data_req(false, false, FCF_LONG_ADDR,
+ 688   5                                                       (address_field_t *)&(src_addr),
+ 689   5                                                         mac_parse_data.src_panid);
+ 690   5                      } else {
+ 691   5                          mac_data_build_and_tx_data_req(false, false, 0, NULL, 0);
+ 692   5                      }
+ 693   4                  }
+ 694   3              } else {
+ 695   3                  /* Frame pending but was not set, so no further action required. */
+ 696   3                  /* Set radio to sleep if allowed */
+ 697   3                  mac_trx_sleep();
+ 698   3              }   /* if (mac_parse_data.fcf & FCF_FRAME_PENDING) */
+ 699   2          }   /* (mac_parse_data.payload_length == 0) */
+ 700   1      }
+ 701          
+ 702          
+ 703          /*
+ 704           * Start the Persistence timer for indirect data
+ 705           *
+ 706           * This function starts the persistence timer for handling of indirect
+ 707           * data.
+ 708           */
+ 709          void mac_start_persistence_timer (void)
+ 710          {
+ 711   1          retval_t status = MAC_FAILURE;
+ 712   1          uint32_t persistence_int_us;
+ 713   1          uint8_t bo_for_persistence_tmr;
+ 714   1      #ifdef RTX51_TINY_OS
+ 715   1          eStatus timer_status;
+ 716   1      #endif
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 13  
+
+ 717   1      
+ 718   1          if (hal_pib_BeaconOrder == NON_BEACON_NWK) {
+ 719   2              /*
+ 720   2               * The timeout interval for the indirect data persistence timer is
+ 721   2               * based on the define below and is the same as for a nonbeacon build.
+ 722   2               */
+ 723   2              bo_for_persistence_tmr = BO_USED_FOR_MAC_PERS_TIME;
+ 724   2          } else {
+ 725   2              /*
+ 726   2               * The timeout interval for the indirect data persistence timer is
+ 727   2               * based on the current beacon order.
+ 728   2               */
+ 729   2              bo_for_persistence_tmr = hal_pib_BeaconOrder;
+ 730   2          }
+ 731   1      
+ 732   1          persistence_int_us =
+ 733   1              HAL_CONVERT_SYMBOLS_TO_US(
+ 734   1                  HAL_GET_BEACON_INTERVAL_TIME(bo_for_persistence_tmr)) / 1000;
+ 735   1      
+ 736   1          if (indirect_data_q.size > 0) {
+ 737   2              mac_hal_frame_pending(true);
+ 738   2          }
+ 739   1      
+ 740   1          /* Start the indirect data persistence timer now. */
+ 741   1      #ifdef RTX51_TINY_OS
+ 742   1          timer_status = STM_StartTimer(indirect_data_persistence_timer,
+ 743   1                                        persistence_int_us);
+ 744   1          // son nguyen printf("\nmcps_data persistence_int_us %lu", persistence_int_us); 
+ 745   1          if (STATUS_SUCCESS != timer_status) { // Kiran added during merge
+ 746   2              qmm_queue_flush(&indirect_data_q);
+ 747   2              printf("\nqmm Failed to start timer");
+ 748   2          }
+ 749   1      #endif
+ 750   1      }
+ 751          
+ 752          /*
+ 753           * This function generates the confirmation for those indirect data buffers
+ 754           * whose persistence time has reduced to zero.
+ 755           *
+ 756           * @param buf_ptr Pointer to buffer of indirect data whose persistance time
+ 757           * has reduced to zero
+ 758           */
+ 759          static void handle_exp_persistence_timer (buffer_t *buf_ptr)
+ 760          {
+ 761   1          frame_info_t *tx_frame_p = (frame_info_t *)BMM_BUFFER_POINTER(buf_ptr);
+ 762   1      
+ 763   1          /*
+ 764   1           * The frame should never be in transmission while this function
+ 765   1           * is called.
+ 766   1           */
+ 767   1          switch (tx_frame_p->msg_type) {
+ 768   2          case ASSOCIATIONRESPONSE:
+ 769   2              mac_mlme_comm_status(MAC_TRANSACTION_EXPIRED, buf_ptr);
+ 770   2              break;
+ 771   2      
+ 772   2          case DISASSOCIATIONNOTIFICATION:
+ 773   2              /*
+ 774   2               * Prepare disassociation confirm message after transmission of
+ 775   2               * the disassociation notification frame.
+ 776   2               */
+ 777   2              mac_prep_disassoc_conf(buf_ptr, MAC_TRANSACTION_EXPIRED);
+ 778   2              break;
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 14  
+
+ 779   2      
+ 780   2          case MCPS_MESSAGE:
+ 781   2              mac_gen_mcps_data_conf(buf_ptr, (uint8_t)MAC_TRANSACTION_EXPIRED,
+ 782   2                                     tx_frame_p->msduHandle, 0);
+ 783   2              break;
+ 784   2      
+ 785   2          default:
+ 786   2              /* Nothing to be done here. */
+ 787   2              break;
+ 788   2          }
+ 789   1      }
+ 790          
+ 791          /*
+ 792           *
+ 793           * Handles the decrement of the persistance time of each indirect data frame
+ 794           * in the indirect queue.
+ 795           * If the persistance time of any indirect data reduces to zero, the
+ 796           * frame is removed from the indirect queue and
+ 797           * a confirmation for that indirect data is sent with the status
+ 798           * transaction expired.
+ 799           */
+ 800          static void handle_persistence_time_decrement (void)
+ 801          {
+ 802   1          search_t find_buf;
+ 803   1          buffer_t *buffer_persistent_zero = NULL;
+ 804   1      
+ 805   1          /*
+ 806   1           * This callback function traverses through the indirect queue and
+ 807   1           * decrements the persistence time for each data frame.
+ 808   1           */
+ 809   1      #ifdef CALLBACK
+                  find_buf.compare_func = decrement_persistence_time;
+              #else
+ 812   1          find_buf.compare_func_id = MAC_DECREMENT_PERSI_TIME;
+ 813   1      #endif
+ 814   1      
+ 815   1          /*
+ 816   1           * At the end of this function call (qmm_queue_read), the indirect data
+ 817   1           * will be updated with the decremented persistence time.
+ 818   1           */
+ 819   1          qmm_queue_read(&indirect_data_q, &find_buf);
+ 820   1      
+ 821   1          /*
+ 822   1           * Once we have updated the persistence timer, any frame with a persistence
+ 823   1           * time of zero needs to be removed from the indirect queue.
+ 824   1           */
+ 825   1      
+ 826   1          /*
+ 827   1           * This callback function traverses through the indirect queue and
+ 828   1           * searches for a data frame with persistence time equal to zero.
+ 829   1           */
+ 830   1      #ifdef CALLBACK
+                  find_buf.compare_func = check_persistence_time_zero;
+              #else
+ 833   1          find_buf.compare_func_id = MAC_CHECK_PERSI_TIME_ZERO;
+ 834   1      #endif
+ 835   1      
+ 836   1          do {    
+ 837   2              buffer_persistent_zero = qmm_queue_remove(&indirect_data_q, &find_buf);
+ 838   2      
+ 839   2              if (NULL != buffer_persistent_zero) {
+ 840   3                  handle_exp_persistence_timer(buffer_persistent_zero);
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 15  
+
+ 841   3              }
+ 842   2          } while (NULL != buffer_persistent_zero);
+ 843   1          
+ 844   1          mac_hal_frame_pending(false); /* Tell h/w no more frame pending */
+ 845   1      }
+ 846          
+ 847          /*
+ 848           * @brief Handles timeout of indirect data persistence timer
+ 849           *
+ 850           * This function is a callback function of the timer started for checking
+ 851           * the mac persistence time of indirect data in the queue.
+ 852           *
+ 853           * @param callback_parameter Callback parameter
+ 854           */
+ 855          void mac_persistence_timer_cb (void *callback_parameter)
+ 856          {
+ 857   1          /* Decrement the persistence time for indirect data. */
+ 858   1          handle_persistence_time_decrement();
+ 859   1      
+ 860   1          if (indirect_data_q.size > 0) {
+ 861   2              /* Restart persistence timer. */
+ 862   2              mac_start_persistence_timer();
+ 863   2          }
+ 864   1      
+ 865   1          callback_parameter = callback_parameter; /* Keep compiler happy. */
+ 866   1      }
+ 867          
+ 868          /*
+ 869           *
+ 870           * buf_ptr Pointer to the indirect data in the indirect queue
+ 871           * handle Callback parameter
+ 872           *
+ 873           * return FALSE to traverse through the full indirect queue
+ 874           *
+ 875           */
+ 876          bool decrement_persistence_time (void *buf_ptr, void *handle)
+ 877          {
+ 878   1          frame_info_t *frame_p = (frame_info_t *)buf_ptr;
+ 879   1      
+ 880   1          /*
+ 881   1           * In case the frame is currently in the process of being transmitted,
+ 882   1           * the persistence time is not decremented, to avoid the expiration of
+ 883   1           * the persistence timer during transmission.
+ 884   1           * Once the transmission is done (and was not successful),
+ 885   1           * the frame will still be in the indirect queue and the persistence
+ 886   1           * timer will be decremented again.
+ 887   1           */
+ 888   1          if (!frame_p->indirect_in_transit) {
+ 889   2              /* Decrement the persistence time for this indirect data frame. */
+ 890   2              frame_p->persistence_time--;
+ 891   2          }
+ 892   1      
+ 893   1          handle = handle;    /* Keep compiler happy. */
+ 894   1      
+ 895   1          return (false);
+ 896   1      }
+ 897          
+ 898          /*
+ 899           *
+ 900           * This callback function checks whether the persistence time
+ 901           * of the indirect data is set to zero.
+ 902           *
+C51 COMPILER V9.53.0.0   MAC_MCPS_DATA                                                     11/04/2015 20:09:49 PAGE 16  
+
+ 903           * buf_p - Pointer to indirect data buffer
+ 904           *
+ 905           * @return 1 if extended address passed matches with the destination
+ 906           * address of the indirect frame , 0 otherwise
+ 907           */
+ 908          bool check_persistence_time_zero (void *buf_ptr, void *handle)
+ 909          {
+ 910   1          frame_info_t *frame = (frame_info_t *)buf_ptr;
+ 911   1      
+ 912   1          /* Frame shall not be in transmission. */
+ 913   1          if (!frame->indirect_in_transit) {
+ 914   2              if (frame->persistence_time == 0) {
+ 915   3                  return (true);
+ 916   3              }
+ 917   2          }
+ 918   1      
+ 919   1          handle = handle;    /* Keep compiler happy. */
+ 920   1      
+ 921   1          return (false);
+ 922   1      }
+ 923          
+ 924          #endif //HYBRII_802154
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3500    ----
+   CONSTANT SIZE    =     27    ----
+   XDATA SIZE       =      4     141
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

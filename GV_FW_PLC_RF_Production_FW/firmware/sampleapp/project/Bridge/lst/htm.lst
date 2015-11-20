@@ -1,0 +1,3694 @@
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE HTM
+OBJECT MODULE PLACED IN .\obj\htm.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\hpgp\src\test\htm.c LARGE OBJECTADVANCED OPTIMIZE(9
+                    -,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..
+                    -\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\h
+                    -al;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\fi
+                    -rmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbe
+                    -e;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\in
+                    -c;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\i
+                    -nc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;
+                    -..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers
+                    -\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..
+                    -\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\
+                    -components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers
+                    -\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilitie
+                    -s;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\n
+                    -wk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..
+                    -\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII
+                    -_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC
+                    -,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DET
+                    -ECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUP
+                    -T,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REG
+                    -ISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\htm.lst) TABS(2) OBJE
+                    -CT(.\obj\htm.obj)
+
+line level    source
+
+   1          /** ========================================================
+   2           *
+   3           * @file htm.c
+   4           * 
+   5           *  @brief HPGP Test Manager
+   6           *
+   7           *  Copyright (C) 2010-2012, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * =========================================================*/
+  11          
+  12          
+  13          #ifdef RTX51_TINY_OS
+  14          #include <rtx51tny.h>
+  15          #endif  //RTX51_TINY_OS
+  16          #include <string.h>
+  17          #include <stdio.h>
+  18          #include <stdlib.h>
+  19          #include <intrins.h>
+  20          #if defined __GNUC__
+              #include <unistd.h> //sleep
+              #endif  //__GNUC__
+  23          #include "papdef.h"
+  24          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif  //ROUTE
+  27          #include "hal_eth.h"
+  28          #ifdef UM
+  29          #include "nma.h"
+  30          #endif  //UM
+  31          #include "hal_common.h"
+  32          #include "crm.h"
+  33          #include "fm.h"
+  34          #include "ctrll.h"
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 2   
+
+  35          #include "linkl.h"
+  36          #include "hpgpdef.h"
+  37          #include "nma.h"
+  38          #include "nma_fw.h"
+  39          #include "hpgpapi.h"
+  40          #include "list.h"
+  41          #include "event.h"
+  42          #include "hpgpdef.h"
+  43          #include "htm.h"
+  44          #ifdef LLP_POWERSAVE
+              #include "psm.h"
+              #endif
+  47          #include "timer.h"
+  48          #include "stm.h"
+  49          #include "ui_utils.h"
+  50          #ifdef HYBRII_802154
+  51          #include "mac_diag.h"
+  52          #endif
+  53          #ifdef P8051
+  54          #include "uart.h"
+  55          #endif
+  56          #if defined(WIN32) || defined(_WIN32) || defined(LINUX)
+              #include <pthread.h>
+              #include <errno.h>
+              #endif 
+  60          #include "green.h"
+  61          #include "sys_common.h"
+  62          #ifdef UART_HOST_INTF 
+  63          #include "gv701x_uartdriver_fw.h"
+  64          #include "gv701x_uartdriver.h"
+  65          #endif
+  66          #include "datapath.h"
+  67          #include "dmm.h"
+  68          #include "frametask.h"
+  69          #include "hybrii_tasks.h"
+  70          #include "list.h"
+  71          #ifdef NO_HOST
+  72          #include "event.h"
+  73          #endif
+  74          #include "gv701x_gpiodriver.h"
+  75          #include "hpgp_msgs.h"
+  76          #include "hal_hpgp_reset.h"
+  77          #ifdef HYBRII_802154
+  78          #include "return_val.h"
+  79          #include "qmm.h"
+  80          #include "bmm.h"
+  81          #include "mac_const.h"
+  82          #include "mac_msgs.h"
+  83          #include "mac_data_structures.h"
+  84          #include "mac_hal.h"
+  85          #include "mac_internal.h"
+  86          #include "mac_api.h"
+  87          #include "mac.h"
+  88          #endif
+  89          #ifdef _LED_DEMO_
+              #include "led_board.h"
+              #endif
+  92          #include "gv701x_flash_fw.h"
+  93          #ifdef NO_HOST
+  94          #include "gv701x_flash.h"
+  95          #endif
+  96          
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 3   
+
+  97          #ifdef NO_HOST
+  98          gv701x_app_msg_hdr_t msg_hdr_app_cmd;
+  99          #endif
+ 100          extern sHomePlugCb HomePlug;
+ 101          #ifdef DEBUG_DATAPATH
+ 102          extern u8 sigDbg;
+ 103          extern u8 pktDbg;
+ 104          extern u8 ethQueueDebug;
+ 105          #endif
+ 106          #ifdef ROUTE_TEST
+              extern u8 dropTei[3];
+              u8 dropcco = 0;
+              #endif
+ 110          #ifdef LOG_FLASH
+              extern u32 lastITime;
+              extern u32 lastBtime;
+              extern u8 log[600];
+              extern u16 *logLen;
+              extern u16 *blockId;
+              extern u32 logIndx;
+              #endif
+ 118          u8 devNum = 0;
+ 119          
+ 120          #ifdef POWERSAVE
+              u8 psDebug=0;
+              u8 txOff=0;
+              u8 rxOff=0;
+              u8 phyOff=0;
+              u8 macClkChange=0;
+              u8 pllOff=0;
+              #endif  //POWERSAVE
+ 128          #ifdef LLP_POWERSAVE
+              u8 psDebug=0;
+              u8 psDebug1=0;
+              #endif
+ 132          extern sysProfile_t gSysProfile;
+ 133          extern u16 FmDebug;
+ 134          extern u8 hostDetected;
+ 135          extern void datapath_queue_depth(queue_id_e id);
+ 136          #ifdef UART_HOST_INTF 
+ 137          extern u8 GV701x_UartConfig(u32 baudrate, u16 rxthreshold);
+ 138          #endif  //UART_HOST_INTF
+ 139          extern void GV701x_GPIO_Config(u8 mode, u32 gpio);
+ 140          extern void GV701x_GPIO_Write(u32 gpio,u8 value);
+ 141          #ifdef LOG_FLASH
+              eStatus dumpLog();
+              #endif
+ 144          #ifdef SW_RECOVERY
+ 145          extern u32 gL1;
+ 146          extern u32 gL2;
+ 147          extern u32 gL3;
+ 148          extern u32 gBCNR;
+ 149          extern u32 gDiscStall;
+ 150          extern u32 gBcnStall;
+ 151          
+ 152          #endif
+ 153          #ifdef Z_P_BRIDGE
+              extern void mac_hal_bridge_config(uint8_t enable);
+              #endif
+ 156          #ifdef LandS
+              void led_driver_write (unsigned char ch_no, unsigned int usr_value);
+              #endif
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 4   
+
+ 159          #ifdef LINK_STATUS
+              extern u8 linkStatus;
+              #endif
+ 162          extern u8 opMode;
+ 163          #ifdef PLC_TEST
+              extern u8 gCount;
+              extern u8 gCCOTest;
+              #endif
+ 167          #ifdef NO_HOST
+ 168          extern sDmm AppDmm;
+ 169          #endif
+ 170          
+ 171          u8 poll_key(void);
+ 172          eStatus setMac(void);
+ 173          eStatus setMac1(void);
+ 174          eStatus setMac2(void);
+ 175          void getMac(void);
+ 176          void broadcast_CCOTEI(void);
+ 177          #ifdef NO_HOST
+ 178          extern void GV701x_Nwk_CmdProcess(char* CmdBuf);
+ 179          #endif
+ 180          
+ 181          void HTM_Manu()
+ 182          {
+ 183   1      #if 0
+                  printf(" Test Manu (select one)\n");
+                  printf(" 1: Set default NID\n");
+              #if 0 //def CCO_FUNC
+                  printf("2:Start the nw as CCO\n");
+              #endif
+              #if 0 //def STA_FUNC
+                  printf("3:Actively join the nw as STA\n");
+                  printf("4:Start network disc\n");
+                printf("5:Passively join the nw as STA\n");
+              #endif
+              #if 0
+                  
+                  printf(" 6: Start associated STA\n");
+                  printf(" 7: Leave the network\n");
+                  printf(" 8: Set CCo capability\n");
+                  printf(" 9: Start User-Appointed CCo\n");
+                  printf(" 30: Test CRM\n");
+                  printf(" 31: Display CRM\n");
+              #endif
+              #endif
+ 204   1      }
+ 205          
+ 206          
+ 207          #if 0//def UART_HOST_INTF
+              void display_uart_stat()
+              {
+              
+                FM_Printf(FM_USER,"\n******RX Stat***********\n");
+                FM_Printf(FM_USER,"Rx Count              %u\n",uartRxControl.rxCount);
+                FM_Printf(FM_USER,"Rx Ready              %bu\n",uartRxControl.rxReady);
+                FM_Printf(FM_USER,"Last Rx Frame Len     %u\n",uartRxControl.lastRxCount);
+                FM_Printf(FM_USER,"Rx Frame Count        %lu\n",uartRxControl.rxFrameCount);
+                FM_Printf(FM_USER,"CPU QD Grant Fail     %lu\n",uartRxControl.cpuGrantfail);
+                FM_Printf(FM_USER,"Rx Frame Loss         %lu\n",uartRxControl.rxFrameLoss);
+                FM_Printf(FM_USER,"Rx Frame Loss Soft Q  %u\n",uartRxControl.rxLossSoftQ);
+              #ifndef UART_RAW 
+                FM_Printf(FM_USER,"Rx CRC                %u\n",uartRxControl.crcRx);
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 5   
+
+                FM_Printf(FM_USER,"Rx Good Frame Count   %lu\n",uartRxControl.goodRxFrmCnt);
+                FM_Printf(FM_USER,"Rx Drop Count         %u\n",uartRxControl.rxDropCount);
+              #else
+                FM_Printf(FM_USER,"Rx Expected Count     %u\n",uartRxControl.rxExpectedCount);
+              #endif
+                FM_Printf(FM_USER,"Timeout Period        %lu ms\n",uartRxControl.timeout);
+              #ifdef LG_UART_CONFIG
+                FM_Printf(FM_USER,"Uart Tx Mode: Auto mode = 0, Low Edge = 1, Low Level = 2: %bu",\
+                                            uartTxControl.txModeControl);
+              #endif
+                FM_Printf(FM_USER,"\n*******TX Stat**********\n");
+                FM_Printf(FM_USER,"Tx Pending Count      %u\n",uartTxControl.txCount);
+                FM_Printf(FM_USER,"Tx Frame Count        %lu\n",uartTxControl.txFrameCount);  
+              #ifndef UART_RAW 
+                FM_Printf(FM_USER,"Tx CRC                %u\n",uartTxControl.crcTx);
+              #endif
+              
+              }
+              #endif
+ 240          
+ 241          void update_powermode(u8 TxRxPowermode, u8 powermode)
+ 242          {
+ 243   1          char            input[10];
+ 244   1         
+ 245   1         
+ 246   1          if(TxRxPowermode == 0)
+ 247   1          {
+ 248   2              
+ 249   2              if(powermode == 0)
+ 250   2              {
+ 251   3                 mac_utils_spi_write(0x34,0x08);   //added by varsha
+ 252   3                 mac_utils_spi_write(0x35,0x30);   //added by varsha
+ 253   3                  
+ 254   3              }
+ 255   2              else if(powermode == 1)
+ 256   2              {
+ 257   3                  mac_utils_spi_write(0x34,0x00);   //added by varsha
+ 258   3                  mac_utils_spi_write(0x35,0x00);   //added by varsha
+ 259   3              }
+ 260   2              else if(powermode == 2)
+ 261   2              {
+ 262   3                  mac_utils_spi_write(0x34,0x00);   //added by varsha
+ 263   3                  mac_utils_spi_write(0x35,0x0f);   //added by varsha
+ 264   3              }
+ 265   2          }
+ 266   1          else
+ 267   1          {
+ 268   2              do
+ 269   2            {
+ 270   3              //printf("Enter Rx Power mode : 0-Normal, 1-PS ");
+ 271   3              while (getline(input, sizeof(input)) > 0)
+ 272   3              {
+ 273   4                if(sscanf(input,"%bd",&powermode) >= 1)
+ 274   4                break;
+ 275   4              }
+ 276   3            }while (powermode>1);  
+ 277   2      
+ 278   2               if(powermode == 0)
+ 279   2              {
+ 280   3                 mac_utils_spi_write(0x26,0x00);   //added by varsha
+ 281   3                
+ 282   3                  
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 6   
+
+ 283   3              }
+ 284   2              else if(powermode == 1)
+ 285   2              {
+ 286   3                  mac_utils_spi_write(0x26,0x1C);   //added by varsha
+ 287   3                 
+ 288   3              }
+ 289   2      
+ 290   2      
+ 291   2      
+ 292   2          }
+ 293   1      
+ 294   1      
+ 295   1      }
+ 296          
+ 297          #if 0
+              void HTM_SetLineMode(u8 *cmdBuf)
+              {
+                  u8 lineMd;
+                  if(sscanf(cmdBuf, "%bu", &lineMd) >= 1)
+                  {
+                      sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);    
+                      LINKL_SetLineMode(linkl, (eLineMode)lineMd);
+                  }
+              }
+              
+              #endif
+ 309          
+ 310          
+ 311          void HTM_ResetNsm()
+ 312          {
+ 313   1          sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+ 314   1      
+ 315   1          //CTRLL_StartNetDisc(ctrll);
+ 316   1          
+ 317   1      
+ 318   1      
+ 319   1      }
+ 320          
+ 321          
+ 322          #ifdef UKE_TEST
+              void HTM_SetDefaultNidSC()
+              { 
+                   sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+                   u8     nid[NID_LEN] = {0xb0, 0xf2, 0xe6, 0x95, 0x66, 0x6b, 0x03};
+                                      // {0xB0, 0xF2, 0xE6, 0x95, 0x66, 0x6B, 0x83}; // Zyxel box NID = B0F2E695666B83
+                                                      
+              
+                  u8     nmk[ENC_KEY_LEN] = {0x50, 0xD3, 0xE4, 0x93, 0x3F, 0x85, 0x5B, 0x70, 0x40,
+                                          0x78, 0x4D, 0xF8, 0x15, 0xAA, 0x8D, 0xB7};
+              
+               
+                  nid[NID_LEN-1] &= SECLV_MASK;       
+                  nid[NID_LEN-1] |= (SECLV_SC << SECLV_OFFSET); // By default SC
+              
+                  CTRLL_SetKey(ctrll, nmk, nid);        
+              }
+              
+              
+              void HTM_SetDefaultNidHS()
+              { 
+                   sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+                   u8     nid[NID_LEN] = {0xb0, 0xf2, 0xe6, 0x95, 0x66, 0x6b, 0x03};
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 7   
+
+                          // {0xB0, 0xF2, 0xE6, 0x95, 0x66, 0x6B, 0x83}; // Zyxel box NID = B0F2E695666B83
+                                          
+              
+                  u8     nmk[ENC_KEY_LEN] = {0x50, 0xD3, 0xE4, 0x93, 0x3F, 0x85, 0x5B, 0x70, 0x40,
+                                          0x78, 0x4D, 0xF8, 0x15, 0xAA, 0x8D, 0xB7};
+              
+               
+                nid[NID_LEN-1] &= SECLV_MASK;       
+                  nid[NID_LEN-1] |= (SECLV_HS << SECLV_OFFSET); // By default SC
+              
+                  CTRLL_SetKey(ctrll, nmk, nid);        
+              }
+              #endif
+ 358          
+ 359          
+ 360          void HTM_SetDefaultNid()
+ 361          { 
+ 362   1             sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+ 363   1             
+ 364   1      #ifdef QCA
+                   u8     nid[NID_LEN] = {0xb0, 0xf2, 0xe6, 0x95, 0x66, 0x6b, 0x03};
+                          // {0xB0, 0xF2, 0xE6, 0x95, 0x66, 0x6B, 0x83}; // Zyxel box NID = B0F2E695666B83
+                                          
+              
+                  u8     nmk[ENC_KEY_LEN] = {0x50, 0xD3, 0xE4, 0x93, 0x3F, 0x85, 0x5B, 0x70, 0x40,
+                                          0x78, 0x4D, 0xF8, 0x15, 0xAA, 0x8D, 0xB7};
+              
+               
+              #else 
+ 374   1      #ifdef DEVELO
+                  u8     nid[NID_LEN] = {0x04, 0xa0, 0xad, 0xcd, 0xcd, 0x73, 0x08};
+                          // {0xB0, 0xF2, 0xE6, 0x95, 0x66, 0x6B, 0x83}; // Zyxel box NID = B0F2E695666B83
+                                          
+              
+                  u8     nmk[ENC_KEY_LEN] = {0x50, 0xD3, 0xE4, 0x93, 0x3F, 0x85, 0x5B, 0x70, 0x40,
+                                          0x78, 0x4D, 0xF8, 0x15, 0xAA, 0x8D, 0xB7};
+              
+              #else
+ 383   1          u8     nid[NID_LEN] = {0x47, 0x96, 0x18, 0xdd, 0x60, 0x4C, 0x32};
+ 384   1                  // {0xB0, 0xF2, 0xE6, 0x95, 0x66, 0x6B, 0x83}; // Zyxel box NID = B0F2E695666B83
+ 385   1                                          
+ 386   1          u8     nmk[ENC_KEY_LEN] = {0xa4, 0x5e, 0x36, 0x87, 0x5a, 0x6f, 0x8c, 0xbe,
+ 387   1                                     0x4e, 0x68, 0x24, 0x41, 0x3c, 0xa1, 0x9d, 0x0e};
+ 388   1      
+ 389   1      
+ 390   1      #endif
+ 391   1      #endif                         
+ 392   1      
+ 393   1      #ifndef QCA
+ 394   1        nid[NID_LEN-1] &= SECLV_MASK;       
+ 395   1          nid[NID_LEN-1] |= (SECLV_SC << SECLV_OFFSET); // By default SC
+ 396   1      #endif
+ 397   1          CTRLL_SetKey(ctrll, nmk, nid);        
+ 398   1      }
+ 399          
+ 400          
+ 401          #if 0
+              // Prints the MAC address stored in a 6 byte array to stdout
+              static void HTM_PrintMACAddress(char *dbg, u8 *macAddr)
+              {
+                  printf("%s %02X-%02X-%02X-%02X-%02X-%02X\n", dbg,
+                  macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 8   
+
+              }
+              
+              
+              
+              
+              void HTM_DisplayCrm()
+              {
+                  u8             i, j;
+                  sScb          *scb = NULL;
+                  sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sCrm          *crm = LINKL_GetCrm(linkl);
+              
+                  scb = NULL;
+                  scb = CRM_GetNextScb(crm, scb);
+                  i = 0;
+                  while(scb)
+                  {
+                      FM_Printf(FM_ERROR, "== SCB %d == \n", i);
+                      HTM_PrintMACAddress("\tMAC Addr:", scb->macAddr);
+                      FM_Printf(FM_ERROR, "\ttei: %d \n", scb->tei); 
+                      FM_Printf(FM_ERROR, "\tCCo cap: %d\n",  scb->staCap.fields.ccoCap);
+                      FM_Printf(FM_ERROR, "\tDisc STA list (%d):\n", scb->numDiscSta);  
+                      if(scb->numDiscSta)
+                      {
+                          for(j = 0; j< DISC_STA_LIST_MAX; j++)
+                          {
+                              if(scb->discStaInfo[j].valid)
+                              {
+                                  HTM_PrintMACAddress("\t", scb->discStaInfo[j].macAddr);
+                                  FM_Printf(FM_ERROR, "\ttei: %d. \n", scb->discStaInfo[j].tei); 
+                                  FM_Printf(FM_ERROR, "\tSTA CAP: 0x%.2x. \n", 
+                                                  scb->discStaInfo[j].staCap.byte); 
+                                  FM_Printf(FM_ERROR, "\tSTA STATUS: 0x%.2x. \n", 
+                                                  scb->discStaInfo[j].staStatus.byte); 
+                              }
+                          }
+                     
+                      }
+                      FM_Printf(FM_ERROR, "\t#Disc Net: %d.\n", scb->numDiscNet);          
+                      scb = CRM_GetNextScb(crm, scb);
+                      i++;
+                  }
+              }
+              
+              void HTM_TestCrm()
+              {
+                  u8 i;
+                  sScb          *scb = NULL;
+                  sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+              //    sStaInfo      *staInfo = LINKL_GetStaInfo(linkl);
+                  sCrm          *crm = LINKL_GetCrm(linkl);
+              
+                  CRM_Init(crm);
+                  scb = CRM_AddScb(crm, 23);    
+                  for(i = 0; i < CRM_SCB_MAX; i++)
+                  {
+                      scb = CRM_AllocScb(crm);    
+              //        scb = CRM_AddScb(crm, i);    
+                      if(scb)
+                      {
+                         FM_Printf(FM_ERROR, "%d: Allocate SCB TEI %d.\n", i, scb->tei);
+                      }
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 9   
+
+                      else
+                      {
+                         FM_Printf(FM_ERROR, "%d: no SCB\n", i);
+                      }
+                  }
+                  i = 0;
+                  scb = NULL;
+                  scb = CRM_GetNextScb(crm, scb);
+                  while(scb)
+                  {
+                      FM_Printf(FM_ERROR, "%d, Get SCB TEI %d.\n", i, scb->tei);
+                      scb = CRM_GetNextScb(crm, scb);
+                      i++;
+                  }
+                  scb = CRM_GetScb(crm, 23);
+                  FM_Printf(FM_ERROR, "Get SCB TEI %d and free it.\n", scb->tei);
+                  CRM_FreeScb(crm, scb);
+              
+              //    FM_Printf(FM_ERROR, "Allocate SCB \n");
+              //    scb = CRM_AllocScb(crm);    
+                  scb = CRM_AddScb(crm, 23);    
+                  FM_Printf(FM_ERROR, "Add SCB TEI %d.\n", scb->tei);
+              
+                  CRM_RemoveBucket(crm, 2);
+                  scb = CRM_GetScb(crm, 247);
+              //    FM_Printf(FM_ERROR, "Get SCB TEI %d and free it.\n", scb->tei);
+              //    CRM_FreeScb(crm, scb);
+              
+                  scb = NULL;
+                  scb = CRM_GetNextScb(crm, scb);
+                  i = 0;
+                  while(scb)
+                  {
+                      FM_Printf(FM_ERROR, "%d: SCB TEI %d.\n", i, scb->tei);
+                      scb = CRM_GetNextScb(crm, scb);
+                      i++;
+                  }
+                 
+              
+              }
+              
+              #endif
+ 511          
+ 512          
+ 513          #ifdef CCO_FUNC
+ 514          void HTM_StartNet()
+ 515          {
+ 516   1          sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+ 517   1          //CTRLL_StartNetwork(ctrll, NETWORK_START, NULL);
+ 518   1      }
+ 519          #endif
+ 520          
+ 521          #ifdef STA_FUNC
+ 522          void HTM_JoinNet()
+ 523          {
+ 524   1          sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+ 525   1          //CTRLL_StartNetwork(ctrll, NETWORK_JOIN, NULL);
+ 526   1      }
+ 527          
+ 528          #if 0
+              void HTM_JoinNetPassively()
+              {
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 10  
+
+                  sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+                 // CTRLL_StartNetwork(ctrll, NETWORK_JOIN_PASSIVE, NULL);
+              }
+              
+              #endif
+ 536          
+ 537          void HTM_StartNetDisc()
+ 538          {
+ 539   1          sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+ 540   1          
+ 541   1          CTRLL_StartNetDisc(ctrll);
+ 542   1      }
+ 543          
+ 544          #if 0
+              void HTM_AssocNet()
+              {
+                  sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+                  CTRLL_SendAssocReq(ctrll);
+              }
+              
+              #endif
+ 552          
+ 553          void HTM_LeaveNet()
+ 554          {
+ 555   1          sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+ 556   1      
+ 557   1        CTRLL_NetExit(ctrll);
+ 558   1      }
+ 559          #endif
+ 560          
+ 561          #ifdef POWERSAVE
+              // HTM_psSta: configures the station Power Save mode (used in both CCO and STA)
+              void HTM_psSta()
+              {
+                u8  input[10];
+                u16 sLen;
+                u8  setFlag;
+                  sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer);
+                sScb *scb=NULL;
+                u8 pss = 0;
+                u8 tmpAwd = 0;
+                u8 tmpPsp = 0;
+                u8 tmpVal = 0;
+              
+                if (linkLayer->hal->hhalCb->psAvln == FALSE)
+                {
+                  FM_Printf(FM_MMSG, "PS for AVLN disabled\n");
+                  return;
+                }
+              
+                  if (linkLayer->mode == LINKL_STA_MODE_CCO)
+                {
+                  // this station is CCO
+                  scb = staInfo->ccoScb;
+                }
+                else
+                {
+                  // this station is STA
+                  scb = staInfo->staScb;
+                }
+              
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 11  
+
+                if (!scb)
+                {
+                  FM_Printf(FM_MMSG, "STA neither CCO nor STA\n");
+                  return;
+                }
+              
+                setFlag = !scb->psState;
+              //    HTM_SetStaPs(setFlag);
+                if (setFlag)
+                {
+              //    Scb->pssi = 0;
+              
+              #ifdef PS_MITSUMI
+                  do
+                  {
+                    FM_Printf(FM_MMSG, "Enter 1 for Regular PS mode or 2 for Extended PS mode: ");
+                    while ((sLen = getline(input, sizeof(input))) > 0)
+                    {
+                      if (sLen > 1)
+                      {
+                        if(sscanf(input,"%bu",&tmpVal) >= 1)
+                          break;
+                      }
+                      else
+                        break;    // <CR>, use default value
+                    }
+                  }while((tmpVal != 1) && (tmpVal != 2));
+              
+                  if (tmpVal == 1)
+                  {
+                    tmpAwd = 9; // 2 bps
+                    tmpPsp = 2; // 4 bps  
+                  }
+                  else
+                  {
+                    tmpAwd = 9; // 2 bps
+                    tmpPsp = 3; // 8 bps  
+                  }
+              #else
+                  // if PS is enabled, ask for AWD and PSP
+                  do
+                  {
+                    FM_Printf(FM_USER, "Enter AWD value: 0 - 14 (<CR>: default value of 0) : ");
+                    while ((sLen = getline(input, sizeof(input))) > 0)
+                    {
+              //        FM_Printf(FM_USER, "\ninput1=%s, sLen=%d\n", input, sLen);
+                      if (sLen > 1)
+                      {
+                        if(sscanf(input,"%bu",&tmpAwd) >= 1)
+                          break;
+                      }
+                      else
+                        break;    // <CR>, use default value
+                    }
+                  }while(tmpAwd > 14);
+                  if (tmpAwd == 14)
+                  {
+              #ifndef MPER    
+                    printf("tmpAwd == 14, change to 8\n");
+              #endif
+                    tmpAwd = 8;
+                  }
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 12  
+
+                  do
+                  {
+                    FM_Printf(FM_USER, "Enter PSP value: 0 - 10 (<CR>: default value of 0) : ");
+                    while ((sLen = getline(input, sizeof(input))) > 0)
+                    {
+              //      printf("\ninput2=%s, sLen=%d\n", input, sLen);
+                      if (sLen > 1)
+                      {
+                        if(sscanf(input,"%bu",&tmpPsp) >= 1)
+                          break;
+                      }
+                      else break;   // <CR>, use default value
+                    }
+                  }while(tmpPsp > 10);
+              #endif  //PS_MITSUMI_NO
+              
+                  pss = (tmpAwd << 4) | tmpPsp;
+              //FM_Printf(FM_MMSG, "tmpAwd=0x%bx, tmpPsp=0x%bx, pss=0x%bx\n", tmpAwd, tmpPsp, pss);
+                }
+                else
+                {
+                  pss = 0x0f; // PS=off 
+                }
+              
+                PSM_set_sta_PS(setFlag, pss);
+                  if (linkLayer->mode == LINKL_STA_MODE_CCO)
+                    FM_Printf(FM_MMSG, "PS %s\n", scb->psState ? "ON":"OFF");
+              }
+              
+              // HTM_psAvln: configures the AVLN Power Save mode (set in bcn entry)
+              void HTM_psAvln()
+              {
+                u8  input[10];
+                u8  tmpVal = 0, sLen;
+                  sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer);
+              
+                  if (!PSM_psAvln(!linkLayer->hal->hhalCb->psAvln))
+                {
+                //  FM_Printf(FM_MMSG, "Must be a CCO to exe this cmd. Cmd aborted !\n");
+                  return;
+                }
+              
+                  FM_Printf(FM_MMSG, "PS %s\n", linkLayer->hal->hhalCb->psAvln ? "ON":"OFF");
+              }
+              
+              void HTM_psDisplayPsList()  
+              {
+              
+                  sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+              
+                PSM_psDisplayPsList(linkl->hal->hhalCb->devMode); 
+              }
+              
+              void HTM_stopPs()
+              {
+                u8  input[10];
+                u16 sLen;
+                u8 tei;
+                bool retVal = FALSE;
+              
+                do
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 13  
+
+                {
+                  FM_Printf(FM_USER, "Enter TEI:0-99:: ");
+                  while ((sLen = getline(input, sizeof(input))) > 0)
+                  {
+              //        FM_Printf(FM_USER, "\ninput1=%s, sLen=%d\n", input, sLen);
+                    if (sLen > 1)
+                    {
+                      if(sscanf(input,"%bu",&tei) >= 1)
+                        break;
+                    }
+                    else
+                      break;    // <CR>, use default value
+                  }
+                } while(tei > 100);
+              
+                retVal = PSM_stop_sta_PS(tei);
+                if (retVal != TRUE)
+                  printf("can't stop PS of tei %bu\n", tei);
+              }
+              #endif  //POWERSAVE
+ 737          
+ 738          #ifdef LLP_POWERSAVE
+              // HTM_psSta: configures the station Power Save mode (used in both CCO and STA)
+              void HTM_psSta()
+              {
+                u8  input[10];
+                u16 sLen;
+                u8  setFlag;
+                  sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer);
+                sScb *scb=NULL;
+                u8 pss = 0;
+                u8 tmpAwd = 0;
+                u8 tmpPsp = 0;
+                u8 tmpVal = 1;
+              
+                  if (linkLayer->mode == LINKL_STA_MODE_CCO)
+                {
+                  // this station is CCO
+                  scb = staInfo->ccoScb;
+                  setFlag = !scb->psState;
+                }
+                else
+                {
+                  // this station is STA
+                  scb = staInfo->staScb;
+                  setFlag = !linkLayer->hal->hhalCb->psSta;
+                }
+              
+                if (!scb)
+                {
+                  linkLayer->hal->hhalCb->psSta = FALSE;
+                  FM_Printf(FM_USER, "Unknown STA mode\n");
+                  return;
+                }
+              
+                if (setFlag)
+                {
+                  if (linkLayer->mode == LINKL_STA_MODE_CCO)
+                  {
+              
+              #if 1
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 14  
+
+                    do
+                    {
+                      FM_Printf(FM_USER, "Enter 1 for 50%% PS or 2 for 75%% PS (<CR> = 1): ");
+                      while ((sLen = getline(input, sizeof(input))) > 0)
+                      {
+                        if (sLen > 1)
+                        {
+                          if(sscanf(input,"%bu",&tmpVal) >= 1)
+                            break;
+                        }
+                        else
+                        {
+                          break;    // <CR>, use default value
+                        }
+                      }
+                    }while((tmpVal != 1) && (tmpVal != 2));
+              
+                    if (tmpVal == 1)
+                    {
+                      tmpAwd = 10;  // 4 bps
+                      tmpPsp = 3; // 8 bps  
+                    }
+                    else
+                    {
+                      tmpAwd = 10;  // 4 bps
+                      tmpPsp = 4; // 16 bps 
+                    }
+              #else
+                    // if PS is enabled, ask for AWD and PSP
+                    do
+                    {
+                      FM_Printf(FM_USER, "Enter AWD value: 0 - 14 (<CR>: default value of 0) : ");
+                      while ((sLen = getline(input, sizeof(input))) > 0)
+                      {
+              //          FM_Printf(FM_USER, "\ninput1=%s, sLen=%d\n", input, sLen);
+                        if (sLen > 1)
+                        {
+                          if(sscanf(input,"%bu",&tmpAwd) >= 1)
+                            break;
+                        }
+                        else
+                          break;    // <CR>, use default value
+                      }
+                    }while(tmpAwd > 14);
+              
+                    do
+                    {
+                      FM_Printf(FM_USER, "Enter PSP value: 0 - 10 (<CR>: default value of 0) : ");
+                      while ((sLen = getline(input, sizeof(input))) > 0)
+                      {
+              //        printf("\ninput2=%s, sLen=%d\n", input, sLen);
+                        if (sLen > 1)
+                        {
+                          if(sscanf(input,"%bu",&tmpPsp) >= 1)
+                            break;
+                        }
+                        else break;   // <CR>, use default value
+                      }
+                    }while(tmpPsp > 10);
+              #endif  //PS_MITSUMI_NO
+              
+                    pss = (tmpAwd << 4) | tmpPsp;
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 15  
+
+                  } // if CCO
+              //FM_Printf(FM_MMSG, "tmpAwd=0x%bx, tmpPsp=0x%bx, pss=0x%bx\n", tmpAwd, tmpPsp, pss);
+                }
+                else
+                {
+                  pss = 0x0f; // PS=off 
+                }
+              
+                PSM_set_sta_PS(setFlag, pss);
+                  if (linkLayer->mode == LINKL_STA_MODE_CCO)
+                  {
+                      sCnsm             *cnsm = NULL;
+                      cnsm =  LINKL_GetCnsm(linkLayer);
+                      cnsm->bcnUpdate = cnsm->bcnUpdate | 2;
+                    FM_Printf(FM_MMSG, "STA PS %s\n", scb->psState ? "ON":"OFF");
+                  }
+              }
+              
+              void HTM_psDisplayPsList()  
+              {
+              
+                  sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+              
+                PSM_psDisplayPsList(linkl->hal->hhalCb->devMode); 
+              }
+              #endif  //POWERSAVE
+ 867          
+ 868          #if 0
+              
+              void HTM_StartUaSta()
+              {
+                  sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  LINKL_SetStaMode(linkl);
+                  LINKL_StartSta(linkl, LINKL_STA_TYPE_UNASSOC); 
+              }
+              
+              void HTM_StartAssocSta()
+              {
+                  sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  LINKL_SetStaMode(linkl);
+                  LINKL_StartSta(linkl, LINKL_STA_TYPE_ASSOC); 
+              }
+              
+              
+              void HTM_StartAssoc()
+              {
+                  sEvent *newEvent = NULL;
+              
+                  sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  LINKL_SetStaMode(linkl);
+                  LINKL_StartSta(linkl, LINKL_STA_TYPE_UNASSOC); 
+              
+                  sleep(2); //to wait for the central beacon
+              
+                  newEvent = EVENT_Alloc(0, 0);
+                  if(newEvent)
+                  {
+                      newEvent->eventHdr.type = EVENT_TYPE_NET_ACC_REQ;
+                      newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                      LINKL_SendEvent(linkl, newEvent);
+                  }
+              }
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 16  
+
+              
+              void HTM_LeaveNet()
+              {
+                  sEvent *newEvent = NULL;
+              
+                  sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+              
+              
+                  newEvent = EVENT_Alloc(0, 0);
+                  if(newEvent)
+                  {
+                      newEvent->eventHdr.type = EVENT_TYPE_NET_LEAVE_REQ;
+                      newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                      LINKL_SendEvent(linkl, newEvent);
+                  }
+              }
+              
+              
+              void HTM_SetCcoCap()
+              {
+                  int cap; 
+                  sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  printf(" Select one)\n");
+                  printf(" 0: Level-0 CCo\n");
+                  printf(" 1: Level-1 CCo\n");
+                  printf(" 2: Level-2 CCO\n");
+                  printf(" 3: Level-3 CCo\n");
+                  scanf("%d", &cap);
+                  if(cap < 4)
+                  {
+                      LINKL_SetCCoCap(linkl, cap);
+                  }
+              
+              }
+              
+              void HTM_ApptCco()
+              {
+                  //sEvent *newEvent = NULL;
+                  //sCcCcoApptReq *ccoApptReq = NULL;
+                  //sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+                  char *line = NULL;
+                  size_t   numBytes = 128;
+                  int   read = 0;
+                  u8   macAddr[MAC_ADDR_LEN];
+              
+                  line = (char *) malloc (numBytes + 1);
+              
+                  printf(" Please enter the new CCo MAC address:\n");
+              
+                  while( (read = getline(&line, &numBytes, stdin)) != -1)
+                  {
+                      if(sscanf(line, "%x:%x:%x:%x:%x:%x", 
+                                  &macAddr[0],
+                                  &macAddr[1],
+                                  &macAddr[2],
+                                  &macAddr[3],
+                                  &macAddr[4],
+                                  &macAddr[5]) == 6)
+                      {
+                          HTM_PrintMACAddress("MAC Addr:", macAddr);
+                      }
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 17  
+
+                  }
+                  free(line);
+              
+                  CTRLL_ApptCCo(ctrll, macAddr, 0);
+                
+              /*
+                  newEvent = EVENT_Alloc(sizeof(sCcCcoApptReq), 0);
+                  if(newEvent)
+                  {
+                      newEvent->eventHdr.type = EVENT_TYPE_CCO_APPOINT_REQ;
+                      newEvent->eventHdr.eventClass = EVENT_CLASS_CTRL;
+              
+                      ccoApptReq = (sCcCcoApptReq *)newEvent->buffDesc.dataptr;
+                      ccoApptReq->reqType = 0; //HPGP_CCO_APPT_REQ_APPT_HO
+                      memcpy(ccoApptReq->macAddr, macAddr, MAC_ADDR_LEN);
+              
+                      LINKL_SendEvent(linkl, newEvent);
+                  }
+              */
+              
+              }
+              
+              #endif
+ 988          
+ 989          static char xdata CmdBuf[128];
+ 990          
+ 991          void HHAL_CmdHelp()
+ 992          {
+ 993   1      #if 0
+                os_switch_task();
+                  FM_Printf(FM_USER, "HAL Test Commands:\n"
+                         "p stat     - Display stat\n");
+                  FM_Printf(FM_USER, 
+                         "p rstStat  - Reset stat\n");
+                os_switch_task();
+                  FM_Printf(FM_USER, 
+                         "p hstat      - Display host stat\n");
+                  FM_Printf(FM_USER, 
+                         "p hrststat   - Rest host stat\n");
+                os_switch_task();
+                  if(opMode == UPPER_MAC)
+                  {
+                      FM_Printf(FM_USER, 
+                             "p lineMode [0/1] - Set line mode [AC/DC]\n");
+                      FM_Printf(FM_USER, 
+                             "p defNID   - Set default NID\n");
+                      os_switch_task();
+              #ifdef CCO_FUNC
+                      FM_Printf(FM_USER, 
+                             "p startNet - Start the Network as a CCO\n");
+              #endif
+                  os_switch_task();
+              #ifdef STA_FUNC
+                      FM_Printf(FM_USER, 
+                             "p joinNet  - Join the network as a STA\n");
+                      FM_Printf(FM_USER, 
+                             "p netDisc  - Start network discovery\n" );
+                      FM_Printf(FM_USER, 
+                             "p lvNet    - Leave network\n");
+                  os_switch_task();
+              #endif
+                      FM_Printf(FM_USER, 
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 18  
+
+                             "p peer    - show peer list\n");
+              #ifdef AUTO_PING            
+                      FM_Printf(FM_USER, 
+                             "p ping    - ping to destination tei\n");
+              #endif
+                  os_switch_task();
+                      FM_Printf(FM_USER, 
+                             "p reset    - Reset Device state\n");
+              
+              #ifdef SNIFFER
+                      FM_Printf(FM_USER, 
+                             "p (no)swsniff - Trun ON/OFF sniffer mode\n");
+              #endif 
+                  os_switch_task();
+                             //"p (no)sniff- Turn off/on sniffer mode\n"
+                      FM_Printf(FM_USER, 
+                          "p getMac   - Get MAC address\n");
+                      FM_Printf(FM_USER, 
+                          "p setMac   - Set MAC address\n" );
+              #ifdef UKE      
+                      FM_Printf(FM_USER, 
+                    "p setsecmode - Set security Mode - 0:HS, 1:SC, 2:ADD, 3:JOIN\n");
+              #endif      
+                  os_switch_task();
+              #ifdef LINK_STATUS
+                      FM_Printf(FM_USER, 
+                          "p linkstatus - Trun ON link status ind\n");            
+                      FM_Printf(FM_USER, 
+                          "p nolinkstatus - Trun OFF link status ind\n");
+              #endif
+              #ifdef IMPROVE_PER
+                      FM_Printf(FM_USER, 
+                          "p improveper - Update base band reg to improve per\n");
+              #endif
+                  os_switch_task();
+              #ifdef POWERSAVE
+                      FM_Printf(FM_USER, 
+                          "p psavln - Toggle the AVLN PS mode\n");
+                      FM_Printf(FM_USER, 
+                          "p pssta - Toggle the Station PS mode\n");
+                      FM_Printf(FM_USER, 
+                          "p pslist - List all Stations in PS mode\n");
+              #endif
+              #ifdef LLP_POWERSAVE
+                      FM_Printf(FM_USER, 
+                          "p pssta - Toggle the Station PS mode\n");
+              #endif
+              #ifdef NO_HOST
+                      FM_Printf(FM_USER, 
+                    "p app <command> - User Application command\n");
+              #endif
+              #ifdef UART_HOST_INTF 
+                      FM_Printf(FM_USER, 
+                    "p uartconfig <baudrate> <framelength> - Configures UART param\n");   
+              #endif
+              #ifdef LandS
+                      FM_Printf(FM_USER, 
+                          "p PWMLevel      - PWM LED brightness level (0 ~ 255)\n");
+              #endif
+                  os_switch_task();
+              //#ifdef ER_TEST
+                      FM_Printf(FM_USER, 
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 19  
+
+                    "p erenable    - Enable Extended Range mode\n");
+                      FM_Printf(FM_USER, 
+                    "p erdisable   - Disable Extended Range mode\n");
+              //#endif  //ER_TEST
+              
+                  os_switch_task();
+                      FM_Printf(FM_USER, 
+                    "p version    - Display version\n");
+                      FM_Printf(FM_USER, 
+                    "p txpowermode   - Transmission Power mode\n");
+                  os_switch_task();
+              #ifdef ROUTE
+                      FM_Printf(FM_USER, 
+                    "p lrt   - Display route table\n");
+              #endif
+                  os_switch_task();
+                  }
+                  else
+                  {
+                      FM_Printf(FM_USER, 
+              #ifdef PLC_TEST
+                             "p starttest - Start PER test\n"
+              #endif
+                       "p lineMode [0/1] - Set line mode [AC/DC]\n" 
+                       "p txpowermode   - Transmission Power mode\n"
+                       "p erenable   - Enable Extended Range mode\n"
+                       "p erdisable  - Disable Extended Range mode\n"
+                       "p version   - Display version \n"
+                             );
+              
+                     }
+              #endif  
+1121   1          return;
+1122   1      }
+1123          
+1124          void HHAL_DisplayPeerList() 
+1125          {
+1126   1      
+1127   1          u8             i, j;
+1128   1          sScb          *scb = NULL;
+1129   1          sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1130   1          sCrm          *crm = LINKL_GetCrm(linkl);
+1131   1      
+1132   1      
+1133   1          scb = CRM_GetNextScb(crm, scb);
+1134   1          i = 0;
+1135   1          while(scb)
+1136   1          {
+1137   2              FM_Printf(FM_USER, "== Peer No : == %bu\n", i);
+1138   2      
+1139   2              FM_Printf(FM_USER, "\t Mac Address: ");
+1140   2      
+1141   2              for (j = 0; j < 6; j++)
+1142   2              {
+1143   3      #ifdef P8051
+1144   3                  printf("%02bx  ", scb->macAddr[j]);
+1145   3      #else
+                          printf("%02x  ", scb->macAddr[j]);
+              #endif
+1148   3      
+1149   3              }
+1150   2              
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 20  
+
+1151   2              printf("\n");
+1152   2                  
+1153   2        
+1154   2              FM_Printf(FM_USER, "\ttei: %bu\n", scb->tei);
+1155   2              FM_Printf(FM_USER, "\tCCo cap: %bu\n",  scb->staCap.fields.ccoCap);
+1156   2              FM_Printf(FM_USER, "\tDisc STA list (%bu)\n", linkl->staInfo.numDiscSta);
+1157   2          FM_Printf(FM_USER, "\tRSSI :(%bu)\n",scb->rssiLqi.s.rssi);
+1158   2          FM_Printf(FM_USER, "\tLQI  :(%bu)\n",scb->rssiLqi.s.lqi);
+1159   2              scb = CRM_GetNextScb(crm, scb);
+1160   2              i++;
+1161   2          }
+1162   1      }
+1163          
+1164          #if 0
+              
+              void HHT_AddrCfg()
+              {
+                  u8              tei;
+                  u8              remoteTei;
+                  u8              snid;
+                  u8              input[10];
+              
+                  printf("Cur SNID  = 0x%bX, Cur TEI = 0x%bX, Rem TEI = 0x%bX\n", HHAL_GetSnid(), HHAL_GetTei(), gHpgpHa
+             -lCB.remoteTei );    
+                  
+                do
+                {
+                  printf("Enter new SNID :: 0x"); 
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input, "%bx", &snid) >= 1)
+                    break;
+                  }
+                }while (snid > 15);
+                  
+                do
+                {
+                  printf("Enter new TEI  :: 0x"); 
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input, "%bx", &tei) >= 1)
+                    break;
+                  }
+                }while (tei > 0xFE); 
+              
+                do
+                {
+                  printf("Enter remote TEI  :: 0x"); 
+                  while (getline(input, sizeof(input)) > 0)
+                  {
+                    if(sscanf(input, "%bx", &remoteTei) >= 1)
+                    break;
+                  }
+                }while (remoteTei > 0xFE);   
+              
+                  HHAL_SetTei(tei);
+                  gHpgpHalCB.remoteTei = remoteTei;
+                  gHpgpHalCB.selfTei = tei;
+                  HHAL_SetSnid(snid);
+              }
+              #endif
+1211          
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 21  
+
+1212          extern void spiflash_eraseConfigMem();
+1213          
+1214          extern u8  ethTxDone;
+1215          
+1216          extern void DMM_MgmtMem();
+1217          extern void DMM_eventMem();
+1218          
+1219          extern void DMM_BcnMem();
+1220          extern NMA_SetSniffer();
+1221          #ifdef UKE
+              static void setSecMode(void);                                 
+              #endif
+1224          
+1225          #if 0
+              
+              void getAllLog()
+              {
+              
+                  
+                  FM_Printf(FM_USER,"BM:\n");
+                  DMM_BcnMem();   //bm
+                  os_switch_task(); 
+                  
+                  FM_Printf(FM_USER,"MM:\n");
+                  DMM_MgmtMem();   //mm
+                  os_switch_task(); 
+                  
+                  FM_Printf(FM_USER,"EM:\n");
+                  DMM_eventMem();   //em
+                  os_switch_task(); 
+                  
+                  FM_Printf(FM_USER,"Stat:\n");
+                  HHAL_DisplayPlcStat();   //stat
+              
+                  os_switch_task(); 
+                  FM_Printf(FM_USER,"Peer:\n");
+                  HHAL_DisplayPeerList();   //peer
+              
+                  os_switch_task(); 
+                  printf ("host");     //qd
+                  datapath_queue_depth(HOST_DATA_QUEUE);
+                  printf ("plc");
+                  datapath_queue_depth(PLC_DATA_QUEUE);
+              
+                  os_switch_task(); 
+              #ifdef HYBRII_ETH   
+                  FM_Printf(FM_USER,"hStat:\n");
+                  EHAL_DisplayEthStat();   //hstat
+              #endif
+                  os_switch_task(); 
+                  FM_Printf(FM_USER,"dump:\n");
+                  {   //dump
+                      uBcnStatusReg         bcnStatus;
+                      uPlcMedStatReg        plcMedStat;  
+                      uPlcStatusReg         plcStatus;
+                      
+                      bcnStatus.reg   = ReadU32Reg(PLC_BCNSTATUS_REG);
+                      plcStatus.reg  = ReadU32Reg(PLC_STATUS_REG);
+                      plcMedStat.reg = ReadU32Reg(PLC_MEDIUMSTATUS_REG);
+                      
+                      FM_Printf(FM_USER, "phyActive: %bu, plcMacIdle: %bu, crsMac: %bu, plcTxQRdy: %bu, \n \
+                      plcTxQSwCtrl: %bu, txWindow: %bu, bBcnTxPending: %bu, bBcnNotSent: %bu   \n",
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 22  
+
+                      plcMedStat.s.phyActive, plcStatus.s.plcMacIdle, plcMedStat.s.crsMac, plcStatus.s.plcTxQRdy, \
+                      plcStatus.s.plcTxQSwCtrl, plcMedStat.s.txWindow, gHpgpHalCB.bBcnTxPending,\
+                      gHpgpHalCB.bBcnNotSent);
+                  
+                  }
+              #ifdef UART_HOST_INTF 
+                  os_switch_task(); 
+                  FM_Printf(FM_USER,"Uart:\n");
+                  display_uart_stat();   
+              #endif
+                  os_switch_task(); 
+                  FM_Printf(FM_USER,"sysparam:\n");    
+                {
+                    sLinkLayer *linkl = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  u16 regVal;
+                  sSnsm *snsm = &linkl->staNsm;
+              #ifdef MCCO
+                  sCnsm *cnsm = &linkl->ccoNsm;
+              #endif
+                  
+                    sStaInfo   *staInfo = NULL;
+                    staInfo = LINKL_GetStaInfo(linkl);
+                  FM_HexDump(FM_USER,"Self NID: ",staInfo->nid,NID_LEN);
+                    FM_Printf(FM_USER,"Self SNID: %bu\n", staInfo->snid);
+                    FM_Printf(FM_USER,"Selfx SNID: %bu\n", gHpgpHalCB.snid);
+                    
+                  FM_Printf(FM_USER,"nwselected : %bu\n", gHpgpHalCB.nwSelected);
+                  FM_Printf(FM_USER,"nwse snid: %bu\n", gHpgpHalCB.nwSelectedSnid); 
+              
+                  if(linkl->mode == LINKL_STA_MODE_STA){
+                  FM_Printf(FM_USER,"sync: %bu\n", snsm->netSync);      
+                  FM_Printf(FM_USER,"scan %bu\n", snsm->netScan);     
+                    }
+                        
+              #ifdef MCCO
+                  FM_HexDump(FM_USER,"Central CCo  NID: ",cnsm->passiveNid,NID_LEN);
+              
+                  FM_Printf(FM_USER,"Central CCo   SNID: %bu\n", gHpgpHalCB.passSnid);
+              
+                  FM_Printf(FM_USER,"slotId: %bu\n", cnsm->slotId);
+              
+              #endif
+              
+                  if (gHpgpHalCB.lineMode == LINE_MODE_AC)
+                    FM_Printf(FM_USER,"LineMode: AC\n");
+                  else
+                    FM_Printf(FM_USER,"LineMode: DC\n");      
+              
+                  if (gHpgpHalCB.lineFreq == FREQUENCY_50HZ)
+                    FM_Printf(FM_USER,"Freq: 50 Hz\n");
+                  else
+                    FM_Printf(FM_USER,"Freq: 60 Hz\n");
+                  
+                  FM_Printf(FM_USER,"Assoc Status: %bu\n",MCTRL_IsAssociated());
+                  FM_Printf(FM_USER,"Auth Status: %bu\n",staInfo->staScb->staStatus.fields.authStatus);
+                  
+                    FM_Printf(FM_USER,"TEI: %bu\n", staInfo->tei);
+              
+                  if (gHpgpHalCB.devMode == DEV_MODE_STA)
+                      FM_Printf(FM_USER,"Dev Mode: STATION\n");
+                  else if(gHpgpHalCB.devMode == DEV_MODE_CCO)
+                    FM_Printf(FM_USER,"Dev Mode: CCO\n");
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 23  
+
+              #ifdef MCCO     
+                  else if(gHpgpHalCB.devMode == DEV_MODE_PCCO)
+                    FM_Printf(FM_USER,"Dev Mode: PCCO\n");
+              #endif
+                  
+                  FM_Printf(FM_USER,"freq: %bu\n", (gHpgpHalCB.gFreqCB.freqDetected));
+                  FM_Printf(FM_USER,"bcninit : %bu\n", (gHpgpHalCB.bcnInitDone));
+              
+                  FM_Printf(FM_USER,"avgInit : %bu\n", gHpgpHalCB.bPerAvgInitDone);
+              
+                  FM_Printf(FM_USER,"syncC : %bu\n", gHpgpHalCB.syncComplete);
+                  FM_Printf(FM_USER,"slotUsage : %bu\n",  staInfo->slotUsage);
+              
+                  
+                    
+                  regVal = mac_utils_spi_read(0x35);
+              
+                  if((u8 *)(&regVal)[0] == 0x30)
+                  {
+                    FM_Printf(FM_USER,"Power Mode: Auto\n");
+                  }
+                  else if((u8 *)(&regVal)[0] == 0x00)
+                  {
+                    FM_Printf(FM_USER,"Power Mode: Normal\n");
+                  }
+                  else if((u8 *)(&regVal)[0] == 0x0f)
+                  {
+                    FM_Printf(FM_USER,"Power Mode: High\n");
+                  }
+                  
+                  if(ReadU8Reg(0x4F0) == 0x80)
+                  {
+                    FM_Printf(FM_USER,"ER Mode: Enabled\n");
+                  }
+                  else
+                  {
+                    FM_Printf(FM_USER,"ER Mode: Disabled\n");
+                  }         
+                }
+              }
+              #endif
+1377          void dumpflash()
+1378          {
+1379   1      #if 0 // commented for common space
+                  FM_HexDump(FM_USER, "MAC ADDR: ", gSysProfile.macAddress,6);
+                  FM_Printf(FM_USER, "linemode: %bu\n",gSysProfile.lineMode);
+                  FM_Printf(FM_USER, "lineFreq: %bu\n",gSysProfile.lineFreq);
+                  FM_Printf(FM_USER, "lastUserAppCCOState: %bu\n",gSysProfile.lastUserAppCCOState);
+                  FM_HexDump(FM_USER, "NID: ", gSysProfile.nid,NID_LEN);
+                  FM_HexDump(FM_USER, "NMK: ", gSysProfile.nmk,ENC_KEY_LEN);
+                  FM_Printf(FM_USER, "secLevel: %bu\n",gSysProfile.secLevel);
+                  FM_Printf(FM_USER, "powerSaveMode: %bu\n",gSysProfile.powerSaveMode);
+                  FM_Printf(FM_USER, "advPowerSaveMode: %bu\n",gSysProfile.advPowerSaveMode);
+                  FM_Printf(FM_USER, "ccoCap: %bu\n",gSysProfile.cap.fields.ccoCap);
+                  FM_Printf(FM_USER, "proxyNetCap: %bu\n",gSysProfile.cap.fields.proxyNetCap);
+                  FM_Printf(FM_USER, "backupCcoCap: %bu\n",gSysProfile.cap.fields.backupCcoCap);
+                  FM_Printf(FM_USER, "greenPhyCap: %bu\n",gSysProfile.cap.fields.greenPhyCap);
+                  FM_Printf(FM_USER, "powerSaveCap: %bu\n",gSysProfile.cap.fields.powerSaveCap);
+                  FM_Printf(FM_USER, "repeaterRouting: %bu\n",gSysProfile.cap.fields.repeaterRouting);
+                  FM_Printf(FM_USER, "HPAVSupported: %bu\n",gSysProfile.cap.fields.HPAVVersion);
+                  FM_Printf(FM_USER, "bridgeSupported: %bu\n",gSysProfile.cap.fields.bridgeSupported);
+              #endif
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 24  
+
+1398   1      }
+1399          
+1400          #ifdef NO_HOST
+1401          u32 gApsRxFwd = 0;
+1402          u32 gApsRxApp = 0;
+1403          #endif
+1404          
+1405          #ifdef MCCO
+1406          extern void CNSM_SetCentralCCo();
+1407          #endif
+1408          extern volatile u8 host_intf_max_cp;
+1409          #ifdef SPI_LOG
+              extern void dumpSpiSnap();
+              #endif
+1412          
+1413          void HHAL_CmdHALProcess(char* CmdBuf)
+1414          {
+1415   1          u8  cmd[30];
+1416   1      #ifdef POWERSAVE
+                  sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                  sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer);
+              #endif
+1420   1      
+1421   1          CmdBuf++;
+1422   1      
+1423   1          if (sscanf(CmdBuf, "%s", &cmd) < 1 || strcmp(cmd, "?") == 0)
+1424   1          {
+1425   2              //HHAL_CmdHelp();
+1426   2              return;
+1427   2        }
+1428   1      /*  if(strcmp(cmd, "xmitTest") == 0 || strcmp(cmd, "xmittest") == 0)
+1429   1        {
+1430   1          HHT_BasicTxMenu();    
+1431   1        }            */
+1432   1          
+1433   1          if(opMode == UPPER_MAC)
+1434   1          {
+1435   2      
+1436   2      #ifdef DEBUG_DATAPATH
+1437   2              if (strcmp(cmd, "ed") == 0)
+1438   2              {
+1439   3                  ethQueueDebug = 1;
+1440   3              }
+1441   2            else  if (strcmp(cmd, "sd") == 0)
+1442   2              {
+1443   3                  ethQueueDebug = 1;
+1444   3                  sigDbg = 1;
+1445   3              }
+1446   2            else  if (strcmp(cmd, "nsd") == 0)
+1447   2              {
+1448   3                  ethQueueDebug = 0;
+1449   3                  sigDbg = 0;
+1450   3              }
+1451   2            else  if (strcmp(cmd, "pd") == 0)
+1452   2              {
+1453   3                  pktDbg = 1;
+1454   3              }
+1455   2              else  if (strcmp(cmd, "npd") == 0)
+1456   2              {
+1457   3                  pktDbg = 0;
+1458   3              }
+1459   2              else
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 25  
+
+1460   2      #endif
+1461   2      
+1462   2          if (strcmp(cmd, "bm") == 0)
+1463   2            {
+1464   3              DMM_BcnMem();
+1465   3            }
+1466   2      #ifdef NO_HOST    
+1467   2          else if (strcmp(cmd, "am") == 0)
+1468   2            {
+1469   3              DMM_DisplayMemUsage(&AppDmm);
+1470   3            }
+1471   2      #endif    
+1472   2          else if (strcmp(cmd, "mm") == 0)
+1473   2            {
+1474   3              DMM_MgmtMem();
+1475   3              
+1476   3            }else
+1477   2            if (strcmp(cmd, "em") == 0)
+1478   2            {
+1479   3              DMM_eventMem();
+1480   3              
+1481   3            }else
+1482   2          if (strcmp(cmd, "edone") == 0)
+1483   2            {
+1484   3              FM_Printf(FM_USER, "ethTxDone=%bu", ethTxDone);
+1485   3      
+1486   3            }else
+1487   2              if (strcmp(cmd, "stat") == 0)
+1488   2              {
+1489   3                  HHAL_DisplayPlcStat();
+1490   3              }
+1491   2              else  if (strcmp(cmd, "peer") == 0)
+1492   2              {
+1493   3                     HHAL_DisplayPeerList();
+1494   3              }
+1495   2      #ifdef MCCO
+1496   2          else if (strcmp(cmd, "disclist")== 0)
+1497   2          {
+1498   3      #if 0   
+                    sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                    u8 i = 0;
+                    u8 k = 0;
+                    for(i = 0; i < DISC_STA_LIST_MAX; i++)
+                    {
+                      if(linkl->staInfo.discStaInfo[i].valid == TRUE)
+                      {
+                        FM_Printf(FM_USER,"STA No : %bu\n",k);
+                        FM_Printf(FM_USER,"SNID   : %bu\n",linkl->staInfo.discStaInfo[i].snid);
+                        FM_HexDump(FM_USER,"MacAddress   :",(u8*)&linkl->staInfo.discStaInfo[i].macAddr,  
+                               MAC_ADDR_LEN);
+                        FM_Printf(FM_USER,"SlotUsage: %bu\n",linkl->staInfo.discStaInfo[i].slotUsage);
+                        k++;//Network Number
+                      }               
+                    }
+              #endif      
+1515   3          }
+1516   2      #endif          
+1517   2          else if (strcmp(cmd, "netlist")== 0)
+1518   2          {
+1519   3      #if 1   
+1520   3            sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+1521   3            u8 i = 0;
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 26  
+
+1522   3            u8 k = 0;
+1523   3            for(i = 0; i < AVLN_LIST_MAX; i++)
+1524   3            {
+1525   4              if(linkl->staInfo.discNetInfo[i].valid == TRUE)
+1526   4              {
+1527   5                FM_Printf(FM_USER,"\nNW: %bu\n",k);
+1528   5                FM_HexDump(FM_USER,"NID:",linkl->staInfo.discNetInfo[i].nid,NID_LEN);
+1529   5                FM_Printf(FM_USER,"SNID: %bu\n",linkl->staInfo.discNetInfo[i].snid);
+1530   5      
+1531   5                FM_Printf(FM_USER,"SlotId: %bu\n",linkl->staInfo.discNetInfo[i].slotId);
+1532   5                FM_Printf(FM_USER,"RSSI : %bu\n",linkl->staInfo.discNetInfo[i].rssi);
+1533   5                FM_Printf(FM_USER,"LQI : %bu\n",linkl->staInfo.discNetInfo[i].lqi);
+1534   5                FM_HexDump(FM_USER,"bcnCnt\n",(u8*)&linkl->staInfo.discNetInfo[i].bcnRxCnt, 4);
+1535   5      
+1536   5                k++;//Network Number
+1537   5              }     
+1538   4      #if 0       
+                      if(MCTRL_IsAssociated())
+                      {
+                      
+                        if(linkl->staInfo.discNetInfo[i].valid == TRUE)
+                        {
+                          FM_Printf(FM_USER,"\nNW: %bu\n",k);
+                          FM_HexDump(FM_USER,"NID:",linkl->staInfo.discNetInfo[i].nid,NID_LEN);
+                          FM_Printf(FM_USER,"SNID: %bu\n",linkl->staInfo.discNetInfo[i].snid);
+              
+                          FM_Printf(FM_USER,"SlotId: %bu\n",linkl->staInfo.discNetInfo[i].slotId);
+                          FM_Printf(FM_USER,"RSSI : %bu\n",linkl->staInfo.discNetInfo[i].rssi);
+                          FM_Printf(FM_USER,"LQI : %bu\n",linkl->staInfo.discNetInfo[i].lqi);
+                          k++;//Network Number
+                        }
+              
+                        if(linkl->staNsm.avlnInfo[i].valid == TRUE)
+                          {
+                            FM_Printf(FM_USER,"\nNW: %bu\n",k);
+                            FM_HexDump(FM_USER,"NID:",linkl->staNsm.avlnInfo[i].nid,NID_LEN);
+                            FM_Printf(FM_USER,"SNID: %bu\n",linkl->staNsm.avlnInfo[i].snid);
+              
+                            FM_Printf(FM_USER,"SlotId: %bu\n",linkl->staNsm.avlnInfo[i].slotId);
+                            FM_Printf(FM_USER,"Rssi : %bu\n",linkl->staNsm.avlnInfo[i].rssi);
+                            FM_Printf(FM_USER,"lqi : %bu\n",linkl->staNsm.avlnInfo[i].lqi);
+                            FM_HexDump(FM_USER,"bcnRxCnt:",(u8*)&linkl->staNsm.avlnInfo[i].bcnRxCnt,4);
+                            k++;//Network Number
+                          }
+                      }
+                      else
+                      {
+                        
+                          if(linkl->staInfo.discNetInfo[i].valid == TRUE)
+                          {
+                            FM_Printf(FM_USER,"\nNW: %bu\n",k);
+                            FM_HexDump(FM_USER,"NID:",linkl->staInfo.discNetInfo[i].nid,NID_LEN);
+                            FM_Printf(FM_USER,"SNID: %bu\n",linkl->staInfo.discNetInfo[i].snid);
+              
+                            FM_Printf(FM_USER,"SlotId: %bu\n",linkl->staInfo.discNetInfo[i].slotId);
+                            FM_Printf(FM_USER,"RSSI : %bu\n",linkl->staInfo.discNetInfo[i].rssi);
+                            FM_Printf(FM_USER,"LQI : %bu\n",linkl->staInfo.discNetInfo[i].lqi);
+                            FM_HexDump(FM_USER,"bcnCnt\n",(u8*)&linkl->staInfo.discNetInfo[i].bcnRxCnt, 4);
+              
+                            k++;//Network Number
+                          }
+                        
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 27  
+
+                        
+                      }
+              #endif        
+1587   4            }
+1588   3      #endif      
+1589   3          }
+1590   2          else if(strcmp(cmd,"qd") == 0)
+1591   2          {
+1592   3            datapath_queue_depth(HOST_DATA_QUEUE);
+1593   3            datapath_queue_depth(PLC_DATA_QUEUE);   
+1594   3            }
+1595   2      
+1596   2      #ifdef LandS 
+                   else if (strcmp(cmd, "PWMLevel") == 0)
+                   {
+                    u8   tmp;
+                  //u8 inputlevel[10];
+                  unsigned int dim_value = 0;
+              
+                  printf(" PWM Brightness Level?: 0 ~ 255  :: ");
+                  
+                  while ( getline(input, sizeof(input)) > 0)
+                  {       
+                    if(sscanf(input,"%bu",&tmp) >= 0)
+                    {
+                        printf("i/p value = %bx\n", tmp);
+                      break;
+                    }
+                  }
+                  printf("PWM Level i/p value = %bx\n", tmp);
+              
+                  dim_value = (255 - tmp) * 3;  //6;
+                    if (dim_value == 0)
+                     dim_value = 1; 
+              
+                  init_led_bar();
+                  //led_dim(LED_CH1, dim_value);  
+                  led_driver_write(LED_CH0, dim_value); 
+                  init_led_bar();
+                  led_driver_write(LED_CH1, dim_value);
+                  init_led_bar();
+                  led_driver_write(LED_CH2, dim_value);
+                  init_led_bar();
+                  led_driver_write(LED_CH3, dim_value);
+                   }
+              #endif
+1630   2      #ifdef MULTIDEVICE_WAR
+                      else if (strcmp(cmd, "sniff") == 0)
+                    { 
+                        uPlcStatusReg  plcStatus;
+                        FM_Printf(FM_USER,"Promisc Mode Enable\n");
+                          plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+                          plcStatus.s.promiscModeEn  = 1; 
+                          WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+                    } 
+                      else if (strcmp(cmd, "nosniff") == 0)
+                    { 
+                        uPlcStatusReg  plcStatus;
+                        FM_Printf(FM_USER,"Promisc Mode Disable\n");
+                          plcStatus.reg = ReadU32Reg(PLC_STATUS_REG);
+                          plcStatus.s.promiscModeEn  = 0; 
+                          WriteU32Reg(PLC_STATUS_REG, plcStatus.reg);
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 28  
+
+                    }
+              #endif
+1648   2      #ifdef SNIFFER    
+                    else if (strcmp(cmd, "swsniff") == 0)
+                    {
+                        hostIntf = HOST_INTF_ETH;
+                      eth_plc_sniffer = 1;
+                      eth_plc_bridge = 1;
+                      hhal_tst_sniff_cfg (1); //set HW sniff
+                    } 
+                    else if (strcmp(cmd, "noswsniff") == 0)
+                    {
+                    hostIntf = HOST_INTF_NO;
+                      eth_plc_sniffer = 0;
+                      eth_plc_bridge = 0;
+                      hhal_tst_sniff_cfg (0); //reset HW sniff
+                    }
+              #endif
+1664   2      
+1665   2              else if (strcmp(cmd, "rststat") == 0)
+1666   2              {
+1667   3                  HHAL_ResetPlcStat();
+1668   3                  //HHAL_DisplayPlcStat();
+1669   3              }
+1670   2              else if (strcmp(cmd, "defnid") == 0)
+1671   2              {
+1672   3                  //HTM_SetDefaultNid();
+1673   3              } 
+1674   2      #ifdef SPI_LOG
+                      else if(strcmp(cmd,"spisnap") == 0)
+                        {
+                     dumpSpiSnap();
+                      } 
+              #endif        
+1680   2      #ifdef UKE_TEST
+                      else if (strcmp(cmd, "defnidsc") == 0)
+                      {
+                          HTM_SetDefaultNidSC();
+                      } 
+                      else if (strcmp(cmd, "defnidhs") == 0)
+                      {
+                          //HTM_SetDefaultNidHS();
+                      } 
+              #endif    
+1690   2              else if (strcmp(cmd, "reset") == 0)
+1691   2              {
+1692   3                  //HTM_ResetNsm();
+1693   3              }
+1694   2      #if 0   
+                      else if (strcmp(cmd, "linemode") == 0 )
+                      {
+                         // HTM_SetLineMode(CmdBuf+sizeof("linemode"));
+                      }
+              #endif
+1700   2      
+1701   2      #ifdef CCO_FUNC
+1702   2              else if (strcmp(cmd, "startnet") == 0)
+1703   2              {
+1704   3                  HTM_StartNet();
+1705   3              }
+1706   2      #ifdef MCCO
+1707   2          #if 0
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 29  
+
+                      else if (strcmp(cmd, "central") == 0)
+                      {
+                          CNSM_SetCentralCCo();
+                      }
+                  #endif
+1713   2      #endif
+1714   2      #endif
+1715   2      #ifndef NO_HOST
+              #ifdef STA_FUNC
+                      else if (strcmp(cmd, "joinnet") == 0)
+                      {
+                          HTM_JoinNet();
+                      }
+                      else if (strcmp(cmd, "netdisc") == 0)
+                      {
+                          HTM_StartNetDisc();
+                      }
+                      else if (strcmp(cmd, "lvnet") == 0)
+                      {
+                          //HTM_LeaveNet();
+                      }
+              #endif
+              #endif
+1731   2      #ifdef POWERSAVE
+                      else if (strcmp(cmd, "psavln") == 0)
+                      {
+                          HTM_psAvln();
+                      }
+                      else if (strcmp(cmd, "pssta") == 0)
+                      {
+                          HTM_psSta();
+                      }
+                      else if (strcmp(cmd, "pslist") == 0)
+                      {
+                    HTM_psDisplayPsList();
+                      }
+                      else if (strcmp(cmd, "ps") == 0)
+                      {
+                    printf("pbst=%lu, CurBPST=%lu, NTB=%lu\n", 
+                    (rtocl(ReadU32Reg(PLC_BPST_REG)) * 40)/1000000, (rtocl(ReadU32Reg(PLC_CurBPST_REG))*40)/1000000, (rtocl
+             -(ReadU32Reg(PLC_NTB_REG))*40)/1000000);
+                    printf("bpCnt=%lu\n", staInfo->ccoScb->bpCnt);
+                      }
+                      else if (strcmp(cmd, "psdebug") == 0)
+                      {
+                    psDebug = !psDebug;
+                      printf("psDebug is now %s\n", psDebug ? "ON":"OFF");
+                      }
+                      else if (strcmp(cmd, "psstat") == 0)
+                      {
+                    PSM_showStat();
+                      }
+                      else if (strcmp(cmd, "psrststat") == 0)
+                      {
+                    PSM_clearStat();
+                      }
+                      else if (strcmp(cmd, "psstop") == 0)
+                      {
+                    HTM_stopPs();
+                      }
+                      else if (strcmp(cmd, "pstxon") == 0)
+                      {
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 30  
+
+                    txOff=1;
+                      }
+                      else if (strcmp(cmd, "pstxoff") == 0)
+                      {
+                    txOff=0;
+                      }
+                      else if (strcmp(cmd, "psrxon") == 0)
+                      {
+                    rxOff=1;
+                      }
+                      else if (strcmp(cmd, "psrxoff") == 0)
+                      {
+                    rxOff=0;
+                      }
+                      else if (strcmp(cmd, "psphyon") == 0)
+                      {
+                    phyOff=1;
+                      }
+                      else if (strcmp(cmd, "psphyoff") == 0)
+                      {
+                    phyOff=0;
+                      }
+                      else if (strcmp(cmd, "psmacclockon") == 0)
+                      {
+                    macClkChange=1;
+                      }
+                      else if (strcmp(cmd, "psrxmacclockoff") == 0)
+                      {
+                    macClkChange=0;
+                      }
+                      else if (strcmp(cmd, "pspllon") == 0)
+                      {
+                    pllOff=1;
+                      }
+                      else if (strcmp(cmd, "psplloff") == 0)
+                      {
+                    pllOff=0;
+                      }
+              #ifdef HYBRII_ETH   
+                    else  if (strcmp(cmd, "hwstat") == 0)
+                    {
+                         EHAL_Print_ethHWStat();
+                    }
+                    else  if (strcmp(cmd, "rsthwstat") == 0)
+                    {
+                         EHAL_Clear_ethHWStat();
+                    }
+              #endif    
+              #endif
+1818   2      #ifdef LLP_POWERSAVE
+                      else if (strcmp(cmd, "pssta") == 0)
+                      {
+                          HTM_psSta();
+                      }
+                      else if (strcmp(cmd, "pslist") == 0)
+                      {
+                    HTM_psDisplayPsList();
+                      }
+                      else if (strcmp(cmd, "psdebug") == 0)
+                      {
+                    psDebug = !psDebug;
+                      printf("psDebug is now %s\n", psDebug ? "ON":"OFF");
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 31  
+
+                      }
+                      else if (strcmp(cmd, "psdebug1") == 0)
+                      {
+                    psDebug1 = !psDebug1;
+                      printf("psDebug1 is now %s\n", psDebug1 ? "ON":"OFF");
+                      }
+                      else if (strcmp(cmd, "psstat") == 0)
+                      {
+                    PSM_showStat();
+                      }
+                      else if (strcmp(cmd, "psrststat") == 0)
+                      {
+                    PSM_clearStat();
+                      }
+              #endif
+1846   2      #if 0 //def ER_TEST
+                  else if (strcmp(cmd, "erenable") == 0)
+                {
+                     WriteU8Reg(0x4F0, 0x80);
+                }
+                else if (strcmp(cmd, "erdisable") == 0)
+                {
+                     WriteU8Reg(0x4F0, 0x0);
+                }
+              #endif  //ER_TEST
+1856   2      
+1857   2      #ifdef HYBRII_ETH
+                      else if (strcmp(cmd, "hstat") == 0)
+                      {
+                          EHAL_DisplayEthStat();
+              
+                      }
+                      else if (strcmp(cmd, "hrststat") == 0)
+                      {
+                          EHAL_ResetStat();
+                      }
+              #endif
+1868   2      
+1869   2      else if (strcmp(cmd, "setmac") == 0)
+1870   2         {
+1871   3           setMac();
+1872   3         }
+1873   2      
+1874   2      
+1875   2      
+1876   2      #if 0
+                  
+              
+                     
+              
+                      else if (strcmp(cmd, "setmac1") == 0)
+                      {
+                          setMac1();
+                      }
+                      else if (strcmp(cmd, "setmac2") == 0)
+                      {
+                          setMac2();
+                      }
+              #endif    
+1890   2              else if (strcmp(cmd, "getmac") == 0)
+1891   2              {
+1892   3                  getMac();
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 32  
+
+1893   3              }
+1894   2      #if 0
+                    else if (strcmp(cmd, "dump") == 0)
+                      {
+                          uBcnStatusReg         bcnStatus;
+                          uPlcMedStatReg        plcMedStat;  
+                          uPlcStatusReg         plcStatus;
+                          
+                          bcnStatus.reg   = ReadU32Reg(PLC_BCNSTATUS_REG);
+                          plcStatus.reg  = ReadU32Reg(PLC_STATUS_REG);
+                          plcMedStat.reg = ReadU32Reg(PLC_MEDIUMSTATUS_REG);
+                          
+                          FM_Printf(FM_USER, "phyActive: %bu, plcMacIdle: %bu, crsMac: %bu, plcTxQRdy: %bu,\n \
+                          plcTxQSwCtrl: %bu, txWindow: %bu, bBcnTxPending: %bu, bBcnNotSent: %bu\n",
+                          plcMedStat.s.phyActive, plcStatus.s.plcMacIdle, plcMedStat.s.crsMac, plcStatus.s.plcTxQRdy, \
+                          plcStatus.s.plcTxQSwCtrl, plcMedStat.s.txWindow, gHpgpHalCB.bBcnTxPending,\
+                          gHpgpHalCB.bBcnNotSent);
+              
+                    }
+              #endif    
+1913   2      #ifdef UKE  
+                  else if (strcmp(cmd, "setsecmode") == 0)
+                  {
+                      setSecMode();
+                      }
+              #endif    
+1919   2              else if (strcmp(cmd, "gvmsg") == 0)
+1920   2              {
+1921   3                  FM_SetDebugLevel(FM_MASK_ALL);
+1922   3              }
+1923   2              else if (strcmp(cmd, "nogvmsg") == 0)
+1924   2              {
+1925   3      
+1926   3                  FM_SetDebugLevel(FM_MASK_DEFAULT);
+1927   3              }
+1928   2      #ifdef IMPROVE_PER
+                      else if (strcmp(cmd, "improveper") == 0)
+                      {        
+                          WriteU8Reg(0x48a, 0xb4);        
+                          WriteU8Reg(0x48b, 0x00);        
+                          WriteU8Reg(0x484, 0x5a);
+                          WriteU8Reg(0x478, 0x21);
+                          WriteU8Reg(0x483, 0x13);
+                      }
+              #endif
+1938   2          else  if (strcmp(cmd, "version") == 0)
+1939   2              {
+1940   3            FM_Printf(FM_USER, "VERSION: %s\n",get_Version());
+1941   3          }
+1942   2              else  if (strcmp(cmd, "txpowermode") == 0)
+1943   2              {
+1944   3      #if 0        
+                          u8 powermode;
+                          char input[10];
+                          do
+                        {
+                          printf("Enter Tx Power mode: 0-Auto, 1-Normal, 2-High Power");
+                          while (getline(input, sizeof(input)) > 0)
+                          {
+                            if(sscanf(input,"%bd",&powermode) >= 1)
+                            break;
+                          }
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 33  
+
+                        }while (powermode>2);
+                       update_powermode(0, powermode);
+              #endif       
+1958   3              }
+1959   2      #ifdef ROUTE
+                      else  if (strcmp(cmd, "lrt") == 0)
+                      {
+                          ROUTE_displayLRT();
+                      }
+              #ifdef ROUTE_TEST
+                      else  if (strcmp(cmd, "setdroptei") == 0)
+                      {
+                          char input[10];
+                      //printf("Enter Drop Tei: ");
+                      while (getline(input, sizeof(input)) > 0)
+                      {
+                        if(sscanf(input,"%bd",&dropTei[0]) >= 1)
+                        break;
+                      }
+                          while (getline(input, sizeof(input)) > 0)
+                      {
+                        if(sscanf(input,"%bd",&dropTei[1]) >= 1)
+                        break;
+                      }
+                          while (getline(input, sizeof(input)) > 0)
+                      {
+                        if(sscanf(input,"%bd",&dropTei[2]) >= 1)
+                        break;
+                      }
+                      }
+                      else  if (strcmp(cmd, "dropcco") == 0)
+                      {
+                          dropcco = 1;
+                      }
+              #endif
+              #endif
+1991   2      
+1992   2      #ifdef NO_HOST
+1993   2      #if 0
+                else if(strcmp(cmd, "hostcp") == 0)
+                  {
+                    FM_Printf(FM_USER,"cpcnt %bu", host_intf_max_cp);
+                    host_intf_max_cp = 0;
+              
+                    FM_Printf(FM_USER,"cnt %lu: %lus \n",
+                        gApsRxFwd,gApsRxApp);
+                  }
+              #endif  
+2003   2      #endif
+2004   2      #if 0
+                  else if(strcmp(cmd, "memdump") == 0 )
+                  {     
+                    u16 address;
+                    u16 memsize;      
+                    volatile u8 *mem_address;
+                    if (sscanf(CmdBuf+8, "%x %u", &address,&memsize) < 1) 
+                    {
+                            return;
+                        }
+                              
+                    mem_address = (u8 xdata *)address;
+                    FM_Printf(FM_USER,"Address: %x\n",address);
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 34  
+
+                    FM_HexDump(FM_USER,"Mem Dump",mem_address,memsize);
+                  }
+              #endif
+2020   2      #if 0
+                  else if(strcmp(cmd, "gvreset") == 0)
+                  {
+                    GV701x_Chip_Reset();
+                  }
+                
+              #endif    
+2027   2          else if(strcmp(cmd, "plctxreset") == 0)
+2028   2          {
+2029   3            plc_reset_tx();
+2030   3          
+2031   3          }
+2032   2          else if(strcmp(cmd, "plcrxreset") == 0)
+2033   2          {
+2034   3            plc_reset_rx();
+2035   3          }
+2036   2      
+2037   2      #if 0   
+                  else if(strcmp(cmd, "ethhost") == 0)
+                  {
+                    hostDetected = TRUE;
+                    hostIntf = HOST_INTF_ETH;
+                  }
+              #endif    
+2044   2      #if 0 //def UART_HOST_INTF 
+                  else if(strcmp(cmd, "uarthost") == 0)
+                  {
+                    hostDetected = TRUE;
+                    hostIntf = HOST_INTF_UART;
+                  }
+                  else if(strcmp(cmd, "nohostintf") == 0)
+                  {
+                    hostDetected = FALSE;
+                    hostIntf = HOST_INTF_NO;
+                  }
+                  else if(strcmp(cmd, "uarttimeout") == 0)
+                  {
+                    char* appstr = NULL;      
+                    u32 timeout;
+                  
+                    appstr = strtok(CmdBuf," ");
+                    appstr = strtok(NULL," ");
+                    timeout = (u32)atol(appstr);      
+                    GV701x_SetUartRxTimeout(timeout);
+                  }
+              #ifdef LG_UART_CONFIG   
+                  else if(strcmp(cmd, "uarttxmode") == 0)
+                  {
+                    char* appstr = NULL;      
+                    u8 mode;
+                  
+                    appstr = strtok(CmdBuf," ");
+                    appstr = strtok(NULL," ");
+                    mode = (u32)atoi(appstr);
+                    if(mode >= UART_TX_AUTO && mode <= UART_TX_LOW_LEVEL)
+                    {
+                      GV701x_UartTxMode(mode);
+                    }
+                  }
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 35  
+
+              #endif    
+                  #if 0   
+                  else if(strcmp(cmd, "uartstat") == 0)
+                  {
+                    display_uart_stat();
+                  }
+              
+                    else if(strcmp(cmd, "uartread") == 0)
+                    {
+                      if(uartRxControl.rxCount != 0)
+                      {
+                        FM_HexDump(FM_USER,"\nRX Buffer\n",uartRxControl.pRxdataBuffer,uartRxControl.rxCount);
+                      }
+                    }
+              #endif      
+                    else if(strcmp(cmd, "uartconfig") == 0)
+                    {
+                      char* appstr = NULL;      
+                      u32 baud;
+                      u16 frm_len;      
+                      
+                      appstr = strtok(CmdBuf," ");
+                      appstr = strtok(NULL," ");
+                      baud = (u32)atol(appstr);     
+                      appstr = strtok(NULL,"\0");     
+                      frm_len = (u16)atoi(appstr);
+                      GV701x_UartConfig(baud, frm_len);
+                    }     
+              #endif
+2108   2      #ifdef NO_HOST
+2109   2          else if(strcmp(cmd, "app") == 0)
+2110   2          {
+2111   3            char* appstr;
+2112   3            u8 sLen;
+2113   3            u8 appid;       
+2114   3            
+2115   3            if(sscanf(CmdBuf + sizeof("app"), "%bu", &appid) >= 1)
+2116   3            {       
+2117   4              if(appid >= APP_MAX_APPLICATIONS)
+2118   4                return;     
+2119   4              
+2120   4              msg_hdr_app_cmd.dst_app_id = appid;       
+2121   4            }
+2122   3            
+2123   3            appstr = (char*)(CmdBuf + sizeof("app ") + ((appid > 9) ? 3 : 2));
+2124   3            sLen = strlen(appstr);
+2125   3            Host_SendIndication(HOST_EVENT_APP_CMD, SYS_MAC_ID, appstr, (sLen + 1) /*cater to \0*/);
+2126   3          }
+2127   2      #endif
+2128   2          else if(strcmp(cmd, "commit") == 0)
+2129   2              {
+2130   3      #ifdef NO_HOST        
+2131   3                  u8 buff[MAX_HOST_CMD_LENGTH];
+2132   3            hostCmdCommit* commit;
+2133   3                  
+2134   3            memset(buff, 0x00, MAX_HOST_CMD_LENGTH);  
+2135   3            
+2136   3            commit = (hostCmdCommit *)buff;
+2137   3            commit->command = HOST_CMD_COMMIT_REQ;
+2138   3            commit->action = ACTION_SET;
+2139   3      
+2140   3      #ifndef UART_OLD_APP
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 36  
+
+2141   3            /*Send command to firmware*/  
+2142   3            if(STATUS_FAILURE == GV701x_SendAppEvent(APP_FW_MSG_APPID, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, HPGP_MAC_
+             -ID, 
+2143   3                      EVENT_CLASS_MGMT, MGMT_FRM_ID, buff, sizeof(hostCmdCommit), 0))
+2144   3            {
+2145   4              printf("\nCommit Fail 1.0");
+2146   4            }
+2147   3      #else         
+                    NMA_RecvMgmtPacket((hostHdr_t*)buff, sizeof(hostHdr_t) + sizeof(hostCmdCommit));          
+              #endif          
+2150   3      #else
+                          u8 buff[MAX_HOST_CMD_LENGTH];
+                    hostHdr_t* pHostHdr = (hostHdr_t *)buff; 
+                    hostCmdCommit* commit;
+                          
+                    memset(buff, 0x00, MAX_HOST_CMD_LENGTH);  
+                    
+                    /*Fill the Hybrii Header*/
+                    pHostHdr = (hostHdr_t*)buff;
+                    pHostHdr->protocol = HPGP_MAC_ID;
+                    pHostHdr->type = MGMT_FRM_ID; 
+                    pHostHdr->length = NHTOHS(sizeof(hostCmdCommit));   
+                    pHostHdr->rsvd = 0;   
+                    commit = (hostCmdCommit *)(pHostHdr + 1);
+                    commit->command = HOST_CMD_COMMIT_REQ;
+                    commit->action = ACTION_SET;
+              
+                        NMA_RecvMgmtPacket((hostHdr_t*)buff, sizeof(hostHdr_t) + sizeof(hostCmdCommit));
+              
+              #endif
+2170   3              
+2171   3              } 
+2172   2      #ifdef  HYBRII_802154
+2173   2          else if(strcmp(cmd, "lwp") == 0) {
+2174   3            u8 cmd_arg[64];
+2175   3      
+2176   3            FM_Printf(FM_USER,"\n@0x23:");        
+2177   3            while (getline(cmd_arg, sizeof(cmd_arg)) > 0)
+2178   3            {
+2179   4              if(sscanf(cmd_arg,"%bx",&gSysProfile.rfParam.reg_23) >= 1)
+2180   4              break;
+2181   4            }
+2182   3            
+2183   3            memset(cmd_arg, 0x00, 10);  
+2184   3            FM_Printf(FM_USER,"\n@0x24:");        
+2185   3            while (getline(cmd_arg, sizeof(cmd_arg)) > 0)
+2186   3            {
+2187   4              if(sscanf(cmd_arg,"%bx",&gSysProfile.rfParam.reg_24) >= 1)
+2188   4              break;
+2189   4            }     
+2190   3          } 
+2191   2      #endif    
+2192   2      #if 0
+                        else if(strcmp(cmd, "setfreq") == 0)
+                      {
+                          char input[10];
+                          u8 freq;
+                      FM_Printf(FM_USER,"Enter Freq =  0 for 50Hz, 1 for 60Hz: ");
+                      while (getline(input, sizeof(input)) > 0)
+                      {
+                        if(sscanf(input,"%bd",&freq) >= 1)
+                        break;
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 37  
+
+                      }
+                          if(freq == 0)
+                          {
+                          gHpgpHalCB.lineFreq = FREQUENCY_50HZ;
+                      gSysProfile.lineFreq = FREQUENCY_50HZ;
+                          }
+                          else if(freq == 1)
+                          {
+                              gHpgpHalCB.lineFreq = FREQUENCY_60HZ;
+                            gSysProfile.lineFreq = FREQUENCY_60HZ;
+                          }
+                          else
+                          {
+                              FM_Printf(FM_USER,"Invalid Option\n");
+                          }
+                      }
+              
+              #endif
+2220   2              else if(strcmp(cmd, "sysparam") == 0)   
+2221   2          {
+2222   3            sLinkLayer *linkl = HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);      
+2223   3            sSnsm *snsm = &linkl->staNsm;
+2224   3      #ifdef MCCO
+2225   3            sCnsm *cnsm = &linkl->ccoNsm;
+2226   3      #endif
+2227   3            
+2228   3            sStaInfo   *staInfo = NULL;
+2229   3            staInfo = LINKL_GetStaInfo(linkl);
+2230   3            FM_HexDump(FM_USER,"S NID: ",staInfo->nid,NID_LEN);
+2231   3            FM_Printf(FM_USER,"S SNID: %bu\n", staInfo->snid);
+2232   3            FM_Printf(FM_USER,"S SNID: %bu\n", gHpgpHalCB.snid);
+2233   3              
+2234   3            //FM_Printf(FM_USER,"nwselected : %bu\n", gHpgpHalCB.nwSelected);
+2235   3            //FM_Printf(FM_USER,"nwse snid: %bu\n", gHpgpHalCB.nwSelectedSnid); 
+2236   3      
+2237   3            if(linkl->mode == LINKL_STA_MODE_STA){
+2238   4            //FM_Printf(FM_USER,"sync: %bu\n", snsm->netSync);      
+2239   4            //FM_Printf(FM_USER,"scan %bu\n", snsm->netScan);     
+2240   4      
+2241   4            //FM_Printf(FM_USER,"ccoDet %bu\n", snsm->enableCcoDetection);
+2242   4              
+2243   4              }
+2244   3                  
+2245   3      #ifdef MCCO
+2246   3            FM_HexDump(FM_USER,"C CCoNID: ",cnsm->passiveNid,NID_LEN);
+2247   3        
+2248   3            FM_Printf(FM_USER,"C CCoSNID: %bu\n", gHpgpHalCB.passSnid);
+2249   3      
+2250   3            FM_Printf(FM_USER,"sId: %bu\n", cnsm->slotId);
+2251   3        
+2252   3      #endif
+2253   3       
+2254   3            if (gHpgpHalCB.lineMode == LINE_MODE_AC)
+2255   3              FM_Printf(FM_USER,"LM: AC\n");
+2256   3            else
+2257   3              FM_Printf(FM_USER,"LM: DC\n");      
+2258   3      
+2259   3            //if (gHpgpHalCB.lineFreq == FREQUENCY_50HZ)
+2260   3            //  FM_Printf(FM_USER,"Freq: 50 Hz\n");
+2261   3            //else
+2262   3            //  FM_Printf(FM_USER,"Freq: 60 Hz\n");
+2263   3            
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 38  
+
+2264   3            FM_Printf(FM_USER,"AStatus: %bu\n",MCTRL_IsAssociated());
+2265   3            FM_Printf(FM_USER,"AuStatus: %bu\n",staInfo->staScb->staStatus.fields.authStatus);
+2266   3            
+2267   3            //FM_Printf(FM_USER,"TEI: %bu\n", staInfo->tei);
+2268   3      
+2269   3            if (gHpgpHalCB.devMode == DEV_MODE_STA)
+2270   3              FM_Printf(FM_USER,"DM: STA\n");
+2271   3            else if(gHpgpHalCB.devMode == DEV_MODE_CCO)
+2272   3              FM_Printf(FM_USER,"DM: CCO\n");
+2273   3      #ifdef MCCO     
+2274   3            else if(gHpgpHalCB.devMode == DEV_MODE_PCCO)
+2275   3              FM_Printf(FM_USER,"DM: PCCO\n");
+2276   3      #endif
+2277   3            
+2278   3            //FM_Printf(FM_USER,"freq: %bu\n", (gHpgpHalCB.gFreqCB.freqDetected));
+2279   3            //FM_Printf(FM_USER,"bcninit : %bu\n", (gHpgpHalCB.bcnInitDone));
+2280   3      
+2281   3            //FM_Printf(FM_USER,"avgInit : %bu\n", gHpgpHalCB.bPerAvgInitDone);
+2282   3      
+2283   3            //FM_Printf(FM_USER,"syncC : %bu\n", gHpgpHalCB.syncComplete);
+2284   3            //FM_Printf(FM_USER,"slotUsage : %bu\n",  staInfo->slotUsage);
+2285   3            FM_HexDump(FM_USER,"zc", (u8*)&gHpgpHalCB.zcInt, 4);
+2286   3          
+2287   3            
+2288   3      #if 0       
+                    regVal = mac_utils_spi_read(0x35);
+              
+                    if((u8 *)(&regVal)[0] == 0x30)
+                    {
+                      FM_Printf(FM_USER,"Power Mode: Auto\n");
+                    }
+                    else if((u8 *)(&regVal)[0] == 0x00)
+                    {
+                      FM_Printf(FM_USER,"Power Mode: Normal\n");
+                    }
+                    else if((u8 *)(&regVal)[0] == 0x0f)
+                    {
+                      FM_Printf(FM_USER,"Power Mode: High\n");
+                    }
+                    
+                    if(ReadU8Reg(0x4F0) == 0x80)
+                    {
+                      FM_Printf(FM_USER,"ER Mode: Enabled\n");
+                    }
+                    else
+                    {
+                      FM_Printf(FM_USER,"ER Mode: Disabled\n");
+                    }                     
+              #endif      
+2313   3              }       
+2314   2              else if(strcmp(cmd, "eflash") == 0)
+2315   2              {
+2316   3                  spiflash_eraseConfigMem();      
+2317   3              }
+2318   2              else if(strcmp(cmd, "phyreset") == 0)
+2319   2          {
+2320   3            //hold_reset_phy_tx();
+2321   3            //hold_reset_phy_rx();
+2322   3              //disable_plc_txrx();
+2323   3      
+2324   3              //release_reset_phy_tx();
+2325   3            //release_reset_phy_rx();
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 39  
+
+2326   3            //enable_plc_txrx();
+2327   3          }
+2328   2      #if 0   
+                      else if(strcmp(cmd, "dumpflash") == 0)
+                      {
+                          dumpflash();
+                      }
+                    else if(strcmp(cmd, "print") == 0)
+                    {
+                      FmDebug = FM_MASK;
+                    }
+                    else if(strcmp(cmd, "noprint") == 0)
+                    {
+              
+                      FmDebug = 0;
+                    }
+                      else if(strcmp(cmd, "adddev") == 0)
+                      {
+                          char input[10];
+                      FM_Printf(FM_USER,"Enter no of dev: ");
+                      while (getline(input, sizeof(input)) > 0)
+                      {
+                        if(sscanf(input,"%bd",&devNum) >= 1)
+                        break;
+                      }
+                          HTM_ResetNsm();
+                      }
+              #endif
+2354   2      
+2355   2      #ifdef LOG_FLASH
+              
+                  else if(strcmp(cmd, "elog") == 0)
+                  {
+                    //spiflash_eraseLogMem();
+                          
+                          *logLen = 0;
+                          *blockId = 0;
+                          logIndx = 4;
+                  }
+                      else if(strcmp(cmd, "log") == 0)
+                      {
+                          // dump from flash      
+                          //dumpLog();
+                          //FM_HexDump(FM_USER,"",log,*logLen);
+                      }
+                  else if(strcmp(cmd, "dumplog") == 0)
+                      {
+                          // dump from flash      
+                          //dumpLogMem();
+                      }
+              #endif
+2377   2          /* 
+2378   2      
+2379   2              else if(strcmp(cmd, "alllog") == 0)
+2380   2              {
+2381   2                  //getAllLog();
+2382   2      
+2383   2              }
+2384   2               else if (strcmp(cmd, "uppermac") == 0 || (strcmp(cmd, "upperMac") == 0))
+2385   2                  {
+2386   2                      opMode = UPPER_MAC;
+2387   2                      eth_plc_bridge = 0;
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 40  
+
+2388   2                  }
+2389   2                  else if (strcmp(cmd, "lowermac") == 0 || (strcmp(cmd, "lowermac") == 0))
+2390   2                  {
+2391   2                      opMode = LOWER_MAC;
+2392   2                  }
+2393   2              */
+2394   2              
+2395   2              /*  else if (strcmp(cmd, "diag") == 0)
+2396   2                  {
+2397   2                      HHT_SetDiagMode();
+2398   2                  }
+2399   2                  else if (strcmp(cmd, "cBcn") == 0)
+2400   2                  {
+2401   2                      HHT_SendBcn(BEACON_TYPE_CENTRAL);
+2402   2                  }
+2403   2                  else if (strcmp(cmd, "tx") == 0)
+2404   2                  {
+2405   2                      HHT_SimulateTxTestMenu();
+2406   2                  }
+2407   2                  else if (strcmp(cmd, "devMode") == 0 || strcmp(cmd, "devmode") == 0)
+2408   2                  {
+2409   2                      HHT_DevCfg();
+2410   2                  }
+2411   2                  else if (strcmp(cmd, "addr") == 0)
+2412   2                  {
+2413   2                      HHT_AddrCfg();
+2414   2                  }
+2415   2                  else if (strcmp(cmd, "txCfg") == 0 || strcmp(cmd, "txcfg") == 0)
+2416   2                  {
+2417   2                      HHAL_SetDevMode(DEV_MODE_STA, LINE_MODE_DC);
+2418   2                      gHpgpHalCB.bcnInitDone = 1;
+2419   2                      HHT_DevCfg();
+2420   2                  }
+2421   2                  else if (strcmp(cmd, "rxCfg") == 0 || strcmp(cmd, "rxcfg") == 0)
+2422   2                  {
+2423   2                      u8 remoteTei = HYBRII_DEFAULT_TEICCO; 
+2424   2                  u8 selfTei   = HYBRII_DEFAULT_TEISTA;
+2425   2                      
+2426   2                      HHAL_SetTei(selfTei);
+2427   2                      gHpgpHalCB.remoteTei = remoteTei;
+2428   2                      gHpgpHalCB.bcnInitDone = 0;
+2429   2                  } 
+2430   2                  else if (strcmp(cmd, "key") == 0 ) 
+2431   2                  {
+2432   2                      HHT_SetKey();
+2433   2                  }
+2434   2                  else if (strcmp(cmd, "tblTest") == 0 || strcmp(cmd, "tbltest") == 0) 
+2435   2                  {
+2436   2                      HHT_TestMemoryTables();
+2437   2                  }  
+2438   2                else if (strcmp(cmd, "robo") == 0)
+2439   2                {
+2440   2                  HHT_SetRoboMode();
+2441   2                }
+2442   2                  
+2443   2                else if (strcmp(cmd, "demo") == 0)
+2444   2                {
+2445   2                      HHT_LedDemoTxMenu(CmdBuf+1+ strlen("demo"));
+2446   2                  }
+2447   2      #ifdef _LED_DEMO_
+2448   2                  else if (strcmp(cmd, "led") == 0)
+2449   2                  {       
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 41  
+
+2450   2                       init_led_board();
+2451   2                       led_control(TRUE, PLC_DISPLAY_BLUE, PLC_DISPLAY_DIGIT, 7);
+2452   2                  }
+2453   2      #endif  
+2454   2                  else  if (strcmp(cmd, "scan") == 0)
+2455   2                  {
+2456   2                      u32 timerCnt1;
+2457   2                      u32 timercnt2;
+2458   2                      //HHAL_SetDefDevConfig(DEVMODE_STA, LINEMODE_DC);
+2459   2                      HHAL_SetSWStatReqScanFlag(REG_FLAG_SET);
+2460   2                      HHT_DevCfg(); 
+2461   2                  }
+2462   2                  else  if (strcmp(cmd, "sniff") == 0)
+2463   2                  {
+2464   2                      hhal_tst_sniff_cfg(TRUE); 
+2465   2                  }
+2466   2                  else  if (strcmp(cmd, "nosniff") == 0)
+2467   2                  {
+2468   2                      hhal_tst_sniff_cfg(FALSE); 
+2469   2                  }   
+2470   2             else
+2471   2             {
+2472   2                 HHAL_CmdHelp();
+2473   2             }  
+2474   2             */
+2475   2          }
+2476   1      
+2477   1      #ifdef PLC_TEST
+                  else
+                  {
+                      if (strcmp(cmd, "stat") == 0)
+                      {
+                          HHAL_DisplayPlcStat();
+                      }
+                      else if (strcmp(cmd, "rststat") == 0 || strcmp(cmd, "rstStat") == 0)
+                      {
+                          //HHAL_ResetPlcStat();
+                          //HHAL_DisplayPlcStat();
+                      }
+              
+                  else if(strcmp(cmd,"qd") == 0)
+                  {
+                    datapath_queue_depth(HOST_DATA_QUEUE);
+              
+                    //FM_Printf(FM_USER,"h q"); 
+              
+                    datapath_queue_depth(PLC_DATA_QUEUE);
+              
+                    //FM_Printf(FM_USER,"plc q");
+              
+                  
+                  }
+              #if 0   
+                      else if (strcmp(cmd, "txpowermode") == 0)
+                      {
+                          u8 powermode;
+                          char input[10];
+                          do
+                        {
+                          printf("Enter Tx Power mode : 0 - Automotive, 1 - Normal, 2 - High ");
+                          while (getline(input, sizeof(input)) > 0)
+                          {
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 42  
+
+                            if(sscanf(input,"%bd",&powermode) >= 1)
+                            break;
+                          }
+                        }while (powermode>2);
+                      update_powermode(0, powermode);
+                      }  
+              #endif    
+              #if 0
+                      else if (strcmp(cmd, "linemode") == 0)
+                      {
+                          HTM_SetLineMode(CmdBuf+sizeof("linemode"));
+                      }
+              #endif    
+              #ifdef HYBRII_ETH
+                      else if (strcmp(cmd, "hstat") == 0)
+                      {
+                          EHAL_DisplayEthStat();
+              
+                      }
+                      else if (strcmp(cmd, "hrststat") == 0)
+                      {
+                          EHAL_ResetStat();
+                      }
+              #endif
+                      else if (strcmp(cmd, "erenable") == 0)
+                    {
+                         //WriteU8Reg(0x4F0, 0x80);
+                    }
+                    else if (strcmp(cmd, "erdisable") == 0)
+                    {
+                        // WriteU8Reg(0x4F0, 0x0);
+                    }
+              #ifdef PLC_TEST
+                      else  if (strcmp(cmd, "starttest") == 0)
+                      {
+                           gCCOTest = 1;
+                           gCount = 0;
+                           broadcast_CCOTEI();
+                      }
+              #endif
+              #ifdef DEBUG_DATAPATH
+                      else if (strcmp(cmd, "ed") == 0)
+                      {
+                          ethQueueDebug = 1;
+                      }
+                    else  if (strcmp(cmd, "sd") == 0)
+                      {
+                          ethQueueDebug = 1;
+                          sigDbg = 1;
+                      }
+                    else  if (strcmp(cmd, "nsd") == 0)
+                      {
+                          ethQueueDebug = 0;
+                          sigDbg = 0;
+                      }
+                    else  if (strcmp(cmd, "pd") == 0)
+                      {
+                          pktDbg = 1;
+                      }
+                      else  if (strcmp(cmd, "npd") == 0)
+                      {
+                          pktDbg = 0;
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 43  
+
+                      }
+              
+              #endif
+              
+              #if 0
+                      else if (strcmp(cmd, "debug") == 0)
+                      {
+              
+                          FM_SetDebugLevel(FM_MASK_ALL);
+                      }
+              #endif    
+                  
+                  else  if (strcmp(cmd, "version") == 0)
+                      {
+                    FM_Printf(FM_USER, "VERSION: %s\n",get_Version());  
+                  }
+              #if 0   
+                      else
+                      {
+                          HHAL_CmdHelp();
+                      }
+              #endif    
+              
+                  }
+              #endif  
+2599   1      }   
+2600          void 
+2601          hex_to_int(unsigned char *MacAddr, int len)
+2602          {
+2603   1        int j;
+2604   1        for(j=0; j<len; j++)
+2605   1        {
+2606   2          if(MacAddr[j] >= '0' && MacAddr[j] <= '9')
+2607   2          {
+2608   3            MacAddr[j] = MacAddr[j] - 48;
+2609   3          }
+2610   2          else if( MacAddr[j] == 'A' || MacAddr[j] == 'a')
+2611   2          {
+2612   3            MacAddr[j] = 10;
+2613   3          }
+2614   2          else if(MacAddr[j] == 'B'|| MacAddr[j] == 'b')
+2615   2          {
+2616   3            MacAddr[j] = 11;
+2617   3          }
+2618   2          else if(MacAddr[j] == 'C'|| MacAddr[j] == 'c')  
+2619   2          {
+2620   3            MacAddr[j] = 12;
+2621   3          }
+2622   2          else if(MacAddr[j] == 'D' || MacAddr[j] == 'd')
+2623   2          {
+2624   3            MacAddr[j] = 13;
+2625   3          }
+2626   2          else if(MacAddr[j] == 'E'|| MacAddr[j] == 'e')
+2627   2          {
+2628   3            MacAddr[j] = 14;
+2629   3          }
+2630   2          else if(MacAddr[j] == 'F'|| MacAddr[j] == 'f')
+2631   2          {
+2632   3            MacAddr[j] = 15;
+2633   3          }
+2634   2      
+2635   2      
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 44  
+
+2636   2        }
+2637   1      }
+2638          
+2639          
+2640          eStatus setMac()
+2641          {
+2642   1          u8 mac[6];
+2643   1          u8 macstr[20];
+2644   1          u8 i;
+2645   1          sHaLayer *hal;
+2646   1          hal = HOMEPLUG_GetHal();
+2647   1          
+2648   1          FM_Printf(FM_USER, "MACAddr::");
+2649   1          getline(macstr, sizeof(macstr));
+2650   1      
+2651   1          if(macstr[2] != ':' || macstr[5] != ':' || macstr[8] != ':' || macstr[11] != ':' || macstr[14] != ':')
+             - 
+2652   1        {
+2653   2        //  FM_Printf(FM_USER, "ERROR: Invalid MAC address\n");
+2654   2          //FM_Printf(FM_USER, "format: AA:22:CC:44:FE:34\n");
+2655   2          return STATUS_FAILURE;
+2656   2        }
+2657   1        hex_to_int(&macstr[0], strlen(macstr));
+2658   1        i = 0;
+2659   1        mac[0] =  (macstr[i] * 16) + macstr[i+1];
+2660   1        i += 3;
+2661   1        mac[1] =  (macstr[i] * 16) + macstr[i+1];
+2662   1        i += 3;
+2663   1        mac[2] =  (macstr[i] * 16) + macstr[i+1];
+2664   1        i += 3;
+2665   1        mac[3] =  (macstr[i] * 16) + macstr[i+1];
+2666   1        i += 3;
+2667   1        mac[4] =  (macstr[i] * 16) + macstr[i+1];
+2668   1        i += 3;
+2669   1        mac[5] =  (macstr[i] * 16) + macstr[i+1];
+2670   1      
+2671   1          memcpy(hal->macAddr, &mac, MAC_ADDR_LEN);
+2672   1          return STATUS_SUCCESS;
+2673   1      }
+2674          
+2675          
+2676          
+2677          eStatus setMac1()
+2678          {
+2679   1          u8 mac[6];
+2680   1      //    u8 macstr[20]="0:7:e9:10:bc:f9";
+2681   1          u8 macstr[20]="84:8f:69:c8:74:9e";
+2682   1          u8 i;
+2683   1          sHaLayer *hal;
+2684   1          hal = HOMEPLUG_GetHal();
+2685   1          
+2686   1        hex_to_int(&macstr[0], strlen(macstr));
+2687   1        i = 0;
+2688   1        mac[0] =  (macstr[i] * 16) + macstr[i+1];
+2689   1        i += 3;
+2690   1        mac[1] =  (macstr[i] * 16) + macstr[i+1];
+2691   1        i += 3;
+2692   1        mac[2] =  (macstr[i] * 16) + macstr[i+1];
+2693   1        i += 3;
+2694   1        mac[3] =  (macstr[i] * 16) + macstr[i+1];
+2695   1        i += 3;
+2696   1        mac[4] =  (macstr[i] * 16) + macstr[i+1];
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 45  
+
+2697   1        i += 3;
+2698   1        mac[5] =  (macstr[i] * 16) + macstr[i+1];
+2699   1      
+2700   1          memcpy(hal->macAddr, &mac, MAC_ADDR_LEN);
+2701   1          return STATUS_SUCCESS;
+2702   1      }
+2703          
+2704          #if 0
+              
+              eStatus setMac2()
+              {
+                  u8 mac[6];
+                  u8 macstr[20]="00:07:e9:10:bc:f9";
+                  u8 i;
+                  sHaLayer *hal;
+                  hal = HOMEPLUG_GetHal();
+                  
+                hex_to_int(&macstr[0], strlen(macstr));
+                i = 0;
+                mac[0] =  (macstr[i] * 16) + macstr[i+1];
+                i += 3;
+                mac[1] =  (macstr[i] * 16) + macstr[i+1];
+                i += 3;
+                mac[2] =  (macstr[i] * 16) + macstr[i+1];
+                i += 3;
+                mac[3] =  (macstr[i] * 16) + macstr[i+1];
+                i += 3;
+                mac[4] =  (macstr[i] * 16) + macstr[i+1];
+                i += 3;
+                mac[5] =  (macstr[i] * 16) + macstr[i+1];
+              
+                  memcpy(hal->macAddr, &mac, MAC_ADDR_LEN);
+                  return STATUS_SUCCESS;
+              }
+              
+              #endif
+2733          
+2734          void getMac()
+2735          {
+2736   1          sHaLayer *hal;
+2737   1          hal = HOMEPLUG_GetHal();
+2738   1          FM_HexDump(FM_USER, "MAC ADDR: ", hal->macAddr, MAC_ADDR_LEN);
+2739   1      }
+2740          #ifdef UKE
+              void setSecMode(void)
+              {
+                 // u8 input[10];
+                  //u8 secMode;
+                  sCtrlLayer *ctrll;
+                  ctrll = HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+              
+                  #if 0
+                  FM_Printf(FM_ERROR,"Enter Security Mode :: ");
+                  getline(input, sizeof(input));
+                  sscanf(input,"%bd",&secMode);
+                  if(secMode > 3 || secMode < 0)
+                  {
+                      FM_Printf(FM_ERROR, "Invalid Security Mode\n");
+                      return;
+                  }
+              
+                  #else
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 46  
+
+              
+                  #endif
+                  
+                  CTRLL_setSecMode(ctrll, SEC_MODE_SC_ADD);
+                  return;
+              }
+              #endif
+2766           
+2767          void HHAL_DisplayPlcStat()
+2768          {
+2769   1      #if 1
+2770   1      
+2771   1          u16 outStandingDescCnt;
+2772   1      
+2773   1          u16 totalDesc      = PLC_TXQ_DEPTH + PLC_TXQ_DEPTH + PLC_TXQ_DEPTH + PLC_TXQ_DEPTH;
+2774   1          u16 freeDescCnt    =  (u16)(HHAL_GetPlcTxQFreeDescCnt(0) + HHAL_GetPlcTxQFreeDescCnt(1) + \
+2775   1                                HHAL_GetPlcTxQFreeDescCnt(2) + HHAL_GetPlcTxQFreeDescCnt(3));  
+2776   1          outStandingDescCnt = totalDesc - freeDescCnt;
+2777   1      
+2778   1        os_switch_task();
+2779   1          if(gHpgpHalCB.halStats.TotalRxGoodFrmCnt || gHpgpHalCB.halStats.RxErrBcnCnt)
+2780   1          {
+2781   2              FM_Printf(FM_USER,"============ PLC Rx Statistics ==============\n");
+2782   2      #ifndef MPER    
+2783   2              FM_Printf(FM_USER,"TotalRxGoodFrmCnt = %lu\n",gHpgpHalCB.halStats.TotalRxGoodFrmCnt);
+2784   2      #else
+                      FM_Printf(FM_USER,"TotalRxGoodFrmCnt = %lu\n",gHpgpHalCB.halStats.TotalRxGoodFrmCnt - gHpgpHalCB.h
+             -alStats.DuplicateRxCnt);
+              #endif
+2787   2        os_switch_task();
+2788   2          //    FM_Printf(FM_USER,"TotalRxBytesCnt   = %lu\n",gHpgpHalCB.halStats.TotalRxBytesCnt);
+2789   2      #ifndef MPER    
+2790   2              FM_Printf(FM_USER,"RxGoodDataCnt     = %lu\n",gHpgpHalCB.halStats.RxGoodDataCnt);
+2791   2      #else
+                      FM_Printf(FM_USER,"RxGoodDataCnt     = %lu\n",gHpgpHalCB.halStats.RxGoodDataCnt - gHpgpHalCB.halSt
+             -ats.DuplicateRxCnt);
+              #endif
+2794   2              FM_Printf(FM_USER,"RxGoodBcnCnt      = %lu\n",gHpgpHalCB.halStats.RxGoodBcnCnt);
+2795   2              //FM_Printf(FM_USER,"RxGoodMgmtCnt     = %lu\n",gHpgpHalCB.halStats.RxGoodMgmtCnt);
+2796   2              os_switch_task();
+2797   2          //    FM_Printf(FM_USER,"RxGoodSoundCnt    = %lu\n",gHpgpHalCB.halStats.RxGoodSoundCnt);
+2798   2      #ifndef MPER    
+2799   2          //    FM_Printf(FM_USER,"TotalRxMissCnt    = %lu\n",gHpgpHalCB.halStats.TotalRxMissCnt); 
+2800   2             // FM_Printf(FM_USER,"DuplicateRxCnt    = %lu\n",gHpgpHalCB.halStats.DuplicateRxCnt); 
+2801   2      #endif    
+2802   2            //  FM_Printf(FM_USER,"BcnRxIntCnt       = %lu\n",gHpgpHalCB.halStats.BcnRxIntCnt);
+2803   2             // FM_Printf(FM_USER,"BcnSyncCnt        = %lu\n\n",gHpgpHalCB.halStats.BcnSyncCnt);
+2804   2          }
+2805   1          os_switch_task();   
+2806   1          if(gHpgpHalCB.halStats.TotalTxFrmCnt)
+2807   1          {
+2808   2              FM_Printf(FM_USER,"============ PLC Tx Statistics ==============\n");
+2809   2             // FM_Printf(FM_USER,"TotalTxFrmCnt     = %lu\n",gHpgpHalCB.halStats.TotalTxFrmCnt);
+2810   2         ////     FM_Printf(FM_USER,"TotalTxBytesCnt   = %lu\n",gHpgpHalCB.halStats.TotalTxBytesCnt);
+2811   2              FM_Printf(FM_USER,"TxDataCnt         = %lu\n",gHpgpHalCB.halStats.TxDataCnt);
+2812   2              FM_Printf(FM_USER,"TxBcnCnt          = %lu\n",gHpgpHalCB.halStats.TxBcnCnt);
+2813   2           //   FM_Printf(FM_USER,"TxMgmtCnt         = %lu\n\n",gHpgpHalCB.halStats.TxMgmtCnt);
+2814   2          }
+2815   1      #if 0 
+                  os_switch_task();  
+                  FM_Printf(FM_USER,"============ PLC Err Statistics =============\n");
+              #ifndef MPER  
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 47  
+
+                      FM_Printf(FM_USER,"PtoH swDropCnt  = %lu\n",gHpgpHalCB.halStats.PtoHswDropCnt);
+                      FM_Printf(FM_USER,"HtoP swDropCnt   = %lu\n",gHpgpHalCB.halStats.HtoPswDropCnt);
+                      FM_Printf(FM_USER,"G SwDropCnt      = %lu\n",gHpgpHalCB.halStats.GswDropCnt);    
+                //  FM_Printf(FM_USER,"CurTxTestFrmCnt  = %lu\n",gHpgpHalCB.halStats.CurTxTestFrmCnt);
+              #ifdef SW_BCST    
+                  FM_Printf(FM_USER,"BCST swDropCnt   = %lu\n",gHpgpHalCB.halStats.swBcstDropCnt);
+              #endif
+                      os_switch_task();
+              #endif  
+              #ifndef MPER  
+                  
+                  FM_Printf(FM_USER,"FrameCtrlErrCnt   = %lu\n",hal_common_reg_32_read(PLC_FCCSERRCNT_REG));
+                  FM_Printf(FM_USER,"PBCSRxErrCnt      = %lu\n",hal_common_reg_32_read(PLC_PBCSRXERRCNT_REG));  
+                  os_switch_task();
+              #endif  
+              #ifndef MPER
+                  FM_Printf(FM_USER,"PBCSTxErrCnt      = %lu\n",hal_common_reg_32_read(PLC_PBCSTXERRCNT_REG));
+                  FM_Printf(FM_USER,"ICVErrCnt         = %lu\n",hal_common_reg_32_read(PLC_ICVERRCNT_REG));
+                  FM_Printf(FM_USER,"RxErrBcnCnt       = %lu\n",gHpgpHalCB.halStats.RxErrBcnCnt);
+                 
+                  os_switch_task();
+              #endif  
+                  FM_Printf(FM_USER,"PendingTxDescCnt  = %u\n",outStandingDescCnt);
+              #endif
+2843   1      #if 0 //ndef MPER 
+                 FM_Printf(FM_USER,"AddrFilterErrCnt  = %lu\n",hal_common_reg_32_read(PLC_ADDRFILTERERRCNT_REG));
+              
+                 FM_Printf(FM_USER,"PLCMpduDropCnt    = %lu\n",hal_common_reg_32_read(PLC_MPDUDROPCNT_REG));
+                //    FM_Printf(FM_USER,"CorruptFrmCnt     = %lu\n",gHpgpHalCB.halStats.CorruptFrmCnt);
+                  FM_Printf(FM_USER,"MissSyncCnt     = %lu\n",gHpgpHalCB.halStats.MissSyncCnt);
+                  FM_Printf(FM_USER,"STAleadCCOCount   = %lu\n",gHpgpHalCB.halStats.STAleadCCOCount);
+                  FM_Printf(FM_USER,"STAlagCCOCount  = %lu\n",gHpgpHalCB.halStats.STAlagCCOCount);
+              
+                  FM_Printf(FM_USER,"PhyActRstCnt      = %bu\n",gHpgpHalCB.halStats.phyActHangRstCnt ); 
+                  FM_Printf(FM_USER,"macTxStuckCnt     = %u\n",gHpgpHalCB.halStats.macTxStuckCnt);  
+                  os_switch_task();
+              
+                  FM_Printf(FM_USER,"macRxStuckCnt     = %u\n",gHpgpHalCB.halStats.macRxStuckCnt);
+                  FM_Printf(FM_USER,"phyStuckCnt       = %bu\n",gHpgpHalCB.halStats.phyStuckCnt);
+                  FM_Printf(FM_USER,"mpiRxStuckCnt     = %bu\n",gHpgpHalCB.halStats.mpiRxStuckCnt);
+                
+                  os_switch_task();
+              
+                  FM_Printf(FM_USER,"smTxStuckCnt      = %bu\n",gHpgpHalCB.halStats.smTxStuckCnt);
+                  FM_Printf(FM_USER,"smRxStuckCnt      = %bu\n",gHpgpHalCB.halStats.smRxStuckCnt);
+              #endif  
+2865   1      //    FM_Printf(FM_USER,"macHangRecover1   = %bu\n",gHpgpHalCB.halStats.macHangRecover1);
+2866   1      //    FM_Printf(FM_USER,"macHangRecover2   = %bu\n\n",gHpgpHalCB.halStats.macHangRecover2);
+2867   1      
+2868   1      #if 1
+2869   1         // FM_Printf(FM_USER,"FreeCPCnt         = %bu\n",CHAL_GetFreeCPCnt());    
+2870   1      //    FM_Printf(FM_USER,"TimerIntCnt       = %lu\n",STM_GetTick()); 
+2871   1          
+2872   1          FM_Printf(FM_USER,"BcnSentIntCnt     = %lu\n",gHpgpHalCB.halStats.BcnSentIntCnt);
+2873   1          
+2874   1        os_switch_task();
+2875   1        //FM_Printf(FM_USER,"Mac H Recovery    = %bu\n",gHpgpHalCB.halStats.macHangRecover2);
+2876   1      #if 0 //def SW_RECOVERY 
+                FM_Printf(FM_USER,"BPIntCnt      = %lu\n",gHpgpHalCB.halStats.bpIntCnt);
+                FM_Printf(FM_USER,"BPIntGap      = %u\n",gHpgpHalCB.bpIntGap);
+              
+                FM_Printf(FM_USER,"Mac L1            = %lu\n",gL1);
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 48  
+
+                FM_Printf(FM_USER,"Mac L2            = %lu\n",gL2);
+                FM_Printf(FM_USER,"Mac L3            = %lu\n",gL3);
+              #endif
+2884   1      
+2885   1        os_switch_task();
+2886   1        //FM_Printf(FM_USER,"Mac BCN Tx R      = %lu\n",gBCNR);
+2887   1        //FM_Printf(FM_USER,"Mac BCN S R       = %lu\n",gBcnStall);
+2888   1        //FM_Printf(FM_USER,"Mac DISC S R      = %lu\n",gDiscStall);
+2889   1      #endif
+2890   1      //    FM_Printf(FM_USER,"SS1               = %lX\n",gHpgpHalCB.halStats.lastSs1);
+2891   1      //    FM_Printf(FM_USER,"NTBB4             = %lX\n",gHpgpHalCB.lastNtbB4);
+2892   1      //    FM_Printf(FM_USER,"NTBAft            = %lX\n",gHpgpHalCB.lastNtbAft);
+2893   1      //    FM_Printf(FM_USER,"BPST              = %lX\n\n",gHpgpHalCB.lastBpst);
+2894   1      
+2895   1      
+2896   1          os_switch_task();
+2897   1      
+2898   1      #if 0
+                  printf("============  Q Controller Statistics =============\n");
+                  printf("No 1st Desc             = %bu\n",gHalCB.qc_no_1st_desc);    
+                  printf("Too many desc           = %bu\n",gHalCB.qc_too_many_desc);    
+                  printf("No desc                 = %bu\n",gHalCB.qc_no_desc);    
+                  printf("No grant (CPU Tx Q)     = %bu\n",gHalCB.qc_no_grant);
+              
+                  os_switch_task();
+                  printf("No grant (free CP)      = %bu\n",gHalCB.cp_no_grant_free_cp);
+                  printf("No grant (alloc CP)     = %d\n",gHalCB.cp_no_grant_alloc_cp);
+                  printf("No grant (read CP mem)  = %d\n",gHalCB.cp_no_grant_read_cp);
+                  printf("No grant (write CP mem) = %d\n",gHalCB.cp_no_grant_write_cp);f
+              #ifdef LOG_FLASH
+                  os_switch_task();
+                  printf("Last ISM Entry    = %lu\n",lastITime);
+                  printf("Last BCN TX       = %lu\n\n",lastBtime);
+              #endif    
+              
+              #endif
+2917   1      #endif    
+2918   1      }
+2919          
+2920          void HTM_CmdHelp (void)
+2921          {
+2922   1      
+2923   1      #if 0
+                  u32 ver = hal_common_reg_32_read(HYBRII_VERSION_REG);
+                  printf("MAC HW Version: V0x%08lX\n", ver);
+                  printf("MAC FW Version: %s\n\n",get_Version());
+                  printf
+                  (
+                      "  rb addr       - Read (8-bit) from Reg\n"
+                      "  rw addr       - Read (32-bit) from Reg\n"
+                      "  wb addr data  - Write (8-bit) to Reg\n"
+                      "  ww addr data  - Write (32-bit) to Reg\n"
+                      "  sr addr data  - PHY SPI Read  (8-bit)  from Reg\n"
+                      "  sw addr data  - PHY SPI Write (8-bit)  to   Reg\n"
+              #ifdef HYBRII_HPGP
+                  "  p cmd         - Send cmd to HPGP HAL module\n"
+              #endif
+              #ifdef HYBRII_802154
+                      "  z<cmd>        - Send cmd to Zigbee module\n"
+              #endif
+                      "\n"
+                  );
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 49  
+
+              
+              #endif
+2945   1      }
+2946          
+2947          #if 0
+              void HTM_CmdRun()
+              {
+                  char* CmdBufPnt;
+              
+                  CmdBufPnt = &CmdBuf[0];
+              
+                printf("> ");
+                  ui_utils_cmd_get(CmdBufPnt, 128);
+              
+                  switch (*CmdBufPnt)
+                  {
+              
+                  case 'R':
+                  case 'r':
+                      ui_utils_reg_read(CmdBufPnt);
+                      break;
+              
+                  case 'W':
+                  case 'w':
+                      ui_utils_reg_write(CmdBufPnt);
+                      break;
+              
+                  case 's':
+                      ui_utils_cmd_spi(CmdBufPnt);
+                      break;
+              
+              #ifdef HYBRII_HPGP
+                case 'P':
+                case 'p':
+                  HHAL_CmdHALProcess(CmdBufPnt);
+                  break;            
+              #endif
+              
+              #if (defined HYBRII_802154) && (defined ZBMAC_DIAG) 
+                  case 'z':   
+                      mac_diag_zb_cmd(CmdBufPnt);
+                      break;                
+              #endif                  
+              
+                  default:
+                      HTM_CmdHelp();
+                      break;
+                  }
+              }
+              
+              #else
+2994          void HTM_CmdRun()
+2995          {
+2996   1          char* CmdBufPnt;
+2997   1        u8 bool;
+2998   1          CmdBufPnt = &CmdBuf[0];
+2999   1        bool = ui_utils_cmd_get_poll(CmdBufPnt, 128);
+3000   1        if (bool)
+3001   1        {
+3002   2          switch (*CmdBufPnt)
+3003   2          {
+3004   3          case 'R':
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 50  
+
+3005   3          case 'r':
+3006   3              ui_utils_reg_read(CmdBufPnt);
+3007   3              break;
+3008   3          case 'W':
+3009   3          case 'w':
+3010   3              ui_utils_reg_write(CmdBufPnt);
+3011   3              break;
+3012   3          case 's':
+3013   3              ui_utils_cmd_spi(CmdBufPnt);
+3014   3              break;
+3015   3      #ifdef HYBRII_HPGP
+3016   3        case 'P':
+3017   3        case 'p':
+3018   3          HHAL_CmdHALProcess(CmdBufPnt);
+3019   3          break;            
+3020   3      #endif
+3021   3      #if (defined HYBRII_802154) && (defined ZBMAC_DIAG) 
+                  case 'z':
+                      mac_diag_zb_cmd(CmdBufPnt);
+                      break;                
+              #endif                  
+3026   3          default:
+3027   3              HTM_CmdHelp();
+3028   3              break;
+3029   3          }
+3030   2         printf("> ");
+3031   2        }
+3032   1      }
+3033          #endif
+3034          #if 0
+              void HTM_Proc(sHtm *htm)
+              {
+                  char    *line = NULL;
+                  size_t   numBytes = 128;
+                  int   read = 0;
+                  u8    done  = 0;
+              
+                  line = (char *) malloc (numBytes + 1);
+                  while(!done)
+                  {
+                     HTM_Manu();
+                     memset(line, 0, numBytes + 1);
+              #ifdef P8051
+                     if( (read = getline(line, numBytes)) != 0)
+              #else
+                     if( (read = getline(&line, &numBytes, stdin)) != -1)
+              #endif
+                     {
+                         //scanf("%d", &htm->opt);
+                         sscanf(line, "%d", &htm->opt);
+              
+                         switch(htm->opt)
+                         {
+                             case 1:
+                                 HTM_SetDefaultNid();
+                                 break;
+              #ifdef CCO_FUNC
+                             case 2:
+                                 HTM_StartNet();
+                                 done = 1;
+                                 break;
+              #endif
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 51  
+
+              #ifdef STA_FUNC
+                             case 3:
+                                HTM_JoinNet();
+                                 done = 1;
+                                 break;
+                             case 4:
+                                HTM_StartNetDisc();
+                                 done = 1;
+                                 break;
+                             case 5:
+                          //      HTM_JoinNetPassively();
+                                 done = 1;
+                                 break;
+              #endif
+              #if 0
+                             case 3:
+                                HTM_StartAssoc();
+                                 break;
+                             case 5:
+                                HTM_StartUaSta();
+                                 break;
+                             case 6:
+                                HTM_StartAssocSta();
+                                 break;
+                             case 7:
+                                HTM_LeaveNet();
+                                 break;
+                             case 8:
+                                HTM_SetCcoCap();
+                                 break;
+                             case 9:
+                                HTM_ApptCco();
+                                 break;
+                             case 30:
+                                 HTM_TestCrm();
+                                 break;
+                             case 31:
+                                HTM_DisplayCrm();
+                                 break;
+              #endif
+                             default:
+                             {
+                             }
+                         }
+                     }
+                  } // end of while
+                  free(line);
+              }
+              
+              #endif
+3117          eStatus HTM_Init(sHtm *htm)
+3118          {
+3119   1          memset(htm, 0, sizeof(sHtm));
+3120   1         
+3121   1      #ifdef RTX51_TINY_OS
+3122   1        //  os_create_task(HYBRII_TASK_ID_UI);
+3123   1      #endif
+3124   1          return STATUS_SUCCESS;
+3125   1      }
+3126          
+3127          #ifdef RTX51_TINY_OS
+3128          void HTM_Task (void)// _task_ HYBRII_TASK_ID_UI
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 52  
+
+3129          {
+3130   1          while (1) {
+3131   2              HTM_CmdRun();
+3132   2          }
+3133   1      }
+3134          #endif
+3135          /** =========================================================
+3136           *
+3137           * Edit History
+3138           *
+3139           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/test/htm.c,v $
+3140           *
+3141           * $Log: htm.c,v $
+3142           * Revision 1.56  2015/01/03 12:56:14  kiran
+3143           * Er mode and Tx power mode displayed under "p sysparam" command
+3144           *
+3145           * Revision 1.55  2015/01/02 14:55:36  kiran
+3146           * 1) Timer Leak fixed while freeing SCB fixed
+3147           * 2) Software broadcast supported for LG
+3148           * 3) UART Loopback supported for LG
+3149           * 4) Keep Alive feature to ageout defunctional STA
+3150           * 5) Improved flash API's for NO Host Solution
+3151           * 6) Imporved PLC Hang recovery mechanism
+3152           * 7) Reduced nested call tree of common path functions
+3153           * 8) Code optimization and cleanup (unused arguments, unused local variables)
+3154           * 9) Work around for UART hardware interrupt issues (unintended interrupts and no interrupts)
+3155           * 10) Use of memory specific pointers instead of generic pointers
+3156           *
+3157           * Revision 1.54  2014/12/09 07:09:09  ranjan
+3158           * - multicco feature under MCCO flag
+3159           *
+3160           * Revision 1.53  2014/11/26 13:19:40  ranjan
+3161           * *** empty log message ***
+3162           *
+3163           * Revision 1.52  2014/11/17 06:52:33  prashant
+3164           * SPI fix, All devices become unassoc CCO issue fix
+3165           *
+3166           * Revision 1.51  2014/11/11 14:52:58  ranjan
+3167           * 1.New Folder Architecture espically in /components
+3168           * 2.Modular arrangment of functionality in new files
+3169           *    anticipating the need for exposing them as FW App
+3170           *    development modules
+3171           * 3.Other improvisation in code and .h files
+3172           *
+3173           * Revision 1.50  2014/10/28 16:27:43  kiran
+3174           * 1) Software recovery using Watchdog Timer
+3175           * 2) Hardware recovery monitor and policies
+3176           * 3) Timer Polling in Control Task and Frame task for better accuracy
+3177           * 4) Common memory optimized by reducing prints
+3178           * 5) Discovered netlist corruption fixed
+3179           * 6) VCO fix in HHAL_AFEInit()
+3180           * 7) Idata optimized by removing floating point operation
+3181           * 8) Fixed EVENT_TYPE_CC_BCN_IND false indication during association @ CCO
+3182           * 9) Beacon processing protected from interrupts
+3183           * 10) Corrupted Beacons are dropped
+3184           * 11) Some unused arguments removed to improve code size
+3185           *
+3186           * Revision 1.49  2014/10/15 10:42:52  ranjan
+3187           * small fixes in um
+3188           *
+3189           * Revision 1.48  2014/10/13 10:23:57  prashant
+3190           * LG-Uart corruption issue fix
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 53  
+
+3191           *
+3192           * Revision 1.47  2014/09/30 21:48:34  tri
+3193           * Added LLP PS
+3194           *
+3195           * Revision 1.46  2014/09/19 06:23:59  prashant
+3196           * Uart data flow changed
+3197           *
+3198           * Revision 1.45  2014/09/05 09:28:18  ranjan
+3199           * 1. uppermac cco-sta switching feature fix
+3200           * 2. general stability fixes for many station associtions
+3201           * 3. changed mgmt memory pool for many STA support
+3202           *
+3203           * Revision 1.44  2014/08/25 07:37:35  kiran
+3204           * 1) RSSI & LQI support
+3205           * 2) Fixed Sync related issues
+3206           * 3) Fixed timer 0 timing drift for SDK
+3207           * 4) MMSG & Error Logging in Flash
+3208           *
+3209           * Revision 1.43  2014/08/12 08:45:43  kiran
+3210           * 1) Event fixes
+3211           * 2) API to change UART line control parameters
+3212           *
+3213           * Revision 1.42  2014/08/05 13:12:55  kiran
+3214           * Fixed CP loss issue with UART Host & Peripheral interface
+3215           *
+3216           * Revision 1.41  2014/08/01 05:38:19  kiran
+3217           * 1) Unicast packet loss fixed
+3218           * 2) In p stat cmd Q controller stats added
+3219           * 3) Peer list access support added for SDK
+3220           *
+3221           * Revision 1.40  2014/07/30 12:26:26  kiran
+3222           * 1) Software Recovery for CCo
+3223           * 2) User appointed CCo support in SDK
+3224           * 3) Association process performance fixes
+3225           * 4) SSN related fixes
+3226           *
+3227           * Revision 1.39  2014/07/22 10:03:53  kiran
+3228           * 1) SDK Supports Power Save
+3229           * 2) Uart_Driver.c cleanup
+3230           * 3) SDK app memory pool optimization
+3231           * 4) Prints from STM.c are commented
+3232           * 5) Print messages are trimmed as common no memory left in common
+3233           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+3234           *
+3235           * Revision 1.38  2014/07/21 03:41:48  prashant
+3236           * Power save changes
+3237           *
+3238           * Revision 1.37  2014/07/16 10:47:40  kiran
+3239           * 1) Updated SDK
+3240           * 2) Fixed Diag test in SDK
+3241           * 3) Ethernet and SPI interfaces removed from SDK as common memory is less
+3242           * 4) GPIO access API's added in SDK
+3243           * 5) GV701x chip reset command supported
+3244           * 6) Start network and Join network supported in SDK (Forced CCo and STA)
+3245           * 7) Some bug fixed in SDK (CP free, p app command issue etc.)
+3246           *
+3247           * Revision 1.36  2014/07/10 11:42:45  prashant
+3248           * power save commands added
+3249           *
+3250           * Revision 1.35  2014/07/05 09:16:27  prashant
+3251           * 100 Devices support- only association tested, memory adjustments
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 54  
+
+3252           *
+3253           * Revision 1.34  2014/06/24 16:26:45  ranjan
+3254           * -zigbee frame_handledata fix.
+3255           * -added reason code for uppermac host events
+3256           * -small cleanups
+3257           *
+3258           * Revision 1.33  2014/06/23 06:56:44  prashant
+3259           * Ssn reset fix upon device reset, Duplicate SNID fix
+3260           *
+3261           * Revision 1.32  2014/06/20 22:42:53  yiming
+3262           * check in code for LLP PWM setting
+3263           *
+3264           * Revision 1.31  2014/06/19 17:13:19  ranjan
+3265           * -uppermac fixes for lvnet and reset command for cco and sta mode
+3266           * -backup cco working
+3267           *
+3268           * Revision 1.30  2014/06/19 07:16:02  prashant
+3269           * Region fix, frequency setting fix
+3270           *
+3271           * Revision 1.29  2014/06/17 09:24:58  kiran
+3272           * interface selection issue fix, get version supported.
+3273           *
+3274           * Revision 1.28  2014/06/12 13:15:44  ranjan
+3275           * -separated bcn,mgmt,um event pools
+3276           * -fixed datapath issue due to previous checkin
+3277           * -work in progress. neighbour cco detection
+3278           *
+3279           * Revision 1.27  2014/06/11 13:17:47  kiran
+3280           * UART as host interface and peripheral interface supported.
+3281           *
+3282           * Revision 1.26  2014/06/05 10:26:08  prashant
+3283           * Host Interface selection isue fix, Ac sync issue fix
+3284           *
+3285           * Revision 1.25  2014/06/05 08:38:41  ranjan
+3286           * -flash function enabled for uppermac
+3287           * - commit command after any change would flash systemprofiles
+3288           * - verfied upper mac
+3289           *
+3290           * Revision 1.24  2014/05/28 10:58:59  prashant
+3291           * SDK folder structure changes, Uart changes, removed htm (UI) task
+3292           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+3293           *
+3294           * Revision 1.23  2014/05/21 23:03:41  tri
+3295           * more PS
+3296           *
+3297           * Revision 1.22  2014/05/16 08:52:30  kiran
+3298           * - System Profile Flashing API's Added. Upper MAC functionality tested
+3299           *
+3300           * Revision 1.21  2014/05/15 20:22:14  yiming
+3301           * Add ER mode
+3302           *
+3303           * Revision 1.20  2014/05/12 08:09:58  prashant
+3304           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+3305           *
+3306           * Revision 1.19  2014/04/29 22:24:40  yiming
+3307           * disable print message for Mitsumi
+3308           *
+3309           * Revision 1.18  2014/04/29 21:30:23  yiming
+3310           * disable print message for Mitsumi (MPER)
+3311           *
+3312           * Revision 1.17  2014/04/28 18:32:56  tri
+3313           * more PS
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 55  
+
+3314           *
+3315           * Revision 1.16  2014/04/25 21:17:39  tri
+3316           * PS
+3317           *
+3318           * Revision 1.15  2014/04/24 21:52:09  yiming
+3319           * Working Code for Mitsumi
+3320           *
+3321           * Revision 1.14  2014/04/23 23:09:53  tri
+3322           * more PS
+3323           *
+3324           * Revision 1.13  2014/04/21 03:30:52  ranjan
+3325           * SSN filter added
+3326           *
+3327           * Revision 1.12  2014/04/21 03:12:50  tri
+3328           * more PS
+3329           *
+3330           * Revision 1.11  2014/04/20 04:57:39  tri
+3331           * more PS
+3332           *
+3333           * Revision 1.10  2014/04/15 23:09:26  tri
+3334           * more PS
+3335           *
+3336           * Revision 1.9  2014/04/09 21:11:13  tri
+3337           * more PS
+3338           *
+3339           * Revision 1.8  2014/02/27 10:42:47  prashant
+3340           * Routing code added
+3341           *
+3342           * Revision 1.7  2014/02/26 23:32:35  tri
+3343           * more PS code
+3344           *
+3345           * Revision 1.6  2014/02/26 23:23:23  tri
+3346           * more PS code
+3347           *
+3348           * Revision 1.5  2014/01/28 17:49:59  tri
+3349           * Added Power Save code
+3350           *
+3351           * Revision 1.4  2014/01/14 23:34:22  son
+3352           * Zigbee PLC UMAC integration initial commit
+3353           *
+3354           * Revision 1.3  2014/01/13 08:33:16  ranjan
+3355           * code cleanup
+3356           *
+3357           * Revision 1.2  2014/01/10 17:21:51  yiming
+3358           * check in Rajan 1/8/2014 code release
+3359           *
+3360           * Revision 1.5  2014/01/08 10:53:54  ranjan
+3361           * Changes for LM OS support.
+3362           * New Datapath FrameTask
+3363           * LM and UM  datapath, feature verified.
+3364           *
+3365           * known issues : performance numbers needs revisit
+3366           *
+3367           * review : pending.
+3368           *
+3369           * Revision 1.4  2013/10/25 13:08:16  prashant
+3370           * ism.c fix for zigbee, Sniffer support for lower MAC
+3371           *
+3372           * Revision 1.3  2013/10/16 07:43:38  prashant
+3373           * Hybrii B Upper Mac compiling issues and QCA fix, added default eks code
+3374           *
+3375           * Revision 1.2  2013/09/04 14:49:56  yiming
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 56  
+
+3376           * New changes for Hybrii_A code merge
+3377           *
+3378           * Revision 1.36  2013/08/06 08:27:28  prashant
+3379           * Added txpowermode command
+3380           *
+3381           * Revision 1.35  2013/07/12 08:56:37  ranjan
+3382           * -UKE Push Button Security Feature.
+3383           * Verified : DirectEntry Security Works.Datapath Works.
+3384           *                 command SetSecMode for UKE works.
+3385           * Added against bug-160
+3386           *
+3387           * Revision 1.34  2013/07/03 08:51:11  ranjan
+3388           * for MultiDevice WAR,send all frames as broadcast.forcing dtei to 0xff
+3389           *
+3390           * Revision 1.33  2013/05/23 10:09:30  prashant
+3391           * Version command added, SPI polling waittime increased, sys_common file added
+3392           *
+3393           * Revision 1.32  2013/05/21 18:35:23  kripa
+3394           * *** empty log message ***
+3395           *
+3396           * Revision 1.31  2013/05/16 08:38:41  prashant
+3397           * "p starttest" command merged in upper mac
+3398           * Dignostic mode added in upper mac
+3399           *
+3400           * Revision 1.30  2013/04/17 13:00:59  ranjan
+3401           * Added FW ready event, Removed hybrii header from datapath, Modified hybrii header
+3402           *  formate
+3403           *
+3404           * Revision 1.29  2013/04/04 12:45:17  prashant
+3405           * Multidevice WAR
+3406           *
+3407           * Revision 1.28  2013/04/04 12:21:54  prashant
+3408           * Detecting PLC link failure for HMC. added project for HMC and Renesas
+3409           *
+3410           * Revision 1.27  2013/03/22 12:21:49  prashant
+3411           * default FM_MASK and FM_Printf modified for USER INFO
+3412           *
+3413           * Revision 1.26  2013/02/15 12:53:57  prashant
+3414           * ASSOC.REQ changes for DEVELO
+3415           *
+3416           * Revision 1.25  2013/01/31 10:00:15  ranjan
+3417           * 1)used master rdy signal for host and device spi sync
+3418           * 2)added datapath debug code in DEBUG_DATAPATH
+3419           *
+3420           * Revision 1.24  2013/01/30 08:32:58  prashant
+3421           * Added "p estat", "p erststat", "p getmac" and "p setmac" commands
+3422           *
+3423           * Revision 1.23  2012/12/14 11:06:58  ranjan
+3424           * queue added for eth to plc datapath
+3425           * removed mgmt tx polling
+3426           *
+3427           * Revision 1.22  2012/11/22 09:44:02  prashant
+3428           * Code change for auto ping test, sending tei map ind out, random mac addrr generation.
+3429           *
+3430           * Revision 1.21  2012/11/19 07:46:24  ranjan
+3431           * Changes for Network discovery modes
+3432           *
+3433           * Revision 1.20  2012/11/02 07:36:32  ranjan
+3434           * Log : sniffer support for hal test project
+3435           *          fixes for mac-sap command handling
+3436           *
+3437           * Revision 1.19  2012/10/26 11:50:52  ranjan
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 57  
+
+3438           * QCA NMK added under ifdef QCA_NMK
+3439           *
+3440           * Revision 1.18  2012/10/25 11:38:48  prashant
+3441           * Sniffer code added for MAC_SAP, Added new commands in MAC_SAP for sniffer, bridge,
+3442           *  hardware settings and peer information.
+3443           *
+3444           * Revision 1.17  2012/10/11 06:21:01  ranjan
+3445           * ChangeLog:
+3446           * 1. Added HPGP_MAC_SAP to support linux host data and command path.
+3447           *     define HPGP_MAC_SAP, NMA needs to be added in project.
+3448           *
+3449           * 2. Added 'p ping' command in htm.c . Feature is under AUTO_PING macro.
+3450           *
+3451           * 3. Extended  'p key' command to include PPEK support.
+3452           *
+3453           * verified :
+3454           *   1. Datapath ping works overnite after association,auth
+3455           *   2. HAL TEST project is intact
+3456           *
+3457           * Revision 1.16  2012/07/31 14:50:07  kripa
+3458           * *** empty log message ***
+3459           *
+3460           * Revision 1.15  2012/07/18 22:00:48  son
+3461           * Changed HTM task id name
+3462           *
+3463           * Revision 1.14  2012/07/15 17:55:18  yuanhua
+3464           * added leave network option in HTM.
+3465           *
+3466           * Revision 1.13  2012/07/14 04:14:00  kripa
+3467           * Adding htm task temporarily to avoid an uknown crash.
+3468           * Committed on the Free edition of March Hare Software CVSNT Client.
+3469           * Upgrade to CVS Suite for more features and support:
+3470           * http://march-hare.com/cvsnt/
+3471           *
+3472           * Revision 1.12  2012/07/12 22:05:55  son
+3473           * Moved ISM Polling to ISM Task.
+3474           * UI is now part of init task
+3475           *
+3476           * Revision 1.11  2012/06/29 03:06:29  kripa
+3477           * Adding new command to set lineMode.
+3478           * Committed on the Free edition of March Hare Software CVSNT Client.
+3479           * Upgrade to CVS Suite for more features and support:
+3480           * http://march-hare.com/cvsnt/
+3481           *
+3482           * Revision 1.10  2012/06/20 17:57:53  kripa
+3483           *
+3484           * Committed on the Free edition of March Hare Software CVSNT Client.
+3485           * Upgrade to CVS Suite for more features and support:
+3486           * http://march-hare.com/cvsnt/
+3487           *
+3488           * Revision 1.9  2012/06/15 04:35:21  yuanhua
+3489           * add a STA type of passive unassoc STA. With this STA type, the device acts as a STA during the network 
+             -discovery. It performs the network scan for beacons from the CCO, but does not transmit the UNASSOC_STA.IND and does not
+             - involve in the CCO selection process. Thus, it joins the existing network.
+3490           *
+3491           * Revision 1.8  2012/06/15 00:33:01  son
+3492           * Added back HTM task. Integrate some upper mac test commands to lower mac menu style
+3493           *
+3494           * Revision 1.7  2012/06/11 18:02:01  son
+3495           * Removing htm task creation that is causing crash.
+3496           * Committed on the Free edition of March Hare Software CVSNT Client.
+3497           * Upgrade to CVS Suite for more features and support:
+C51 COMPILER V9.53.0.0   HTM                                                               11/04/2015 20:09:47 PAGE 58  
+
+3498           * http://march-hare.com/cvsnt/
+3499           *
+3500           * Revision 1.6  2012/06/06 17:42:20  son
+3501           * Added HTM Task. Added functions to read/write registers and view statistics.
+3502           * Committed on the Free edition of March Hare Software CVSNT Client.
+3503           * Upgrade to CVS Suite for more features and support:
+3504           * http://march-hare.com/cvsnt/
+3505           *
+3506           * Revision 1.5  2012/05/12 19:41:24  yuanhua
+3507           * added malloc memory pool.
+3508           *
+3509           * Revision 1.4  2012/05/07 04:17:57  yuanhua
+3510           * (1) updated hpgp Tx integration (2) added Rx poll option
+3511           *
+3512           * Revision 1.3  2012/05/01 18:06:49  son
+3513           * Fixed compilatoin issues
+3514           *
+3515           * Revision 1.2  2012/04/20 01:39:33  yuanhua
+3516           * integrated uart module and added compiler flag NMA.
+3517           *
+3518           * Revision 1.1  2012/04/15 20:35:09  yuanhua
+3519           * integrated beacon RX changes in HAL and added HTM for on board test.
+3520           *
+3521           *
+3522           *  ========================================================= */
+3523          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   4658    ----
+   CONSTANT SIZE    =    920    ----
+   XDATA SIZE       =    141     416
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

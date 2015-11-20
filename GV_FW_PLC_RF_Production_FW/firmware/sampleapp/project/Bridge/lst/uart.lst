@@ -1,0 +1,283 @@
+C51 COMPILER V9.53.0.0   UART                                                              11/04/2015 20:09:38 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE UART
+OBJECT MODULE PLACED IN .\obj\uart.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\common\uart.c LARGE OBJECTADVANCED OPTIMIZE(9,SIZE)
+                    - BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\..\fi
+                    -rmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\hal;..\
+                    -..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\firmware
+                    -\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee;..\.
+                    -.\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;..\.
+                    -.\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\inc;..\
+                    -..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;..\..\
+                    -..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\hpgp\
+                    -inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\..\..
+                    -\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\compon
+                    -ents\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\flash
+                    -\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities;..\.
+                    -.\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nwk\inc
+                    -;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\..\co
+                    -mponents\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,
+                    -HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,UM,HY
+                    -BRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETECT,HY
+                    -BRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT,MCCO
+                    -,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGISTER_
+                    -APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\uart.lst) TABS(2) OBJECT(.\
+                    -obj\uart.obj)
+
+line level    source
+
+   1          /** =========================================================
+   2           *
+   3           *  @file uart.c
+   4           * 
+   5           *  @brief UART module
+   6           *
+   7           *  Copyright (C) 2010-2012, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ==========================================================*/
+  11          #include <rtx51tny.h>
+  12          #include <REG51.H>                /* special function register declarations   */
+  13                                            /* for the intended 8051 derivative         */
+  14          #include <stdio.h>
+  15          
+  16          #include "fm.h"
+  17          #include "uart.h"
+  18          
+  19          #define TRUE  1
+  20          #define FALSE 0
+  21          
+  22          
+  23          #ifdef UART_16550
+              u8 *baud_gen =  (u8 xdata *)UART_CLKDIV;
+              u8 *urxbuf   =  (u8 xdata *)UART_RXBUF;
+              u8 *utxbuf   =  (u8 xdata *)UART_TXBUF;
+              union_uart_linestatus *uart_linestatus = (u8 XDATA *)UART_LINESTAT;
+              union_uart_modemctrl  *uart_modemctrl  = (u8 XDATA *)UART_MODEMCTRL;
+              union_uart_linectrl   *uart_linectrl   = (u8 XDATA *)UART_LINECTRL;
+              union_uart_fifoctrl   *uart_fifoctrl   = (u8 XDATA *)UART_FIFOCTRL;
+              union_uart_intctrl    *uart_intctrl    = (u8 XDATA *)UART_INTCTRL;
+              
+              void UART_Init()
+              {
+C51 COMPILER V9.53.0.0   UART                                                              11/04/2015 20:09:38 PAGE 2   
+
+                  *baud_gen = BAUDRATE;
+                  /* No interrupt; enable rx full and tx empty indicator */
+                  uart_intctrl->intctrl     = 0x03;     
+                  /* 1-char depth tx/rx buffer, reset tx/rx buffer */
+                  uart_fifoctrl->fifoctrl   = 0x06;   
+                  /* word length = 8 */
+                  uart_linectrl->linectrl   = 0x03;  
+                  /* No loopback */
+                  uart_modemctrl->modemctrl = 0x00;     
+              }
+              
+              
+              char _getkey()
+              {
+                  u8 a;
+                  do {
+                      while (((uart_linestatus->linestatus)&0x1) == 0) {
+              #ifdef RTX51_TINY_OS
+                          os_switch_task();
+              #endif
+                      }
+                      a = *urxbuf; 
+                  } while (a == 0x11);   //Keil sync char
+              
+                  return(a);
+              }
+              
+              char _getchar()
+              {
+                  u8 a;
+              
+                  if (uart_linestatus->linestatus & 0x1) {
+                      a = *urxbuf;
+                      if (a != 0x11) {
+                          return (a);
+                      }
+                  }
+                  return (0);
+              }
+              
+              u8 poll_key()
+              {
+                  // getkey
+                  char c = 0;
+              
+                  EA = 0;
+                  c = _getchar();
+                  EA = 1;
+                  return c;
+              }
+              
+              char putchar(char c)     //UART16550
+              {
+                  while (((uart_linestatus->linestatus)&0x40)==0);
+                  if (c=='\n') {
+                      *utxbuf = '\r';
+                      while (((uart_linestatus->linestatus)&0x40)==0);
+                  }
+                  *utxbuf = c;
+              
+                  return(c);
+              }
+C51 COMPILER V9.53.0.0   UART                                                              11/04/2015 20:09:38 PAGE 3   
+
+              
+              #else
+  99          void UART_Init()
+ 100          {
+ 101   1      #if 0   
+                  /* clear transmit interrupt */
+                  TI = 0;                             
+                  /* clear receiver interrupt */
+                  RI = 0;                             
+              
+                  /* set serial interrupts to low priority */
+                  PS = 0;                             
+                  /* enable serial interrupts */
+                  ES = 1;
+              #endif                             
+ 112   1      }
+ 113          
+ 114          char _getkey_poll()
+ 115          {
+ 116   1          char c = 0xee;
+ 117   1              if (RI == 0) 
+ 118   1              {
+ 119   2              return c;
+ 120   2            }
+ 121   1          else
+ 122   1          {
+ 123   2              RI = 0;
+ 124   2              c = SBUF;
+ 125   2            if (c == 0x11)
+ 126   2            {
+ 127   3              return (0xee);
+ 128   3            }
+ 129   2          }
+ 130   1          return c;
+ 131   1      }                             
+ 132          char _getkey()
+ 133          {
+ 134   1          char c;
+ 135   1          do
+ 136   1          {
+ 137   2              while (RI == 0) {
+ 138   3      #ifdef RTX51_TINY_OS
+ 139   3                  os_switch_task();
+ 140   3      #endif
+ 141   3              }
+ 142   2              RI = 0;
+ 143   2              c = SBUF;
+ 144   2          } while (c == 0x11);    // Ignore 0x11 - XOn sync signal from Keil
+ 145   1          return c;
+ 146   1      }                             
+ 147          
+ 148          char _getchar()
+ 149          {
+ 150   1          char c;
+ 151   1        
+ 152   1        if ((RI != 0) && (SBUF != 0x11))
+ 153   1          {
+ 154   2              c = SBUF;
+ 155   2              RI = 0;
+ 156   2              return c;
+ 157   2          }
+ 158   1          RI = 0;
+C51 COMPILER V9.53.0.0   UART                                                              11/04/2015 20:09:38 PAGE 4   
+
+ 159   1      
+ 160   1          return 0;
+ 161   1      }
+ 162          
+ 163          char putchar(char c)
+ 164          {
+ 165   1          if (c == '\n')  
+ 166   1          {
+ 167   2              TI = 0;
+ 168   2              SBUF = '\r';        // output CR before LF
+ 169   2              while (TI == 0);
+ 170   2              TI = 0;
+ 171   2          }
+ 172   1          TI = 0;
+ 173   1          SBUF = c;        // output CR before LF
+ 174   1          while (TI == 0);
+ 175   1          TI = 0;
+ 176   1          return c;      
+ 177   1      }
+ 178          
+ 179          u8 poll_key()
+ 180          {
+ 181   1          char c = 0;
+ 182   1      
+ 183   1          EA = 0;
+ 184   1          if(RI!=0)
+ 185   1          {
+ 186   2              RI = 0;
+ 187   2              c = SBUF;
+ 188   2          }
+ 189   1          EA = 1;
+ 190   1          return c;
+ 191   1      }
+ 192          #endif
+ 193          
+ 194          int getline(char *s, int lim)
+ 195          {
+ 196   1          char *t;
+ 197   1          int c, len=lim;
+ 198   1      
+ 199   1          t = s;
+ 200   1          while (--lim>1 && (c=_getkey()) != '\r' && c != '\n')
+ 201   1          {
+ 202   2              *s++ = c;
+ 203   2              putchar(c);
+ 204   2              if(c=='\b')
+ 205   2              {
+ 206   3                  s-=2;
+ 207   3                  lim+=2;
+ 208   3                  putchar(' ');
+ 209   3                  putchar('\b');
+ 210   3              }
+ 211   2          }
+ 212   1          if (c == '\n' || c == '\r')
+ 213   1          {
+ 214   2              putchar('\n');
+ 215   2              *s++ = c;
+ 216   2          }
+ 217   1          else if (lim == 1) 
+ 218   1          {
+ 219   2              *s++ = '\n';
+ 220   2              //fprintf(stderr, "WARNING. getline: Line too long, splitted.\n");
+C51 COMPILER V9.53.0.0   UART                                                              11/04/2015 20:09:38 PAGE 5   
+
+ 221   2          }
+ 222   1          *s = '\0';
+ 223   1          return s - t;
+ 224   1      }
+ 225          
+ 226          
+ 227          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    409    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      12
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

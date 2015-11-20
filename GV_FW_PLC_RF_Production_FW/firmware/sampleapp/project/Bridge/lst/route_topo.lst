@@ -1,0 +1,1885 @@
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE ROUTE_TOPO
+OBJECT MODULE PLACED IN .\obj\route_topo.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\src\route_topo.c LARGE OBJECTADVANCED OPTIMIZE(9,SIZE) BROWSE INTV
+                    -ECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\..\firmware\hal;.
+                    -.\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\hal;..\..\..\..\fir
+                    -mware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\firmware\hpgp\src\ro
+                    -ute;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee;..\..\..\..\comp
+                    -onents\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;..\..\..\..\comp
+                    -onents\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\fir
+                    -mware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;..\..\..\..\firmwa
+                    -re\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\hpgp\inc;..\..\..
+                    -\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\..\..\..\componen
+                    -ts\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\components\nma;..\
+                    -..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\flash\inc;..\..\.
+                    -.\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities;..\..\..\..\comp
+                    -onents\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..
+                    -\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\..\components\dri
+                    -vers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,
+                    -CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,UM,HYBRII_B,Hybri
+                    -i_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETECT,HYBRII_B_AFE,_
+                    -BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT,MCCO,SW_RECOVERY
+                    -,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGISTER_APP,LLP_APP,
+                    -BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\route_topo.lst) TABS(2) OBJECT(.\obj\ro
+                    -ute_topo.obj)
+
+line level    source
+
+   1          /* ========================================================
+   2           *
+   3           * @file: route_topo.c
+   4           * 
+   5           * @brief: This file supports all routines required 
+   6           *         for mesh uplink and downlink decision making
+   7           *         and profiling
+   8           *      
+   9           *  Copyright (C) 2010-2015, Greenvity Communications, Inc.
+  10           *  All Rights Reserved
+  11           *  
+  12           * =========================================================*/
+  13          
+  14          #ifdef RTOPO_APP
+  15          
+  16          /****************************************************************************** 
+  17            * Includes
+  18            ******************************************************************************/
+  19            
+  20          #include "stdio.h"
+  21          #include "string.h"
+  22          #include "gv701x_includes.h"
+  23          #ifdef ROUTE_APP
+  24          #include "route.h"
+  25          #include "route_fw.h"
+  26          #endif
+  27          #ifdef HPGP_DRIVER_APP
+  28          #include "gv701x_hpgpdriver.h"
+  29          #endif
+  30          #ifdef LRWPAN_DRIVER_APP
+  31          #include "gv701x_lrwpandriver.h"
+  32          #endif
+  33          #ifdef NWKSTARTUP_APP
+  34          #include "gv701x_nwkstartup.h"
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 2   
+
+  35          #endif
+  36          #include "route_topo_fw.h"
+  37          #include "route_topo.h"
+  38          
+  39          /****************************************************************************** 
+  40            * Global Data
+  41            ******************************************************************************/
+  42          u8 rtopo_app_id;
+  43          gv701x_app_queue_t rtopo_queues;  
+  44          rtopo_data_t rtopo_data;
+  45          gv701x_state_t rtopo_state;
+  46          
+  47          #ifndef OLD_SCAN
+  48          static u8 rtopo_rf_curscan_ch = MIN_CHANNEL;
+  49          #endif 
+  50          
+  51          /****************************************************************************** 
+  52            * External Data
+  53            ******************************************************************************/
+  54            
+  55          /******************************************************************************
+  56            * External Funtion prototypes
+  57            ******************************************************************************/
+  58            
+  59          /******************************************************************************
+  60            * Funtion prototypes
+  61            ******************************************************************************/
+  62          
+  63          void rtopo_start_devrole(u8 link);
+  64          void rtopo_handle_timeout(void);
+  65          #ifndef OLD_SCAN
+  66          void rtopo_start_wirscan_engine(u8 mode);
+  67          #endif
+  68          
+  69          /******************************************************************************
+  70           * @fn      rtopo_init
+  71           *
+  72           * @brief   Initializes the driver
+  73           *
+  74           * @param   app_id - application identification number
+  75           *
+  76           * @return  none
+  77           */
+  78          
+  79          void rtopo_init(u8 app_id)
+  80          { 
+  81   1        /*Initialize the database*/ 
+  82   1        memset(&rtopo_data, 0x00, sizeof(rtopo_data_t));      
+  83   1        memset(&rtopo_state, 0x00, sizeof(gv701x_state_t));   
+  84   1      
+  85   1        rtopo_app_id = app_id;  
+  86   1        SLIST_Init(&rtopo_queues.appRxQueue);
+  87   1        
+  88   1        FM_Printf(FM_USER, "\nInit RtopoApp (app id %bu)", app_id);   
+  89   1      
+  90   1        rtopo_state.state = RTOPO_INIT;
+  91   1        rtopo_state.event = RTOPO_IDLE_EVENT; 
+  92   1        rtopo_state.statedata = NULL;   
+  93   1        rtopo_state.statedatalen = 0;     
+  94   1      
+  95   1        /*Allocated Re-transmit timer*/
+  96   1        rtopo_data.tx_timer = STM_AllocTimer(SW_LAYER_TYPE_APP, 
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 3   
+
+  97   1                  RTOPO_TX_TIMER_EVNT,&rtopo_app_id); 
+  98   1        rtopo_data.tx_cnt = 0;  
+  99   1        rtopo_data.tx_time = RTOPO_BASE_TIMEOUT;
+ 100   1      
+ 101   1        /*Allocated Profile timer*/
+ 102   1        rtopo_data.profile_timer = STM_AllocTimer(SW_LAYER_TYPE_APP, 
+ 103   1                  RTOPO_PROFILE_TIMER_EVNT,&rtopo_app_id);  
+ 104   1      
+ 105   1        /*Allocated Profile 1 timer*/
+ 106   1        rtopo_data.profile_1_timer = STM_AllocTimer(SW_LAYER_TYPE_APP, 
+ 107   1                  RTOPO_PROFILE_1_TIMER_EVNT,&rtopo_app_id);  
+ 108   1      
+ 109   1        /*Allocated Profile 2 timer*/
+ 110   1        rtopo_data.freeze_timer = STM_AllocTimer(SW_LAYER_TYPE_APP, 
+ 111   1                  RTOPO_FREEZE_TIMER_EVNT, &rtopo_app_id);  
+ 112   1      
+ 113   1        rtopo_data.scan.power_line.enabled = FALSE;
+ 114   1        rtopo_data.scan.wireless.enabled = FALSE;
+ 115   1      
+ 116   1      #ifdef LRWPAN_DRIVER_APP  
+ 117   1        rtopo_data.scan.wireless.scantype = MLME_SCAN_TYPE_ACTIVE;
+ 118   1      #endif  
+ 119   1        rtopo_data.scan.wireless.scanMode = RTOPO_SCAN_PEER_SELECTION;
+ 120   1      
+ 121   1      
+ 122   1      #if 0 
+                /*Allocate Network Scan timer*/
+                rtopo_data.scan.timer = STM_AllocTimer(SW_LAYER_TYPE_APP, 
+                                      RTOPO_SCAN_TIMER_EVNT, 
+                                      &rtopo_app_id); 
+              #endif
+ 128   1      
+ 129   1        rtopo_data.pref.enabled = FALSE;
+ 130   1        /*Allocate Network Scan timer*/
+ 131   1        rtopo_data.pref.timer = STM_AllocTimer(SW_LAYER_TYPE_APP, 
+ 132   1                              RTOPO_PREF_TIMER_EVNT, 
+ 133   1                              &rtopo_app_id); 
+ 134   1        
+ 135   1        rtopo_data.link_pref.link = POWER_LINE;   
+ 136   1      }
+ 137          
+ 138          /******************************************************************************
+ 139           * @fn      rtopo_start
+ 140           *
+ 141           * @brief   Starts the network profile
+ 142           *
+ 143           * @param   none
+ 144           *
+ 145           * @return  none
+ 146           */
+ 147          
+ 148          void rtopo_start(u8 link, u8 mode)
+ 149          {
+ 150   1        if(link & PLC_NIC)
+ 151   1        {
+ 152   2          STM_StartTimer(rtopo_data.pref.timer, RTOPO_PREF_TIME);
+ 153   2          rtopo_data.pref.enabled = TRUE;
+ 154   2        }
+ 155   1      
+ 156   1        rtopo_state.state = RTOPO_START;    
+ 157   1        rtopo_start_scan(link, mode);   
+ 158   1      }
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 4   
+
+ 159          
+ 160          /******************************************************************************
+ 161           * @fn      rtopo_start_scan
+ 162           *
+ 163           * @brief   Starts the network profile
+ 164           *
+ 165           * @param   none
+ 166           *
+ 167           * @return  none
+ 168           */
+ 169            
+ 170          void rtopo_start_scan(u8 link, u8 scanMode)
+ 171          { 
+ 172   1        if(link & PLC_NIC)
+ 173   1        { 
+ 174   2      #ifdef HPGP_DRIVER_APP
+ 175   2          if(hpgp_drv_data.scan.active == FALSE)
+ 176   2          {
+ 177   3            hpgp_drv_scan_evnt_msg_t hpgp_scan;     
+ 178   3            hpgp_scan.event = HPGPDRV_SCAN_EVNT;
+ 179   3            hpgp_drv_data.scan.time = RTOPO_SCAN_TIME;
+ 180   3      #if 0     
+                    FM_Printf(FM_APP, "\nPS");
+              #endif
+ 183   3            GV701x_SendAppEvent(rtopo_app_id, hpgp_drv_data.app_id, APP_MSG_TYPE_APPEVENT,
+ 184   3              APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &hpgp_scan, 
+ 185   3              sizeof(hpgp_drv_scan_evnt_msg_t), 0);     
+ 186   3            //rtopo_data.scan.enabled = TRUE;
+ 187   3            rtopo_data.scan.power_line.enabled = TRUE;
+ 188   3          }
+ 189   2      #endif
+ 190   2        }
+ 191   1        
+ 192   1        if(link & RF_NIC)
+ 193   1        { 
+ 194   2      #if 0
+                  FM_Printf(FM_APP, "\nSC e %bu t %bu m %bu", rtopo_data.scan.wireless.enabled,
+                      rtopo_data.scan.wireless.scantype, scanMode);
+              #endif
+ 198   2          rtopo_data.scan.wireless.scanMode = scanMode;
+ 199   2          
+ 200   2      #ifdef HQ_RF_TEST   
+                  rtopo_data.scan.wireless.scanMode = RTOPO_SCAN_CHANNEL_SELECTION;
+              #endif
+ 203   2          if(rtopo_data.scan.wireless.enabled == FALSE)
+ 204   2          {
+ 205   3            if(rtopo_data.scan.wireless.scantype == MLME_SCAN_TYPE_ACTIVE)
+ 206   3            {     
+ 207   4      #ifndef OLD_SCAN      
+ 208   4              rtopo_rf_curscan_ch = MIN_CHANNEL;
+ 209   4              rtopo_start_wirscan_engine(scanMode);
+ 210   4              return;
+ 211   4      #endif        
+ 212   4            }
+ 213   3            else
+ 214   3      
+ 215   3            {
+ 216   4      #ifdef LRWPAN_DRIVER_APP
+ 217   4              if(lrwpan_db.scan.active == FALSE)
+ 218   4              {
+ 219   5                lrwpan_scan_evnt_msg_t lrwpan_scan;     
+ 220   5                lrwpan_scan.event = LRWPAN_SCAN_EVNT;     
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 5   
+
+ 221   5      
+ 222   5                lrwpan_db.scan.type = rtopo_data.scan.wireless.scantype;
+ 223   5                if(rtopo_data.scan.wireless.scantype == MLME_SCAN_TYPE_ACTIVE)
+ 224   5                  lrwpan_db.scan.time = 5;                  
+ 225   5                else if(rtopo_data.scan.wireless.scantype == MLME_SCAN_TYPE_ED)
+ 226   5                  lrwpan_db.scan.time = 3;                  
+ 227   5      #if 0
+                        FM_Printf(FM_APP, "\nWS %bu mode %bu", rtopo_data.scan.wireless.scantype, scanMode);
+              #endif
+ 230   5                GV701x_SendAppEvent(rtopo_app_id, lrwpan_db.app_id, APP_MSG_TYPE_APPEVENT,
+ 231   5                  APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &lrwpan_scan, 
+ 232   5                  sizeof(lrwpan_scan_evnt_msg_t), 0);           
+ 233   5                rtopo_data.scan.wireless.enabled = TRUE;
+ 234   5                rtopo_data.scan.wireless.scanMode = scanMode;     
+ 235   5              }
+ 236   4      #endif
+ 237   4            }
+ 238   3          }
+ 239   2        }
+ 240   1      }
+ 241          
+ 242          #ifndef OLD_SCAN
+ 243          /******************************************************************************
+ 244           * @fn      rtopo_start_wirscan_engine
+ 245           *
+ 246           * @brief   Starts the wireless scan engine
+ 247           *
+ 248           * @param   mode - the scan mode (in routetopo.h)
+ 249           *
+ 250           * @return  none
+ 251           */
+ 252            
+ 253          void rtopo_start_wirscan_engine(u8 mode)
+ 254          {   
+ 255   1      #ifdef LRWPAN_DRIVER_APP
+ 256   1      #if 0 
+                FM_Printf(FM_APP, "\nSEng(m %lx i %bx)", lrwpan_db.scan.ch_mask, rtopo_rf_curscan_ch);
+              #endif
+ 259   1        for(; rtopo_rf_curscan_ch <= MAX_CHANNEL; rtopo_rf_curscan_ch++)
+ 260   1        {
+ 261   2          if(lrwpan_db.scan.ch_mask & BIT(rtopo_rf_curscan_ch))
+ 262   2          {
+ 263   3            lrwpan_cfg_evnt_msg_t lrwpan_cfg;
+ 264   3            route_info.wireless_ch = rtopo_rf_curscan_ch;
+ 265   3      #if 1
+ 266   3            //FM_Printf(FM_APP, "\nch: %bx", rtopo_rf_curscan_ch);
+ 267   3      #endif
+ 268   3            lrwpan_cfg.event = LRWPAN_CFG_EVNT;
+ 269   3            lrwpan_cfg.attribute = phyCurrentChannel;     
+ 270   3            lrwpan_db.channel = rtopo_rf_curscan_ch;
+ 271   3            memcpy((u8*)&lrwpan_cfg.value, &lrwpan_db.channel, sizeof(uint8_t));
+ 272   3            GV701x_SendAppEvent(rtopo_app_id, lrwpan_db.app_id, APP_MSG_TYPE_APPEVENT,
+ 273   3              APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &lrwpan_cfg, 
+ 274   3              sizeof(lrwpan_cfg_evnt_msg_t), 0);        
+ 275   3            break;
+ 276   3          }
+ 277   2        }
+ 278   1      
+ 279   1        if(rtopo_rf_curscan_ch == (MAX_CHANNEL + 1))
+ 280   1        { 
+ 281   2          rtopo_start_evnt_msg_t rtopo_start;
+ 282   2          rtopo_data.scan.wireless.enabled = FALSE;
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 6   
+
+ 283   2          rtopo_rf_curscan_ch = MIN_CHANNEL;
+ 284   2      #if 0
+                  FM_Printf(FM_APP, "\nSComp chmask %lx", lrwpan_db.scan.ch_mask);
+              #endif
+ 287   2              
+ 288   2          rtopo_data.scan.wireless.scantype = MLME_SCAN_TYPE_ED;
+ 289   2          rtopo_start.event = RTOPO_START_EVNT;
+ 290   2          rtopo_start.link = RF_NIC; 
+ 291   2          rtopo_start.mode = mode; 
+ 292   2          GV701x_SendAppEvent(rtopo_app_id, rtopo_app_id, APP_MSG_TYPE_APPEVENT,
+ 293   2              APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID,      
+ 294   2              &rtopo_start, sizeof(rtopo_start_evnt_msg_t), 0);     
+ 295   2        }
+ 296   1      #endif  
+ 297   1      }
+ 298          #endif
+ 299          
+ 300          /******************************************************************************
+ 301           * @fn      rtopo_rx
+ 302           *
+ 303           * @brief   Handler to receiver an Over the Air packet
+ 304           *
+ 305           * @param   buf - Data packet holder 
+ 306           *          len - length of data received
+ 307           *
+ 308           * @return  none
+ 309           */
+ 310          
+ 311          void rtopo_rx(u8* buf, u8 len)
+ 312          {
+ 313   1        sEth2Hdr* petherhdr = (sEth2Hdr*)(buf);
+ 314   1      #ifdef ROUTE_APP
+ 315   1        route_hdr_t* rhdr = (route_hdr_t* )(&buf[sizeof(sEth2Hdr)]);
+ 316   1      #endif
+ 317   1        u8 cmdid = RHDR_GET_CMDID(rhdr);
+ 318   1        len = len;
+ 319   1      
+ 320   1        /*Filter any other ether type packets*/
+ 321   1        if(petherhdr->ethtype != APP_ETHER_PROTO)
+ 322   1          return;
+ 323   1      
+ 324   1        switch(cmdid) 
+ 325   1        {   
+ 326   2          /*Handle Get Parameter from Host packet*/
+ 327   2          case GET_PARAM_RSP: 
+ 328   2            if(STATUS_SUCCESS == rtopo_recv_getparam((rtopo_getparam_t*)(rhdr + 1)))
+ 329   2            {
+ 330   3              rtopo_data.tx_cnt = 0;
+ 331   3              STM_StopTimer(rtopo_data.tx_timer);
+ 332   3            }
+ 333   2          break;
+ 334   2      
+ 335   2          case GET_PARAM_IND: 
+ 336   2            STM_StopTimer(rtopo_data.tx_timer);
+ 337   2          break;
+ 338   2          
+ 339   2          default:
+ 340   2          break;
+ 341   2        } 
+ 342   1      }
+ 343          
+ 344          /******************************************************************************
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 7   
+
+ 345           * @fn      rtopo_tx
+ 346           *
+ 347           * @brief   Send Data packet Over the Air
+ 348           *
+ 349           * @param   buf - Data packet holder 
+ 350           *          payloadLen - number of bytes to be sent
+ 351           *      frametype - type of frame to be sent (defines found in route.h)
+ 352           *
+ 353           * @return  none
+ 354           */
+ 355          
+ 356          u8 rtopo_tx(u8* buf, u8 payloadLen, u8 frametype)
+ 357          {
+ 358   1        u8 ret = STATUS_FAILURE;
+ 359   1      
+ 360   1      #ifdef ROUTE_APP    
+ 361   1        ret = route_send_to_ll((u8*)buf, payloadLen, frametype, FALSE);
+ 362   1      
+ 363   1        if(ret == FALSE)
+ 364   1          ret = STATUS_FAILURE;
+ 365   1        else
+ 366   1          ret = STATUS_SUCCESS;   
+ 367   1      #endif
+ 368   1        return ret;
+ 369   1      }
+ 370          
+ 371          /******************************************************************************
+ 372           * @fn      rtopo_RxAppMsg
+ 373           *
+ 374           * @brief   Receives a message from another app/fw
+ 375           *
+ 376           * @params  msg_buf - message buffer
+ 377           *
+ 378           * @return  none
+ 379           */
+ 380          
+ 381          void rtopo_RxAppMsg(sEvent* event)
+ 382          {
+ 383   1        gv701x_app_msg_hdr_t* msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;
+ 384   1        hostHdr_t* hybrii_hdr;
+ 385   1        hostEventHdr_t* evnt_hdr;
+ 386   1      
+ 387   1        hybrii_hdr = (hostHdr_t*)(msg_hdr + 1);
+ 388   1      
+ 389   1        if(msg_hdr->dst_app_id == rtopo_app_id)
+ 390   1        { 
+ 391   2          memcpy(&rtopo_state.msg_hdr, msg_hdr, sizeof(gv701x_app_msg_hdr_t));
+ 392   2          rtopo_state.eventproto = hybrii_hdr->protocol;
+ 393   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 394   2            (hybrii_hdr->type == EVENT_FRM_ID))
+ 395   2          {
+ 396   3            evnt_hdr = (hostEventHdr_t*)(hybrii_hdr + 1);
+ 397   3            rtopo_state.event = evnt_hdr->type;   
+ 398   3            rtopo_state.statedata = (u8*)(evnt_hdr + 1);
+ 399   3            rtopo_state.statedatalen = (u16)(hybrii_hdr->length - sizeof(hostEventHdr_t));    
+ 400   3          }
+ 401   2          else
+ 402   2          {
+ 403   3            rtopo_state.event = (u8)(*((u8*)(hybrii_hdr + 1)));
+ 404   3            rtopo_state.statedata = (u8*)(hybrii_hdr + 1);
+ 405   3            rtopo_state.statedatalen = (u16)hybrii_hdr->length;
+ 406   3          }   
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 8   
+
+ 407   2          rtopo_state.eventtype = hybrii_hdr->type;
+ 408   2          rtopo_state.eventclass = event->eventHdr.eventClass;  
+ 409   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 410   2            (hybrii_hdr->type == EVENT_FRM_ID) &&
+ 411   2            (rtopo_state.event == HOST_EVENT_APP_TIMER))
+ 412   2          {     
+ 413   3            rtopo_timerhandler((u8*)(evnt_hdr + 1)); 
+ 414   3            return;
+ 415   3          }   
+ 416   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 417   2            (hybrii_hdr->type == EVENT_FRM_ID) &&
+ 418   2            (rtopo_state.event == HOST_EVENT_APP_CMD))
+ 419   2          {     
+ 420   3            rtopo_cmdprocess((char*)(evnt_hdr + 1));
+ 421   3            return;
+ 422   3          }   
+ 423   2        }
+ 424   1        else if(msg_hdr->dst_app_id == APP_BRDCST_MSG_APPID)
+ 425   1        {
+ 426   2          u8 *event = (u8*)(hybrii_hdr + 1);
+ 427   2      #ifdef NWKSTARTUP_APP     
+ 428   2          if(msg_hdr->src_app_id == nwkstartup_data.app_id)
+ 429   2          {
+ 430   3            if(msg_hdr->type == APP_MSG_TYPE_APPIND)
+ 431   3            {     
+ 432   4              switch((u8)*event)
+ 433   4              {
+ 434   5                case NWK_LINKUP_IND:
+ 435   5                {
+ 436   6                  nwk_up_ind_msg_t* nwk_up = (nwk_up_ind_msg_t*)event;  
+ 437   6                  route_start_evnt_msg_t route_start; 
+ 438   6      #ifdef HPGP_DRIVER_APP          
+ 439   6                  if(nwk_up->link & PLC_NIC)    
+ 440   6                  {           
+ 441   7                    if((hpgp_nwk_data.params.nwk.role == DEV_MODE_STA)
+ 442   7                      && (rtopo_data.scan.power_line.enabled == TRUE))
+ 443   7                      rtopo_data.scan.power_line.enabled = FALSE;
+ 444   7                    
+ 445   7                    if(hpgp_nwk_data.params.nwk.role == DEV_MODE_CCO)
+ 446   7                      rtopo_data.link_pref.link = WIRELESS; 
+ 447   7                    else
+ 448   7                    if(hpgp_nwk_data.params.nwk.role == DEV_MODE_STA)
+ 449   7                    {
+ 450   8                    
+ 451   8                      rtopo_data.link_pref.link = POWER_LINE;
+ 452   8                      rtopo_state.state = RTOPO_START;
+ 453   8                      
+ 454   8                      route_start.event = ROUTE_START_EVNT;
+ 455   8                      route_start.link = POWER_LINE;              
+ 456   8                      route_start.assignparent = POWER_LINE;
+ 457   8                      GV701x_SendAppEvent(rtopo_app_id, route_app_id, APP_MSG_TYPE_APPEVENT,
+ 458   8                                APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &route_start, 
+ 459   8                                sizeof(route_start_evnt_msg_t), 0);             
+ 460   8                    }
+ 461   7      #if 1             
+ 462   7                    FM_Printf(FM_APP, "\nP up(p %bu rs %bu rl %bu)", rtopo_data.link_pref.link, rtopo_state.state,
+ 463   7                          hpgp_nwk_data.params.nwk.role);
+ 464   7      #endif
+ 465   7                  } 
+ 466   6      #endif          
+ 467   6                  if(nwk_up->link & RF_NIC)
+ 468   6                  {
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 9   
+
+ 469   7                    if((rtopo_data.pref.enabled == FALSE) &&
+ 470   7                      (hpgp_drv_data.state.state != HPGPDRV_UP))
+ 471   7                    {
+ 472   8                      rtopo_data.link_pref.link = WIRELESS;     
+ 473   8                    }
+ 474   7                    rtopo_state.state = RTOPO_START;
+ 475   7                    //rtopo_data.scan.wireless.enabled = FALSE; 
+ 476   7      
+ 477   7                    
+ 478   7                    if(rtopo_data.scan.wireless.scanMode == RTOPO_SCAN_PEER_SELECTION)
+ 479   7                    {
+ 480   8                      route_start.event = ROUTE_START_EVNT;
+ 481   8                      route_start.link = WIRELESS;    
+ 482   8                      route_start.assignparent = WIRELESS;
+ 483   8                      GV701x_SendAppEvent(rtopo_app_id, route_app_id, APP_MSG_TYPE_APPEVENT, 
+ 484   8                                APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &route_start,
+ 485   8                                sizeof(route_start_evnt_msg_t), 0);             
+ 486   8                    }
+ 487   7      #if 1                           
+ 488   7                    FM_Printf(FM_APP, "\nW up(p %bu pe %bu rs %bu sm %bu)", rtopo_data.link_pref.link,
+ 489   7                              rtopo_data.pref.enabled, rtopo_state.state,
+ 490   7                              rtopo_data.scan.wireless.scanMode);
+ 491   7      #endif
+ 492   7                  }           
+ 493   6                }
+ 494   5                break;
+ 495   5                
+ 496   5                case NWK_LINKDWN_IND:   
+ 497   5                {
+ 498   6                  nwk_dwn_ind_msg_t* nwk_dwn = (nwk_dwn_ind_msg_t*)event;
+ 499   6                  route_stop_evnt_msg_t route_stop;
+ 500   6                  
+ 501   6                  if((nwk_dwn->link & PLC_NIC) && (nwk_dwn->link & RF_NIC))
+ 502   6                  {
+ 503   7                    rtopo_state.state = RTOPO_INIT; 
+ 504   7                    rtopo_data.link_pref.link = POWER_LINE;   
+ 505   7      
+ 506   7      #ifdef ROUTE_APP  
+ 507   7                    route_info.route_sel_active = TRUE;             
+ 508   7      #endif
+ 509   7                    STM_StopTimer(rtopo_data.freeze_timer);
+ 510   7                    STM_StopTimer(rtopo_data.tx_timer);
+ 511   7                    
+ 512   7      #ifdef LRWPAN_DRIVER_APP            
+ 513   7                    lrwpan_db.scan.time = 5;            
+ 514   7                    lrwpan_db.scan.type = MLME_SCAN_TYPE_ACTIVE;
+ 515   7      #endif            
+ 516   7      #if 1
+ 517   7                    rtopo_start_scan(nwk_dwn->link, RTOPO_SCAN_PEER_SELECTION);
+ 518   7      #endif
+ 519   7                    rtopo_data.scan.power_line.enabled = FALSE;           
+ 520   7                    hpgp_nwk_data.params.nwk.role = DEV_MODE_STA;
+ 521   7                    memcpy((u8*)hpgp_nwk_data.params.nwk.key.nid, 
+ 522   7                        (u8*)cco_nid, NID_LEN);
+ 523   7                    
+ 524   7                    route_info.disc_params.powerline.cnt = 0;
+ 525   7                    route_info.disc_params.wireless.cnt = 0;
+ 526   7                    route_info.disc_params.link &= ~WIRELESS;
+ 527   7                    route_info.disc_params.link &= ~POWER_LINE;   
+ 528   7      
+ 529   7                    route_stop.event = ROUTE_STOP_EVNT;
+ 530   7                    route_stop.link = POWER_LINE | WIRELESS;              
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 10  
+
+ 531   7                    GV701x_SendAppEvent(rtopo_app_id, route_app_id, APP_MSG_TYPE_APPEVENT, 
+ 532   7                              APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &route_stop, 
+ 533   7                              sizeof(route_stop_evnt_msg_t), 0);              
+ 534   7      
+ 535   7      #if 1             
+ 536   7                    FM_Printf(FM_APP, "\nNWK dwn(rf plc) (pref %bu pse %bu wse %bu)", rtopo_data.link_pref.link,
+ 537   7                          rtopo_data.scan.power_line.enabled, rtopo_data.scan.wireless.enabled);              
+ 538   7      #endif
+ 539   7                  }         
+ 540   6                  else if(nwk_dwn->link & RF_NIC)
+ 541   6                  {
+ 542   7                    rtopo_data.link_pref.link = POWER_LINE;                 
+ 543   7                    route_info.disc_params.wireless.cnt = 0;
+ 544   7                    route_info.disc_params.link &= ~WIRELESS;
+ 545   7      #ifdef ROUTE_APP                
+ 546   7                    if(route_info.parent != NULL)
+ 547   7                    {
+ 548   8                      if(route_info.parent->link == WIRELESS)
+ 549   8                      {
+ 550   9                        rtopo_state.state = RTOPO_START;
+ 551   9                        route_info.route_sel_active = TRUE;
+ 552   9                        STM_StopTimer(rtopo_data.freeze_timer);
+ 553   9                        STM_StopTimer(rtopo_data.tx_timer);
+ 554   9                      }
+ 555   8                    }
+ 556   7                    else
+ 557   7                    {
+ 558   8                      rtopo_state.state = RTOPO_START;
+ 559   8                      route_info.route_sel_active = TRUE;
+ 560   8                      STM_StopTimer(rtopo_data.freeze_timer);
+ 561   8                      STM_StopTimer(rtopo_data.tx_timer);
+ 562   8                    }
+ 563   7      
+ 564   7      #endif
+ 565   7                    rtopo_start_scan(RF_NIC, RTOPO_SCAN_PEER_SELECTION);
+ 566   7      #if 1                             
+ 567   7                    FM_Printf(FM_APP, "\nNwk dwn(rf) (p %bu dl %bu rs %bu)", rtopo_data.link_pref.link, 
+ 568   7                        route_info.disc_params.link, rtopo_state.state);            
+ 569   7      #endif
+ 570   7                    route_stop.event = ROUTE_STOP_EVNT;
+ 571   7                    route_stop.link =  WIRELESS;              
+ 572   7                    GV701x_SendAppEvent(rtopo_app_id, route_app_id, APP_MSG_TYPE_APPEVENT, 
+ 573   7                              APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &route_stop, 
+ 574   7                              sizeof(route_stop_evnt_msg_t), 0);              
+ 575   7      
+ 576   7      #if 1
+ 577   7                    if((nwkstartup_data.link.power_line.state == LINK_UP)
+ 578   7      #if 1               
+ 579   7                      && ((route_info.parent != NULL) ? 
+ 580   7                         (route_info.parent->link != POWER_LINE) : (TRUE))
+ 581   7      #endif                   
+ 582   7                    )
+ 583   7                    {
+ 584   8                      route_start_evnt_msg_t route_start;
+ 585   8                      route_start.event = ROUTE_START_EVNT;
+ 586   8                      route_start.link = POWER_LINE;
+ 587   8                      route_start.assignparent = POWER_LINE;
+ 588   8                      GV701x_SendAppEvent(rtopo_app_id, route_app_id, APP_MSG_TYPE_APPEVENT, 
+ 589   8                                APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &route_start, 
+ 590   8                                sizeof(route_start_evnt_msg_t), 0);             
+ 591   8                    }
+ 592   7      #endif              
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 11  
+
+ 593   7                  }
+ 594   6                  else if(nwk_dwn->link & PLC_NIC)
+ 595   6                  {           
+ 596   7                    route_info.disc_params.powerline.cnt = 0;
+ 597   7                    route_info.disc_params.link &= ~POWER_LINE; 
+ 598   7                    if(rtopo_data.pref.enabled == FALSE)
+ 599   7                      rtopo_data.link_pref.link = WIRELESS;
+ 600   7                    rtopo_data.scan.power_line.enabled = FALSE;
+ 601   7      #ifdef ROUTE_APP                              
+ 602   7                    if(route_info.parent != NULL)
+ 603   7                    {
+ 604   8                      if(route_info.parent->link == POWER_LINE)
+ 605   8                      {
+ 606   9                        rtopo_state.state = RTOPO_START;
+ 607   9                        route_info.route_sel_active = TRUE;
+ 608   9                        STM_StopTimer(rtopo_data.freeze_timer);
+ 609   9                      }
+ 610   8                    }
+ 611   7                    else
+ 612   7                    {
+ 613   8                      rtopo_state.state = RTOPO_START;
+ 614   8                      route_info.route_sel_active = TRUE;
+ 615   8                      STM_StopTimer(rtopo_data.freeze_timer);
+ 616   8                    }
+ 617   7      #endif  
+ 618   7                    if(hpgp_nwk_data.params.nwk.role == DEV_MODE_STA)
+ 619   7                    {
+ 620   8                      rtopo_state.state = RTOPO_START;
+ 621   8                      hpgp_nwk_data.params.nwk.role = DEV_MODE_STA;
+ 622   8                      memcpy((u8*)hpgp_nwk_data.params.nwk.key.nid, 
+ 623   8                          (u8*)cco_nid, NID_LEN);           
+ 624   8                    }
+ 625   7      
+ 626   7                    route_stop.event = ROUTE_STOP_EVNT;
+ 627   7                    route_stop.link = POWER_LINE;             
+ 628   7                    GV701x_SendAppEvent(rtopo_app_id, route_app_id, APP_MSG_TYPE_APPEVENT,
+ 629   7                              APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &route_stop, 
+ 630   7                              sizeof(route_stop_evnt_msg_t), 0);              
+ 631   7      
+ 632   7      #if 1
+ 633   7                    FM_Printf(FM_APP, "\nNWK dwn(plc)(p %bu pe %bu se %bu dl %bu rs %bu hm %bu)", 
+ 634   7                        rtopo_data.link_pref.link, rtopo_data.pref.enabled,
+ 635   7                        rtopo_data.scan.power_line.enabled, route_info.disc_params.link,
+ 636   7                        rtopo_state.state, hpgp_nwk_data.params.nwk.role);                    
+ 637   7      #endif
+ 638   7      
+ 639   7                    if(nwkstartup_data.link.wireless.state == LINK_UP)
+ 640   7                    {
+ 641   8                      if(hpgp_nwk_data.params.nwk.role == DEV_MODE_STA)
+ 642   8                      {
+ 643   9      #if 1               
+ 644   9                        if((route_info.parent != NULL) ? 
+ 645   9                           (route_info.parent->link != WIRELESS) : (TRUE))
+ 646   9      #endif                     
+ 647   9                        {
+ 648  10      #if 1             
+ 649  10                          route_start_evnt_msg_t route_start;
+ 650  10                          route_start.event = ROUTE_START_EVNT;
+ 651  10                          route_start.link = WIRELESS;
+ 652  10                          route_start.assignparent = WIRELESS;
+ 653  10                          GV701x_SendAppEvent(rtopo_app_id, route_app_id, APP_MSG_TYPE_APPEVENT, 
+ 654  10                                    APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &route_start, 
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 12  
+
+ 655  10                                    sizeof(route_start_evnt_msg_t), 0);                   
+ 656  10      #endif            
+ 657  10                        }
+ 658   9                      }
+ 659   8                    }
+ 660   7                      
+ 661   7                  }           
+ 662   6                }
+ 663   5                break;
+ 664   5                
+ 665   5                default:
+ 666   5                break;
+ 667   5              } 
+ 668   4            }
+ 669   3          }   
+ 670   2      #endif  
+ 671   2          return;
+ 672   2        }
+ 673   1        rtopo_sm(&rtopo_state);
+ 674   1      }
+ 675          
+ 676          /******************************************************************************
+ 677           * @fn      rtopo_send_getparam
+ 678           *
+ 679           * @brief   Send Get Parameter request packet
+ 680           *
+ 681           * @param   id - parameter id (define found in gv701x_nwkstartup.h) 
+ 682           *          val - pointer to the parameter
+ 683           *      cnt - pointer to the re-transmit counter
+ 684           *               (re-transmissions occur at an exponential index)
+ 685           *
+ 686           * @return  none
+ 687           */
+ 688          
+ 689          void rtopo_send_getparam(u8 id, u8 *val, u8* cnt)
+ 690          {
+ 691   1        u8 buf[RTOPO_MAX_PKT_BUFFSIZE];
+ 692   1        route_hdr_t* rhdr = &buf[(sizeof(sEth2Hdr))];
+ 693   1        rtopo_getparam_t* gparm = (rtopo_getparam_t*)(rhdr + 1);
+ 694   1        
+ 695   1        val = val;
+ 696   1        memset(buf, 0x00, RTOPO_MAX_PKT_BUFFSIZE);  
+ 697   1      
+ 698   1        /*Fill the packet fields*/
+ 699   1      #ifdef ROUTE_APP
+ 700   1        memcpy_cpu_to_le (&gparm->ieee_address, &route_info.ieee_addr, (IEEE_MAC_ADDRESS_LEN - 2));
+ 701   1      #endif
+ 702   1        gparm->v[0].id = id; 
+ 703   1        gparm->v[0].value = 0;
+ 704   1      
+ 705   1        /*Start the re-transmit timer*/
+ 706   1        if(STATUS_SUCCESS == STM_StartTimer(rtopo_data.tx_timer, rtopo_data.tx_time))             
+ 707   1        {       
+ 708   2      #if 1
+ 709   2          FM_Printf(FM_APP, "\nGPTx (s 0x%02x, d 0x%02x, l %bu cnt %bu", 
+ 710   2              le16_to_cpu(rhdr->target), le16_to_cpu(rhdr->parent),        
+ 711   2              (route_info.parent != NULL)? route_info.parent->link : 0, *cnt);
+ 712   2      #endif  
+ 713   2          /*Send the packet*/
+ 714   2          if(STATUS_SUCCESS == rtopo_tx(buf, ((sizeof(sEth2Hdr)) + sizeof(route_hdr_t) + 
+ 715   2                          sizeof(rtopo_getparam_t)), GET_PARAM_REQ))
+ 716   2          {   
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 13  
+
+ 717   3            if((*cnt) < RTOPO_TIMEOUT_MAX_EXPONENT)
+ 718   3            {
+ 719   4              rtopo_data.tx_time = ((rtopo_data.tx_time)*(RTOPO_TIMEOUT_EXPONENT));                         
+ 720   4            }       
+ 721   3            *cnt = *cnt + 1;      
+ 722   3          }
+ 723   2        }
+ 724   1      }
+ 725          
+ 726          /******************************************************************************
+ 727           * @fn      rtopo_recv_getparam
+ 728           *
+ 729           * @brief   Parse the parameter received from the Host
+ 730           *
+ 731           * @param   param - parameter received (define found in gv701x_nwkstartup.h) 
+ 732           *
+ 733           * @return  none
+ 734           */
+ 735          
+ 736          u8 rtopo_recv_getparam(rtopo_getparam_t* param) 
+ 737          {
+ 738   1        u32 temp_nid;
+ 739   1        u16 nid1;
+ 740   1      
+ 741   1      #if 1
+ 742   1        FM_Printf(FM_APP, "\nGRx (s 0x%02x, d 0x%02x, l %bu, rs %bu", 
+ 743   1            ((route_info.parent != NULL)? route_info.parent->addr:0), (route_info.zid),       
+ 744   1            (route_info.parent != NULL)? route_info.parent->link:0, rtopo_state.state);   
+ 745   1      #endif
+ 746   1        
+ 747   1        if(rtopo_state.state == RTOPO_COMPLETE) 
+ 748   1          return STATUS_FAILURE;
+ 749   1      
+ 750   1        /*Unique NID parameter across entire network*/  
+ 751   1        if(param->v[0].id == RTOPO_PLC_NID) 
+ 752   1        {     
+ 753   2          temp_nid = NHTOHL(param->v[0].value); 
+ 754   2          nid1 = temp_nid;
+ 755   2      
+ 756   2      #ifdef BRIDGE
+ 757   2      #ifdef HPGP_DRIVER_APP
+ 758   2          memcpy(&hpgp_nwk_data.params.nwk.key.nid[0], cco_nid, NID_LEN -2);
+ 759   2          memcpy(&hpgp_nwk_data.params.nwk.key.nid[5], &nid1, sizeof(u16)); 
+ 760   2      
+ 761   2          /*Write the NID into the flash*/
+ 762   2          if(STATUS_FAILURE == GV701x_FlashWrite(hpgp_drv_data.app_id, 
+ 763   2                      (u8*)hpgp_nwk_data.params.nwk.key.nid, NID_LEN))
+ 764   2          {
+ 765   3          }
+ 766   2      #endif            
+ 767   2      
+ 768   2          //rtopo_state.event = RTOPO_STOP_EVNT;
+ 769   2          rtopo_start_devrole(PLC_NIC);
+ 770   2      #endif    
+ 771   2        } 
+ 772   1        else 
+ 773   1        {
+ 774   2      #if 0 
+                  FM_Printf(FM_APP, "\nParam ID mismatch");
+              #endif
+ 777   2          return STATUS_FAILURE;
+ 778   2        } 
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 14  
+
+ 779   1      
+ 780   1        return STATUS_SUCCESS;
+ 781   1      }
+ 782          
+ 783          /******************************************************************************
+ 784           * @fn      rtopo_timerhandler
+ 785           *
+ 786           * @brief   Timer handler for NwkStartupProfile timer events
+ 787           *
+ 788           * @param   event - event from firmware
+ 789           *
+ 790           * @return  none
+ 791           *
+ 792           */
+ 793          
+ 794          void rtopo_timerhandler(u8* buf)
+ 795          {           
+ 796   1        hostTimerEvnt_t* timerevt = (hostTimerEvnt_t*)buf;  
+ 797   1        
+ 798   1        if(buf == NULL)
+ 799   1          return;
+ 800   1      
+ 801   1        /*Demultiplexing the specific timer event*/           
+ 802   1        switch((u8)timerevt->type)
+ 803   1        {             
+ 804   2          /*Re-transmit timer event*/
+ 805   2          case RTOPO_TX_TIMER_EVNT: 
+ 806   2            rtopo_handle_timeout();
+ 807   2          break;
+ 808   2      
+ 809   2          /*Device Profile timer event*/
+ 810   2          case RTOPO_PROFILE_TIMER_EVNT:
+ 811   2          {
+ 812   3      #ifdef HPGP_DRIVER_APP        
+ 813   3            nwk_start_evnt_msg_t nwk_start;
+ 814   3            /*Start as CCO*/
+ 815   3            hpgp_nwk_data.params.nwk.role = DEV_MODE_CCO;     
+ 816   3            nwk_start.event = NWK_START_EVENT;
+ 817   3            nwk_start.link = PLC_NIC;
+ 818   3            GV701x_SendAppEvent(rtopo_app_id, nwkstartup_data.app_id, APP_MSG_TYPE_APPEVENT,
+ 819   3                      APP_MAC_ID, EVENT_CLASS_CTRL, EVENT_FRM_ID,
+ 820   3                      &nwk_start, sizeof(nwk_start_evnt_msg_t), 0);
+ 821   3      #endif  
+ 822   3          }
+ 823   2          break;        
+ 824   2      
+ 825   2          /*Device Profile timer event*/
+ 826   2          case RTOPO_PROFILE_1_TIMER_EVNT:
+ 827   2          {       
+ 828   3            nwk_start_evnt_msg_t nwk_start;
+ 829   3      #if (defined NWKSTARTUP_APP) && (defined HPGP_DRIVER_APP) && (defined ROUTE_APP)      
+ 830   3            nwkstartup_data.link.power_line.state = LINK_DOWN;
+ 831   3            nwkstartup_data.link.power_line.addr = route_info.zid;
+ 832   3      
+ 833   3            hpgp_nwk_data.params.nwk.role = DEV_MODE_CCO;     
+ 834   3            nwk_start.event = NWK_START_EVENT;
+ 835   3            nwk_start.link = PLC_NIC;
+ 836   3            GV701x_SendAppEvent(rtopo_app_id, nwkstartup_data.app_id, APP_MSG_TYPE_APPEVENT,
+ 837   3                      APP_MAC_ID, EVENT_CLASS_CTRL, EVENT_FRM_ID,
+ 838   3                      &nwk_start, sizeof(nwk_start_evnt_msg_t), 0);
+ 839   3      #endif        
+ 840   3          }
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 15  
+
+ 841   2          break;
+ 842   2      
+ 843   2          /*Device Profile timer event*/
+ 844   2          case RTOPO_FREEZE_TIMER_EVNT:
+ 845   2          { 
+ 846   3      #ifdef ROUTE_APP      
+ 847   3            if(route_info.parent != NULL) 
+ 848   3            {
+ 849   4              route_info.route_sel_active = FALSE;
+ 850   4            }
+ 851   3      #endif
+ 852   3          }
+ 853   2          break;
+ 854   2      
+ 855   2          case RTOPO_PREF_TIMER_EVNT:
+ 856   2          {   
+ 857   3            rtopo_data.pref.enabled = FALSE;    
+ 858   3            if((hpgp_drv_data.state.state != HPGPDRV_START) &&
+ 859   3              (hpgp_drv_data.state.state != HPGPDRV_UP))
+ 860   3            {
+ 861   4      #ifdef LRWPAN_DRIVER_APP        
+ 862   4              if(lrwpan_state.state == LRWPAN_UP)
+ 863   4                rtopo_data.link_pref.link = WIRELESS;
+ 864   4      #endif        
+ 865   4            }
+ 866   3      #if 0     
+                    FM_Printf(FM_APP, "\nTO Pref hs %bu ls %bu pl %bu", hpgp_drv_data.state.state,
+                        lrwpan_state.state, rtopo_data.link_pref.link);           
+              #endif
+ 870   3          }
+ 871   2          break;
+ 872   2      
+ 873   2          case RTOPO_SCAN_TIMER_EVNT:
+ 874   2            rtopo_data.scan.power_line.enabled = FALSE;
+ 875   2          break;
+ 876   2          
+ 877   2          default:
+ 878   2          break;
+ 879   2        }     
+ 880   1      }
+ 881          
+ 882          /******************************************************************************
+ 883           * @fn      rtopo_handle_timeout
+ 884           *
+ 885           * @brief   Handles transmit timeout
+ 886           *
+ 887           * @param   none
+ 888           *
+ 889           * @return  none
+ 890           *
+ 891           */
+ 892          
+ 893          void rtopo_handle_timeout(void)
+ 894          {
+ 895   1        if(rtopo_data.tx_cnt >= RTOPO_MAX_TX_RETRY_COUNT)
+ 896   1        { 
+ 897   2          route_stop_evnt_msg_t route_stop;
+ 898   2      #ifdef NWKSTARTUP_APP   
+ 899   2          nwk_stop_evnt_msg_t nwk_stop;   
+ 900   2      #endif    
+ 901   2      #if 0
+                  FM_Printf(FM_APP, "\nRTTO");    
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 16  
+
+              #endif
+ 904   2          rtopo_data.tx_cnt = 0;
+ 905   2          rtopo_data.tx_time = RTOPO_BASE_TIMEOUT;    
+ 906   2          rtopo_state.state = RTOPO_INIT;
+ 907   2          rtopo_state.event = RTOPO_IDLE_EVENT;       
+ 908   2      #ifdef ROUTE_APP            
+ 909   2          route_stop.event = ROUTE_STOP_EVNT;
+ 910   2          route_stop.link = route_info.parent->link;
+ 911   2          GV701x_SendAppEvent(rtopo_app_id, route_app_id, APP_MSG_TYPE_APPEVENT, APP_MAC_ID, EVENT_CLASS_CTRL,
+ 912   2                    MGMT_FRM_ID, &route_stop, sizeof(route_stop_evnt_msg_t), 0);              
+ 913   2      #endif
+ 914   2      
+ 915   2      #ifdef NWKSTARTUP_APP
+ 916   2          nwk_stop.event = NWK_STOP_EVENT;
+ 917   2      #ifdef ROUTE_APP
+ 918   2          nwk_stop.link = route_info.parent->link;
+ 919   2      #endif    
+ 920   2          GV701x_SendAppEvent(rtopo_app_id, nwkstartup_data.app_id, APP_MSG_TYPE_APPEVENT, APP_MAC_ID, EVENT_CLASS
+             -_CTRL,
+ 921   2                    MGMT_FRM_ID, &nwk_stop, sizeof(nwk_stop_evnt_msg_t), 0);              
+ 922   2      #endif    
+ 923   2        }
+ 924   1        else
+ 925   1        {   
+ 926   2          rtopo_send_getparam(RTOPO_PLC_NID, NULL, &rtopo_data.tx_cnt);
+ 927   2        }
+ 928   1      }
+ 929          
+ 930          /******************************************************************************
+ 931           * @fn    rtopo_handle_scanind
+ 932           *
+ 933           * @brief Handles the scan indication coming from HPGP driver
+ 934           *
+ 935           * @param none
+ 936           *
+ 937           * @return  none
+ 938           *
+ 939           */
+ 940          void rtopo_handle_scanind(u8 link, u8 status) 
+ 941          {
+ 942   1        if(link & PLC_NIC)
+ 943   1        {
+ 944   2      #ifdef HPGP_DRIVER_APP
+ 945   2          u8 i;
+ 946   2          u8 valid = FALSE;
+ 947   2          rtopo_data.scan.power_line.enabled = FALSE;
+ 948   2      
+ 949   2          for(i = 0; (i < hpgp_nwk_data.netlist.entries); i++)
+ 950   2          {   
+ 951   3            if((hpgp_nwk_data.netlist.list[i].valid == TRUE) &&
+ 952   3              (memcmp(hpgp_nwk_data.netlist.list[i].nid, cco_nid, NID_LEN-2) == 0) &&
+ 953   3              (memcmp(&hpgp_nwk_data.netlist.list[i].vendor_ota.ouid, 
+ 954   3                  hpgp_nwk_data.params.nwk.app_info.oem[0].ouid, OUID_LEN) == 0))
+ 955   3            {
+ 956   4              u16* parent_addr;       
+ 957   4              {
+ 958   5                {       
+ 959   6                  parent_addr = (u16*)(&hpgp_nwk_data.netlist.list[i].vendor_ota.buf[MAC_ADDR_LEN]);          
+ 960   6      #if 1
+ 961   6                  FM_Printf(FM_APP, "\ni %bu rssi %bu lqi %bu bcnt %lu ract %bu", i, hpgp_nwk_data.netlist.list[i].rss
+             -i,                
+ 962   6                      hpgp_nwk_data.netlist.list[i].lqi, hpgp_nwk_data.netlist.list[i].bcnRxCnt, route_info.route_sel_ac
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 17  
+
+             -tive);                
+ 963   6                  FM_HexDump(FM_APP,"\nNid:",(u8*)hpgp_nwk_data.netlist.list[i].nid, NID_LEN);
+ 964   6                  FM_HexDump(FM_APP,"\nVField:",(u8*)&hpgp_nwk_data.netlist.list[i].vendor_ota, 
+ 965   6                        sizeof(svendorota));  
+ 966   6                  FM_Printf(FM_APP, "\nPaddr %x", *parent_addr);
+ 967   6      #endif                  
+ 968   6                  if(hpgp_nwk_data.params.nwk.role == DEV_MODE_CCO)
+ 969   6                  {
+ 970   7                    valid = TRUE;
+ 971   7      #ifdef ROUTE_APP      
+ 972   7                    route_add_neighbor(0x0000, hpgp_nwk_data.netlist.list[i].vendor_ota.buf, 
+ 973   7                              0, POWER_LINE, 0, hpgp_nwk_data.netlist.list[i].rssi,
+ 974   7                              hpgp_nwk_data.netlist.list[i].bcnRxCnt, 
+ 975   7                              hpgp_nwk_data.netlist.list[i].lqi, *parent_addr, 0, 0);
+ 976   7      #endif        
+ 977   7                  }
+ 978   6                  else if(hpgp_nwk_data.params.nwk.role == DEV_MODE_STA)
+ 979   6                  {
+ 980   7                    if((hpgp_drv_data.state.state != HPGPDRV_UP) &&
+ 981   7                      (hpgp_drv_data.state.state != HPGPDRV_START))
+ 982   7                    {
+ 983   8                      valid = TRUE;
+ 984   8      #ifdef ROUTE_APP          
+ 985   8                      route_add_neighbor (0x0000, hpgp_nwk_data.netlist.list[i].vendor_ota.buf, 
+ 986   8                                0, POWER_LINE, 0, hpgp_nwk_data.netlist.list[i].rssi,
+ 987   8                                hpgp_nwk_data.netlist.list[i].bcnRxCnt, 
+ 988   8                                hpgp_nwk_data.netlist.list[i].lqi, *parent_addr, 0, 0);                         
+ 989   8      #endif          
+ 990   8                    }
+ 991   7                    else
+ 992   7                      rtopo_data.scan.power_line.enabled = TRUE;
+ 993   7                  }
+ 994   6                  break;
+ 995   6                }
+ 996   5              }
+ 997   4            }               
+ 998   3          }
+ 999   2      
+1000   2      #ifdef ROUTE_APP
+1001   2          if(valid == TRUE)
+1002   2          {
+1003   3            neighbor_info_t* best_nbr;
+1004   3            best_nbr = route_select_best_neighbor(POWER_LINE);  
+1005   3            
+1006   3            if(NULL != best_nbr)
+1007   3            {       
+1008   4              if(best_nbr->ieee_addr != NULL)
+1009   4              {
+1010   5                hostEventScanList* nbr = NULL;  
+1011   5      
+1012   5                for(i = 0; (i < MAX_NETWORK_LIST); i++)
+1013   5                {
+1014   6                  if((hpgp_nwk_data.netlist.list[i].valid == TRUE) &&
+1015   6                    (memcmp(&hpgp_nwk_data.netlist.list[i].vendor_ota.buf[0], 
+1016   6                      best_nbr->ieee_addr, IEEE_MAC_ADDRESS_LEN-2) == 0))
+1017   6                  {
+1018   7      #if 0             
+                            FM_Printf(FM_APP, "\nLU=%bu rssi %bu lqi %bu bcnRxCnt %lu rsel %bu", i, hpgp_nwk_data.netlist.list[
+             -i].rssi,                  
+                                hpgp_nwk_data.netlist.list[i].lqi, hpgp_nwk_data.netlist.list[i].bcnRxCnt,
+                                route_info.route_sel_active);                 
+                            FM_HexDump(FM_APP,"\nNid:",(u8*)hpgp_nwk_data.netlist.list[i].nid, NID_LEN);
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 18  
+
+                            FM_HexDump(FM_APP,"\nVField:",(u8*)&hpgp_nwk_data.netlist.list[i].vendor_ota.buf, 
+                                      sizeof(svendorota));
+              #endif                
+1026   7                    if(route_info.route_sel_active == TRUE)
+1027   7                    {
+1028   8                      nwk_start_evnt_msg_t nwk_start;
+1029   8                      nwk_start.event = NWK_START_EVENT;
+1030   8                      nwk_start.link = PLC_NIC;
+1031   8                      hpgp_nwk_data.params.nwk.role = DEV_MODE_STA;
+1032   8                      memcpy((u8*)hpgp_nwk_data.params.nwk.key.nid, 
+1033   8                          (u8*)hpgp_nwk_data.netlist.list[i].nid, NID_LEN);
+1034   8                      memcpy((u8*)hpgp_nwk_data.params.nwk.key.nmk, (u8*)nmk, ENC_KEY_LEN);
+1035   8      
+1036   8                      GV701x_SendAppEvent(rtopo_app_id, nwkstartup_data.app_id, 
+1037   8                                APP_MSG_TYPE_APPEVENT, APP_MAC_ID, EVENT_CLASS_CTRL,                          
+1038   8                                EVENT_FRM_ID,&nwk_start, sizeof(nwk_start_evnt_msg_t), 0);                          
+1039   8                      rtopo_data.scan.power_line.enabled = TRUE;
+1040   8                      break;
+1041   8                    }
+1042   7                  }       
+1043   6                } 
+1044   5              }
+1045   4            } 
+1046   3          }
+1047   2      #endif  
+1048   2      #endif  
+1049   2        }
+1050   1      
+1051   1        if(link & RF_NIC)
+1052   1        { 
+1053   2      #ifdef LRWPAN_DRIVER_APP  
+1054   2          u8 i;
+1055   2          u8 channel = 0;
+1056   2          u8 j = MIN_CHANNEL;
+1057   2      #ifdef ROUTE_APP    
+1058   2          u8 ed = ROUTE_ED_THRESHOLD;
+1059   2      #endif
+1060   2      
+1061   2          route_info.wireless_ch = 0;
+1062   2      #if 0
+                  FM_Printf(FM_APP, "\nLs %bu Uc %bu St %bu Sm %bu s %bx\n", 
+                    lrwpan_db.scan.result.ResultListSize, lrwpan_db.scan.result.UnscannedChannels,
+                    lrwpan_db.scan.result.ScanType, rtopo_data.scan.wireless.scanMode, status);     
+              #endif
+1067   2      
+1068   2          if(status == STATUS_FAILURE)
+1069   2          {
+1070   3      #if 1   
+1071   3            FM_Printf(FM_APP, "\nScnF");
+1072   3      #endif
+1073   3            rtopo_data.scan.wireless.enabled = FALSE;
+1074   3      #if 0     
+                    FM_Printf(FM_APP, "\nCont scan0..");
+              #endif
+1077   3            rtopo_start_scan(RF_NIC, rtopo_data.scan.wireless.scanMode);
+1078   3            return;
+1079   3          }
+1080   2            
+1081   2          for(i = 0; i < lrwpan_db.scan.result.ResultListSize; i++)
+1082   2          {     
+1083   3            if(lrwpan_db.scan.result.ScanType == MLME_SCAN_TYPE_ACTIVE)
+1084   3            {   
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 19  
+
+1085   4      #ifdef OLD_SCAN     
+                      if(lrwpan_db.scan.result.list[i].val.PANDescriptor.CoordAddrSpec.PANId != LRWPAN_PANID)
+                      {
+              #if 0       
+                        FM_Printf(FM_APP, "\nPan mismatch");
+              #endif
+                        memset(&lrwpan_db.scan.result.list[i], 0x00, sizeof(result_list_t));
+                        continue;
+                      }
+                                              
+                      lrwpan_db.scan.result.list[i].active = FALSE;
+              #if 0                   
+                      FM_Printf(FM_APP, "\nNo: %bu Ch %bx ChP %bx AM %bx A %x PAN %x LQI %bu T %lu", i,
+                        lrwpan_db.scan.result.list[i].val.PANDescriptor.LogicalChannel,
+                        lrwpan_db.scan.result.list[i].val.PANDescriptor.ChannelPage,      
+                        lrwpan_db.scan.result.list[i].val.PANDescriptor.CoordAddrSpec.AddrMode,     
+                        lrwpan_db.scan.result.list[i].val.PANDescriptor.CoordAddrSpec.Addr.short_address,           
+                        lrwpan_db.scan.result.list[i].val.PANDescriptor.CoordAddrSpec.PANId,      
+                        lrwpan_db.scan.result.list[i].val.PANDescriptor.LinkQuality, 
+                        lrwpan_db.scan.result.list[i].val.PANDescriptor.TimeStamp);   
+                        //FM_HexDump(FM_APP,"\nBcnPayload:", lrwpan_db.scan.result.list[i].bcn_payload,
+                          //    MAX_BCN_PAYLOAD);
+              #endif      
+                      route_add_neighbor(0x0000, lrwpan_db.scan.result.list[i].bcn_payload, 0, WIRELESS, 0, 
+                          0, 0, lrwpan_db.scan.result.list[i].val.PANDescriptor.LinkQuality, 0, 
+                          lrwpan_db.scan.result.list[i].val.PANDescriptor.LogicalChannel, 0);       
+              #endif
+1112   4            }               
+1113   3            else if(lrwpan_db.scan.result.ScanType == MLME_SCAN_TYPE_ED)
+1114   3            {                 
+1115   4              for(; j <= MAX_CHANNEL; j++)
+1116   4              {       
+1117   5                if((lrwpan_db.scan.ch_mask & BIT(j)))
+1118   5                {
+1119   6                  j++;
+1120   6                  break;
+1121   6                }           
+1122   5              }
+1123   4      
+1124   4      #if 0
+                      FM_Printf(FM_APP, "\nNo. %bu ED %bx ed %bx (j-1) %bx" , i,
+                        lrwpan_db.scan.result.list[0].val.ed_value[i], ed, (j-1));    
+              #endif                
+1128   4              if(route_is_neightable_empty(WIRELESS) == TRUE)
+1129   4              {
+1130   5                if(lrwpan_db.scan.result.list[0].val.ed_value[i] <= ed)
+1131   5                {
+1132   6                  ed = lrwpan_db.scan.result.list[0].val.ed_value[i]; 
+1133   6                  channel = j - 1;              
+1134   6                }
+1135   5              }
+1136   4              else
+1137   4              {
+1138   5                route_update_neighbor_ed((j - 1), 
+1139   5                  ((lrwpan_db.scan.result.list[0].val.ed_value[i] == 0) ? 
+1140   5                  (1) : (lrwpan_db.scan.result.list[0].val.ed_value[i])));
+1141   5              }
+1142   4            }         
+1143   3          }
+1144   2      
+1145   2      #if 0 
+                  /*TBD: Fix LMAC RF scan issue*/
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 20  
+
+                  if(lrwpan_db.scan.result.UnscannedChannels == 0)
+              #endif    
+1149   2          {           
+1150   3            u8 stop_scan = FALSE;
+1151   3            
+1152   3            if(lrwpan_db.scan.result.ResultListSize != 0)
+1153   3            {
+1154   4              if(rtopo_data.scan.wireless.scantype == MLME_SCAN_TYPE_ACTIVE)
+1155   4              {       
+1156   5      #ifdef OLD_SCAN       
+                        //rtopo_data.scan.wireless.enabled = FALSE;
+              #endif          
+1159   5              }
+1160   4              else if(rtopo_data.scan.wireless.scantype == MLME_SCAN_TYPE_ED)
+1161   4              {
+1162   5                neighbor_info_t* best_nbr = NULL;         
+1163   5                
+1164   5                if(route_is_neightable_empty(WIRELESS) == FALSE)
+1165   5                {     
+1166   6                  if(rtopo_data.scan.wireless.scanMode == RTOPO_SCAN_PEER_SELECTION)  
+1167   6                  {
+1168   7                    for(j = MIN_CHANNEL; j <= MAX_CHANNEL; j++)
+1169   7                    {       
+1170   8                      if((lrwpan_db.scan.ch_mask & BIT(j)))
+1171   8                      {
+1172   9                        route_info.wireless_ch = j;
+1173   9      #if 0               
+                                FM_Printf(FM_APP, "\nPch %bx", route_info.wireless_ch);
+              #endif
+1176   9                        if(route_select_best_neighbor(WIRELESS) != NULL)
+1177   9                          stop_scan = TRUE;
+1178   9                      }           
+1179   8                    }   
+1180   7                  }
+1181   6                  else if(rtopo_data.scan.wireless.scanMode == RTOPO_SCAN_CHANNEL_SELECTION)
+1182   6                  {
+1183   7                    stop_scan = TRUE;
+1184   7      #if 0             
+                            FM_Printf(FM_APP, "\nChannel Sel");
+              #endif
+1187   7                  }
+1188   6      
+1189   6                  if((rtopo_data.scan.wireless.scanMode == RTOPO_SCAN_PEER_SELECTION) ||
+1190   6                    (rtopo_data.scan.wireless.scanMode == RTOPO_SCAN_CHANNEL_SELECTION))
+1191   6                  {
+1192   7                    if(stop_scan == TRUE)
+1193   7                    {
+1194   8      #if 0           
+                              FM_Printf(FM_APP, "\nYes");
+              #endif              
+1197   8                      route_info.wireless_ch = 0;
+1198   8                      best_nbr = route_select_best_neighbor(WIRELESS);  
+1199   8                      if(best_nbr != NULL)
+1200   8                      {               
+1201   9                        rtopo_data.scan.wireless.panid = LRWPAN_PANID;
+1202   9                        rtopo_data.scan.wireless.channel = best_nbr->ch;                  
+1203   9                        rtopo_data.scan.wireless.enabled = FALSE;
+1204   9                        rtopo_start_devrole(RF_NIC);
+1205   9                      }
+1206   8                      else
+1207   8                        stop_scan = FALSE;
+1208   8                    }
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 21  
+
+1209   7                  }
+1210   6                }
+1211   5                else 
+1212   5                { 
+1213   6                  if(rtopo_data.scan.wireless.scanMode == RTOPO_SCAN_CHANNEL_SELECTION)
+1214   6                  {
+1215   7                    if((rtopo_data.pref.enabled == FALSE) && (channel != 0))
+1216   7                    {
+1217   8                      stop_scan = TRUE;
+1218   8                      rtopo_data.scan.wireless.enabled = FALSE;
+1219   8                      rtopo_data.scan.wireless.panid = LRWPAN_PANID;
+1220   8                      rtopo_data.scan.wireless.channel = channel;   
+1221   8                      rtopo_data.scan.wireless.scantype = MLME_SCAN_TYPE_ACTIVE;  
+1222   8                      rtopo_start_devrole(RF_NIC);
+1223   8                    }
+1224   7                    else      
+1225   7                    {
+1226   8                      //rtopo_data.scan.wireless.enabled = FALSE;
+1227   8                      //rtopo_data.scan.wireless.scantype = MLME_SCAN_TYPE_ED;                  
+1228   8                      stop_scan = FALSE;
+1229   8                    }
+1230   7                  }
+1231   6                }         
+1232   5              }       
+1233   4            }
+1234   3      
+1235   3            if(rtopo_data.scan.wireless.scantype == MLME_SCAN_TYPE_ACTIVE)
+1236   3              rtopo_data.scan.wireless.scantype = MLME_SCAN_TYPE_ED;
+1237   3            else if(rtopo_data.scan.wireless.scantype == MLME_SCAN_TYPE_ED)
+1238   3              rtopo_data.scan.wireless.scantype = MLME_SCAN_TYPE_ACTIVE;
+1239   3            
+1240   3            if(stop_scan == FALSE)
+1241   3            {
+1242   4              rtopo_data.scan.wireless.enabled = FALSE;
+1243   4      #if 0     
+                      FM_Printf(FM_APP, "\nCont scan1..");
+              #endif
+1246   4              rtopo_start_scan(RF_NIC, rtopo_data.scan.wireless.scanMode);
+1247   4            }
+1248   3            else 
+1249   3            {
+1250   4      #if 1
+1251   4              FM_Printf(FM_APP, "\nStopS");
+1252   4      #endif        
+1253   4      #if 0       
+              #ifndef OLD_SCAN      
+                      route_stop_evnt_msg_t route_stop;
+                      route_stop.event = ROUTE_STOP_EVNT;
+                      route_stop.link = WIRELESS;             
+                      GV701x_SendAppEvent(rtopo_app_id, route_app_id, APP_MSG_TYPE_APPEVENT, 
+                                APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &route_stop, 
+                                sizeof(route_stop_evnt_msg_t), 0);  
+              #endif
+              #endif        
+1263   4            }
+1264   3          }
+1265   2      #endif    
+1266   2        }
+1267   1      }
+1268          
+1269          /******************************************************************************
+1270           * @fn    rtopo_handle_scanind
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 22  
+
+1271           *
+1272           * @brief Handles the scan indication coming from HPGP driver
+1273           *
+1274           * @param none
+1275           *
+1276           * @return  none
+1277           *
+1278           */
+1279          void rtopo_start_devrole(u8 link) 
+1280          {
+1281   1      #if (defined NWKSTARTUP_APP) && (defined ROUTE_APP)
+1282   1        
+1283   1      #ifdef HPGP_DRIVER_APP           
+1284   1        /*Start CCO on the PLC link*/
+1285   1        if((link & PLC_NIC) && (nwkstartup_data.link.power_line.state != LINK_DISABLE))           
+1286   1        {
+1287   2          if(hpgp_nwk_data.params.nwk.role != DEV_MODE_CCO)
+1288   2          {
+1289   3            u16 time;
+1290   3            nwk_start_evnt_msg_t nwk_start;
+1291   3                
+1292   3            if(route_info.zid >= 10)
+1293   3              time = route_info.zid/10;
+1294   3            else
+1295   3              time = route_info.zid;
+1296   3            time = time*100;
+1297   3      #if 0     
+                    
+                    /*Set a Random time to start CCO*/
+                    STM_StartTimer(rtopo_data.profile_timer, time);
+              
+              #else
+1303   3      #ifdef HPGP_DRIVER_APP          
+1304   3            /*Start as CCO*/
+1305   3            hpgp_nwk_data.params.nwk.role = DEV_MODE_CCO;     
+1306   3            nwk_start.event = NWK_START_EVENT;
+1307   3            nwk_start.link = PLC_NIC;
+1308   3            GV701x_SendAppEvent(rtopo_app_id, nwkstartup_data.app_id, APP_MSG_TYPE_APPEVENT,
+1309   3                      APP_MAC_ID, EVENT_CLASS_CTRL, EVENT_FRM_ID,
+1310   3                      &nwk_start, sizeof(nwk_start_evnt_msg_t), 0);
+1311   3      #endif
+1312   3      #endif
+1313   3            rtopo_state.state = RTOPO_COMPLETE;
+1314   3          }
+1315   2        }
+1316   1      #endif
+1317   1      
+1318   1      #ifdef LRWPAN_DRIVER_APP
+1319   1        if((link & RF_NIC) && (nwkstartup_data.link.wireless.state != LINK_DISABLE))
+1320   1        {       
+1321   2          nwk_start_evnt_msg_t nwk_start;
+1322   2          nwk_start.event = NWK_START_EVENT;
+1323   2          nwk_start.link = RF_NIC;
+1324   2          lrwpan_db.short_addr = nwkstartup_data.link.wireless.addr;  
+1325   2          lrwpan_db.panid = rtopo_data.scan.wireless.panid; 
+1326   2          lrwpan_db.channel = rtopo_data.scan.wireless.channel;
+1327   2          route_info.wireless_ch = lrwpan_db.channel;
+1328   2          
+1329   2          GV701x_SendAppEvent(rtopo_app_id, nwkstartup_data.app_id, APP_MSG_TYPE_APPEVENT,
+1330   2                    APP_MAC_ID, EVENT_CLASS_CTRL, EVENT_FRM_ID,
+1331   2                    &nwk_start, sizeof(nwk_start_evnt_msg_t), 0);       
+1332   2      #if 0   
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 23  
+
+                  FM_Printf(FM_APP, "\nLStart A %x PAN %x CH %bx", lrwpan_db.short_addr, 
+                        rtopo_data.scan.wireless.panid, 
+                          rtopo_data.scan.wireless.channel);                    
+              #endif        
+1337   2          rtopo_data.scan.wireless.panid = 0; 
+1338   2          rtopo_data.scan.wireless.channel = 0;     
+1339   2          rtopo_data.scan.wireless.enabled = FALSE; 
+1340   2          rtopo_data.scan.wireless.start = FALSE;   
+1341   2        }
+1342   1      #endif
+1343   1      #endif
+1344   1      }
+1345          
+1346          /******************************************************************************
+1347           * @fn      rtopo_poll
+1348           *
+1349           * @brief   The NetowrkStartup Device profiling State Machine, 
+1350           *      it executes all internal/external 
+1351           *      events triggered
+1352           *
+1353           * @param   state - state machine object of the driver
+1354           *          (passed as a reference incase there are more than one object)
+1355           *
+1356           * @return  none
+1357           *
+1358           */
+1359          
+1360          void rtopo_poll(void) 
+1361          {
+1362   1        if(rtopo_state.state != RTOPO_INIT)
+1363   1        {
+1364   2      #ifdef HPGP_DRIVER_APP  
+1365   2          if(rtopo_data.scan.power_line.enabled == FALSE)
+1366   2          {   
+1367   3            if(hpgp_nwk_data.params.nwk.role == DEV_MODE_CCO)       
+1368   3            {         
+1369   4              rtopo_start_scan(PLC_NIC,RTOPO_SCAN_PEER_SELECTION);
+1370   4            }
+1371   3            else if(hpgp_nwk_data.params.nwk.role == DEV_MODE_STA)
+1372   3            {
+1373   4              if((hpgp_drv_data.state.state != HPGPDRV_UP) /*&&
+1374   4                (hpgp_drv_data.state.state != HPGPDRV_START)*/)
+1375   4              {                   
+1376   5                rtopo_start_scan(PLC_NIC, RTOPO_SCAN_PEER_SELECTION);         
+1377   5              }
+1378   4            }
+1379   3          }
+1380   2      #endif
+1381   2      
+1382   2      #if 0
+              #ifdef LRWPAN_DRIVER_APP
+                  if(rtopo_data.scan.wireless.enabled == FALSE)
+                  {   
+                    if((lrwpan_state.state != LRWPAN_START) &&
+                      (lrwpan_state.state != LRWPAN_SCAN) &&
+                      (lrwpan_state.state != LRWPAN_UP))
+                    {     
+                      rtopo_start_scan(RF_NIC);         
+                    }
+                  }   
+              #endif    
+              #endif
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 24  
+
+1395   2      
+1396   2        }
+1397   1      }
+1398          
+1399          /******************************************************************************
+1400           * @fn      rtopo_sm
+1401           *
+1402           * @brief   The NetowrkStartup Device profiling State Machine, 
+1403           *      it executes all internal/external 
+1404           *      events triggered
+1405           *
+1406           * @param   state - state machine object of the driver
+1407           *          (passed as a reference incase there are more than one object)
+1408           *
+1409           * @return  none
+1410           *
+1411           */
+1412          
+1413          void rtopo_sm(gv701x_state_t* state) 
+1414          {
+1415   1        if(state == NULL)
+1416   1          return;
+1417   1      
+1418   1      #if 1 
+1419   1        if(state->event != RTOPO_IDLE_EVENT)
+1420   1          FM_Printf(FM_APP, "\nRtopo S %bu E %bu P %bu C %bu E %bu Da %bu Sa %bu T %bu", 
+1421   1              state->state, state->event,
+1422   1              state->eventproto, state->eventclass, state->eventtype, 
+1423   1              state->msg_hdr.dst_app_id, state->msg_hdr.src_app_id, state->msg_hdr.type);
+1424   1      #endif
+1425   1      
+1426   1        switch(state->state)
+1427   1        {   
+1428   2          case RTOPO_INIT:
+1429   2          case RTOPO_START:     
+1430   2          case RTOPO_COMPLETE:
+1431   2            if(state->eventproto == APP_MAC_ID)
+1432   2            {
+1433   3      #ifdef HPGP_DRIVER_APP                    
+1434   3              if(state->msg_hdr.src_app_id == hpgp_drv_data.app_id)
+1435   3              {
+1436   4                if(state->msg_hdr.type == APP_MSG_TYPE_APPIND)
+1437   4                {         
+1438   5                  switch(state->event)
+1439   5                  {             
+1440   6                    case HPGPDRV_SCAN_IND:
+1441   6                      rtopo_handle_scanind(PLC_NIC, STATUS_SUCCESS);
+1442   6                    break;      
+1443   6                    default:
+1444   6                    break;
+1445   6                  }
+1446   5                }
+1447   4              }
+1448   3      #endif        
+1449   3      #ifdef LRWPAN_DRIVER_APP
+1450   3              if(state->msg_hdr.src_app_id == lrwpan_db.app_id)
+1451   3              {
+1452   4                if(state->msg_hdr.type == APP_MSG_TYPE_APPIND)
+1453   4                {                 
+1454   5                  switch(state->event)
+1455   5                  {             
+1456   6                    case LRWPAN_SCAN_IND:             
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 25  
+
+1457   6                      if(state->statedata != NULL)
+1458   6                      {
+1459   7                        lrwpan_scan_ind_t* lrwpan_scan = (lrwpan_scan_ind_t*)state->statedata;
+1460   7                        rtopo_handle_scanind(RF_NIC, lrwpan_scan->status);
+1461   7                      }             
+1462   6                    break;  
+1463   6      
+1464   6                    case LRWPAN_CFG_IND:              
+1465   6                      if(state->statedata != NULL)
+1466   6                      {
+1467   7                        lrwpan_cfg_ind_t* lrwpan_cfg = (lrwpan_cfg_ind_t*)state->statedata;
+1468   7      #if 0                 
+                                FM_Printf(FM_APP, "\nLCIND %bu", lrwpan_cfg->status);
+              #endif
+1471   7                        if(lrwpan_cfg->status == STATUS_SUCCESS)
+1472   7                        {
+1473   8                          if(lrwpan_cfg->attribute == phyCurrentChannel)
+1474   8                          {                   
+1475   9                            route_start_evnt_msg_t route_start; 
+1476   9      #if 0
+                                    FM_Printf(FM_APP, "\nSCont(s %bx ch %bx)", lrwpan_cfg->status, lrwpan_db.channel);    
+              #endif                                            
+1479   9                            route_start.event = ROUTE_START_EVNT;
+1480   9                            route_start.link = WIRELESS;
+1481   9                            route_start.assignparent = 0;
+1482   9                            GV701x_SendAppEvent(rtopo_app_id, route_app_id, APP_MSG_TYPE_APPEVENT,
+1483   9                                      APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &route_start, 
+1484   9                                      sizeof(route_start_evnt_msg_t), 0);   
+1485   9                          }
+1486   8                        }
+1487   7                      }             
+1488   6                    break;  
+1489   6                    
+1490   6                    default:
+1491   6                    break;
+1492   6                  }
+1493   5                }
+1494   4              }
+1495   3      #endif
+1496   3      #ifdef ROUTE_APP
+1497   3              if(state->msg_hdr.src_app_id == route_app_id) 
+1498   3              { 
+1499   4                if(state->msg_hdr.type == APP_MSG_TYPE_APPIND)
+1500   4                {                 
+1501   5                  switch(state->event)
+1502   5                  {     
+1503   6                    case ROUTE_DWN_IND:
+1504   6                    {   
+1505   7                      nwk_stop_evnt_msg_t nwk_stop; 
+1506   7                      route_dwn_ind_msg_t* route_dwn = (route_dwn_ind_msg_t*)state->statedata; 
+1507   7      #if 1               
+1508   7                      FM_Printf(FM_APP, "\nRdwn l %bu r %bu pl %bu wl %bu re %bu we %bu pe %bu", route_dwn->link, route_
+             -dwn->reason,
+1509   7                        nwkstartup_data.link.power_line.state, 
+1510   7                        nwkstartup_data.link.wireless.state, hpgp_nwk_data.params.nwk.role,
+1511   7                        rtopo_data.scan.wireless.enabled,
+1512   7                        rtopo_data.scan.power_line.enabled);  
+1513   7      #endif
+1514   7      
+1515   7      #ifdef ROUTE_RECOVERY
+1516   7                      
+1517   7        //              swResetGV701x(1);
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 26  
+
+1518   7                      STM_StartTimer(route_info.rec_timer, 
+1519   7                               ROUTE_RECOVERY_TIME_LINKFAIL); //10 minutes
+1520   7      #endif
+1521   7      
+1522   7      
+1523   7                      if(route_dwn->reason != ROUTE_REASON_MANUAL)
+1524   7                      {
+1525   8                        //rtopo_state.state = RTOPO_INIT;
+1526   8                        if((route_dwn->link & WIRELESS)||
+1527   8                          (route_dwn->link & POWER_LINE))
+1528   8                        {
+1529   9                          //rtopo_start_scan(RF_NIC, RTOPO_SCAN_PEER_SELECTION);
+1530   9                        }
+1531   8                        
+1532   8                        if((route_dwn->link & POWER_LINE) && 
+1533   8                          (rtopo_data.scan.power_line.enabled == FALSE))
+1534   8                        {
+1535   9                          rtopo_data.scan.power_line.enabled = TRUE;                        
+1536   9                        }
+1537   8                      
+1538   8                        if( ((route_dwn->link & POWER_LINE) &&
+1539   8                          (((hpgp_nwk_data.params.nwk.role == DEV_MODE_STA) ?
+1540   8                          (nwkstartup_data.link.power_line.state == LINK_UP) : (TRUE)))) ||                   
+1541   8                            ((route_dwn->link & WIRELESS) &&
+1542   8                          (nwkstartup_data.link.wireless.state == LINK_UP)) )
+1543   8                        {
+1544   9                          nwk_stop.event = NWK_STOP_EVENT;
+1545   9                          nwk_stop.link = 0;
+1546   9                          
+1547   9                          if(hpgp_nwk_data.params.nwk.role == DEV_MODE_CCO)
+1548   9                          {
+1549  10                            nwk_stop.link |= PLC_NIC;
+1550  10                            hpgp_nwk_data.params.nwk.role = DEV_MODE_STA;                     
+1551  10                            memcpy((u8*)hpgp_nwk_data.params.nwk.key.nid, 
+1552  10                                (u8*)cco_nid, NID_LEN);           
+1553  10                          }
+1554   9                          nwk_stop.link |= ((route_dwn->link == POWER_LINE) ? 
+1555   9                                     PLC_NIC : RF_NIC);
+1556   9                          nwk_stop.link |= ((route_dwn->link == WIRELESS) ? 
+1557   9                                     RF_NIC : PLC_NIC);
+1558   9                          
+1559   9                          GV701x_SendAppEvent(rtopo_app_id, nwkstartup_data.app_id, 
+1560   9                                  APP_MSG_TYPE_APPEVENT, APP_MAC_ID, EVENT_CLASS_CTRL,
+1561   9                                  MGMT_FRM_ID, &nwk_stop, sizeof(nwk_stop_evnt_msg_t), 0);        
+1562   9                            
+1563   9                        }
+1564   8                      }
+1565   7                    }
+1566   6                    break;
+1567   6      
+1568   6                    case ROUTE_DISC_IND:
+1569   6                    {
+1570   7                      route_disc_ind_msg_t* route_disc = (route_disc_ind_msg_t*)state->statedata; 
+1571   7      #if 0               
+                              FM_Printf(FM_APP, "\nRdisc l %bu r %bu",  route_disc->link, route_disc->reason);          
+              #endif                                      
+1574   7                      if(((route_disc->link & WIRELESS) == WIRELESS) &&
+1575   7                        (route_disc->reason == ROUTE_REASON_MANUAL) &&
+1576   7                        (rtopo_data.scan.wireless.scanMode == RTOPO_SCAN_PEER_SELECTION))
+1577   7                      {                 
+1578   8      #ifndef OLD_SCAN      
+1579   8                        rtopo_rf_curscan_ch++;
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 27  
+
+1580   8                        rtopo_start_wirscan_engine(rtopo_data.scan.wireless.scanMode);
+1581   8      #endif
+1582   8                      }                             
+1583   7                    }
+1584   6                    break;
+1585   6                    
+1586   6                    default:
+1587   6                    break;
+1588   6                  }
+1589   5                }
+1590   4              }
+1591   3      #endif
+1592   3                      
+1593   3              if(state->msg_hdr.dst_app_id != APP_BRDCST_MSG_APPID) 
+1594   3              {       
+1595   4                if(state->msg_hdr.type == APP_MSG_TYPE_APPEVENT)
+1596   4                {                 
+1597   5                  switch(state->event)
+1598   5                  {       
+1599   6                    case 
+1600   6                      RTOPO_START_EVNT:
+1601   6                    {
+1602   7                      rtopo_start_evnt_msg_t* start_msg = (rtopo_start_evnt_msg_t*)state->statedata;
+1603   7                      rtopo_start(start_msg->link, start_msg->mode);
+1604   7                    }
+1605   6                    break;      
+1606   6                    
+1607   6                    case RTOPO_PROFILE_EVNT:
+1608   6      #if (defined NWKSTARTUP_APP) && (defined ROUTE_APP)
+1609   6      #if 1
+1610   6                      FM_Printf(FM_APP, "\nProf(ws: %bu ps: %bu rs: %bu, rv: %bu pl: %bu)", 
+1611   6                          nwkstartup_data.link.wireless.state, 
+1612   6                          nwkstartup_data.link.power_line.state, route_state.state, 
+1613   6                          (route_info.parent != NULL)? route_info.parent->valid:0, 
+1614   6                          (route_info.parent != NULL)? route_info.parent->link:0);
+1615   6      #endif
+1616   6      #endif              
+1617   6      #if 1 
+1618   6                      if(route_info.route_sel_active == TRUE)
+1619   6                      {
+1620   7                        /*If timer is already running it wont update the timeout value*/
+1621   7                        STM_StartTimer(rtopo_data.freeze_timer, RTOPO_TOPOCHANGE_TIME);                 
+1622   7                      }
+1623   6      #endif                
+1624   6                      /*If Wireless link is up*/
+1625   6                      if(rtopo_state.state == RTOPO_COMPLETE)
+1626   6                        return;
+1627   6      #ifdef NWKSTARTUP_APP
+1628   6                      if((nwkstartup_data.link.wireless.state == LINK_UP) &&
+1629   6                        (nwkstartup_data.link.power_line.state == LINK_DOWN) && 
+1630   6                        (hpgp_drv_data.state.state != HPGPDRV_START))
+1631   6      #endif            
+1632   6                      {
+1633   7      #if (defined ROUTE_APP) && (defined HPGP_DRIVER_APP) && (defined HPGP_DRIVER_APP)
+1634   7                        /*If routing is complete and the profiling hasnt begun*/
+1635   7                        if((route_state.state == ROUTE_COMPLETE) && 
+1636   7                          ((route_info.parent == NULL) ? (0) : 
+1637   7                          ((route_info.parent->valid == TRUE) &&
+1638   7                          (route_info.parent->link == WIRELESS))))
+1639   7                        {
+1640   8                          u8 tmp_nid2[NID_LEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+1641   8                          u8 tmp_nid3[NID_LEN] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00};        
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 28  
+
+1642   8                          u8 tmp_nid1[NID_LEN] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00};    
+1643   8                          
+1644   8                          /*Fetch from flash if there exists any preconfigured NID
+1645   8                            to start as CCO*/
+1646   8      #if 0                     
+                                  if(STATUS_SUCCESS == GV701x_FlashRead(hpgp_drv_data.app_id, 
+                                            (u8*)tmp_nid1, 
+                                            NID_LEN))
+              #else
+1651   8                          if(1)
+1652   8      #endif
+1653   8                          {   
+1654   9                            if((0 == memcmp((u8*)tmp_nid1, tmp_nid2, NID_LEN)) ||
+1655   9                              (0 == memcmp((u8*)tmp_nid1, tmp_nid3, NID_LEN)))
+1656   9                            {       
+1657  10                              /*Request for NID from the Host*/
+1658  10                              rtopo_data.tx_cnt = 0;
+1659  10                              rtopo_send_getparam(RTOPO_PLC_NID, NULL, &rtopo_data.tx_cnt);
+1660  10                            }               
+1661   9                            else
+1662   9                            {
+1663  10                              if((0 == memcmp((u8*)tmp_nid1, cco_nid, NID_LEN-2)))
+1664  10                              {
+1665  11                                /*NID exists in flash, complete the profiling*/
+1666  11                                memcpy(hpgp_nwk_data.params.nwk.key.nid, tmp_nid1, NID_LEN);  
+1667  11                                rtopo_start_devrole(PLC_NIC);
+1668  11                              }                   
+1669  10                              else
+1670  10                              {
+1671  11                                /*Request for NID from the Host*/
+1672  11                                rtopo_data.tx_cnt = 0;  
+1673  11                                rtopo_send_getparam(RTOPO_PLC_NID, NULL, &rtopo_data.tx_cnt); 
+1674  11                              }
+1675  10                            }
+1676   9                          }
+1677   8                        } 
+1678   7      #endif            
+1679   7                      }
+1680   6      
+1681   6      
+1682   6      #if (defined NWKSTARTUP_APP) && (defined ROUTE_APP) && (defined HPGP_DRIVER_APP)
+1683   6                      /*If PLC link is up*/
+1684   6                      if(nwkstartup_data.link.power_line.state == LINK_UP)
+1685   6                      {
+1686   7      #if 0               
+                                FM_Printf(FM_APP, "\n10.0");
+              #endif
+1689   7                        if((route_state.state == ROUTE_COMPLETE) &&
+1690   7                          (route_info.parent != NULL))
+1691   7                        {
+1692   8      #if 0                 
+                                  FM_Printf(FM_APP, "\n10.1");                  
+              #endif
+1695   8                          if((route_info.parent->valid == TRUE) &&
+1696   8                            (route_info.parent->link == POWER_LINE))
+1697   8                          { 
+1698   9                            STM_StopTimer(rtopo_data.tx_timer);
+1699   9      #if 1                   
+1700   9                            FM_Printf(FM_APP, "\n10.2");
+1701   9      #endif
+1702   9                            rtopo_data.scan.wireless.start = TRUE;
+1703   9                            //rtopo_start_scan(RF_NIC, RTOPO_SCAN_CHANNEL_SELECTION);   
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 29  
+
+1704   9                            rtopo_data.scan.wireless.scanMode = RTOPO_SCAN_CHANNEL_SELECTION;
+1705   9                            //rtopo_start_devrole(RF_NIC);
+1706   9                            rtopo_state.state = RTOPO_COMPLETE;
+1707   9                          }
+1708   8                        }
+1709   7                      }
+1710   6      #endif            
+1711   6                    break;
+1712   6      
+1713   6                    case RTOPO_STOP_EVNT:
+1714   6      #if 0             
+                              state->state = RTOPO_INIT;
+                              state->event = RTOPO_IDLE_EVENT;
+                              //rtopo_data.scan.power_line.enabled = FALSE;
+              #endif
+1719   6                    break;
+1720   6                    
+1721   6                    default:
+1722   6                    break;        
+1723   6                  }
+1724   5                }
+1725   4              }       
+1726   3            }
+1727   2          break;
+1728   2            
+1729   2          default:
+1730   2          break;      
+1731   2        }
+1732   1      
+1733   1      
+1734   1        state->event = RTOPO_IDLE_EVENT;  
+1735   1        state->eventtype = 0;
+1736   1        state->eventclass = 0;
+1737   1        state->eventproto = 0;
+1738   1        state->statedata = NULL;  
+1739   1        state->statedatalen = 0;  
+1740   1        memset((u8*)&state->msg_hdr, 0x00, sizeof(gv701x_app_msg_hdr_t));
+1741   1      }
+1742          
+1743          /******************************************************************************
+1744           * @fn      rtopo_cmdprocess
+1745           *
+1746           * @brief   It handles application command line requests
+1747           *
+1748           * @param   CmdBuf - command string
+1749           *
+1750           * @return  none
+1751           *
+1752           */
+1753          
+1754          void rtopo_cmdprocess(char* CmdBuf) 
+1755          {
+1756   1        if(strcmp(CmdBuf, "state") == 0) 
+1757   1        {
+1758   2          printf("\nRtopo S %bu E %bu", rtopo_state.state, rtopo_state.event);            
+1759   2        }
+1760   1        else if(strcmp(CmdBuf, "stats") == 0) 
+1761   1        {
+1762   2          printf("\nRtopo p %bu ps %bu ws %bu (ch %bx panid %x s %bu m %bu t %bu)",
+1763   2              rtopo_data.pref.enabled , rtopo_data.scan.power_line.enabled,
+1764   2              rtopo_data.scan.wireless.enabled, rtopo_data.scan.wireless.channel,
+1765   2              rtopo_data.scan.wireless.panid, rtopo_data.scan.wireless.start,
+C51 COMPILER V9.53.0.0   ROUTE_TOPO                                                        11/04/2015 20:09:52 PAGE 30  
+
+1766   2              rtopo_data.scan.wireless.scanMode, rtopo_data.scan.wireless.scantype);
+1767   2        }
+1768   1        else if(strcmp(CmdBuf, "nvclear") == 0) 
+1769   1        {
+1770   2          GV701x_FlashErase(rtopo_app_id);
+1771   2        }
+1772   1      }
+1773          
+1774          #endif /*RTOPO_APP*/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   7707    ----
+   CONSTANT SIZE    =    672    ----
+   XDATA SIZE       =     46     641
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

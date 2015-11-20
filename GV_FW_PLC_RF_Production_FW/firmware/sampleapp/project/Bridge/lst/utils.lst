@@ -1,0 +1,376 @@
+C51 COMPILER V9.53.0.0   UTILS                                                             11/04/2015 20:09:37 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE UTILS
+OBJECT MODULE PLACED IN .\obj\utils.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\common\utils.c LARGE OBJECTADVANCED OPTIMIZE(9,SIZE
+                    -) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\..\f
+                    -irmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\hal;..
+                    -\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\firmwar
+                    -e\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee;..\
+                    -..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;..\
+                    -..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\inc;..
+                    -\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;..\..
+                    -\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\hpgp
+                    -\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\..\.
+                    -.\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\compo
+                    -nents\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\flas
+                    -h\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities;..\
+                    -..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nwk\in
+                    -c;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\..\c
+                    -omponents\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051
+                    -,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,UM,H
+                    -YBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETECT,H
+                    -YBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT,MCC
+                    -O,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGISTER
+                    -_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\utils.lst) TABS(2) OBJECT(
+                    -.\obj\utils.obj)
+
+line level    source
+
+   1          #include <stdio.h>
+   2          #include <string.h>
+   3          #include "papdef.h"
+   4          #include "hal_common.h"
+   5          #include "uart.h"
+   6          #include "utils_fw.h"
+   7          #include "utils.h"
+   8          
+   9          
+  10          static unsigned char xdata reg_400 _at_ 0x0400;
+  11          static unsigned char xdata reg_401 _at_ 0x0401;
+  12          static unsigned char xdata reg_402 _at_ 0x0402;
+  13          static unsigned char xdata reg_403 _at_ 0x0403;
+  14          
+  15          static unsigned char xdata reg_404 _at_ 0x0404;
+  16          static unsigned char xdata reg_405 _at_ 0x0405;
+  17          static unsigned char xdata reg_406 _at_ 0x0406;
+  18          static unsigned char xdata reg_407 _at_ 0x0407;
+  19          
+  20          static u16 var = 0xcafe;
+  21          
+  22          uint16_t crc_ccitt_update (uint16_t crc, uint8_t data_byte)
+  23          {
+  24   1          data_byte ^= lo8(crc);
+  25   1          data_byte ^= data_byte << 4;
+  26   1      
+  27   1         return ((((uint16_t)data_byte << 8) | hi8(crc)) ^
+  28   1                   (uint8_t)(data_byte >> 4) ^ ((uint16_t)data_byte << 3));
+  29   1      }
+  30          
+  31          /* Converts a 16-bit value into a 2 bytes array */
+  32          void mac_utils_16_bit_to_byte_array (uint16_t value, uint8_t *array_p)
+  33          {
+  34   1          array_p[0] = value & 0xFF;
+C51 COMPILER V9.53.0.0   UTILS                                                             11/04/2015 20:09:37 PAGE 2   
+
+  35   1          array_p[1] = (value >> 8) & 0xFF;
+  36   1      }
+  37          
+  38          /* Convert a 32-bit value into a 4 bytes array */
+  39          void mac_utils_32_bit_to_byte_array (uint32_t value, uint8_t *array_p)
+  40          {
+  41   1          uint8_t index = 0;
+  42   1      
+  43   1          while (index < 4) {
+  44   2              array_p[index++] = value & 0xFF;
+  45   2              value = value >> 8;
+  46   2          }
+  47   1      }
+  48          
+  49          /**
+  50           * Converts a 64-bit value into  a 8 bytes array
+  51           *
+  52           */
+  53          void mac_utils_64_bit_to_byte_array (uint64_t value, uint8_t *array_p)
+  54          {
+  55   1          uint8_t index = 0;
+  56   1      
+  57   1          while (index < 4) {
+  58   2              array_p[index++] = value.lo_u32 & 0xFF;
+  59   2              value.lo_u32     = value.lo_u32 >> 8;
+  60   2          }
+  61   1          while (index < 8) {
+  62   2              array_p[index++] = value.hi_u32 & 0xFF;
+  63   2              value.hi_u32     = value.hi_u32 >> 8;
+  64   2          }
+  65   1      }
+  66          
+  67          /*
+  68           * Converts a 2 Byte array into a 16-Bit value
+  69           *
+  70           * data_p - the pointer to the 2 Byte array
+  71           *
+  72           * return 16-bit value
+  73           */
+  74          uint16_t mac_utils_byte_array_to_16_bit (uint8_t *data_p)
+  75          {
+  76   1          return (data_p[0] | ((uint16_t)data_p[1] << 8));
+  77   1      }
+  78          
+  79          /*
+  80           * Converts a 4 Byte array into a 16-Bit value
+  81           *
+  82           * data_p - the pointer to the 4 Byte array
+  83           *
+  84           * return 32-bit value
+  85           */
+  86          uint32_t mac_utils_byte_array_to_32_bit (uint8_t *data_p)
+  87          {
+  88   1          union {
+  89   1              uint32_t val32;
+  90   1              uint8_t  val8[4];
+  91   1          } long_addr;
+  92   1      
+  93   1          uint8_t index;
+  94   1      
+  95   1          for (index = 4; index != 0; index--) {
+  96   2              long_addr.val8[index - 1] = *data_p++;
+C51 COMPILER V9.53.0.0   UTILS                                                             11/04/2015 20:09:37 PAGE 3   
+
+  97   2          }
+  98   1      
+  99   1          return (long_addr.val32);
+ 100   1      }
+ 101          
+ 102          /**
+ 103           * Converts a 8 Byte array into a 64-Bit value
+ 104           *
+ 105           * data_p - the pointer to the 8 Byte array
+ 106           *
+ 107           * return 64-bit value
+ 108           */
+ 109          uint64_t mac_utils_byte_array_to_64_bit (uint8_t *data_p)
+ 110          {
+ 111   1          uint8_t  index = 0;
+ 112   1          uint64_t value;
+ 113   1      
+ 114   1          value.lo_u32 = mac_utils_byte_array_to_32_bit(data_p);
+ 115   1          value.hi_u32 = mac_utils_byte_array_to_32_bit(&data_p[4]);
+ 116   1      
+ 117   1          return (value);
+ 118   1      }
+ 119          
+ 120          #ifdef HYBRII_FPGA
+                #define LOOP_COUNT   300
+              #else
+ 123            #define LOOP_COUNT   900
+ 124          #endif
+ 125          
+ 126          void mac_utils_delay_ms (uint16_t interval)
+ 127          {
+ 128   1          uint16_t i;
+ 129   1      
+ 130   1          for (i = 0; i < interval; i++) {
+ 131   2              uint16_t c1;
+ 132   2              for (c1 = 0; c1 < LOOP_COUNT; c1++);
+ 133   2          }
+ 134   1      }
+ 135          static void mac_utils_afe_spi_enable (bool enable)
+ 136          {
+ 137   1          uint8_t  value;
+ 138   1      
+ 139   1          value = reg_401;
+ 140   1      
+ 141   1          if (enable) {
+ 142   2              reg_401 = value | 0x03;     // Enable AFE SPI
+ 143   2          } else {
+ 144   2              reg_401 = value & ~0x03;    // Disable AFE SPI
+ 145   2          }
+ 146   1      }
+ 147          uint16_t mac_utils_spi_read (u16 spi_addr)
+ 148          {
+ 149   1          uint16_t reg_data = 0;
+ 150   1      
+ 151   1          spi_addr |= 0x0080;         // Read Enable
+ 152   1          spi_addr &= 0x00FF;
+ 153   1      
+ 154   1          mac_utils_afe_spi_enable(true);
+ 155   1      
+ 156   1          reg_405 = spi_addr;
+ 157   1      
+ 158   1          reg_404 = 0x01;
+C51 COMPILER V9.53.0.0   UTILS                                                             11/04/2015 20:09:37 PAGE 4   
+
+ 159   1        
+ 160   1          mac_utils_delay_ms(1);
+ 161   1      
+ 162   1          reg_data = reg_403;
+ 163   1              
+ 164   1          mac_utils_afe_spi_enable(false);
+ 165   1          
+ 166   1          return (reg_data);
+ 167   1      }
+ 168          
+ 169          void mac_utils_spi_write (u16 spi_addr, u16 spi_data)
+ 170          {
+ 171   1          spi_addr &= 0x007F;         // max.  7-bit addr
+ 172   1          spi_data &= 0xFFFF;         // max. 16-bit data
+ 173   1          
+ 174   1          mac_utils_afe_spi_enable(true);
+ 175   1      
+ 176   1          reg_405 = spi_addr;
+ 177   1          reg_406 = spi_data;
+ 178   1      
+ 179   1          reg_404 = 0x01;
+ 180   1        
+ 181   1          mac_utils_delay_ms(1);
+ 182   1          mac_utils_afe_spi_enable(false);
+ 183   1      }
+ 184          
+ 185          void mac_utils_cmd_spi_write (uint8_t *cmd_buf_p)
+ 186          {
+ 187   1          uint16_t spi_addr;
+ 188   1          uint16_t spi_data;
+ 189   1          
+ 190   1          if (sscanf(cmd_buf_p + 1, "%x %x", &spi_addr, &spi_data) < 2) {
+ 191   2              return;
+ 192   2          }
+ 193   1      
+ 194   1          mac_utils_spi_write(spi_addr, spi_data);
+ 195   1      
+ 196   1          printf("    SPI:  %03X --> [%02X]\n\n", spi_data, spi_addr);
+ 197   1      }
+ 198          
+ 199          void mac_utils_cmd_spi_read (uint8_t *cmd_buf_p)
+ 200          {
+ 201   1          uint16_t spi_addr;
+ 202   1          uint16_t spi_data;
+ 203   1          
+ 204   1          if (sscanf(cmd_buf_p + 1, "%x", &spi_addr) < 1) {
+ 205   2              return;
+ 206   2          }
+ 207   1      
+ 208   1          spi_data = mac_utils_spi_read(spi_addr);
+ 209   1      
+ 210   1          printf("    SPI:  %03X --> [%02X]\n\n", spi_data, spi_addr);
+ 211   1      }
+ 212          
+ 213          void mac_utils_cmd_get (uint8_t *cmd_buf_p)
+ 214          {
+ 215   1          char     c;
+ 216   1          uint8_t  idx = 0;
+ 217   1          while (1) {
+ 218   2              c = _getkey();
+ 219   2      
+ 220   2              switch (c) {
+C51 COMPILER V9.53.0.0   UTILS                                                             11/04/2015 20:09:37 PAGE 5   
+
+ 221   3              case '\b':    // backspace
+ 222   3                  if (idx > 0) {
+ 223   4                      printf("\b \b");
+ 224   4                      idx--;
+ 225   4                  }
+ 226   3                  break;
+ 227   3      
+ 228   3              case 0x1B:    // ESC
+ 229   3              case '`':
+ 230   3                  *cmd_buf_p = 0;
+ 231   3                  printf("\n");
+ 232   3                  return;
+ 233   3                  break;
+ 234   3      
+ 235   3              case '\r':    // enter
+ 236   3              case '\n':
+ 237   3                  printf(" \n");
+ 238   3            
+ 239   3                  while (idx < 128) {
+ 240   4                      *(cmd_buf_p + idx++) = 0;
+ 241   4                  }
+ 242   3                  return;
+ 243   3      
+ 244   3              default:
+ 245   3                  if (idx < 128) {
+ 246   4                      *(cmd_buf_p + idx) = c;
+ 247   4                      putchar(*(cmd_buf_p + idx++));
+ 248   4                  }
+ 249   3                  break;
+ 250   3              }
+ 251   2          }
+ 252   1      }
+ 253          
+ 254          void mac_utils_cmd_read (uint8_t *cmd_buf_p)
+ 255          {
+ 256   1          uint16_t reg_addr;
+ 257   1          uint16_t reg_data;
+ 258   1          
+ 259   1          if (sscanf(cmd_buf_p + 1, "%x", &reg_addr) < 1) {
+ 260   2              return;
+ 261   2          }
+ 262   1      
+ 263   1          reg_data = ReadU8Reg(reg_addr);
+ 264   1      
+ 265   1          printf("    Reg:  [%04X] --> %02X\n\n", reg_addr, reg_data);
+ 266   1      }
+ 267          
+ 268          void mac_utils_cmd_write (uint8_t *cmd_buf_p)
+ 269          {
+ 270   1          uint16_t reg_addr;
+ 271   1          uint16_t reg_data;
+ 272   1          
+ 273   1          if (sscanf(cmd_buf_p + 1, "%x %x", &reg_addr, &reg_data) < 2) {
+ 274   2              return;
+ 275   2          }
+ 276   1      
+ 277   1          reg_data &= 0x00FF;
+ 278   1      
+ 279   1          printf("    Reg:  %02X --> [%04X]\n\n", reg_data, reg_addr);
+ 280   1      
+ 281   1          WriteU8Reg(reg_addr, reg_data);
+ 282   1      }
+C51 COMPILER V9.53.0.0   UTILS                                                             11/04/2015 20:09:37 PAGE 6   
+
+ 283          
+ 284          void memcpy_cpu_to_le(void* pDstn, void* pSrc, u16 len)
+ 285          {
+ 286   1        u16 i;
+ 287   1      
+ 288   1      #if BYTE_ORDER == BIG_ENDIAN    
+ 289   1        for (i = 0; i < len; ++i) 
+ 290   1        {
+ 291   2          ((u8 *)pDstn)[len-1-i] = ((u8 *)pSrc)[i];
+ 292   2        }
+ 293   1      #else
+                memcpy(pDstn, pSrc, len);
+              #endif
+ 296   1        return;
+ 297   1      }
+ 298          
+ 299          int memcmp_cpu_to_le(void* pDstn, void* pSrc, u16 len)
+ 300          {
+ 301   1        u16 i;
+ 302   1      #if BYTE_ORDER == BIG_ENDIAN  
+ 303   1        for (i = 0; i < len; ++i) 
+ 304   1        {
+ 305   2          if(((u8 *)pDstn)[len-1-i] != ((u8 *)pSrc)[i])
+ 306   2          {
+ 307   3            if(((u8 *)pDstn)[len-1-i] > ((u8 *)pSrc)[i])
+ 308   3              return 1;
+ 309   3            else 
+ 310   3              return -1;
+ 311   3          }
+ 312   2        }
+ 313   1      #else
+                return memcmp(pDstn, pSrc, len);
+              #endif
+ 316   1        return 0;
+ 317   1      }
+ 318          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1501    ----
+   CONSTANT SIZE    =    102    ----
+   XDATA SIZE       =      2      78
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

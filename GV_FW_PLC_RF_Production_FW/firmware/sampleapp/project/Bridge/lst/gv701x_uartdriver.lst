@@ -1,0 +1,1574 @@
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE GV701X_UARTDRIVER
+OBJECT MODULE PLACED IN .\obj\gv701x_uartdriver.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\hal\gv701x_uartdriver.c LARGE OBJECTADVANCED OPTIMI
+                    -ZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\.
+                    -.\..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\s
+                    -rc\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\.
+                    -.\firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\z
+                    -igbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\even
+                    -t\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hp
+                    -gp\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_supp
+                    -ort;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\dri
+                    -vers\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\component
+                    -s;..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..
+                    -\..\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\dri
+                    -vers\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\util
+                    -ities;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drive
+                    -rs\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\.
+                    -.\..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HY
+                    -BRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_
+                    -SYNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ
+                    -_DETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTE
+                    -RRUPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP
+                    -,REGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\gv701x_uartdriver
+                    -.lst) TABS(2) OBJECT(.\obj\gv701x_uartdriver.obj)
+
+line level    source
+
+   1          /** =======================================================
+   2           * @file gv701x_uartdriver.c
+   3           * 
+   4           *  @brief Uart Interface Driver Module
+   5           *
+   6           *  Copyright (C) 2010-2014, Greenvity Communications, Inc.
+   7           *  All Rights Reserved
+   8           *  
+   9           * ========================================================*/
+  10          
+  11          #include <REG51.H>                /* special function register declarations   */
+  12                             /* for the intended 8051 derivative       */
+  13          #include <stdio.h>
+  14          #include <string.h> 
+  15          #include "papdef.h"
+  16          #include "hal_common.h"
+  17          #include "hal_hpgp.h"
+  18          #include "fm.h"
+  19          #include "gv701x_uartdriver_fw.h"
+  20          #include "utils_fw.h" 
+  21          #include "event_fw.h"
+  22          #include "hal.h"
+  23          #include "datapath.h"
+  24          #include "nma.h"
+  25          #include "timer.h"
+  26          #include "stm.h"
+  27          #ifdef NO_HOST
+  28          #include "gv701x_osal.h"
+  29          #endif
+  30          #include "gv701x_gpiodriver.h"
+  31          #include "dmm.h"
+  32          #include "gv701x_uartdriver.h"
+  33          
+  34          //#pragma NOAREGS
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 2   
+
+  35          #define TIMER_RELOAD_VALUE  (44702)
+  36          #define TIMER_TICK10      (20833)
+  37          #define ARBITOR_REQ_MAX_TIMES 10
+  38          
+  39          #ifdef UART_HOST_INTF
+  40          
+  41          xdata volatile uint8_t rxBuffer[APP_DATA_MAX_SIZE]; 
+  42          xdata volatile uint8_t txBuffer[APP_DATA_MAX_SIZE];
+  43          
+  44          //volatile u8 *urxbuf   =  (u8 xdata *)UART_RXBUF;
+  45          //volatile u8 *utxbuf   =  (u8 xdata *)UART_TXBUF;
+  46          //u8 *intid  =  (u8 xdata *)UART_INTID;
+  47          #define UART_RX_REG   (*(volatile u8 xdata *)(UART_RXBUF))
+  48          #define UART_TX_REG   (*(volatile u8 xdata *)(UART_TXBUF))
+  49          union_uart_linestatus *uart_linestatus = (u8 XDATA *)UART_LINESTAT;
+  50          union_uart_modemctrl  *uart_modemctrl  = (u8 XDATA *)UART_MODEMCTRL;
+  51          union_uart_linectrl   *uart_linectrl   = (u8 XDATA *)UART_LINECTRL;
+  52          union_uart_fifoctrl   *uart_fifoctrl   = (u8 XDATA *)UART_FIFOCTRL;
+  53          union_uart_intctrl    *uart_intctrl    = (u8 XDATA *)UART_INTCTRL;
+  54          union_uart_modemstat  *uart_modemstatus = (u8 XDATA *)UART_MODEMSTAT;
+  55          extern sSlist peripheralTxQ;
+  56          extern dqueue_t gDqueue[MAX_DATA_QUEUES];
+  57          extern u8 pktDbg;
+  58          #ifdef NO_HOST
+  59          extern gv701x_aps_queue_t appSupLayer;
+  60          extern sDmm AppDmm;
+  61          #endif
+  62          const uart_baudlook_t baud_lookup[11] =
+  63          {
+  64            { 1200,  1302},
+  65            { 2400,  651},
+  66            { 4800,  325},
+  67            { 9600,  162},
+  68            { 14400, 108},
+  69            { 19200, 81},
+  70            { 28800, 54},
+  71            { 38400, 40},
+  72            { 56000, 28},
+  73            { 57600, 27},
+  74            { 115200, 13}
+  75          };
+  76          
+  77          uartRxControl_t uartRxControl; 
+  78          uartTxControl_t uartTxControl;
+  79          volatile union_uart_modemstat modemstatus_u;
+  80          
+  81          volatile u8         ii;
+  82          volatile sSlink    *slink_t = NULL;
+  83          volatile sSegDesc  *segdesc_t = NULL; 
+  84          volatile sDmm* pDmm_t;  
+  85          
+  86          #ifdef UART_GPIO_INTERRUPT
+  87            volatile uartGpioStatus_t uartGpioStatus;
+  88          #endif 
+  89          
+  90          #ifdef UART_LOOPBACK
+              #define LOOPBACK_ENABLE 1
+              #define LOOPBACK_DISABLE 0
+              u8 gLoopBack = 0;
+              #endif
+  95          
+  96          //volatile sCommonRxFrmSwDesc lCommonRxFrmSwDesc;
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 3   
+
+  97          
+  98          extern u8 host_intf_max_cp;
+  99           
+ 100          bool datapath_IsQueueFullIsr(queue_id_e id)
+ 101          {
+ 102   1        u8 head = gDqueue[id].head;
+ 103   1        u8 tail = gDqueue[id].tail;
+ 104   1        if ((head & 0x7F) != (tail  & 0x7F)||
+ 105   1               ((head & 0x80) != (tail  & 0x80)))
+ 106   1        {
+ 107   2      
+ 108   2          // check if pending queue is full. if yes drop the frame or if not-full queue the frame
+ 109   2      
+ 110   2          if (((head & 0x80) != (tail  & 0x80)) &&
+ 111   2            ((head & 0x7F) == (tail  & 0x7F)))
+ 112   2          {   
+ 113   3            return TRUE;
+ 114   3          }
+ 115   2      
+ 116   2        } 
+ 117   1          return FALSE;
+ 118   1      }
+ 119          
+ 120          void datapath_queueIsr(queue_id_e id,
+ 121                         sSwFrmDesc *pPlcTxFrmSwDesc)
+ 122          {
+ 123   1        u8 wrapBit;
+ 124   1          u8 indexHd;
+ 125   1        sSwFrmDesc *swDesc;
+ 126   1      
+ 127   1        indexHd = (gDqueue[id].head & 0x7F);       
+ 128   1      
+ 129   1        swDesc = &gDqueue[id].desc[indexHd];
+ 130   1        
+ 131   1        memcpy ((void*)swDesc, (void*)pPlcTxFrmSwDesc,
+ 132   1               sizeof(sSwFrmDesc)); 
+ 133   1      
+ 134   1        wrapBit = gDqueue[id].head & 0x80;
+ 135   1      
+ 136   1        swDesc->frmInfo.plc.status = 0;
+ 137   1      
+ 138   1      
+ 139   1        if (id == PLC_DATA_QUEUE)
+ 140   1        {
+ 141   2      
+ 142   2          host_intf_max_cp += pPlcTxFrmSwDesc->cpCount;
+ 143   2      
+ 144   2        }
+ 145   1      
+ 146   1        gDqueue[id].head = ((gDqueue[id].head & 0x7F) + 1 ) | wrapBit;
+ 147   1        
+ 148   1        if ((gDqueue[id].head & 0x7F)== MAX_Q_BUFFER)
+ 149   1        {
+ 150   2          gDqueue[id].head ^= 0x80;     //inverse wraparound bit
+ 151   2          gDqueue[id].head &= 0x80;
+ 152   2        }
+ 153   1      
+ 154   1      }
+ 155          
+ 156          
+ 157          xdata uint8_t uartcounter;
+ 158          
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 4   
+
+ 159          #ifdef LG_UART_CONFIG
+                volatile uint8_t txEnable = 0;
+              #endif
+ 162          volatile uint8_t modemstatus;
+ 163          
+ 164          /* Add a link to list head */
+ 165          void SLIST_Push_Isr(struct slist *list, struct slink *link)
+ 166          {
+ 167   1          if(list->head == NULL)
+ 168   1          {
+ 169   2              //queuee is empty
+ 170   2              list->head = link;
+ 171   2              list->tail = link;
+ 172   2              link->next = NULL;
+ 173   2          }
+ 174   1          else
+ 175   1          {
+ 176   2              link->next = list->head;
+ 177   2              list->head = link;
+ 178   2          }
+ 179   1      }
+ 180          
+ 181          /* add a link to the list tail */
+ 182          void SLIST_Put_Isr(struct slist *list, struct slink *link)
+ 183          {
+ 184   1          if(list->tail == NULL)
+ 185   1          {
+ 186   2              //queue is empty
+ 187   2              list->head = link;
+ 188   2              list->tail = link;
+ 189   2              link->next = NULL;
+ 190   2          }
+ 191   1          else
+ 192   1          {
+ 193   2              list->tail->next = link;
+ 194   2          list->tail = link;
+ 195   2              link->next = NULL;
+ 196   2          }
+ 197   1      }
+ 198              
+ 199          /* remove a link from the head of the list */
+ 200          struct slink * SLIST_Pop_Isr (struct slist *list)
+ 201          {
+ 202   1          struct slink *link = list->head;
+ 203   1          if( list->tail == link)
+ 204   1          {
+ 205   2              //at most one link in the queue
+ 206   2              list->head = NULL;
+ 207   2            list->tail = NULL;
+ 208   2          }
+ 209   1          else
+ 210   1          {
+ 211   2              list->head = list->head->next;
+ 212   2          }
+ 213   1          
+ 214   1          return link;
+ 215   1      }
+ 216          #ifdef UART_LOOPBACK
+              void GV701x_SetUartLoopBack(u8 enable)
+              {
+                if(enable)
+                {
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 5   
+
+                  gLoopBack = 1;
+                }
+                else
+                {
+                  gLoopBack = 0;
+                }
+              }
+              #endif
+ 229          extern volatile uint8_t tlValue,thValue;
+ 230          extern volatile uint16_t timerValue;// For Timer polling and timer reload //Kiran
+ 231          extern volatile uint16_t timerDiff,timerCalc;
+ 232          extern volatile sStm Stm;
+ 233          
+ 234          void uart_handler(void) __INTERRUPT2__ using 3
+ 235          {
+ 236   1      /////////////////////////// Tx State Machine Variable Declaration ////////////////////////////
+ 237   1      #ifndef UART_RAW
+                static uint8_t txState = IDLE; // Holds state of state machine    
+                static uint16_t length = 0;
+              #endif
+ 241   1      //  static uint8_t txBuff;// temporary buffer for tx data processing. Data from cp will be copied to txBuff
+             - so that it will reduce xdata access multile times
+ 242   1        static uint8_t inst = TRUE;// Used to identify maximum data can be pushed in FIFO.In first instance upto
+ 243   1                       // 16 Bytes can be pushed and onwards size depends upon tx threshold setting
+ 244   1        static uint16_t dataCounterTx = 0;// To hold current location of tx buffer
+ 245   1        static uint8_t dump =0;
+ 246   1      //  static uint8_t txEnable = 0;
+ 247   1      //  static uint8_t cpCounterTx = 0;
+ 248   1         // Counter used to fill minimum and maximum number of characters in FIFO
+ 249   1        //static uint8_t accessCpTx = TRUE;
+ 250   1      //  static uint8_t xdata *cellAddr;
+ 251   1        //static uint8_t lCpLen;
+ 252   1      /////////////////////////// Tx State Machine Variable Declaration End ////////////////////////////
+ 253   1      
+ 254   1      /////////////////////////// Rx State Machine Variable Declaration ///////////////////////////////
+ 255   1      
+ 256   1      #ifndef UART_RAW
+                static uint8_t rxState = IDLE;// Stores the state of RX State Machine    
+                static uint8_t waitEscape; // Maintains the state of incoming ESCAPE  
+                
+              #endif
+ 261   1      
+ 262   1      #ifdef UART_LOOPBACK
+                static uint8_t loopBackLoop = 0;
+                static uint8_t poolId = 0;
+              #endif
+ 266   1      
+ 267   1        //uint8_t modemstatus;
+ 268   1        static uint8_t rxBuff; // Temporary storage for RX FIFO
+ 269   1        //static uint8_t accessCpRx = TRUE;
+ 270   1        //  static uint8_t xdata *cellAddrRx;
+ 271   1        //  static uint8_t lCpLen;
+ 272   1        //  static uint8_t cpCounterRx = 0;
+ 273   1        //  static uint8_t dataCounterRx = 0;
+ 274   1        //  static uint16_t    frame_len;
+ 275   1        //  static xdata uint8_t *cellAddrRx;
+ 276   1      /////////////////////////// Rx State Machine Variable Declaration End ////////////////////////////  
+ 277   1      
+ 278   1        EA = 0;
+ 279   1        dump = (*(u8 xdata *)(UART_INTID)); // Failing to read this register may cause infinite unintended interr
+             -upts. 
+ 280   1      #if 1
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 6   
+
+ 281   1        if(1 == TF0)
+ 282   1        {
+ 283   2          static u8 val = 0;
+ 284   2      
+ 285   2          TF0 = 0;
+ 286   2          //Stm.timeTick++;
+ 287   2      
+ 288   2          if(Stm.timeTick == STM_TIME_TICK_MAX)
+ 289   2          {
+ 290   3            Stm.timeSector = !Stm.timeSector;
+ 291   3            Stm.timeTick = 0;
+ 292   3              
+ 293   3          }
+ 294   2          else
+ 295   2          {
+ 296   3            Stm.timeTick++;
+ 297   3          }
+ 298   2      
+ 299   2          TR0 = 0;
+ 300   2          tlValue = TL0;
+ 301   2          thValue = TH0;
+ 302   2      
+ 303   2          timerValue = (uint16_t)(thValue<<8) | tlValue;
+ 304   2          if(timerValue > 0)
+ 305   2          {
+ 306   3            val = timerValue / TIMER_TICK10;
+ 307   3            //val = (u8)timerCalc;
+ 308   3            //Stm.timeTick += val;
+ 309   3            if(Stm.timeTick == STM_TIME_TICK_MAX)
+ 310   3            {
+ 311   4              Stm.timeSector = !Stm.timeSector;
+ 312   4              Stm.timeTick = 0;         
+ 313   4            }
+ 314   3            else
+ 315   3            {
+ 316   4              Stm.timeTick += val;
+ 317   4            }
+ 318   3            timerCalc = timerValue % TIMER_TICK10;
+ 319   3            timerValue = TIMER_RELOAD_VALUE + timerCalc;
+ 320   3            TL0 = lo8(timerValue);
+ 321   3            TH0 = hi8(timerValue);
+ 322   3          }   
+ 323   2          else
+ 324   2          {
+ 325   3            val = 0;
+ 326   3            TL0 = lo8(TIMER_RELOAD_VALUE);
+ 327   3            TH0 = hi8(TIMER_RELOAD_VALUE);
+ 328   3          }   
+ 329   2          
+ 330   2          TR0 = 1;
+ 331   2          if(uartRxControl.uartRxFlag == 1) // in timer handler or in STM Proc()
+ 332   2          {
+ 333   3            uartRxControl.tick = uartRxControl.tick + ((val + 1)*10);
+ 334   3          }
+ 335   2        
+ 336   2        }
+ 337   1      #endif
+ 338   1      #if 0 //def LG_UART_CONFIG
+                if(uartTxControl.txModeControl == UART_TX_LOW_EDGE)
+                {
+                  modemstatus = ReadU8Reg(UART_MODEMSTAT);//uart_modemstatus.modemstat;
+                
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 7   
+
+                  if(modemstatus == 0x11) // DCTS & CTS are set
+                  {
+                  
+                    if(uartTxControl.txCount == 0)
+                    {
+                      // check if any frame is in queue
+                      //if available then unqueue copy in to local buffer and start interrupt 
+                      if(datapath_IsQueueEmptyIsr(HOST_DATA_QUEUE) == FALSE)
+                      {
+                        xdata uint8_t *cellAddrTx;
+                        sSwFrmDesc* pHostTxFrmSwDesc = NULL;
+                        uint16_t i;
+                        if((pHostTxFrmSwDesc =
+                                  datapath_getHeadDescIsr(HOST_DATA_QUEUE, 1)) != NULL)
+                          {
+                          uartTxControl.pTxBuffer = txBuffer;
+                          uartTxControl.txCount = pHostTxFrmSwDesc->frmLen;
+                          uartTxControl.txDone = 0;
+              
+                          cellAddrTx = CHAL_GetAccessToCP(pHostTxFrmSwDesc->cpArr[0].cp);
+                          for(i=0;i<uartTxControl.txCount;i++)
+                          {
+                            *(uartTxControl.pTxBuffer+i) = *(cellAddrTx + i );
+                          }
+                          CHAL_FreeFrameCp(pHostTxFrmSwDesc->cpArr, pHostTxFrmSwDesc->cpCount);
+                          txEnable = 1;
+                          uart_intctrl->intctrl_field.EnTxEmptInt = 1; // Enables tx interrupt
+                        }//Get head disc
+                      }
+                    }
+                    else
+                    {
+                      txEnable = 1;
+                      uart_intctrl->intctrl_field.EnTxEmptInt = 1;// Enable TX Interrupt
+                    }
+                    modemstatus = ReadU8Reg(UART_MODEMSTAT);//uart_modemstatus.modemstat;
+                  }
+                  else if(modemstatus == 0x01)// Only DCTS is set
+                  {
+                    //SBUF = 'R';
+                    uart_intctrl->intctrl_field.EnTxEmptInt = 0;// Disable TX Interrupt
+                    txEnable = 0;
+                    modemstatus = ReadU8Reg(UART_MODEMSTAT);//modemstatus = uart_modemstatus.modemstat;
+                  }
+                } 
+                else
+                {
+                  txEnable = 1;
+                }
+              #else
+ 393   1      #ifdef UART_GPIO_INTERRUPT
+ 394   1        modemstatus_u.modemstat = ReadU8Reg(UART_MODEMSTAT);
+ 395   1        if(modemstatus_u.modemstat !=0)
+ 396   1        {
+ 397   2          if(modemstatus_u.modemstat_field.DCTS || modemstatus_u.modemstat_field.CTS)
+ 398   2          {
+ 399   3            if(modemstatus_u.modemstat_field.DCTS && modemstatus_u.modemstat_field.CTS) // DCTS & CTS are set
+ 400   3            {
+ 401   4              uartGpioStatus.field.GP_PB_IO11 = 1;
+ 402   4            }
+ 403   3            else if(modemstatus_u.modemstat_field.DCTS && !modemstatus_u.modemstat_field.CTS)// Only DCTS is set
+ 404   3            {
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 8   
+
+ 405   4              uartGpioStatus.field.GP_PB_IO11 = 0;
+ 406   4            }
+ 407   3            modemstatus = ReadU8Reg(UART_MODEMSTAT);
+ 408   3          }
+ 409   2          if(modemstatus_u.modemstat_field.DDSR || modemstatus_u.modemstat_field.DSR)
+ 410   2          {
+ 411   3            if(modemstatus_u.modemstat_field.DDSR && modemstatus_u.modemstat_field.DSR) // DDSR & DSR are set
+ 412   3            {
+ 413   4              uartGpioStatus.field.GP_PB_IO12 = 1;
+ 414   4            }
+ 415   3            else if(modemstatus_u.modemstat_field.DDSR && !modemstatus_u.modemstat_field.DSR)// Only DDSR is set
+ 416   3            {
+ 417   4              uartGpioStatus.field.GP_PB_IO12 = 0;
+ 418   4            }
+ 419   3            modemstatus = ReadU8Reg(UART_MODEMSTAT);
+ 420   3          }
+ 421   2          if(modemstatus_u.modemstat_field.DeltaDCD || modemstatus_u.modemstat_field.DCD)
+ 422   2          {
+ 423   3            if(modemstatus_u.modemstat_field.DeltaDCD && modemstatus_u.modemstat_field.DCD) // DeltaDCD & DCD are s
+             -et
+ 424   3            {
+ 425   4              uartGpioStatus.field.GP_PB_IO13 = 1;
+ 426   4            }
+ 427   3            else if(modemstatus_u.modemstat_field.DeltaDCD && !modemstatus_u.modemstat_field.DCD)// Only DeltaDCD i
+             -s set
+ 428   3            {
+ 429   4              uartGpioStatus.field.GP_PB_IO13 = 0;
+ 430   4            }
+ 431   3            modemstatus = ReadU8Reg(UART_MODEMSTAT);
+ 432   3          }
+ 433   2          if(modemstatus_u.modemstat_field.TrailEdgeInd || modemstatus_u.modemstat_field.RI)
+ 434   2          {
+ 435   3            if(modemstatus_u.modemstat_field.TrailEdgeInd && modemstatus_u.modemstat_field.RI) // TrailEdgeInd & RI
+             - are set
+ 436   3            {
+ 437   4              uartGpioStatus.field.GP_PB_IO18 = 1;
+ 438   4            }
+ 439   3            else if(modemstatus_u.modemstat_field.TrailEdgeInd && !modemstatus_u.modemstat_field.RI)// Only TrailEd
+             -geInd is set
+ 440   3            {
+ 441   4              uartGpioStatus.field.GP_PB_IO18 = 0;
+ 442   4            }
+ 443   3            modemstatus = ReadU8Reg(UART_MODEMSTAT);
+ 444   3          }
+ 445   2        
+ 446   2        } 
+ 447   1      #endif
+ 448   1      #endif 
+ 449   1        if((uart_linestatus->linestat_field.TxThldRegEmpt == TRUE) && (uartTxControl.txCount != 0))
+ 450   1        {
+ 451   2      
+ 452   2          uartcounter = 0;
+ 453   2              while((uartcounter < ((inst != TRUE) ? MIN_TX_BLOCK_SIZE:MAX_TX_BLOCK_SIZE)) 
+ 454   2            && (uartTxControl.txCount != 0) 
+ 455   2      #ifdef LG_UART_CONFIG   
+                    && (txEnable == 1)
+              #endif      
+ 458   2            )
+ 459   2              {
+ 460   3            
+ 461   3            UART_TX_REG = txBuffer[dataCounterTx];//*(uartTxControl.pTxBuffer + dataCounterTx );
+ 462   3                  uartcounter++;// counter for FIFO                
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 9   
+
+ 463   3                  dataCounterTx++;
+ 464   3                  uartTxControl.txCount--;
+ 465   3              }
+ 466   2            
+ 467   2              uartcounter = 0; 
+ 468   2              inst = FALSE; // Next time block of MIN_TX_BLOCK_SIZE will be pushed value based on TX FIFO INT Tr
+             -igger
+ 469   2              if(uartTxControl.txCount == 0)
+ 470   2              {
+ 471   3      #ifdef LG_UART_CONFIG         
+                        uart_fifoctrl->fifoctrl = UART_FIFO_RX_1_TX_0;// LG requires RX FIFO interrupt threshold to be 1.
+             - So UART will generate interrupt of every data byte received uart_fifoctrl->fifoctrl   = UART_FIFO_RX_1_TX_0;// LG requi
+             -res RX FIFO interrupt threshold to be 1. So UART will generate interrupt of every data byte received 
+              #else
+ 474   3            uart_fifoctrl->fifoctrl = UART_FIFO_RX_8_TX_0;
+ 475   3      #endif
+ 476   3      
+ 477   3            uart_intctrl->intctrl_field.EnTxEmptInt = 0;// Disable TX Interrupt 
+ 478   3                  inst = TRUE;
+ 479   3                  dataCounterTx = 0;
+ 480   3      #ifdef LG_UART_CONFIG     
+                    txEnable = 0;
+              #endif
+ 483   3            uartTxControl.txFrameCount++;
+ 484   3                  uartTxControl.txDone = 1;        
+ 485   3              }
+ 486   2        }// TX Interrupt processing end
+ 487   1      
+ 488   1      
+ 489   1        if(uart_linestatus->linestat_field.DR == TRUE)// RX State Machine
+ 490   1        {
+ 491   2            
+ 492   2                  while(uart_linestatus->linestat_field.DR == TRUE)
+ 493   2                  {
+ 494   3              if(uartRxControl.rxCount < UART_DATA_SIZE)
+ 495   3              {
+ 496   4                //*(uartRxControl.pRxdataBuffer + uartRxControl.rxCount) = (*(volatile u8 xdata *)(UART_RXBUF));
+ 497   4                rxBuffer[uartRxControl.rxCount] = UART_RX_REG;//(*(volatile u8 xdata *)(UART_RXBUF));
+ 498   4                uartRxControl.rxCount++;
+ 499   4              }
+ 500   3              else
+ 501   3              {
+ 502   4                rxBuff = UART_RX_REG;//(*(volatile u8 xdata *)(UART_RXBUF));
+ 503   4              }
+ 504   3      #if 1
+ 505   3              if(uartRxControl.rxExpectedCount != 0)// || (uartRxControl.rxCount == UART_DATA_SIZE)
+ 506   3              {
+ 507   4                if(uartRxControl.rxCount >= uartRxControl.rxExpectedCount)
+ 508   4                {
+ 509   5                  static uint16_t   i;
+ 510   5      #ifndef NO_HOST
+                          static uCpuCPReg cpuCPReg;
+              #endif
+ 513   5      //            u8 num12Clks;
+ 514   5      //            u8 curTick;
+ 515   5                  static eStatus status;
+ 516   5                              sEvent *event = NULL;
+ 517   5                    i = 0;
+ 518   5                  uartRxControl.rxReady = 1;
+ 519   5            //      cpCounterRx = 0;
+ 520   5                
+ 521   5                  status = STATUS_FAILURE;
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 10  
+
+ 522   5      
+ 523   5      #ifdef NO_HOST
+ 524   5                          
+ 525   5      #ifdef UART_LOOPBACK
+                          for(loopBackLoop = 0;loopBackLoop < 2;loopBackLoop++)
+                          {
+                            for(poolId = FW_POOL_ID; poolId < APP_POOL_ID;poolId++)
+                            {
+                              if(loopBackLoop == 0 )
+                              {
+              #endif              
+ 533   5                        pDmm_t = &AppDmm;
+ 534   5      #ifdef UART_LOOPBACK                
+                              }
+                              else
+                              {   
+                                switch(poolId)
+                                {
+                                  case FW_POOL_ID:
+                                    pDmm_t = &FwDmm;
+                                  break;
+                                  case MGMT_POOL_ID:
+                                    pDmm_t = &MgmtDmm;
+                                  break;
+                                  case BCN_POOL_ID:
+                                    pDmm_t = &BcnDmm;
+                                  break;
+                                  default:
+                                    pDmm_t = &AppDmm;
+                                  break;
+                                };
+                              }
+              #endif              
+ 555   5                      /* search for the closest memory segment */
+ 556   5                      for (ii = 0; ii < pDmm_t->slabnum; ii++)
+ 557   5                      {
+ 558   6                        if ((uartRxControl.rxCount + sizeof(sEvent)) <= pDmm_t->slab[ii].segsize)
+ 559   6                        {
+ 560   7                          if (!SLIST_IsEmpty(&(pDmm_t->slab[ii].freelist)))
+ 561   7                          {
+ 562   8                            slink_t = SLIST_Pop_Isr(&(pDmm_t->slab[ii].freelist));
+ 563   8                            
+ 564   8                            segdesc_t = SLIST_GetEntry(slink_t, sSegDesc, link);  
+ 565   8                            segdesc_t->poolid = APP_POOL_ID;
+ 566   8                            pDmm_t->slab[ii].inuse++;
+ 567   8                            if (pDmm_t->slab[ii].inuse > pDmm_t->slab[ii].maxuse)
+ 568   8                            {
+ 569   9                              pDmm_t->slab[ii].maxuse = pDmm_t->slab[ii].inuse;
+ 570   9                            }
+ 571   8                            event = (sEvent*)((u8 *)segdesc_t + sizeof(sSegDesc));
+ 572   8                            break;
+ 573   8                          }
+ 574   7                        }
+ 575   6                      }
+ 576   5                      if(event != NULL)
+ 577   5                      {
+ 578   6                        //  memset(event, 0, sizeof(sEvent) + uartRxControl.rxCount);
+ 579   6                        event->buffDesc.buff = (u8 *)event + sizeof(sEvent);
+ 580   6                        event->buffDesc.dataptr = event->buffDesc.buff;
+ 581   6                        event->buffDesc.datalen = 0;
+ 582   6                        event->buffDesc.bufflen = uartRxControl.rxCount;
+ 583   6                        event->eventHdr.status = EVENT_STATUS_COMPLETE;
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 11  
+
+ 584   6                        SLINK_Init(&event->link);
+ 585   6            
+ 586   6                        for(i=0;i<uartRxControl.rxCount;i++)
+ 587   6                        {
+ 588   7                          event->buffDesc.dataptr[i] = *(uartRxControl.pRxdataBuffer + i);
+ 589   7                        }
+ 590   6                      
+ 591   6                        // datapath_queueIsr(APP_DATA_QUEUE,&uartRxControl.rxSwDesc);
+ 592   6                        // Use Event Q
+ 593   6                        //SLIST_Put_Isr(&peripheralRxQ, &event->link);
+ 594   6                        event->buffDesc.datalen = uartRxControl.rxCount;
+ 595   6                        event->eventHdr.type = DATA_FRM_ID;
+ 596   6                        event->eventHdr.eventClass = EVENT_CLASS_DATA;
+ 597   6                        event->eventHdr.trans = APP_PORT_PERIPHERAL;
+ 598   6      #ifdef UART_LOOPBACK                
+                                if(loopBackLoop == 0)
+                                { 
+              #endif                
+ 602   6                          uartRxControl.lastRxCount = uartRxControl.rxCount;// UART RX stat variable
+ 603   6                          uartRxControl.rxFrameCount++;
+ 604   6                          
+ 605   6                          SLIST_Put_Isr(&(appSupLayer.rxQueue), &event->link);
+ 606   6      #ifdef UART_LOOPBACK                  
+                                }
+                                else
+                                {
+                                  SLIST_Push_Isr(&(peripheralTxQ), &event->link);// Adds to list head
+                                }
+              #endif                
+ 613   6                      }
+ 614   5                      else
+ 615   5                      {
+ 616   6      #ifdef UART_LOOPBACK              
+                                if(loopBackLoop == 0)
+                                {
+              #endif                
+ 620   6                          uartRxControl.rxFrameLoss++;
+ 621   6                          uartRxControl.rxLossSoftQ++;
+ 622   6                          gHpgpHalCB.halStats.HtoPswDropCnt++;
+ 623   6      #ifdef UART_LOOPBACK                  
+                                  break;// Break the loop as app pool is not available. 
+                                      //Frame should be dropped and firmware should not do loopback
+                                }
+              #endif                
+ 628   6                      }
+ 629   5      #ifdef UART_LOOPBACK                
+                            }
+                            if(gLoopBack == LOOPBACK_DISABLE)
+                            {
+                              break;
+                            } 
+                                    }
+              #endif            
+ 637   5                  uartRxControl.rxCount = 0;//
+ 638   5                  uartRxControl.rxReady = 0;//Add after complete loop                    
+ 639   5      #else // NO_HOST
+                        if (HHAL_Req_Gnt_Read_CPU_QD_ISR() == STATUS_SUCCESS)
+                        {
+                          if (datapath_IsQueueFullIsr(PLC_DATA_QUEUE))// Discard Packet if Queue is Full
+                          {
+                            uartRxControl.rxSwDesc.cpCount = 0;
+                            uartRxControl.rxCount = 0;
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 12  
+
+                            uartRxControl.rxReady = 0;
+                            uartRxControl.rxFrameLoss++;
+                            uartRxControl.rxLossSoftQ++;
+                            gHpgpHalCB.halStats.HtoPswDropCnt++;
+                            //dataCounterRx = 0;
+                          }
+                          else
+                          //status = CHAL_RequestCP(&uartRxControl.uartRxSwDesc->cpArr[0].cp);
+                          ///////////////////////////////////
+                          {
+                              u8 reqCp;
+                                          u16 tmpLen;
+                                          u8 descLen;
+                                          u16 indx = 0;
+                            uFreeCpCntReg  freeCpCnt;
+                               
+                            freeCpCnt.reg = ReadU32Reg(CPU_FREECPCOUNT_REG);
+                                          reqCp = (uartRxControl.rxCount/HYBRII_CELLBUF_SIZE)+1;
+                                          
+                                          if(freeCpCnt.s.cpCnt >= reqCp)
+                                          {
+                                              uartRxControl.rxSwDesc.cpCount = 0;
+                                              uartRxControl.rxSwDesc.frmLen =  uartRxControl.rxCount;
+                                              tmpLen = uartRxControl.rxCount;
+                                              ii = 0;
+                                              while(tmpLen)
+                                              {
+                                                  status = STATUS_FAILURE;
+                                                  if(tmpLen > HYBRII_CELLBUF_SIZE)
+                                                  {
+                                                      descLen = HYBRII_CELLBUF_SIZE;
+                                                  }
+                                                  else
+                                                  {
+                                                      descLen = tmpLen;
+                                  uartRxControl.rxSwDesc.lastDescLen = descLen;
+                                                  }
+                                    for (i = 0; i < ARBITOR_REQ_MAX_TIMES; i++)
+                                    {
+                                      cpuCPReg.reg = ReadU32Reg(CPU_REQUESTCP_REG);
+                                
+                                      if(cpuCPReg.s.cp == 0xFF)
+                                      {
+                                        // no more free CP
+                                        // set bit 31 to relinquish the grant request
+                                        // and then return error
+                                        break;
+                                      }
+                                
+                                      if(cpuCPReg.s.cpValid)
+                                      {
+                                        // alloc CP is valid
+                                        uartRxControl.rxSwDesc.cpArr[ii].cp = (u8) cpuCPReg.s.cp;
+                                        status = (STATUS_SUCCESS);
+                                        break;
+                                      }
+                                      CHAL_DelayTicks_ISR(10);
+                                      // give HW a chance to grant a CP
+                                      #if 0
+                                      num12Clks = 10;
+                                      do
+                                      {
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 13  
+
+                                        curTick = TL0;
+                                        while(curTick == TL0);
+                                      }while(num12Clks--);
+                                      #endif
+                                      /////////////////////////////////////
+                                    }// for 
+                                    ///////////////////////////////////////////////////////
+                                    if(status == STATUS_FAILURE)
+                                    { 
+                                      uartRxControl.rxSwDesc.cpCount = 0;
+                                      cpuCPReg.reg = 0;
+                                      cpuCPReg.s.cpValid = 1;
+                                      WriteU32Reg(CPU_REQUESTCP_REG, cpuCPReg.reg);
+                                      uartRxControl.rxCount = 0;
+                                      uartRxControl.rxReady = 0;
+                                      //dataCounterRx = 0;
+                                      // SBUF='Y';
+                                      gHalCB.cp_no_grant_alloc_cp++;
+                                      uartRxControl.rxFrameLoss++;
+                                                      break;
+                                    } 
+                                    else
+                                    {
+              
+                                      uartRxControl.rxSwDesc.cpCount++;
+                                      uartRxControl.rxSwDesc.cpArr[ii].len =  descLen;                          
+                                      uartRxControl.pCellAddrRx = CHAL_GetAccessToCP(uartRxControl.rxSwDesc.cpArr[ii].cp);
+                                      uartRxControl.rxSwDesc.cpArr[ii].offsetU32 = 0;
+                                      for(i=0;i<descLen;i++)
+                                      {
+                                        *(uartRxControl.pCellAddrRx + i ) = uartRxControl.pRxdataBuffer[indx+i];
+                                      }
+                                      tmpLen -= descLen;
+                                                      indx += descLen;
+                                                      ii++;
+                                                      
+                                           
+                                    }
+                                              }
+                                              if(status == STATUS_SUCCESS)
+                                              {
+                                                  uartRxControl.lastRxCount = uartRxControl.rxCount;
+                                                  uartRxControl.rxSwDesc.frmInfo.plc.dtei = 0;
+                                  uartRxControl.rxSwDesc.frmType = DATA_FRM_ID;
+                                  uartRxControl.rxSwDesc.txPort = PORT_PLC;                   
+                                  datapath_queueIsr(PLC_DATA_QUEUE,&uartRxControl.rxSwDesc);
+                                  uartRxControl.rxFrameCount++;
+                                  uartRxControl.rxCount = 0;
+                                  uartRxControl.rxReady = 0;
+                                              }
+                              }
+                                          else
+                                {
+                                  uartRxControl.rxSwDesc.cpCount = 0;
+                                uartRxControl.rxCount = 0;
+                                uartRxControl.rxReady = 0;
+                                uartRxControl.rxFrameLoss++;
+                                gHpgpHalCB.halStats.HtoPswDropCnt++;
+                                }
+                                      }
+                          HHAL_Rel_Gnt_Read_CPU_QD_ISR();
+                        } 
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 14  
+
+                        else
+                        {
+                          uartRxControl.cpuGrantfail++;
+                          uartRxControl.rxFrameLoss++;
+                          uartRxControl.rxCount = 0;
+                          uartRxControl.rxReady = 0;
+                        }
+              #endif // NO_HOST
+ 778   5              }
+ 779   4      #endif    
+ 780   4      
+ 781   4            }
+ 782   3          
+ 783   3            if(uartRxControl.rxExpectedCount == 0)
+ 784   3            {
+ 785   4              uartRxControl.uartRxFlag = 1;
+ 786   4              uartRxControl.tick = 0;
+ 787   4            }
+ 788   3            else
+ 789   3            {
+ 790   4              uartRxControl.uartRxFlag = 0;
+ 791   4            }
+ 792   3          
+ 793   3          
+ 794   3          }
+ 795   2        }
+ 796   1        //dump = *intid;//*(u8 xdata *)UART_INTID; // Failing to read this register may cause infinite unintended
+             - interrupts. 
+ 797   1        if(uartTxControl.txCount == 0)
+ 798   1          {
+ 799   2      #ifdef LG_UART_CONFIG         
+                  uart_fifoctrl->fifoctrl = UART_FIFO_RX_1_TX_0;// LG requires RX FIFO interrupt threshold to be 1. So UAR
+             -T will generate interrupt of every data byte received uart_fifoctrl->fifoctrl = UART_FIFO_RX_1_TX_0;// LG requires RX FI
+             -FO interrupt threshold to be 1. So UART will generate interrupt of every data byte received 
+              #else
+ 802   2          uart_fifoctrl->fifoctrl = UART_FIFO_RX_8_TX_0;
+ 803   2      #endif
+ 804   2            uart_intctrl->intctrl_field.EnTxEmptInt = 0;// Disable TX Interrupt 
+ 805   2             
+ 806   2          }
+ 807   1        else
+ 808   1        {
+ 809   2          uart_intctrl->intctrl = 0;// Disable Interrupt
+ 810   2          uart_intctrl->intctrl = 3;// Enable RX TX Interrupt 
+ 811   2        }
+ 812   1        EA = 1;
+ 813   1      }
+ 814          
+ 815          //sSwFrmDesc uplcTxFrmSwDesc;
+ 816          
+ 817          void uartRxProc()
+ 818          {
+ 819   1      #ifndef NO_HOST
+                eStatus status;
+              #endif
+ 822   1        if(uartRxControl.uartRxFlag == 1)
+ 823   1        {
+ 824   2          EA = 0;
+ 825   2          if(uartRxControl.tick >= uartRxControl.timeout)
+ 826   2          {
+ 827   3      #ifdef NO_HOST
+ 828   3      
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 15  
+
+ 829   3              u16 i;
+ 830   3                  sEvent *event = NULL;
+ 831   3      #ifdef UART_LOOPBACK
+                    sEvent *eventLoopBack = NULL;
+              #endif
+ 834   3      #endif
+ 835   3            uartRxControl.rxReady = 1;
+ 836   3      #ifdef NO_HOST
+ 837   3      #if 1
+ 838   3                  event = GV701x_EVENT_Alloc(uartRxControl.rxCount,0);
+ 839   3      
+ 840   3                  if (event == NULL)//GetEventIsr(event))// Discard Packet if Queue is Full
+ 841   3                  {
+ 842   4                      uartRxControl.rxFrameLoss++;
+ 843   4                      uartRxControl.rxLossSoftQ++;
+ 844   4                      gHpgpHalCB.halStats.HtoPswDropCnt++;
+ 845   4                  }
+ 846   3                  else
+ 847   3                  {
+ 848   4                    SLINK_Init(&event->link);
+ 849   4                      event->buffDesc.datalen = uartRxControl.rxCount;
+ 850   4                      event->eventHdr.type = DATA_FRM_ID;
+ 851   4                      event->eventHdr.trans = APP_PORT_PERIPHERAL;
+ 852   4                      event->eventHdr.eventClass = EVENT_CLASS_DATA;        
+ 853   4              uartRxControl.lastRxCount = uartRxControl.rxCount;// UART RX stat variable  
+ 854   4                      for(i=0;i<uartRxControl.rxCount;i++)
+ 855   4                      {
+ 856   5                          event->buffDesc.dataptr[i] = rxBuffer[i]; //*(uartRxControl.pRxdataBuffer + i);
+ 857   5                      }              
+ 858   4      //                        datapath_queueIsr(APP_DATA_QUEUE,&uartRxControl.rxSwDesc);
+ 859   4                      // Use Event Q
+ 860   4                     // SLIST_Put(&peripheralRxQ, &event->link);
+ 861   4                      SLIST_Put_Isr(&(appSupLayer.rxQueue), &event->link);
+ 862   4      
+ 863   4                      uartRxControl.rxFrameCount++;     
+ 864   4                  }
+ 865   3      #endif
+ 866   3      #ifdef UART_LOOPBACK
+                    
+                    if(gLoopBack == LOOPBACK_ENABLE)
+                    {
+                      eventLoopBack = EVENT_Alloc(uartRxControl.rxCount,0);
+                      if(eventLoopBack != NULL)
+                      {
+                        //SLINK_Init(&eventLoopBack->link);
+                                eventLoopBack->buffDesc.datalen = uartRxControl.rxCount;
+                                eventLoopBack->eventHdr.type = DATA_FRM_ID;
+                                eventLoopBack->eventHdr.trans = APP_PORT_PERIPHERAL;
+                                eventLoopBack->eventHdr.eventClass = EVENT_CLASS_DATA;        
+                                for(i=0;i<uartRxControl.rxCount;i++)
+                                {
+                                    eventLoopBack->buffDesc.dataptr[i] = rxBuffer[i]; //*(uartRxControl.pRxdataBuffer + i
+             -);
+                                }           
+                                SLIST_Push_Isr(&(peripheralTxQ), &eventLoopBack->link);// Adds to list head
+                            }
+                    }
+              #endif
+ 886   3      
+ 887   3            
+ 888   3      #else // NO_HOST
+                    if (datapath_IsQueueFullIsr(PLC_DATA_QUEUE))// Discard Packet if Queue is Full
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 16  
+
+                    {
+                      uartRxControl.rxSwDesc.cpCount = 0;
+                      uartRxControl.rxFrameLoss++;
+                      uartRxControl.rxLossSoftQ++;
+                      gHpgpHalCB.halStats.HtoPswDropCnt++;
+                    }
+                    else
+                    {
+                        u8 reqCp;
+                              u16 tmpLen;
+                              u8 descLen;
+                              u16 indx = 0;
+                      u8 cpi = 0;
+                      u8 i;
+                      uFreeCpCntReg  freeCpCnt;
+                         
+                      freeCpCnt.reg = ReadU32Reg(CPU_FREECPCOUNT_REG);
+                              reqCp = (uartRxControl.rxCount/HYBRII_CELLBUF_SIZE)+1;
+                              
+                              if(freeCpCnt.s.cpCnt >= reqCp)
+                              {
+                                  uartRxControl.rxSwDesc.cpCount = 0;
+                                  uartRxControl.rxSwDesc.frmLen =  uartRxControl.rxCount;
+                                  tmpLen = uartRxControl.rxCount;
+                                  while(tmpLen)
+                                  {
+                                      status = STATUS_FAILURE;
+                                      if(tmpLen > HYBRII_CELLBUF_SIZE)
+                                      {
+                                          descLen = HYBRII_CELLBUF_SIZE;
+                                      }
+                                      else
+                                      {
+                                          descLen = tmpLen;
+                            uartRxControl.rxSwDesc.lastDescLen = descLen;
+                                      }
+                              
+                          status = CHAL_RequestCP(&uartRxControl.rxSwDesc.cpArr[cpi].cp);
+                              
+                          ///////////////////////////////////////////////////////
+                          if(status == STATUS_FAILURE)
+                          { 
+                            uartRxControl.rxSwDesc.cpCount = 0;
+                            uartRxControl.rxCount = 0;
+                            uartRxControl.rxReady = 0;
+                            //dataCounterRx = 0;
+                            // SBUF='Y';
+                            gHalCB.cp_no_grant_alloc_cp++;
+                            uartRxControl.rxFrameLoss++;
+                                          break;
+                          } 
+                          else
+                          {
+              
+                            uartRxControl.rxSwDesc.cpCount++;
+                            uartRxControl.rxSwDesc.cpArr[cpi].len =  descLen;                         
+                            uartRxControl.pCellAddrRx = CHAL_GetAccessToCP(uartRxControl.rxSwDesc.cpArr[cpi].cp);
+                            uartRxControl.rxSwDesc.cpArr[cpi].offsetU32 = 0;
+                            for(i=0;i<descLen;i++)
+                            {
+                              *(uartRxControl.pCellAddrRx + i ) = uartRxControl.pRxdataBuffer[indx+i];
+                            }
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 17  
+
+                            tmpLen -= descLen;
+                                          indx += descLen;
+                                          cpi++;
+                                          
+                          }
+                                  }
+                                  if(status == STATUS_SUCCESS)
+                                  {
+                                      uartRxControl.lastRxCount = uartRxControl.rxCount;
+                                      uartRxControl.rxSwDesc.frmInfo.plc.dtei = 0;
+                          uartRxControl.rxSwDesc.frmType = DATA_FRM_ID;
+                          uartRxControl.rxSwDesc.txPort = PORT_PLC;                   
+                          datapath_queueIsr(PLC_DATA_QUEUE,&uartRxControl.rxSwDesc);
+                          uartRxControl.rxFrameCount++;
+                          //uartRxControl.rxCount = 0;
+                          //uartRxControl.rxReady = 0;
+                                  }
+                        }
+                              else
+                      {
+                        uartRxControl.rxSwDesc.cpCount = 0;
+                        //uartRxControl.rxCount = 0;
+                        //uartRxControl.rxReady = 0;
+                        uartRxControl.rxFrameLoss++;
+                        gHpgpHalCB.halStats.HtoPswDropCnt++;
+                      }
+                          }     
+              #endif // NO_HOST
+ 980   3            uartRxControl.rxCount = 0;
+ 981   3            uartRxControl.rxReady = 0;
+ 982   3            uartRxControl.uartRxFlag = 0;
+ 983   3            
+ 984   3          }
+ 985   2          EA = 1;
+ 986   2        }
+ 987   1      }
+ 988          
+ 989          u8 GV701x_SetUartRxTimeout(u32 timeout)
+ 990          {
+ 991   1        if(timeout >= 10)
+ 992   1        {
+ 993   2          uartRxControl.timeout = timeout;
+ 994   2          return STATUS_SUCCESS;  
+ 995   2        }
+ 996   1        else
+ 997   1        {
+ 998   2          return STATUS_FAILURE;
+ 999   2        }   
+1000   1      }
+1001          
+1002          #ifdef LG_UART_CONFIG
+              void GV701x_UartTxMode(u8 mode)
+              {
+                if(mode == UART_TX_AUTO)
+                {
+                  uartTxControl.txModeControl = UART_TX_AUTO;
+                  txEnable = 1;
+                  uart_intctrl->intctrl    = 0x01;
+                }
+                else if(mode == UART_TX_LOW_LEVEL)
+                {
+                  uartTxControl.txModeControl = UART_TX_LOW_LEVEL;
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 18  
+
+                  txEnable = 1;
+                  uart_intctrl->intctrl    = 0x01;
+                }
+                else if(mode == UART_TX_LOW_EDGE)
+                {
+                  uartTxControl.txModeControl = UART_TX_LOW_EDGE;
+                  txEnable = 0;
+                  uart_intctrl->intctrl  = 0x01; // 0x09 in case of interrupts enabled
+                }
+              }
+              #endif
+1025          
+1026          u8 GV701x_UartConfig(u32 baudrate, u16 rxthreshold)
+1027          {
+1028   1        u8 idx;
+1029   1      
+1030   1        if((rxthreshold > UART_DATA_SIZE))
+1031   1        {
+1032   2          return STATUS_FAILURE;      
+1033   2        }
+1034   1        
+1035   1        //uartRxControl.uartRxFlag = 0;
+1036   1        uartRxControl.rxExpectedCount = rxthreshold;
+1037   1        uartRxControl.rxCount = 0;
+1038   1        uartRxControl.rxReady = 0;
+1039   1        uartRxControl.tick = 0;
+1040   1        uartTxControl.txCount = 0;
+1041   1        uartTxControl.txDone = 1;
+1042   1        for(idx = 0; idx < 11; idx++)
+1043   1        {
+1044   2          if(baud_lookup[idx].baud_no == baudrate)    
+1045   2          {
+1046   3            hal_common_reg_32_write(UART_CLKDIV,
+1047   3              baud_lookup[idx].baudrate);     
+1048   3            return STATUS_SUCCESS;
+1049   3          }
+1050   2        }
+1051   1        return STATUS_FAILURE;  
+1052   1      }
+1053          
+1054          void UART_Init16550()
+1055          {
+1056   1        u8 val;
+1057   1        
+1058   1        uart_linectrl_t lineParam;
+1059   1          
+1060   1      #ifdef NO_HOST
+1061   1          hal_common_reg_32_write(UART_CLKDIV,BAUDRATE_9600);
+1062   1      #else
+                hal_common_reg_32_write(UART_CLKDIV,BAUDRATE_115200);
+              #endif
+1065   1      
+1066   1          /* 1-char depth tx/rx buffer, reset tx/rx buffer */
+1067   1      #ifdef NO_HOST  
+1068   1          uart_fifoctrl->fifoctrl   = UART_FIFO_RX_1_TX_8;// LG requires RX FIFO interrupt threshold to be 1. So
+             - UART will generate interrupt of every data byte received   
+1069   1      #else
+                uart_fifoctrl->fifoctrl   = UART_FIFO_RX_8_TX_8;// 8 Bytes TX & RX FIFO interrupt threshold for higer bau
+             -drate
+              #endif  
+1072   1          /* word length = 8 */
+1073   1          //uart_linectrl->linectrl   = 0x03;  
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 19  
+
+1074   1         
+1075   1          lineParam.linectrl                   = 0;
+1076   1        lineParam.linectrl_field.WdLen       = UART_WORD_SIZE_8;
+1077   1        lineParam.linectrl_field.StopBit     = UART_STOPBIT_1;
+1078   1        lineParam.linectrl_field.ParityEn    = UART_PARITY_DISABLE;
+1079   1        lineParam.linectrl_field.EvenParity  = UART_PARITY_ODD;
+1080   1        lineParam.linectrl_field.ForceParity = UART_FORCEPAR_DISABLE;
+1081   1        lineParam.linectrl_field.ForceTx0    = UART_SETBREAK_DISABLE;
+1082   1        
+1083   1          GV701x_SetUartLineParam(lineParam);
+1084   1        
+1085   1          /* No loopback */
+1086   1          uart_modemctrl->modemctrl = 0x00;     
+1087   1        
+1088   1        uartRxControl.rxExpectedCount = 100;
+1089   1        uartRxControl.rxCount = 0;
+1090   1        uartRxControl.rxReady = 0;
+1091   1      
+1092   1      #ifndef UART_RAW 
+                uartRxControl.crcRx = 0;
+                uartTxControl.crcTx = 0;
+                uartRxControl.rxDropCount = 0;
+                uartRxControl.goodRxFrmCnt = 0;
+              #endif  
+1098   1        uartRxControl.pRxdataBuffer = rxBuffer; 
+1099   1        uartTxControl.txCount = 0;
+1100   1        uartTxControl.txDone = 1;
+1101   1        uartRxControl.tick = 0;
+1102   1        uartRxControl.uartRxFlag = 0;
+1103   1        uartRxControl.lastRxCount = 0;
+1104   1        uartRxControl.cpuGrantfail = 0;
+1105   1        uartRxControl.rxFrameLoss = 0;
+1106   1        uartRxControl.rxFrameCount = 0;
+1107   1        uartTxControl.txFrameCount = 0;
+1108   1        uartRxControl.rxLossSoftQ = 0;
+1109   1        GV701x_SetUartRxTimeout(100);
+1110   1      #if 0   
+                if(uartRxAllocCP(MAX_RX_RSVD_CP_CNT) == STATUS_FAILURE) // old architecture was allocating CP in advance
+                {
+                  //FM_Printf(FM_USER,"Failed to alloc UART RX CP\n");
+                }
+              #endif  
+1116   1        
+1117   1        
+1118   1        val = uart_linestatus->linestatus;
+1119   1      #ifdef LG_UART_CONFIG
+                uartTxControl.txModeControl  = UART_TX_AUTO;
+              #endif  
+1122   1        uart_intctrl->intctrl     = 0x01;// 0x09 incase of #ifdef UART_GPIO_INTERRUPT     
+1123   1        
+1124   1      }
+1125          
+1126          void UART_EnableTxInt()
+1127          {
+1128   1        uart_intctrl->intctrl_field.EnTxEmptInt = 1;
+1129   1      }
+1130          
+1131          void UART_DisableTxInt()
+1132          {
+1133   1        uart_intctrl->intctrl_field.EnTxEmptInt = 0;
+1134   1      }
+1135          #if 0 // for maven systems
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 20  
+
+              
+              void uartRxConfig(uint8_t *pBuffer, uint16_t expRxLen)
+              {
+                uartRxControl.pRxdataBuffer = pBuffer;
+                uartRxControl.rxExpectedCount = expRxLen;
+                uartRxControl.rxCount = 0;
+                uartRxControl.rxReady = 0;
+              }
+              
+              void uartTx(uint8_t *pBuffer, uint16_t txLen)
+              {
+                uartTxControl.pTxBuffer = pBuffer;
+                uartTxControl.txCount = txLen;
+                uartTxControl.txDone = 0;
+                UART_EnableTxInt();
+              }
+              #endif
+1153          
+1154          #if 1
+1155          
+1156          
+1157          bool hal_uart_tx_cp (sSwFrmDesc * pHostTxFrmSwDesc)
+1158          
+1159          {
+1160   1        u8 intFlag=0,i, cpi, cellLen;
+1161   1          u16 tmpLen = 0, txcnt;
+1162   1        
+1163   1        xdata uint8_t *cellAddrTx;
+1164   1        intFlag = EA;
+1165   1        EA = 0;
+1166   1        //memcpy((uint8_t*)&uartTxControl.uartTxFrmSwDesc,(uint8_t *)pHostTxFrmSwDesc,sizeof(sSwFrmDesc));
+1167   1        
+1168   1        uartTxControl.pTxBuffer = txBuffer;
+1169   1        uartTxControl.txCount = pHostTxFrmSwDesc->frmLen;
+1170   1        uartTxControl.txDone = 0;
+1171   1        //if (HHAL_Req_Gnt_Read_CPU_QD() == STATUS_SUCCESS)
+1172   1        txcnt = uartTxControl.txCount;
+1173   1        for(cpi = 0; cpi < pHostTxFrmSwDesc->cpCount; cpi++)
+1174   1        {
+1175   2            if(txcnt >= HYBRII_CELLBUF_SIZE)
+1176   2              {
+1177   3                  cellLen = HYBRII_CELLBUF_SIZE;
+1178   3              }
+1179   2              else
+1180   2              {
+1181   3                  cellLen = txcnt;
+1182   3              }
+1183   2          cellAddrTx = CHAL_GetAccessToCP(pHostTxFrmSwDesc->cpArr[cpi].cp);
+1184   2          for(i=0;i<cellLen;i++)
+1185   2          {
+1186   3            *(uartTxControl.pTxBuffer+i+tmpLen) = *(cellAddrTx + i );
+1187   3          }
+1188   2              tmpLen += cellLen;
+1189   2              if(uartTxControl.txCount <= tmpLen)
+1190   2              {
+1191   3                  break;
+1192   3              }
+1193   2          //HHAL_Rel_Gnt_Read_CPU_QD();
+1194   2        } 
+1195   1          uart_intctrl->intctrl_field.EnTxEmptInt = 1; // enables tx interrupt
+1196   1        
+1197   1        EA = intFlag;
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 21  
+
+1198   1        return STATUS_FAILURE;
+1199   1      }
+1200          
+1201          bool hal_uart_tx (sEvent * event)
+1202          
+1203          {
+1204   1        u8 intFlag=0; 
+1205   1      //  xdata uint8_t *cellAddrTx;
+1206   1        intFlag = EA;
+1207   1        EA = 0;
+1208   1        //memcpy((uint8_t*)&uartTxControl.uartTxFrmSwDesc,(uint8_t *)pHostTxFrmSwDesc,sizeof(sSwFrmDesc));
+1209   1      #ifdef LG_UART_CONFIG 
+                if(uartTxControl.txModeControl == UART_TX_AUTO)
+                {
+                  txEnable = 1;
+                }
+              #endif  
+1215   1      #ifdef NO_HOST
+1216   1        uart_fifoctrl->fifoctrl   = UART_FIFO_RX_1_TX_8;
+1217   1      #else
+                uart_fifoctrl->fifoctrl   = UART_FIFO_RX_8_TX_8;
+              #endif
+1220   1        uartTxControl.pTxBuffer = txBuffer;
+1221   1        uartTxControl.txCount = event->buffDesc.datalen;
+1222   1        uartTxControl.txDone = 0;
+1223   1        memcpy(uartTxControl.pTxBuffer, event->buffDesc.dataptr, event->buffDesc.datalen);
+1224   1        uart_intctrl->intctrl_field.EnTxEmptInt = 1; // enables tx interrupt
+1225   1        
+1226   1        EA = intFlag;
+1227   1        return STATUS_FAILURE;
+1228   1      }
+1229          
+1230          #else
+              bool hal_uart_tx_cp (sSwFrmDesc * pHostTxFrmSwDesc)
+              
+              {
+                u8 intFlag=0;
+                intFlag = EA;
+                EA = 0;
+                memcpy((uint8_t*)&uartTxControl.uartTxFrmSwDesc,(uint8_t *)pHostTxFrmSwDesc,sizeof(sSwFrmDesc));
+                uartTxControl.txCount = pHostTxFrmSwDesc->frmLen;
+                uartTxControl.txDone = 0;
+                uart_intctrl->intctrl_field.EnTxEmptInt = 1; // enables tx interrupt
+                EA = intFlag;
+                return STATUS_SUCCESS;
+              }
+              
+              #endif
+1246          
+1247          #if 0
+              
+              eStatus uartRxAllocCP(uint8_t cpNum)
+              {
+                eStatus   status = STATUS_FAILURE;
+                uint8_t   uartCP = 0;
+                uint8_t   i,j;
+                //uint8_t   firstCP;
+                  
+                //memset(&uartRxControl.uartRxFrmSwDesc, 0x00, sizeof(sCommonRxFrmSwDesc));
+                if(datapath_IsQueueFull(PLC_DATA_QUEUE)==FALSE)
+                {
+                  //uartRxControl.uartRxSwDesc = datapath_fetchHeadIsr(PLC_DATA_QUEUE);
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 22  
+
+                    
+                  if(CHAL_GetFreeCPCnt() >= cpNum)
+                  {
+                    for(i=0;i<cpNum;i++)
+                    {
+                      if(i==0)
+                      {
+                        status = CHAL_RequestCP(&uartRxControl.rxSwDesc.cpArr[0].cp);
+                        if(status == STATUS_FAILURE)
+                        { //FM_Printf(FM_USER,"Failed to alloc first CP\n");
+              
+                          SBUF = 'E';
+                          uartRxControl.rxSwDesc.cpCount = 0;
+                          break;
+                        } 
+                      } 
+                      else
+                      {
+                        status = CHAL_RequestCP(&uartRxControl.rxSwDesc.cpArr[i].cp);//-1
+                        if(status == STATUS_FAILURE)
+                        { 
+                          CHAL_DecrementReleaseCPCnt(uartRxControl.rxSwDesc.cpArr[0].cp);
+                          for(j=1;j<=i;j++)
+                          {
+                            CHAL_DecrementReleaseCPCnt(uartRxControl.rxSwDesc.cpArr[j].cp);//in case of failure frees previousl
+             -y allocated cps
+                          }
+                          break;
+                        }
+                      }
+                            
+                    }
+                  }
+                  else
+                  {
+                    uartRxControl.rxSwDesc.cpCount = 0;
+                    //FM_Printf(FM_USER,"NO CP A\n");
+                    return STATUS_FAILURE;
+                  }
+                }
+                if(status == STATUS_SUCCESS)
+                {
+                  //CHAL_IncrementCPUsageCnt(uartRxControl.rxSwDesc.cpArr[0].cp, 2); 
+                  
+                  uartRxControl.rxSwDesc.cpCount = cpNum;// This will help uart driver to identify cp availability during 
+             -rx
+                  //FM_Printf(FM_USER,"CP Alloc Success\n");
+                }
+                return status;
+              }
+              
+              #endif
+1310          
+1311          bool hal_uart_isTxReady()
+1312          {
+1313   1      #ifdef LG_UART_CONFIG
+                if(uartTxControl.txModeControl == UART_TX_AUTO)
+                {
+                  //txEnable = 1;
+                  return (uartTxControl.txDone & uart_linestatus->linestat_field.TxThldRegEmpt);
+                }
+                else if(uartTxControl.txModeControl == UART_TX_LOW_LEVEL)
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 23  
+
+                {
+                  union_uart_modemstat modemstatus_u;
+                  modemstatus_u.modemstat = ReadU8Reg(UART_MODEMSTAT);
+                  if(modemstatus_u.modemstat_field.CTS) // DCTS & CTS are set
+                  {
+                    txEnable = 1;
+                    return (uartTxControl.txDone & uart_linestatus->linestat_field.TxThldRegEmpt);
+                  }
+                  else //if(modemstatus_u.modemstat_field.DCTS && !modemstatus_u.modemstat_field.CTS)
+                  {
+                    txEnable = 0;
+                    return FALSE;
+                  }
+                }
+                else
+                {
+                  return FALSE;
+                }
+              #else
+1339   1        return uartTxControl.txDone;
+1340   1      #endif
+1341   1      }
+1342          #if 0
+              char getChar16550()
+              {
+                return *urxbuf;
+              }
+              
+              void putChar16550(u8 db)
+              {
+                *utxbuf = db;
+              }
+              #endif
+1353          u8 txReady()
+1354          {
+1355   1        return (uart_linestatus->linestat_field.TxThldRegEmpt);
+1356   1      }
+1357          
+1358          u8 rxDataReady()
+1359          {
+1360   1        return (uart_linestatus->linestat_field.DR);
+1361   1      }
+1362          
+1363          #ifdef UART_HOST_INTF
+1364          
+1365          u8 GV701x_UART_GPIO_Read(uint8_t gpio)
+1366          {
+1367   1        if(modemstatus_u.modemstat & gpio)
+1368   1        {
+1369   2          return TRUE;
+1370   2        }
+1371   1        else
+1372   1        {
+1373   2          return FALSE;
+1374   2        }
+1375   1      }
+1376          
+1377          void GV701x_SetUARTParity(u8 pen,u8 eps)
+1378          {
+1379   1        if(pen<2 && eps<2)
+1380   1        {
+1381   2          uart_linectrl->linectrl_field.ParityEn = pen;
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 24  
+
+1382   2          uart_linectrl->linectrl_field.EvenParity = eps;
+1383   2        }
+1384   1        else
+1385   1        {
+1386   2          uart_linectrl->linectrl_field.ParityEn = 0;
+1387   2          uart_linectrl->linectrl_field.EvenParity = 0;
+1388   2        }
+1389   1        
+1390   1        uart_linectrl->linectrl_field.WdLen = 0x03;
+1391   1      }
+1392          
+1393          void GV701x_SetUartLineParam(union_uart_linectrl lineParam)
+1394          {
+1395   1        uart_linectrl->linectrl = lineParam.linectrl;
+1396   1      }
+1397          
+1398          #endif
+1399          #if 1
+1400          void CHAL_DelayTicks_ISR(u32 num12Clks) //reentrant
+1401          {
+1402   1      #ifdef P8051
+1403   1          u8 curTick;
+1404   1          do
+1405   1          {
+1406   2              curTick = TL0;
+1407   2              while(curTick == TL0);
+1408   2          }while(num12Clks--);
+1409   1      #endif
+1410   1      }
+1411          
+1412          u8 XDATA* CHAL_GetAccessToCP_ISR( u8 cp)
+1413          {
+1414   1          u8 XDATA *cellAddr;
+1415   1          u8   bank;
+1416   1          uPktBufBankSelReg pktBufBankSel;
+1417   1      
+1418   1          bank     = (cp & 0x60) >>5;
+1419   1      
+1420   1          pktBufBankSel.reg = ReadU32Reg(CPU_PKTBUFBANKSEL_REG);
+1421   1          pktBufBankSel.s.bank = bank;
+1422   1          WriteU32Reg(CPU_PKTBUFBANKSEL_REG, pktBufBankSel.reg);
+1423   1          cellAddr = (u8 XDATA *) ((u32)MAC_PKTBUF_BASEADDR+ (u32)( (((u32)cp) & 0x1F)<<7) );
+1424   1          return cellAddr;
+1425   1      }
+1426          
+1427          eStatus HHAL_Req_Gnt_Read_CPU_QD_ISR()
+1428          {
+1429   1          u16 i;
+1430   1      
+1431   1          uPlc_CpuQD_Wr_Arb_Req Wr_Arb_Req;
+1432   1      
+1433   1          // Set CPUQD_Write_Req
+1434   1          Wr_Arb_Req.reg = 0;
+1435   1          Wr_Arb_Req.s.cpuQDArbReq = 1;
+1436   1          WriteU32Reg(PLC_CPUQDWRITEARB_REG,Wr_Arb_Req.reg);
+1437   1          CHAL_DelayTicks_ISR(50);
+1438   1      
+1439   1          //Check if we get a grant
+1440   1          for (i = 0; i < ARBITOR_REQ_MAX_TIMES; i++)
+1441   1          {
+1442   2              Wr_Arb_Req.reg = ReadU32Reg(PLC_CPUQDWRITEARB_REG); 
+1443   2              if (Wr_Arb_Req.s.cpuQDArbGntStat)
+C51 COMPILER V9.53.0.0   GV701X_UARTDRIVER                                                 11/04/2015 20:09:37 PAGE 25  
+
+1444   2                  return(STATUS_SUCCESS);
+1445   2              CHAL_DelayTicks_ISR(10);
+1446   2          }
+1447   1          gHalCB.qc_no_grant++;
+1448   1          return(STATUS_FAILURE);
+1449   1      }
+1450          
+1451          void HHAL_Rel_Gnt_Read_CPU_QD_ISR()
+1452          {
+1453   1          uPlc_CpuQD_Wr_Arb_Req Wr_Arb_Req;
+1454   1          // Clear CPUQD_Write_Req
+1455   1          Wr_Arb_Req.reg = 0;
+1456   1          WriteU32Reg(PLC_CPUQDWRITEARB_REG,Wr_Arb_Req.reg);
+1457   1      }
+1458          #endif
+1459          #endif
+1460          
+1461          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   4480    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   1258      82
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

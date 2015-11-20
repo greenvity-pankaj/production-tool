@@ -1,0 +1,2292 @@
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE NMA
+OBJECT MODULE PLACED IN .\obj\nma.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\hpgp\src\nma\nma.c LARGE OBJECTADVANCED OPTIMIZE(9,
+                    -SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\
+                    -..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\ha
+                    -l;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\fir
+                    -mware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee
+                    -;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc
+                    -;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\in
+                    -c;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;.
+                    -.\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\
+                    -hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\
+                    -..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\c
+                    -omponents\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\
+                    -flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities
+                    -;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nw
+                    -k\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\
+                    -..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_
+                    -8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,
+                    -UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETE
+                    -CT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT
+                    -,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGI
+                    -STER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\nma.lst) TABS(2) OBJEC
+                    -T(.\obj\nma.obj)
+
+line level    source
+
+   1          /** ========================================================
+   2           *
+   3           *  @file nma.c
+   4           * 
+   5           *  @brief Network Management Agent
+   6           *
+   7           *  Copyright (C) 2010-2012, Greenvity Communications, Inc.
+   8           *  All Rights Reserved.
+   9           *  
+  10           * ==========================================================*/
+  11          
+  12          #ifdef RTX51_TINY_OS
+  13          #include <rtx51tny.h>
+  14          #endif
+  15          #include<stdio.h>
+  16          #include <string.h>
+  17          #include "papdef.h"
+  18          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  21          #include "list.h"
+  22          #include "hpgpdef.h"
+  23          #include "event.h"
+  24          #include "nma.h"
+  25          #include "nma_fw.h"
+  26          #include "hpgpapi.h"
+  27          #include "hpgpevt.h"
+  28          #include "ctrll.h"
+  29          #include "linkl.h"
+  30          #include "hal_common.h"
+  31          #include "gv701x_osal.h"
+  32          #include "hal_eth.h"
+  33          #include "fm.h"
+  34          #include "green.h"
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 2   
+
+  35          #ifdef HYBRII_802154
+  36          #include "qmm.h"
+  37          #include "return_val.h"
+  38          #include "mac_msgs.h"
+  39          #include "mac_const.h"
+  40          #include "mac_api.h"
+  41          #include "mac_data_structures.h"
+  42          #include "mac_hal.h"
+  43          #include "mac_internal.h"
+  44          #endif
+  45          #ifdef SIMU
+              #include "nmm.h"
+              #endif
+  48          #include "hal.h"
+  49          #include "frametask.h"
+  50          #include "nma.h"
+  51          #include "timer.h"
+  52          #include "stm.h"
+  53          #include "hybrii_tasks.h"
+  54          #include "nma.h"
+  55          #include "gv701x_gpiodriver.h"
+  56          #include "papdef.h"
+  57          #ifdef UM
+  58          #include "sys_config_data_utils.h"
+  59          #endif
+  60          #include "hpgp_msgs.h"
+  61          #include "event_fw.h"
+  62          #include "utils.h"
+  63          
+  64          #define H1MSG_HEADER_SIZE               (6) 
+  65          #define CRC_SIZE                        (4)
+  66          
+  67          extern void Host_SendIndication(u8 eventId, u8 protocol, u8 *payload, u8 length);
+  68          void *NMA_EncodeRsp(u8 command, u8 protocol, u8 *ptr_packet, u16 packetlen);
+  69          eStatus NMA_TransmitMgmtMsg(sEvent *event);
+  70          eStatus NMA_SendCcoApptCnf(sNma *nma, u8 result);
+  71          
+  72          #ifdef UM
+  73          void update_powermode(u8 , u8 );
+  74          #endif
+  75          u8 *get_Version();
+  76          u8 g_data_path = 0;
+  77          extern sEthHalCB gEthHalCB;
+  78          u8 gTxpowermode = 0;
+  79          u8 er = 0;
+  80          extern u8 hwSpecDone;
+  81          extern u8 gEthMacAddrDef[MAC_ADDR_LEN];
+  82          #ifdef NO_HOST
+  83          #ifdef HYBRII_802154
+  84          extern mac_host_db_t mac_host_db;
+  85          #endif
+  86          #endif
+  87          
+  88          eStatus NMA_Init(sNma *nma)
+  89          {
+  90   1         eStatus    status = STATUS_SUCCESS;
+  91   1      
+  92   1      #ifndef P8051
+              #if defined(WIN32) || defined(_WIN32)
+                  nma->nmaSem = CreateSemaphore(
+                      NULL,           // default security attributes
+                      SEM_COUNT,      // initial count
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 3   
+
+                      SEM_COUNT,      // maximum count
+                      NULL);          // unnamed semaphore
+                  if(nma->nmaSem == NULL)
+              #else
+                  if(sem_init(&nma->nmaSem, 0, SEM_COUNT))
+              #endif
+                  {
+                      status = STATUS_FAILURE;
+                  }
+              #endif
+ 107   1      
+ 108   1      #ifdef NO_HOST    
+ 109   1          memset(&nma->msg_hdr, 0x00, sizeof(gv701x_app_msg_hdr_t));
+ 110   1      #endif    
+ 111   1          SLIST_Init(&nma->eventQueue);
+ 112   1      #ifdef RTX51_TINY_OS
+ 113   1      #ifndef UM
+                  os_create_task(HPGP_TASK_ID_NMA);
+              #endif
+ 116   1      #else
+                  SCHED_InitTask(&nma->task, HPGP_TASK_ID_NMA, "NMA",
+                                 HPGP_TASK_PRI_NMA, NMA_Proc, nma);
+              #endif
+ 120   1          return status;
+ 121   1      }
+ 122          
+ 123          #ifdef RTX51_TINY_OS
+ 124          #ifndef UM
+              void NMA_Task (void) _task_ HPGP_TASK_ID_NMA
+              {
+                  sNma* nma = (sNma*)HPGPCTRL_GetLayer(HP_LAYER_TYPE_NMA);
+                  while (1) {
+                
+              #ifdef UART_HOST_INTF
+                  os_switch_task();
+              #else
+                  //os_wait1(K_SIG);// Kiran. Code is not setting K_READY and blocks task execution
+                  os_switch_task();
+              
+              #endif
+                      NMA_Proc(nma);
+                  }
+              }
+              #endif
+ 141          #endif
+ 142          
+ 143          u8 NMA_Proc(void *cookie)
+ 144          {
+ 145   1        void *event = NULL;
+ 146   1          sSlink *slink = NULL;
+ 147   1          sNma   *nma = (sNma *)cookie;
+ 148   1          u8      ret = 0;
+ 149   1      
+ 150   1          while(!SLIST_IsEmpty(&nma->eventQueue)
+ 151   1      #ifndef RTX51_TINY_OS   
+                        && !(ret = SCHED_IsPreempted(&nma->task))
+              #endif
+ 154   1            )
+ 155   1          {
+ 156   2      #ifdef P8051
+ 157   2      __CRIT_SECTION_BEGIN__
+ 158   2      #else
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 4   
+
+                      SEM_WAIT(&nma->nmaSem);
+              #endif
+ 161   2              slink = SLIST_Pop(&nma->eventQueue);
+ 162   2      #ifdef P8051
+ 163   2      __CRIT_SECTION_END__
+ 164   2      #else
+                      SEM_POST(&nma->nmaSem);
+              #endif
+ 167   2              event = SLIST_GetEntry(slink, sEvent, link);
+ 168   2      
+ 169   2              NMA_ProcEvent(nma, event);    
+ 170   2            
+ 171   2              EVENT_Free(event);     
+ 172   2          break;
+ 173   2          }
+ 174   1          return ret;
+ 175   1      }
+ 176          
+ 177          #ifdef MCCO
+ 178          extern void CNSM_SetCentralCCo();
+ 179          #endif
+ 180          
+ 181          void NMA_ProcEvent(sNma *nma, sEvent* event)
+ 182          {
+ 183   1          u8 result = 0;
+ 184   1          sCtrlLayer *ctrll = (sCtrlLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_CTRL);
+ 185   1          sLinkLayer *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 186   1      #ifdef NO_HOST  
+ 187   1        gv701x_app_msg_hdr_t* msg_hdr = NULL;
+ 188   1      #endif
+ 189   1        hostHdr_t *pHostHdr = NULL; 
+ 190   1          sEvent *rspEvent = NULL;
+ 191   1        u8* cmdptr = NULL;    
+ 192   1        u8 cmdlen;
+ 193   1        
+ 194   1      #ifdef NO_HOST  
+ 195   1        msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;     
+ 196   1        pHostHdr = (hostHdr_t* )(msg_hdr + 1);  
+ 197   1      #else
+                pHostHdr = (hostHdr_t* )(event->buffDesc.dataptr);  
+              #endif
+ 200   1      
+ 201   1      #ifdef NO_HOST  
+ 202   1        if(pHostHdr->protocol == HPGP_MAC_ID)
+ 203   1        {
+ 204   2          memcpy((u8*)&nma->msg_event, (u8*)event, sizeof(sEvent));     
+ 205   2          memcpy((u8*)&nma->msg_hybrii_hdr, (u8*)pHostHdr, sizeof(hostHdr_t));      
+ 206   2          memcpy((u8*)&nma->msg_hdr, (u8*)msg_hdr, sizeof(gv701x_app_msg_hdr_t));         
+ 207   2        }
+ 208   1      #ifdef HYBRII_802154      
+ 209   1        if(pHostHdr->protocol == IEEE802_15_4_MAC_ID)
+ 210   1        {
+ 211   2          memcpy((u8*)&mac_host_db.msg_event, (u8*)event, sizeof(sEvent));    
+ 212   2          memcpy((u8*)&mac_host_db.msg_hybrii_hdr, (u8*)pHostHdr, sizeof(hostHdr_t));     
+ 213   2          memcpy((u8*)&mac_host_db.msg_hdr, (u8*)msg_hdr, sizeof(gv701x_app_msg_hdr_t));        
+ 214   2        }
+ 215   1      #endif  
+ 216   1      #endif  
+ 217   1        cmdptr = (u8*)(pHostHdr + 1);
+ 218   1      
+ 219   1      #ifdef NO_HOST  
+ 220   1        cmdlen = event->buffDesc.datalen - sizeof(hostHdr_t) - sizeof(gv701x_app_msg_hdr_t);
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 5   
+
+ 221   1      #else
+                cmdlen = event->buffDesc.datalen - sizeof(hostHdr_t);
+              #endif
+ 224   1          
+ 225   1      
+ 226   1        if(pHostHdr->protocol == HPGP_MAC_ID)
+ 227   1        {
+ 228   2            switch((u8)(*cmdptr))
+ 229   2            {
+ 230   3                case HOST_CMD_FW_READY:
+ 231   3                {            
+ 232   4                    NMA_SendFwReady(PLC_NIC | RF_NIC);
+ 233   4                    break;
+ 234   4                }
+ 235   3      #ifdef APPOINT      
+                        case APCM_AUTHORIZE_REQ:
+                        {
+                      hostCmdAuthSta *authsta;            
+                      authsta = (hostCmdAuthSta *)cmdptr;     
+                            if(cmdlen != sizeof(hostCmdAuthSta))
+                            {
+                                authsta->result = STATUS_FAILURE;
+                            }
+                            else
+                            {
+                            authsta->result = LINKL_StartAuth(linkl,
+                                              &(authsta->nmk[0]),
+                                              &(authsta->dak[0]),
+                                              &(authsta->mac_addr[0]),
+                                                authsta->seclvl);
+                            }
+                        authsta->command = APCM_AUTHORIZE_CNF;
+                            rspEvent = NMA_EncodeRsp(APCM_AUTHORIZE_CNF, pHostHdr->protocol, 
+                            (u8 *)authsta, sizeof(hostCmdAuthSta));
+                      break;
+                        }
+              #endif      
+ 258   3      #ifdef UKE       
+                        case APCM_SET_SECURITY_MODE_REQ:
+                        {            
+                      hostCmdSecMode *ptrsecmode;
+                            u8 result = 0;
+              
+                      ptrsecmode = (hostCmdSecMode *)cmdptr;
+              
+                            CTRLL_setSecMode(ctrll,  ptrsecmode->secmode);
+                                        
+                        ptrsecmode->result = STATUS_SUCCESS;
+                        ptrsecmode->command = APCM_SET_SECURITY_MODE_CNF;
+                            rspEvent = NMA_EncodeRsp(APCM_SET_SECURITY_MODE_CNF, pHostHdr->protocol,
+                                                    (u8 *)ptrsecmode, 
+                                                    sizeof(hostCmdSecMode));                              
+                      break;
+                        }
+              #endif    
+ 276   3                case APCM_GET_SECURITY_MODE_REQ:
+ 277   3                {                       
+ 278   4              hostCmdSecMode *ptrsecmode;            
+ 279   4              ptrsecmode = (hostCmdSecMode *)cmdptr;      
+ 280   4                    if(cmdlen != sizeof(hostCmdSecMode))
+ 281   4                    {
+ 282   5                        ptrsecmode->result = STATUS_FAILURE;
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 6   
+
+ 283   5                    }
+ 284   4                    else
+ 285   4                    {
+ 286   5                  ptrsecmode->result = LINKL_GetSecurityMode(linkl, &ptrsecmode->secmode);
+ 287   5                    }
+ 288   4                ptrsecmode->command = APCM_GET_SECURITY_MODE_CNF;
+ 289   4                    rspEvent = NMA_EncodeRsp(APCM_GET_SECURITY_MODE_CNF, pHostHdr->protocol,
+ 290   4                      (u8 *)ptrsecmode, sizeof(hostCmdSecMode));
+ 291   4              break;
+ 292   4      
+ 293   4                }
+ 294   3                case APCM_SET_KEY_REQ:
+ 295   3                {            
+ 296   4              hostCmdNetId *ptrnetid;            
+ 297   4              ptrnetid = (hostCmdNetId *)cmdptr;
+ 298   4                    if(cmdlen != sizeof(hostCmdNetId))
+ 299   4                    {
+ 300   5                        ptrnetid->result = STATUS_FAILURE;
+ 301   5                    }
+ 302   4                    else
+ 303   4                    {
+ 304   5                  ptrnetid->result = LINKL_SetKey(linkl, &(ptrnetid->nmk[0]), &(ptrnetid->nid[0]));
+ 305   5                    }
+ 306   4              ptrnetid->command = APCM_SET_KEY_CNF;
+ 307   4                    rspEvent = NMA_EncodeRsp(APCM_SET_KEY_CNF, pHostHdr->protocol,
+ 308   4                  (u8 *)ptrnetid, sizeof(hostCmdNetId));
+ 309   4                    break;
+ 310   4                }
+ 311   3                case APCM_GET_KEY_REQ:
+ 312   3                {
+ 313   4                    break;
+ 314   4                }
+ 315   3      
+ 316   3                case APCM_SET_PPKEYS_REQ:
+ 317   3                {
+ 318   4                    break;
+ 319   4                }
+ 320   3                case APCM_SET_NETWORKS_REQ:
+ 321   3                {
+ 322   4              hostCmdNwk *ptrnetwork;    
+ 323   4                    sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 324   4                    sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer);
+ 325   4                            
+ 326   4              ptrnetwork = (hostCmdNwk *)cmdptr;
+ 327   4                    if(cmdlen != sizeof(hostCmdNwk))
+ 328   4                    {
+ 329   5                        ptrnetwork->result = STATUS_FAILURE;
+ 330   5                    }
+ 331   4                    else
+ 332   4                  {
+ 333   5                        if(ptrnetwork->netoption == NETWORK_START)
+ 334   5                        {
+ 335   6      #ifdef MCCO       
+ 336   6      
+ 337   6      #ifndef NO_HOST           
+                          CNSM_SetCentralCCo();
+              #endif
+ 340   6      #endif                  
+ 341   6                            staInfo->lastUserAppCCOState = 1;
+ 342   6                        }
+ 343   5                        else
+ 344   5                        {
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 7   
+
+ 345   6                  staInfo->staCap.fields.backupCcoCap = 0;  
+ 346   6                            staInfo->lastUserAppCCOState = 2;
+ 347   6                        }
+ 348   5                
+ 349   5                
+ 350   5                    ptrnetwork->result = CTRLL_StartNetwork(ctrll, 
+ 351   5                                ptrnetwork->netoption, 
+ 352   5                                                    &(ptrnetwork->nid[0]));
+ 353   5                    }
+ 354   4              ptrnetwork->command = APCM_SET_NETWORKS_CNF;
+ 355   4                    rspEvent = NMA_EncodeRsp(APCM_SET_NETWORKS_CNF, pHostHdr->protocol,
+ 356   4                    (u8 *)ptrnetwork, sizeof(hostCmdNwk));      
+ 357   4                    break;
+ 358   4                }
+ 359   3      
+ 360   3                case APCM_STA_RESTART_REQ:
+ 361   3                {
+ 362   4              hostCmdRstSta *ptrrestartsta;
+ 363   4                  sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 364   4                    sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer); 
+ 365   4                    
+ 366   4              ptrrestartsta = (hostCmdRstSta *)cmdptr;
+ 367   4                    if(cmdlen != sizeof(hostCmdRstSta))
+ 368   4                    {
+ 369   5                        ptrrestartsta->result = STATUS_FAILURE;
+ 370   5                    }
+ 371   4                    else
+ 372   4                    {
+ 373   5                      
+ 374   5                ptrrestartsta->result = CTRLL_StartNetDisc(ctrll);
+ 375   5                    }
+ 376   4              ptrrestartsta->command = APCM_STA_RESTART_CNF;
+ 377   4                    rspEvent = NMA_EncodeRsp(APCM_STA_RESTART_CNF, pHostHdr->protocol,
+ 378   4                  (u8 *)ptrrestartsta, sizeof(hostCmdRstSta));
+ 379   4                    break;
+ 380   4                }
+ 381   3            
+ 382   3                case APCM_NET_EXIT_REQ:
+ 383   3                {
+ 384   4              result = CTRLL_NetExit(ctrll);
+ 385   4                 //   if (result == STATUS_FAILURE)
+ 386   4                    {
+ 387   5                        NMA_SendNetExitCnf(nma, result);
+ 388   5                    }
+ 389   4                    break;
+ 390   4                }
+ 391   3      #ifdef APPOINT
+              
+                        case APCM_CCO_APPOINT_REQ:
+                        {
+                      hostCmdAptCco *ptrappointcco;
+                            if(cmdlen != sizeof(hostCmdAptCco))
+                            {
+                                break; // Error
+                            }
+                      ptrappointcco = (hostCmdAptCco *)cmdptr;
+                      
+                      LINKL_ApptCCo(linkl, &(ptrappointcco->mac_addr[0]), ptrappointcco->reqtype);
+                    
+                            break;
+                        }
+              #endif
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 8   
+
+ 407   3        /********************************************************************
+ 408   3         *
+ 409   3         *  Below messages are Greenvity's proprietary messages
+ 410   3         *
+ 411   3         ********************************************************************/
+ 412   3            case(HOST_CMD_DATAPATH_REQ):
+ 413   3            {     
+ 414   4              hostCmdDatapath *ptrdatapath;
+ 415   4              ptrdatapath = (hostCmdDatapath *)cmdptr;
+ 416   4                    if(cmdlen != sizeof(hostCmdDatapath))
+ 417   4                    {
+ 418   5                        ptrdatapath->result = STATUS_FAILURE;
+ 419   5                    }
+ 420   4                    else
+ 421   4                    {
+ 422   5                  g_data_path = ptrdatapath->datapath;
+ 423   5                  ptrdatapath->result = STATUS_SUCCESS;
+ 424   5                    }
+ 425   4              ptrdatapath->command = HOST_CMD_DATAPATH_CNF;
+ 426   4              rspEvent = NMA_EncodeRsp(HOST_CMD_DATAPATH_CNF, pHostHdr->protocol,
+ 427   4                    (u8 *)ptrdatapath, sizeof(hostCmdDatapath));    
+ 428   4              break;
+ 429   4            }
+ 430   3            
+ 431   3            case(HOST_CMD_SNIFFER_REQ):     
+ 432   3            {
+ 433   4              hostCmdSniffer *ptrsniffer;
+ 434   4              ptrsniffer = (hostCmdSniffer *)cmdptr;
+ 435   4                    if(cmdlen != sizeof(hostCmdSniffer))
+ 436   4                    {
+ 437   5                        ptrsniffer->result = STATUS_FAILURE;
+ 438   5                    }
+ 439   4                    else
+ 440   4                    {
+ 441   5      #ifdef SNIFFER
+                          if(hostIntf == HOST_INTF_ETH)
+                          {
+                            eth_plc_sniffer = ptrsniffer->sniffer;
+                            hhal_tst_sniff_cfg(ptrsniffer->sniffer); //set HW sniff
+                          }
+              #endif
+ 448   5                  ptrsniffer->result = STATUS_SUCCESS;
+ 449   5                    }
+ 450   4              ptrsniffer->command = HOST_CMD_SNIFFER_CNF;
+ 451   4              rspEvent = NMA_EncodeRsp(HOST_CMD_SNIFFER_CNF, pHostHdr->protocol,
+ 452   4                  (u8 *)ptrsniffer, sizeof(hostCmdSniffer));      
+ 453   4              break;
+ 454   4            }
+ 455   3            
+ 456   3            case(HOST_CMD_BRIDGE_REQ):      
+ 457   3            {
+ 458   4              hostCmdBridge *ptrbridge;            
+ 459   4              ptrbridge = (hostCmdBridge *)cmdptr;    
+ 460   4                    if(cmdlen != sizeof(hostCmdBridge))
+ 461   4                    {
+ 462   5                        ptrbridge->result = STATUS_FAILURE;
+ 463   5                    }
+ 464   4                    else
+ 465   4                    {
+ 466   5      #ifdef SNIFFER
+                          if(hostIntf == HOST_INTF_ETH)
+                          {       
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 9   
+
+                            eth_plc_bridge = ptrbridge->bridge;
+                          }
+              #endif
+ 472   5                  ptrbridge->result = STATUS_SUCCESS; 
+ 473   5                    }
+ 474   4              ptrbridge->command = HOST_CMD_BRIDGE_CNF;
+ 475   4              rspEvent = NMA_EncodeRsp(HOST_CMD_BRIDGE_CNF, pHostHdr->protocol,
+ 476   4                    (u8 *)ptrbridge, sizeof(hostCmdBridge));      
+ 477   4              break;
+ 478   4            }
+ 479   3      
+ 480   3            case(HOST_CMD_DEVICE_MODE_REQ):
+ 481   3            {
+ 482   4              hostCmdDevmode *ptrdevmode;            
+ 483   4              ptrdevmode = (hostCmdDevmode *)cmdptr;    
+ 484   4                    if(cmdlen != sizeof(hostCmdDevmode))
+ 485   4                    {
+ 486   5                        ptrdevmode->result = STATUS_FAILURE;
+ 487   5                    }
+ 488   4                    else
+ 489   4                    {
+ 490   5      #ifdef SNIFFER
+                          if(eth_plc_sniffer == 0)
+              #endif
+ 493   5                  {
+ 494   6                    ptrdevmode->devmode = LINKL_GetMode(linkl);
+ 495   6                  }
+ 496   5      #ifdef SNIFFER
+                          else
+                          {
+                            ptrdevmode->devmode = LINKL_STA_MODE_SNIFFER;
+                          }
+              #endif
+ 502   5                  ptrdevmode->result = STATUS_SUCCESS;  
+ 503   5                    }
+ 504   4      
+ 505   4              ptrdevmode->command = HOST_CMD_DEVICE_MODE_CNF;
+ 506   4              rspEvent = NMA_EncodeRsp(HOST_CMD_DEVICE_MODE_CNF, pHostHdr->protocol,
+ 507   4                    (u8 *)ptrdevmode, sizeof(hostCmdDevmode));      
+ 508   4              break;
+ 509   4            }
+ 510   3            
+ 511   3            case(HOST_CMD_HARDWARE_SPEC_REQ):
+ 512   3            {
+ 513   4              hostCmdHwspec *ptrhwspec;
+ 514   4              sHaLayer  *hal;
+ 515   4              ptrhwspec = (hostCmdHwspec *)cmdptr;
+ 516   4                    hwSpecDone = TRUE;
+ 517   4              if(cmdlen != sizeof(hostCmdHwspec))
+ 518   4              {             
+ 519   5                ptrhwspec->result = STATUS_FAILURE;
+ 520   5              }
+ 521   4              else
+ 522   4              {
+ 523   5                hal = HOMEPLUG_GetHal();
+ 524   5                if(ptrhwspec->action == ACTION_GET)
+ 525   5                { 
+ 526   6                  sStaInfo *staInfo = &linkl->staInfo;          
+ 527   6                  ptrhwspec->linemode = gHpgpHalCB.lineMode;
+ 528   6                  ptrhwspec->txpowermode = gTxpowermode;
+ 529   6                            ptrhwspec->dc_frequency = gHpgpHalCB.lineFreq;
+ 530   6                            ptrhwspec->hw_cfg.field.er = er;            
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 10  
+
+ 531   6                  memcpy(&(ptrhwspec->mac_addr[0]), hal->macAddr, MAC_ADDR_LEN);        
+ 532   6                }
+ 533   5                else
+ 534   5                {
+ 535   6                  if(!MCTRL_IsAssociated())           
+ 536   6                  {
+ 537   7      #ifndef NO_HOST           
+                            memcpy(hal->macAddr, &(ptrhwspec->mac_addr[0]), MAC_ADDR_LEN);
+              #endif
+ 540   7                    if((ptrhwspec->linemode <= 0x01 || ptrhwspec->linemode == 0xff) &&
+ 541   7                                    (ptrhwspec->dc_frequency <= 0x01 || ptrhwspec->dc_frequency == 0xff) &&
+ 542   7                      (ptrhwspec->txpowermode <= 0x02 || ptrhwspec->txpowermode == 0xff))
+ 543   7                    {
+ 544   8                      if(ptrhwspec->txpowermode <= 0x02)
+ 545   8                      {
+ 546   9                        gTxpowermode = ptrhwspec->txpowermode;
+ 547   9                      }
+ 548   8                      if(ptrhwspec->linemode<=1)
+ 549   8                      {
+ 550   9                        sLinkLayer  *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);  
+ 551   9                        LINKL_SetLineMode(linkl, (eLineMode)ptrhwspec->linemode);             
+ 552   9                                        if(ptrhwspec->dc_frequency <= 1)
+ 553   9                                        {
+ 554  10                                            gHpgpHalCB.lineFreq = ptrhwspec->dc_frequency;
+ 555  10      #ifdef FREQ_DETECT                                        
+ 556  10                                            FREQDET_FreqSetting(gHpgpHalCB.lineFreq);
+ 557  10      #endif
+ 558  10                                        }
+ 559   9      
+ 560   9                        }
+ 561   8                      else
+ 562   8                      {
+ 563   9                      }
+ 564   8                      if(ptrhwspec->txpowermode == 0)
+ 565   8                      {
+ 566   9                         mac_utils_spi_write(0x34,0x08);   //[kiran]
+ 567   9                         mac_utils_spi_write(0x35,0x30);   //[kiran]        
+ 568   9                      }
+ 569   8                      else if(ptrhwspec->txpowermode == 1)
+ 570   8                      {
+ 571   9                        mac_utils_spi_write(0x34,0x00);   //[kiran]
+ 572   9                        mac_utils_spi_write(0x35,0x00);   //[kiran]
+ 573   9                      }
+ 574   8                      else if(ptrhwspec->txpowermode == 2)
+ 575   8                      {
+ 576   9                        mac_utils_spi_write(0x34,0x00);   //[kiran]
+ 577   9                        mac_utils_spi_write(0x35,0x0f);   //[kiran]
+ 578   9                      }
+ 579   8                      else if(ptrhwspec->txpowermode == 0xff)//[kiran]
+ 580   8                      {
+ 581   9                      }
+ 582   8                                    if(ptrhwspec->hw_cfg.field.er == 1)
+ 583   8                                    {
+ 584   9                                        er = 1;
+ 585   9                                        WriteU8Reg(0x4F0, 0x80);       
+ 586   9                                    }
+ 587   8                                    else
+ 588   8                                    {
+ 589   9                                        er = 0;
+ 590   9                                        WriteU8Reg(0x4F0, 0x0);
+ 591   9                                    }
+ 592   8                    }
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 11  
+
+ 593   7                    else
+ 594   7                    {
+ 595   8                      ptrhwspec->result = STATUS_FAILURE;
+ 596   8                    } 
+ 597   7                  }
+ 598   6                  else
+ 599   6                  {
+ 600   7                    ptrhwspec->result = STATUS_FAILURE;
+ 601   7                  }         
+ 602   6                }
+ 603   5                ptrhwspec->result = STATUS_SUCCESS;
+ 604   5              }
+ 605   4              ptrhwspec->command = HOST_CMD_HARDWARE_SPEC_CNF;
+ 606   4              rspEvent = NMA_EncodeRsp(HOST_CMD_HARDWARE_SPEC_CNF, pHostHdr->protocol,
+ 607   4                    (u8 *)ptrhwspec, sizeof(hostCmdHwspec));
+ 608   4              break;
+ 609   4            }
+ 610   3            
+ 611   3            case(HOST_CMD_DEVICE_STATS_REQ):
+ 612   3            {
+ 613   4      
+ 614   4              hostCmdDevstats *ptrdevstats;
+ 615   4              ptrdevstats = (hostCmdDevstats *)cmdptr;
+ 616   4                    if(cmdlen != sizeof(hostCmdDevstats))
+ 617   4                    {
+ 618   5                        ptrdevstats->result     = STATUS_FAILURE;
+ 619   5                    }
+ 620   4                    else
+ 621   4                    {
+ 622   5                  ptrdevstats->txtotalpktcnt    = gHpgpHalCB.halStats.TotalTxFrmCnt;
+ 623   5                  ptrdevstats->rxtotalpktcnt    = gHpgpHalCB.halStats.TotalRxGoodFrmCnt;
+ 624   5                        ptrdevstats->txdatapktcnt   = gHpgpHalCB.halStats.TxDataCnt;
+ 625   5                  ptrdevstats->rxdatapktcnt     = gHpgpHalCB.halStats.RxGoodDataCnt;
+ 626   5                  ptrdevstats->txpktdropcnt   = hal_common_reg_32_read(PLC_MPDUDROPCNT_REG) + gHpgpHalCB.halStats.Hto
+             -PswDropCnt;
+ 627   5                        //+ hal_common_reg_32_read(PLC_ADDRFILTERERRCNT_REG);
+ 628   5                  ptrdevstats->rxpktdropcnt   = gHpgpHalCB.halStats.RxErrBcnCnt +
+ 629   5                                  gHpgpHalCB.halStats.CorruptFrmCnt +
+ 630   5                                  hal_common_reg_32_read(PLC_PBCSRXERRCNT_REG) +
+ 631   5                                  gHpgpHalCB.halStats.PtoHswDropCnt;
+ 632   5                  ptrdevstats->txhostpktcnt   = gEthHalCB.TotalTxFrmCnt;
+ 633   5                  ptrdevstats->rxhostpktcnt = gEthHalCB.TotalRxFrmCnt;
+ 634   5                  ptrdevstats->result     = STATUS_SUCCESS;
+ 635   5                    }
+ 636   4              ptrdevstats->command    = HOST_CMD_DEVICE_STATS_CNF;
+ 637   4              rspEvent = NMA_EncodeRsp(HOST_CMD_DEVICE_STATS_CNF, pHostHdr->protocol,
+ 638   4                    (u8 *)ptrdevstats, sizeof(hostCmdDevstats));    
+ 639   4              break;
+ 640   4            }
+ 641   3            
+ 642   3            case(HOST_CMD_PEERINFO_REQ):
+ 643   3            {
+ 644   4              hostCmdPeerinfo *ptrpeerinfo;
+ 645   4              peerinfodata  *ptrpeerinfodata;
+ 646   4              u8        lDataBuff[MAX_HOST_CMD_LENGTH - \
+ 647   4                            H1MSG_HEADER_SIZE - CRC_SIZE \
+ 648   4                            - sizeof(hostCmdPeerinfo)];
+ 649   4              sScb            *scb  = NULL;
+ 650   4              sCrm            *crm  = LINKL_GetCrm(linkl);
+ 651   4              ptrpeerinfo = (hostCmdPeerinfo *)lDataBuff;
+ 652   4              memcpy(ptrpeerinfo, cmdptr,sizeof(hostCmdPeerinfo));
+ 653   4              if(cmdlen != sizeof(hostCmdPeerinfo))
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 12  
+
+ 654   4                    {
+ 655   5                        ptrpeerinfo->action = ACTION_GET;
+ 656   5                        ptrpeerinfo->noofentries = 0;
+ 657   5                        ptrpeerinfo->result     = STATUS_FAILURE;
+ 658   5                    }
+ 659   4                    else
+ 660   4                    {
+ 661   5                  ptrpeerinfo->action = ACTION_GET;
+ 662   5                  ptrpeerinfo->noofentries = 0;
+ 663   5                  scb = CRM_GetNextScb(crm, scb);
+ 664   5                    while(scb)
+ 665   5                    {
+ 666   6                    ptrpeerinfodata = (peerinfodata *)(lDataBuff + sizeof(hostCmdPeerinfo)  + \
+ 667   6                                  (sizeof(peerinfodata) * ptrpeerinfo->noofentries));
+ 668   6                    memcpy(&(ptrpeerinfodata->macaddr[0]),scb->macAddr, MAC_ADDR_LEN);
+ 669   6                    ptrpeerinfodata->tei  = scb->tei;
+ 670   6                    ptrpeerinfodata->rssi   = scb->rssiLqi.s.rssi;
+ 671   6                    ptrpeerinfodata->lqi  = scb->rssiLqi.s.lqi;
+ 672   6                    scb = CRM_GetNextScb(crm, scb);
+ 673   6                    ptrpeerinfo->noofentries++;
+ 674   6                    }
+ 675   5                  ptrpeerinfo->result     = STATUS_SUCCESS;
+ 676   5                    }
+ 677   4              ptrpeerinfo->command    = HOST_CMD_PEERINFO_CNF;
+ 678   4              rspEvent = NMA_EncodeRsp(HOST_CMD_PEERINFO_CNF, pHostHdr->protocol,
+ 679   4                    (u8 *)ptrpeerinfo, (u16)(sizeof(hostCmdPeerinfo)+
+ 680   4                      (sizeof(peerinfodata)*(ptrpeerinfo->noofentries))));      
+ 681   4              break;
+ 682   4            }
+ 683   3                
+ 684   3                case(HOST_CMD_SW_RESET_REQ):
+ 685   3                {               
+ 686   4                    hostCmdSwReset *reset = (hostCmdSwReset*)cmdptr;
+ 687   4                    if(cmdlen != sizeof(hostCmdSwReset))
+ 688   4                    {
+ 689   5                        reset->result = STATUS_FAILURE;
+ 690   5                    }
+ 691   4                    else
+ 692   4                    {
+ 693   5                        CTRLL_NetExit(ctrll);
+ 694   5      
+ 695   5                        reset->result = STATUS_SUCCESS;
+ 696   5                    }
+ 697   4                    reset->command = HOST_CMD_SW_RESET_CNF;
+ 698   4      
+ 699   4                    rspEvent = NMA_EncodeRsp(HOST_CMD_SW_RESET_CNF, pHostHdr->protocol,
+ 700   4                    cmdptr, sizeof(hostCmdSwReset));                              
+ 701   4              break;
+ 702   4            }
+ 703   3                case(HOST_CMD_TX_POWER_MODE_REQ):
+ 704   3                {
+ 705   4                    hostCmdTxPowerMode *txPowerMode = (hostCmdTxPowerMode*)cmdptr;
+ 706   4                    if(cmdlen != sizeof(hostCmdTxPowerMode))
+ 707   4                    {
+ 708   5                        txPowerMode->result = STATUS_FAILURE;
+ 709   5                    }
+ 710   4                    else
+ 711   4                    {
+ 712   5                        update_powermode(0, txPowerMode->powermode);
+ 713   5                        txPowerMode->result = STATUS_SUCCESS;
+ 714   5                    }
+ 715   4                    txPowerMode->command = HOST_CMD_TX_POWER_MODE_CNF;
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 13  
+
+ 716   4      
+ 717   4                    rspEvent = NMA_EncodeRsp(HOST_CMD_TX_POWER_MODE_CNF, pHostHdr->protocol,
+ 718   4                    cmdptr, sizeof(hostCmdTxPowerMode));
+ 719   4                    break;
+ 720   4                }
+ 721   3                case(HOST_CMD_COMMIT_REQ):
+ 722   3            {
+ 723   4                    hostCmdCommit *commit = (hostCmdCommit*)cmdptr;
+ 724   4                    if(cmdlen != sizeof(hostCmdCommit))
+ 725   4                    {
+ 726   5                        commit->result = STATUS_FAILURE;
+ 727   5                    }
+ 728   4                    else
+ 729   4                    {   
+ 730   5                        LINKL_CommitStaProfile(linkl);
+ 731   5                        commit->result = STATUS_SUCCESS;
+ 732   5                    }
+ 733   4                    commit->command = HOST_CMD_COMMIT_CNF;
+ 734   4                    rspEvent = NMA_EncodeRsp(HOST_CMD_COMMIT_CNF, pHostHdr->protocol,
+ 735   4                    cmdptr, sizeof(hostCmdCommit));
+ 736   4                    break;
+ 737   4                }
+ 738   3            case HOST_CMD_GET_VERSION_REQ:
+ 739   3                {
+ 740   4              hostCmdGetVersion *version = (hostCmdGetVersion*)cmdptr;
+ 741   4                    if(cmdlen != sizeof(hostCmdGetVersion))
+ 742   4                    {
+ 743   5                        version->result = STATUS_FAILURE;
+ 744   5                    }
+ 745   4                    else
+ 746   4                    {   
+ 747   5                      u32 hver = hal_common_reg_32_read(HYBRII_VERSION_REG);
+ 748   5                      sprintf(version->hwVer, "V0x%08lX", hver);
+ 749   5                strcpy((u8*)(&(version->swVer[0])), (u8*)get_Version());        
+ 750   5                        version->result = STATUS_SUCCESS;
+ 751   5                    }
+ 752   4                    version->command = HOST_CMD_GET_VERSION_CNF;
+ 753   4                    rspEvent = NMA_EncodeRsp(HOST_CMD_GET_VERSION_CNF, pHostHdr->protocol,
+ 754   4                    cmdptr, sizeof(hostCmdGetVersion));
+ 755   4                    break;
+ 756   4                }
+ 757   3      #ifdef POWERSAVE
+                        case(HOST_CMD_PSAVLN_REQ):
+                    {
+                            sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                            sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer);
+                            hostCmdPsAvln *psavln = (hostCmdPsAvln*)cmdptr;
+                      
+                            if(cmdlen != sizeof(hostCmdPsAvln))
+                            {
+                                psavln->result = STATUS_FAILURE;
+                            }
+                            else if(psavln->action == ACTION_GET)
+                            {   
+                                psavln->result = STATUS_SUCCESS;
+                                psavln->mode = linkLayer->hal->hhalCb->psAvln;
+                            }
+                            else
+                            {
+                                if (!PSM_psAvln(psavln->mode))
+                                {
+                                    psavln->result = STATUS_FAILURE;
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 14  
+
+                                }
+                                else
+                                {
+                                    FM_Printf(FM_USER, "AVLN Power Save Mode is now %s\n", psavln->mode ? "ON":"OFF");
+                                    psavln->result = STATUS_SUCCESS;
+                                }
+                            }
+                            psavln->command = HOST_CMD_PSAVLN_CNF;
+                            rspEvent = NMA_EncodeRsp(HOST_CMD_PSAVLN_CNF, pHostHdr->protocol,
+                                  cmdptr, sizeof(hostCmdPsAvln));
+                            break;
+                        }
+                        case(HOST_CMD_PSSTA_REQ):
+                    {
+                            sLinkLayer    *linkLayer = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+                            sStaInfo      *staInfo = LINKL_GetStaInfo(linkLayer);
+                            u8 pss;
+                            sScb *scb = NULL;            
+                            hostCmdPsSta *pssta = (hostCmdPsSta*)cmdptr;
+                      
+                            if(cmdlen != sizeof(hostCmdPsSta))
+                            {
+                                pssta->result = STATUS_FAILURE;
+                            }
+                            else if(pssta->action == ACTION_GET)
+                            {   
+                                if (linkLayer->mode == LINKL_STA_MODE_CCO)
+                              {
+                                // this station is CCO
+                                scb = staInfo->ccoScb;
+                              }
+                              else
+                              {
+                                // this station is STA
+                                scb = staInfo->staScb;
+                              }
+              
+                              if (!scb)
+                              {
+                                FM_Printf(FM_ERROR, "Station is neither CCO nor STA. Abort\n");
+                                pssta->result = STATUS_FAILURE;
+                              }
+                                else
+                                {
+                                    pssta->mode = scb->psState ? 1:0;
+                                    pssta->result = STATUS_SUCCESS;
+                                    if (pssta->mode)
+                                  {
+                                        pssta->awd = scb->pss >> 4;
+                                        pssta->psp = scb->pss & 0x0F;
+                                  }
+                                  else
+                                  {
+                                    pssta->awd = 0;
+                                        pssta->psp = 0x0F;
+                                  }
+                                }
+                            }
+                            else
+                            {
+                                if (linkLayer->hal->hhalCb->psAvln == FALSE)
+                                {
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 15  
+
+                                    pssta->result = STATUS_FAILURE;
+                                }
+                                else
+                                {
+                                    if (linkLayer->mode == LINKL_STA_MODE_CCO)
+                                  {
+                                    // this station is CCO
+                                    scb = staInfo->ccoScb;
+                                  }
+                                  else
+                                  {
+                                    // this station is STA
+                                    scb = staInfo->staScb;
+                                  }
+                                  if (!scb)
+                                  {
+                                    FM_Printf(FM_ERROR, "Station is neither CCO nor STA. Abort\n");
+                                    pssta->result = STATUS_FAILURE;
+                                  }
+                                    else
+                                    {
+                                      if (pssta->mode)
+                                      {
+                                        pss = (pssta->awd << 4) | pssta->psp;
+                                      }
+                                      else
+                                      {
+                                        pss = 0x0f; // PS=off 
+                                      }
+                                      PSM_set_sta_PS(pssta->mode, pss);
+                                      FM_Printf(FM_USER, "STA Power Saving Mode is now %s\n", scb->psState ? "ON":"OFF");
+                                        pssta->result = STATUS_SUCCESS;
+                                    }
+                                }
+                            }
+                            pssta->command = HOST_CMD_PSSTA_CNF;
+                            rspEvent = NMA_EncodeRsp(HOST_CMD_PSSTA_CNF, pHostHdr->protocol,
+                                  cmdptr, sizeof(hostCmdPsSta));
+                            break;
+                        }
+                        case HOST_CMD_GV_RESET_REQ:
+                        {
+                      GV701x_GPIO_Config(WRITE_ONLY, CPU_GPIO_IO_PIN0);
+                      GV701x_GPIO_Write(CPU_GPIO_WR_PIN0,1);
+                            break;
+                        }
+                        case HOST_CMD_ERASE_FLASH_REQ:
+                        {
+                            hostCmdEraseFlash *erase = (hostCmdEraseFlash*)cmdptr;
+                            if(cmdlen != sizeof(hostCmdEraseFlash))
+                            {
+                               erase->result = STATUS_FAILURE;
+                            }
+                      EA = 0;
+                            spiflash_eraseConfigMem();
+                      EA = 1;
+              #ifdef NO_HOST  
+                      EA = 0;
+                      spiflash_eraseSector(GVTY_CONFIG_APP_SECTOR);
+                      spiflash_wrsr_unlock((u8)0);
+                      EA = 1;
+              #endif
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 16  
+
+                            erase->result = STATUS_SUCCESS;
+                            erase->command = HOST_CMD_ERASE_FLASH_CNF;
+                            rspEvent = NMA_EncodeRsp(HOST_CMD_ERASE_FLASH_CNF, pHostHdr->protocol,
+                                  cmdptr, sizeof(hostCmdEraseFlash));
+                            break;
+                        }
+              #endif
+ 909   3      #if 0   
+                    case(HOST_CMD_SET_DEVICEIF_REQ):
+                    {
+                      //TODO - Processing would go here
+                      rspEvent  = H1MSG_EncodeResultCnf(HOST_CMD_SET_DEVICEIF_REQ, 1);
+                            rspEvent->eventHdr.eventClass = EVENT_CLASS_MGMT;
+                      break;
+                    }
+              #endif
+ 918   3                  case HOST_CMD_SCANNETWORK_REQ:
+ 919   3                  {       
+ 920   4                      hostCmdScanNet *scanNet = (hostCmdScanNet*)cmdptr;        
+ 921   4      
+ 922   4      #ifdef NO_HOST  
+ 923   4              memcpy((u8*)&nma->msg_event_1, (u8*)event, sizeof(sEvent));   
+ 924   4              memcpy((u8*)&nma->msg_hybrii_hdr_1, (u8*)pHostHdr, sizeof(hostHdr_t));      
+ 925   4              memcpy((u8*)&nma->msg_hdr_1, (u8*)msg_hdr, sizeof(gv701x_app_msg_hdr_t));
+ 926   4      #endif
+ 927   4                      if(cmdlen != sizeof(hostCmdScanNet))
+ 928   4                    {
+ 929   5                       scanNet->result = STATUS_FAILURE;
+ 930   5                    }
+ 931   4                      else
+ 932   4                      {
+ 933   5                        LINKL_StartScan(scanNet->scanTime);           
+ 934   5                          scanNet->result = STATUS_SUCCESS;
+ 935   5                      }
+ 936   4                      scanNet->command = HOST_CMD_SCANNETWORK_CNF;
+ 937   4                    rspEvent = NMA_EncodeRsp(HOST_CMD_SCANNETWORK_CNF, pHostHdr->protocol,
+ 938   4                          cmdptr, sizeof(hostCmdScanNet));                    
+ 939   4                      break;
+ 940   4                  }
+ 941   3      
+ 942   3                  case HOST_CMD_VENDORSPEC_REQ:
+ 943   3                  {       
+ 944   4                      hostCmdVendorSpec *vendor_spec = (hostCmdVendorSpec*)cmdptr;        
+ 945   4      
+ 946   4                      if(cmdlen != sizeof(hostCmdVendorSpec))
+ 947   4                    {
+ 948   5                       vendor_spec->result = STATUS_FAILURE;
+ 949   5                    }
+ 950   4                      else
+ 951   4                      {
+ 952   5                        if(vendor_spec->action == ACTION_SET)
+ 953   5                        {
+ 954   6                          if(vendor_spec->enable == TRUE)
+ 955   6                          {
+ 956   7                            linkl->ccoNsm.vendorSpec.enable = TRUE;
+ 957   7                    memcpy((u8*)&linkl->ccoNsm.vendorSpec.ota, 
+ 958   7                        (u8*)&vendor_spec->vendor_ota, sizeof(svendorota));
+ 959   7                    vendor_spec->result = STATUS_SUCCESS;
+ 960   7                          }
+ 961   6                  else if(vendor_spec->enable == FALSE)
+ 962   6                  { 
+ 963   7                    linkl->ccoNsm.vendorSpec.enable = FALSE;
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 17  
+
+ 964   7                    memset((u8*)&linkl->ccoNsm.vendorSpec.ota, 
+ 965   7                        0x00, sizeof(svendorota));
+ 966   7                    vendor_spec->result = STATUS_SUCCESS;
+ 967   7                  }
+ 968   6                  else
+ 969   6                    vendor_spec->result = STATUS_FAILURE;
+ 970   6                        }
+ 971   5                else if(vendor_spec->action == ACTION_GET)
+ 972   5                {
+ 973   6                  if(linkl->ccoNsm.vendorSpec.enable == TRUE)
+ 974   6                  {             
+ 975   7                    memcpy((u8*)&vendor_spec->vendor_ota, 
+ 976   7                      (u8*)&linkl->ccoNsm.vendorSpec.ota, 
+ 977   7                      sizeof(svendorota));              
+ 978   7                  }
+ 979   6                }
+ 980   5                else
+ 981   5                  vendor_spec->result = STATUS_FAILURE;           
+ 982   5                      }
+ 983   4                      vendor_spec->command = HOST_CMD_VENDORSPEC_CNF;
+ 984   4                    rspEvent = NMA_EncodeRsp(HOST_CMD_VENDORSPEC_CNF, pHostHdr->protocol,
+ 985   4                          cmdptr, sizeof(hostCmdVendorSpec));                   
+ 986   4                      break;
+ 987   4                  }
+ 988   3            
+ 989   3            default:
+ 990   3            {
+ 991   4              printf("invalid cmd\n");
+ 992   4              break;
+ 993   4            }
+ 994   3            }
+ 995   2        } 
+ 996   1      #ifdef HYBRII_802154  
+ 997   1        else if(pHostHdr->protocol == IEEE802_15_4_MAC_ID)
+ 998   1        {   
+ 999   2          FM_Printf(FM_APP, "\nrfc %bu", (u8)(*cmdptr));    
+1000   2          switch((u8)(*cmdptr))
+1001   2          {         
+1002   3            case MCPS_DATA_REQUEST:
+1003   3            {
+1004   4              wpan_addr_spec_t DstAddrSpec_p;
+1005   4      #ifdef NO_HOST        
+1006   4              mcps_data_req_t* mcps_data_req = (mcps_data_req_t*)cmdptr;
+1007   4      #else
+                      mcps_data_req1_t* mcps_data_req1 = (mcps_data_req1_t*)cmdptr;
+                      mcps_data_req_t mcps_data_req;
+              #endif
+1011   4              
+1012   4      #ifndef NO_HOST
+              #if 0
+                      FM_Printf(FM_USER,"\nSrcAddrMode = %bx\n",mcps_data_req1->SrcAddrMode);
+                      FM_Printf(FM_USER,"\nDstAddrMode = %bx\n",mcps_data_req1->DstAddrMode);
+                      FM_Printf(FM_USER,"\nDstPANId = %x\n",mcps_data_req1->DstPANId);
+                      FM_Printf(FM_USER,"\nmsduHandle = %bx\n",mcps_data_req1->msduHandle);
+                      FM_Printf(FM_USER,"\nTxOptions = %bx\n",mcps_data_req1->TxOptions);
+                      FM_Printf(FM_USER,"\nmsduLength = %bx\n",mcps_data_req1->msduLength);
+              #endif        
+              #else
+1022   4      #if 0
+              
+                      FM_Printf(FM_USER,"\nSrcAddrMode = %bx\n",mcps_data_req->SrcAddrMode);
+                      FM_Printf(FM_USER,"\nDstAddrMode = %bx\n",mcps_data_req->DstAddrMode);
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 18  
+
+                      FM_Printf(FM_USER,"\nDstPANId = %x\n",mcps_data_req->DstPANId);
+                      FM_Printf(FM_USER,"\nmsduHandle = %bx\n",mcps_data_req->msduHandle);
+                      FM_Printf(FM_USER,"\nTxOptions = %bx\n",mcps_data_req->TxOptions);
+                      FM_Printf(FM_USER,"\nmsduLength = %bx\n",mcps_data_req->msduLength);
+              #endif
+1031   4      #endif
+1032   4      #ifndef NO_HOST
+                      memcpy((u8*)&mcps_data_req, (u8*)mcps_data_req1, sizeof(mcps_data_req1));
+                      mcps_data_req.msdu_p = (u8*)(mcps_data_req1 + 1); //(u8*)((u8*)(mcps_data_req + 1) - sizeof(mcps_data_
+             -req->msdu_p));
+                      //FM_HexDump(FM_USER,"\nData:",(u8*)mcps_data_req.msdu_p, mcps_data_req1->msduLength);        
+              #endif
+1037   4      
+1038   4      #ifndef NO_HOST
+                      DstAddrSpec_p.AddrMode =  mcps_data_req1->DstAddrMode;
+                      DstAddrSpec_p.PANId = mcps_data_req1->DstPANId;       
+                      memcpy((u8*)&DstAddrSpec_p.Addr,
+                               (u8*)&mcps_data_req1->DstAddr, sizeof(uint64_t));
+              
+                      mac_api_mcps_data_req (mcps_data_req1->SrcAddrMode, &DstAddrSpec_p,
+                                              mcps_data_req1->msduLength,
+                                              mcps_data_req.msdu_p,
+                                              mcps_data_req1->msduHandle,
+                                              mcps_data_req1->TxOptions,
+                                              &mcps_data_req1->Security);
+              #else
+1051   4              DstAddrSpec_p.AddrMode =  mcps_data_req->DstAddrMode;
+1052   4              DstAddrSpec_p.PANId = mcps_data_req->DstPANId;        
+1053   4              memcpy((u8*)&DstAddrSpec_p.Addr,
+1054   4                       (u8*)&mcps_data_req->DstAddr, sizeof(uint64_t));
+1055   4      
+1056   4              mcps_data_req->msdu_p = (uint8_t*)(mcps_data_req + 1);
+1057   4              mac_api_mcps_data_req (mcps_data_req->SrcAddrMode, &DstAddrSpec_p,
+1058   4                            mcps_data_req->msduLength,
+1059   4                            mcps_data_req->msdu_p,
+1060   4                            mcps_data_req->msduHandle,
+1061   4                            mcps_data_req->TxOptions,
+1062   4                            &mcps_data_req->Security);
+1063   4      #endif
+1064   4              break;
+1065   4            }
+1066   3      
+1067   3            case MCPS_PURGE_REQUEST:
+1068   3            { 
+1069   4              mcps_purge_req_t *pPurgeReq;
+1070   4              pPurgeReq = (mcps_purge_req_t *)cmdptr;
+1071   4              
+1072   4              //FM_Printf(FM_USER,"\nMCPS Purge\n");
+1073   4              //FM_Printf(FM_USER,"MSDU Handle = %bu\r\n",pPurgeReq->msduHandle);       
+1074   4              
+1075   4              mac_api_mcps_purge_req(pPurgeReq->msduHandle);        
+1076   4              break;  
+1077   4            }
+1078   3      
+1079   3            case MLME_START_REQUEST:
+1080   3            {   
+1081   4              mlme_start_req_t *pStartReq;
+1082   4              pStartReq = (mlme_start_req_t *)cmdptr;
+1083   4      
+1084   4              //pStartReq->PANId = le16_to_cpu(pStartReq->PANId);
+1085   4              //pStartReq->StartTime = le32_to_cpu(pStartReq->StartTime);
+1086   4      
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 19  
+
+1087   4      #if 0     
+                      FM_Printf(FM_USER,"\nMLME Start Req\n");
+                      FM_Printf(FM_USER,"\nPANId = %x\n",pStartReq->PANId);
+                      FM_Printf(FM_USER,"Start T = %lx\n",pStartReq->StartTime);
+                      FM_Printf(FM_USER,"LC = %bx\n",pStartReq->LogicalChannel);
+                      FM_Printf(FM_USER,"Channel P = %bx\n",pStartReq->ChannelPage);
+                      FM_Printf(FM_USER,"Beacon Order = %bx\n",pStartReq->BeaconOrder);
+                      FM_Printf(FM_USER,"SuperFrameOrder = %bx\n",pStartReq->SuperframeOrder);
+                      FM_Printf(FM_USER,"PANCoord = %bx\n",pStartReq->PANCoordinator);
+                      FM_Printf(FM_USER,"Battery = %bx\n",pStartReq->BatteryLifeExtension);
+                      FM_Printf(FM_USER,"CoordRealign = %bx\n",pStartReq->CoordRealignment);
+              #endif
+1099   4              mac_api_mlme_start_req (pStartReq->PANId,
+1100   4                             pStartReq->LogicalChannel,
+1101   4                             pStartReq->ChannelPage,
+1102   4                             pStartReq->StartTime,
+1103   4                             pStartReq->BeaconOrder,
+1104   4                             pStartReq->SuperframeOrder,
+1105   4                             pStartReq->PANCoordinator,
+1106   4                             pStartReq->BatteryLifeExtension,
+1107   4                             pStartReq->CoordRealignment,
+1108   4                            &pStartReq->CoordRealignmentSecurity,
+1109   4                            &pStartReq->BeaconSecurity);
+1110   4              break;    
+1111   4            }
+1112   3      
+1113   3            case MLME_ASSOCIATE_REQUEST:
+1114   3            {
+1115   4              wpan_addr_spec_t CoordAddrSpec;
+1116   4              mlme_associate_req_t *pAssocReq;
+1117   4              pAssocReq = (mlme_associate_req_t *)cmdptr;
+1118   4      
+1119   4              //FM_Printf(FM_USER,"\nMLME_ASSOCIATE_REQUEST");
+1120   4      
+1121   4              CoordAddrSpec.AddrMode =  pAssocReq->CoordAddrMode;
+1122   4              CoordAddrSpec.PANId = pAssocReq->CoordPANId;        
+1123   4              memcpy((u8*)&CoordAddrSpec.Addr,
+1124   4                       (u8*)&pAssocReq->CoordAddress, sizeof(address_field_t));
+1125   4              
+1126   4              mac_api_mlme_associate_req (pAssocReq->LogicalChannel,
+1127   4                               pAssocReq->ChannelPage,
+1128   4                               &CoordAddrSpec,
+1129   4                               pAssocReq->CapabilityInformation,
+1130   4                               &pAssocReq->Security);       
+1131   4              break;
+1132   4            }
+1133   3      
+1134   3            case MLME_ASSOCIATE_RESPONSE:
+1135   3            {   
+1136   4              mlme_associate_resp_t *pAssocRsp;
+1137   4              
+1138   4              pAssocRsp = (mlme_associate_resp_t *)cmdptr;
+1139   4      
+1140   4              //_Printf(FM_USER,"\nMLME_ASSOCIATE_RESPONSE");               
+1141   4              
+1142   4              mac_api_mlme_associate_resp (pAssocRsp->DeviceAddress,
+1143   4                           pAssocRsp->AssocShortAddress,
+1144   4                           pAssocRsp->status,
+1145   4                           &pAssocRsp->Security);
+1146   4              break;            
+1147   4            }
+1148   3      
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 20  
+
+1149   3            case MLME_DISASSOCIATE_REQUEST:
+1150   3            {   
+1151   4              mlme_disassociate_req_t *pDisassocReq;
+1152   4              wpan_addr_spec_t DeviceAddrSpec;
+1153   4              pDisassocReq = (mlme_disassociate_req_t *)cmdptr;
+1154   4      
+1155   4      #if 0
+                      pDisassocReq->DevicePANId = le16_to_cpu(pDisassocReq->DevicePANId);
+              
+                      if(pDisassocReq->DeviceAddress.AddrMode == WPAN_ADDRMODE_SHORT)
+                      {
+                        pDisassocReq->DeviceAddress.Addr.short_address = 
+                                  le16_to_cpu(pDisassocReq->DeviceAddress.Addr.short_address);
+                      }
+                      else
+                      {
+                        temp = le32_to_cpu(pDisassocReq->DeviceAddress.Addr.long_address.hi_u32);
+                        pDisassocReq->DeviceAddress.Addr.long_address.hi_u32 = le32_to_cpu(pDisassocReq->DeviceAddress.Addr.l
+             -ong_address.lo_u32);
+                        pDisassocReq->DeviceAddress.Addr.long_address.lo_u32 = temp;  
+                      }
+              #endif
+1170   4              DeviceAddrSpec.AddrMode = pDisassocReq->DeviceAddrMode;
+1171   4              DeviceAddrSpec.PANId = pDisassocReq->DevicePANId;
+1172   4              DeviceAddrSpec.Addr = pDisassocReq->DeviceAddress;
+1173   4      
+1174   4      #if 0
+                      FM_Printf(FM_USER,"\nMLME Disassociate Request\n");
+                      FM_Printf(FM_USER,"Disassociation Reason = %bx\n",pDisassocReq->DisassociateReason);
+                      FM_Printf(FM_USER,"Address Mode = %xx\n",pDisassocReq->DeviceAddrMode);
+                      FM_Printf(FM_USER,"PAN ID = %x\n",pDisassocReq->DevicePANId);
+              #endif        
+1180   4              mac_api_mlme_disassociate_req (&DeviceAddrSpec,
+1181   4                                 pDisassocReq->DisassociateReason,
+1182   4                                 pDisassocReq->TxIndirect,
+1183   4                                 &pDisassocReq->Security);        
+1184   4              break;
+1185   4            }
+1186   3      
+1187   3            case MLME_ORPHAN_RESPONSE:
+1188   3            {   
+1189   4              mlme_orphan_resp_t *pOrphanRes;
+1190   4              pOrphanRes = (mlme_orphan_resp_t *)cmdptr;
+1191   4      
+1192   4      #if 0
+                      temp = le32_to_cpu(pOrphanRes->OrphanAddress.hi_u32);
+                      pOrphanRes->OrphanAddress.hi_u32 = le32_to_cpu(pOrphanRes->OrphanAddress.lo_u32);
+                      pOrphanRes->OrphanAddress.lo_u32 = temp;
+              
+                      pOrphanRes->ShortAddress = le16_to_cpu(pOrphanRes->ShortAddress);
+              #endif
+1199   4      
+1200   4      #if 0
+                      FM_Printf(FM_USER,"\nMLME Orphan Response\n");
+                      FM_Printf(FM_USER,"Short Address = %x\n",pOrphanRes->ShortAddress);
+                      FM_Printf(FM_USER,"Associated Member = %bx\n",pOrphanRes->AssociatedMember);
+              #endif        
+1205   4              mac_api_mlme_orphan_resp(pOrphanRes->OrphanAddress,
+1206   4                               pOrphanRes->ShortAddress,
+1207   4                               pOrphanRes->AssociatedMember,
+1208   4                               &pOrphanRes->Security);
+1209   4              break;
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 21  
+
+1210   4            }
+1211   3      
+1212   3            case MLME_RESET_REQUEST:
+1213   3            {   
+1214   4              mlme_reset_req_t *pResetReq;
+1215   4              
+1216   4              mlme_reset_conf_t mrc;
+1217   4              
+1218   4              pResetReq = (mlme_reset_req_t *)cmdptr;   
+1219   4      #if 0
+                      FM_Printf(FM_USER,"\nMLME Reset Request\n");
+                      FM_Printf(FM_USER,"SetDefaultPIB = %bx\n",pResetReq->SetDefaultPIB);
+              #endif        
+1223   4              if (mac_api_mlme_reset_req(pResetReq->SetDefaultPIB) == false)
+1224   4              {
+1225   5              
+1226   5              
+1227   5                mrc.status = MAC_FAILURE;
+1228   5                mrc.cmdcode = MLME_RESET_CONFIRM;
+1229   5                
+1230   5                rspEvent = NMA_EncodeRsp(MLME_RESET_CONFIRM, IEEE802_15_4_MAC_ID,
+1231   5                            (uint8_t*)&mrc, sizeof(mlme_reset_conf_t));
+1232   5                  
+1233   5                
+1234   5              }
+1235   4              
+1236   4              break;      
+1237   4            }       
+1238   3      
+1239   3            case MLME_GET_REQUEST:
+1240   3            {   
+1241   4              mlme_get_req_t *pGetReq;
+1242   4              pGetReq = (mlme_get_req_t *)cmdptr;
+1243   4      
+1244   4      #if 0       
+                      FM_Printf(FM_USER,"\nMLME Get Req\r\n");
+                      FM_Printf(FM_USER,"PIBAttr = %bx\r\n",pGetReq->PIBAttribute);
+                      FM_Printf(FM_USER,"PIBAttrIndex = %bx\r\n",pGetReq->PIBAttributeIndex);
+              #endif        
+1249   4              mac_api_mlme_get_req (pGetReq->PIBAttribute, 
+1250   4                          pGetReq->PIBAttributeIndex);                    
+1251   4              break;
+1252   4            }
+1253   3      
+1254   3            case MLME_SET_REQUEST:
+1255   3            {
+1256   4              u8 payloadlen;
+1257   4              mlme_set_req_t *pSetReq;
+1258   4              u8 buff[90];
+1259   4              pSetReq = (mlme_set_req_t *)cmdptr;
+1260   4      
+1261   4              payloadlen = mac_get_pib_attribute_size(pSetReq->PIBAttribute);
+1262   4      
+1263   4      #if 0
+                      FM_Printf(FM_USER,"\nMLME Set Req\r\n");
+                      FM_Printf(FM_USER,"PIBAttr = %bx\n",pSetReq->PIBAttribute);
+                      FM_Printf(FM_USER,"PIBAttrIndex = %bx\n",pSetReq->PIBAttributeIndex);
+                      FM_Printf(FM_USER,"payloadlen = %bu\n",payloadlen);
+              #endif
+1269   4      
+1270   4              
+1271   4              if(payloadlen > sizeof(pib_value_t))
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 22  
+
+1272   4              {
+1273   5      #ifndef NO_HOST       
+                        memcpy_cpu_to_le(buff,(pSetReq + 1),payloadlen);          
+              #else
+1276   5                memcpy(buff,(pSetReq + 1),payloadlen);
+1277   5      #endif
+1278   5                mac_api_mlme_set_req (pSetReq->PIBAttribute,
+1279   5                            pSetReq->PIBAttributeIndex,
+1280   5                            (void *)buff);
+1281   5                //FM_HexDump(FM_USER,"\nPayload: ",(u8*)(pSetReq + 1),
+1282   5                //          payloadlen);          
+1283   5              }
+1284   4              else
+1285   4              {
+1286   5      #ifndef NO_HOST       
+                        memcpy_cpu_to_le(buff,(u8*)&pSetReq->PIBAttributeValue,payloadlen);
+              #else
+1289   5                memcpy(buff,(u8*)&pSetReq->PIBAttributeValue,payloadlen);
+1290   5      #endif
+1291   5                memcpy((u8*)&pSetReq->PIBAttributeValue, buff, payloadlen);
+1292   5                          
+1293   5                mac_api_mlme_set_req (pSetReq->PIBAttribute,
+1294   5                            pSetReq->PIBAttributeIndex,
+1295   5                            (void *)buff);
+1296   5                //FM_HexDump(FM_USER,"\nVALUE: ",(u8*)&pSetReq->PIBAttributeValue,
+1297   5                //          payloadlen);          
+1298   5              }
+1299   4              break;
+1300   4            }
+1301   3      
+1302   3            case MLME_RX_ENABLE_REQUEST:
+1303   3            {   
+1304   4              mlme_rx_enable_req_t *pRxEnbReq;
+1305   4              pRxEnbReq = (mlme_rx_enable_req_t *)cmdptr;
+1306   4      #if 0
+                      pRxEnbReq->RxOnTime = le32_to_cpu(pRxEnbReq->RxOnTime);
+                      pRxEnbReq->RxOnDuration = le32_to_cpu(pRxEnbReq->RxOnDuration);
+              #endif
+1310   4      
+1311   4      #if 0
+                      FM_Printf(FM_USER,"\nMLME RX E Req\r\n");
+                      FM_Printf(FM_USER,"DeferP = %bx\r\n",pRxEnbReq->DeferPermit);
+                      FM_Printf(FM_USER,"RxOnT = %lx\r\n",pRxEnbReq->RxOnTime);
+                      FM_Printf(FM_USER,"RxOnD = %lx\r\n",pRxEnbReq->RxOnDuration);
+              #endif
+1317   4              mac_api_mlme_rx_enable_req (pRxEnbReq->DeferPermit,
+1318   4                               pRxEnbReq->RxOnTime,
+1319   4                               pRxEnbReq->RxOnDuration);        
+1320   4              break;
+1321   4            }
+1322   3      
+1323   3            case MLME_SCAN_REQUEST:
+1324   3            {
+1325   4              //uint32_t scan_channels;
+1326   4              mlme_scan_req_t *pScanReq;
+1327   4              pScanReq = (mlme_scan_req_t *)cmdptr;
+1328   4      
+1329   4      #if 0
+                      printf("\nMLME_SCAN_REQUEST");
+                      FM_Printf(FM_USER,"\nScanType = %bx\r\n",pScanReq->ScanType);
+                      FM_Printf(FM_USER,"ScanChannels = %lx\r\n",pScanReq->ScanChannels);
+                      FM_HexDump(FM_USER,"ScanCh:",(u8*)&pScanReq->ScanChannels, 4);
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 23  
+
+                      FM_Printf(FM_USER,"ScanChannels = %lx\r\n",pScanReq->ScanChannels);
+                      FM_Printf(FM_USER,"ScanDuration = %bx\r\n",pScanReq->ScanDuration);
+                      FM_Printf(FM_USER,"ChannelPage = %bx\r\n",pScanReq->ChannelPage);
+              #endif        
+1338   4              if (mac_api_mlme_scan_req (pScanReq->ScanType,
+1339   4                            pScanReq->ScanChannels,
+1340   4                            pScanReq->ScanDuration,
+1341   4                            pScanReq->ChannelPage,
+1342   4                            &pScanReq->Security) == false)
+1343   4                {
+1344   5      
+1345   5                  mlme_scan_conf_t *cnf = (mlme_scan_conf_t*)cmdptr;
+1346   5      
+1347   5                  cnf->status = MAC_FAILURE;
+1348   5                  cnf->ResultListSize = 0;
+1349   5      
+1350   5                  
+1351   5                    cnf->cmdcode = MLME_SCAN_CONFIRM;
+1352   5      //              cnf->ScanType = scan_type;
+1353   5        //            cnf->UnscannedChannels = scan_channels;
+1354   5          //          cnf->ChannelPage = scan_curr_page;
+1355   5                    cnf->ResultListSize = 0;
+1356   5                    cnf->scan_result_list[0].ed_value[0] = 0;
+1357   5      
+1358   5                    
+1359   5                  
+1360   5                  rspEvent = NMA_EncodeRsp(MLME_SCAN_CONFIRM, 
+1361   5                            IEEE802_15_4_MAC_ID, cmdptr,sizeof(mlme_scan_conf_t));
+1362   5                        
+1363   5      
+1364   5      
+1365   5                }
+1366   4              break;
+1367   4            }
+1368   3      
+1369   3            case MLME_SYNC_REQUEST:
+1370   3            {   
+1371   4              mlme_sync_req_t *pSyncReq;
+1372   4              pSyncReq = (mlme_sync_req_t *)cmdptr;
+1373   4      
+1374   4      #if 0
+                      FM_Printf(FM_USER,"\nMLME Sync Req\r\n");
+                      FM_Printf(FM_USER,"LC = %bx\r\n",pSyncReq->LogicalChannel);
+                      FM_Printf(FM_USER,"Ch Page = %lx\r\n",pSyncReq->ChannelPage);
+                      FM_Printf(FM_USER,"Track Beacon = %bx\r\n",pSyncReq->TrackBeacon);
+              #endif
+1380   4              mac_api_mlme_sync_req (pSyncReq->LogicalChannel,
+1381   4                            pSyncReq->ChannelPage,
+1382   4                            pSyncReq->TrackBeacon);
+1383   4              break;
+1384   4            }
+1385   3      
+1386   3            case MLME_POLL_REQUEST:
+1387   3            {   
+1388   4              mlme_poll_req_t *pPollReq;
+1389   4              wpan_addr_spec_t CoordAddrSpec;
+1390   4              pPollReq = (mlme_poll_req_t *)cmdptr;
+1391   4      
+1392   4      #if 0
+                      pPollReq->CoordAddress.PANId = le16_to_cpu(pPollReq->CoordAddress.PANId);
+              
+                      if(pPollReq->CoordAddress.AddrMode == WPAN_ADDRMODE_SHORT){
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 24  
+
+                        pPollReq->CoordAddress.Addr.short_address = le16_to_cpu(pPollReq->CoordAddress.Addr.short_address);
+                      } else {
+                        temp = le32_to_cpu(pPollReq->CoordAddress.Addr.long_address.hi_u32);
+                        pPollReq->CoordAddress.Addr.long_address.hi_u32 = 
+                                       le32_to_cpu(pPollReq->CoordAddress.Addr.long_address.lo_u32);
+                        pPollReq->CoordAddress.Addr.long_address.lo_u32 = temp;
+                      }
+              #endif
+1404   4      
+1405   4              CoordAddrSpec.AddrMode = pPollReq->CoordAddrMode;
+1406   4              CoordAddrSpec.PANId = pPollReq->CoordPANId;
+1407   4              CoordAddrSpec.Addr = pPollReq->CoordAddress;
+1408   4      
+1409   4      #if 0
+                      FM_Printf(FM_USER,"\nMLME Poll Req\r\n");
+                      FM_Printf(FM_USER,"Coord PAN ID = %x\r\n",pPollReq->CoordPANId);
+                      FM_Printf(FM_USER,"Coord Addr = %lx %lx\r\n",pPollReq->CoordAddress.long_address.hi_u32,\
+                                          pPollReq->CoordAddress.long_address.lo_u32);
+              #endif        
+1415   4              mac_api_mlme_poll_req (&CoordAddrSpec,
+1416   4                          &pPollReq->Security);       
+1417   4              break;
+1418   4            } 
+1419   3            
+1420   3            default:
+1421   3            {
+1422   4              printf("invalid cmd\n");
+1423   4              break;
+1424   4            }
+1425   3          }
+1426   2        }
+1427   1      #endif  
+1428   1        else if(pHostHdr->protocol == SYS_MAC_ID)
+1429   1        {
+1430   2          switch((u8)(*cmdptr))     
+1431   2          {
+1432   3      #ifndef NO_HOST
+                    case HOST_CMD_GET_MACADDRESS_REQ:
+                    {
+                      sHaLayer  *hal;         
+                      hostCmdGetMacAddress *getMacaddr = (hostCmdGetMacAddress*)cmdptr;
+                      
+                      if(cmdlen != sizeof(hostCmdGetMacAddress))
+                         getMacaddr->result = STATUS_FAILURE;
+                      else
+                      {       
+                        hal = HOMEPLUG_GetHal();
+                        memcpy((u8*)(&getMacaddr->macaddr), hal->macAddr, MAC_ADDR_LEN);                
+                        getMacaddr->result = STATUS_SUCCESS;          
+                      }
+                      getMacaddr->command = HOST_CMD_GET_MACADDRESS_CNF;
+                      rspEvent = NMA_EncodeRsp(HOST_CMD_GET_MACADDRESS_CNF, pHostHdr->protocol,
+                                  cmdptr, sizeof(hostCmdGetMacAddress));        
+                    }
+                    break;  
+              #endif
+1452   3      
+1453   3            default:
+1454   3            break;
+1455   3          }
+1456   2        }
+1457   1      
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 25  
+
+1458   1          if (rspEvent != NULL)
+1459   1          {
+1460   2              /* transmit a confirmation message */
+1461   2              NMA_TransmitMgmtMsg(rspEvent);
+1462   2          }
+1463   1      }
+1464          
+1465          void *NMA_EncodeRsp(u8 command, u8 protocol, u8 *ptr_packet, u16 packetlen)
+1466          {
+1467   1      #ifndef NO_HOST 
+                u8    evtClass;
+                u8    evtType;
+                u8      frmType;
+              #endif  
+1472   1          sEvent *event = NULL;
+1473   1      #ifdef NO_HOST    
+1474   1        gv701x_app_msg_hdr_t* rsp_msg_hdr = NULL; 
+1475   1        sNma* nma = HOMEPLUG_GetNma();  
+1476   1      #endif
+1477   1        
+1478   1      #ifndef NO_HOST 
+                if(protocol == HPGP_MAC_ID)
+                {
+                  switch(command)
+                  {
+                    case(APCM_SET_SECURITY_MODE_CNF):
+                    case(APCM_GET_SECURITY_MODE_CNF): 
+                    case(APCM_SET_KEY_CNF):
+                    case(APCM_STA_RESTART_CNF):
+                    case(APCM_SET_NETWORKS_CNF):
+                    case(APCM_NET_EXIT_CNF):
+                    case(APCM_CCO_APPOINT_CNF):
+                    case(APCM_AUTHORIZE_CNF):
+                      evtClass = EVENT_CLASS_CTRL;
+                      evtType  = command;
+                      frmType = CONTROL_FRM_ID;
+                      
+                    break;
+                          
+                    //host commands
+                    case(HOST_CMD_DATAPATH_CNF):
+                    case(HOST_CMD_BRIDGE_CNF):
+                    case(HOST_CMD_SNIFFER_CNF):
+                    case(HOST_CMD_DEVICE_MODE_CNF):
+                    case(HOST_CMD_HARDWARE_SPEC_CNF):
+                    case(HOST_CMD_DEVICE_STATS_CNF):
+                    case(HOST_CMD_PEERINFO_CNF):
+                        case(HOST_CMD_SW_RESET_CNF):
+                        case(HOST_CMD_TX_POWER_MODE_CNF):
+                    case(HOST_CMD_COMMIT_CNF):
+                    case(HOST_CMD_GET_VERSION_CNF):
+                        case(HOST_CMD_PSAVLN_CNF):            
+                        case(HOST_CMD_PSSTA_CNF):
+                        case(HOST_CMD_ERASE_FLASH_CNF):
+                    case(HOST_CMD_SCANNETWORK_CNF):
+                    case(HOST_CMD_VENDORSPEC_CNF):        
+                            evtClass = EVENT_CLASS_MGMT;
+                      evtType  = command;
+                      frmType = MGMT_FRM_ID;
+                    break;
+                  
+                    default:
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 26  
+
+                      return NULL;
+                    break;
+                  }
+                }
+              #ifdef HYBRII_802154
+                else if(protocol == IEEE802_15_4_MAC_ID)
+                {
+                  switch(command)
+                  {           
+                    //host commands
+                    case(MCPS_DATA_CONFIRM):
+                    case(MCPS_PURGE_CONFIRM):
+                    case(MLME_ASSOCIATE_CONFIRM):
+                    case(MLME_DISASSOCIATE_CONFIRM):
+                    case(MLME_GET_CONFIRM):
+                    case(MLME_POLL_CONFIRM):
+                    case(MLME_RESET_CONFIRM):
+                        case(MLME_RX_ENABLE_CONFIRM):
+                        case(MLME_SCAN_CONFIRM):
+                    case(MLME_SET_CONFIRM):
+                    case(MLME_START_CONFIRM):
+                            evtClass = EVENT_CLASS_MGMT;
+                      evtType  = command;
+                      frmType = MGMT_FRM_ID;
+                    break;
+                  
+                    default:
+                      return NULL;        
+                    break;
+                  } 
+                }
+              #endif /* HYBRII_802154 */
+                else if(protocol == SYS_MAC_ID)
+                {
+                  switch(command)
+                  {           
+                    case(HOST_CMD_GET_MACADDRESS_CNF):
+                            evtClass = EVENT_CLASS_MGMT;
+                      evtType  = command;
+                      frmType = MGMT_FRM_ID;        
+                    break;
+                    
+                    default:
+                      return NULL;        
+                    break;
+                  }
+                }
+                else
+                {
+                  return NULL;
+                }
+              #endif
+1572   1      
+1573   1      #ifdef NO_HOST  
+1574   1        event = (sEvent* )GV701x_EVENT_Alloc(packetlen + CRC_SIZE + H1MSG_HEADER_SIZE + sizeof(gv701x_app_msg_hdr
+             -_t),
+1575   1                           H1MSG_HEADER_SIZE);
+1576   1      #else
+                event = (sEvent *)EVENT_Alloc(packetlen + CRC_SIZE + H1MSG_HEADER_SIZE, H1MSG_HEADER_SIZE);
+              #endif
+1579   1      
+1580   1        if(event != NULL)
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 27  
+
+1581   1        {
+1582   2      #ifdef NO_HOST    
+1583   2          hostHdr_t *pHostHdr  =  (hostHdr_t*)(&event->buffDesc.dataptr[sizeof(gv701x_app_msg_hdr_t)]);
+1584   2      #else
+                  hostHdr_t *pHostHdr  =  (hostHdr_t*)event->buffDesc.dataptr;
+              #endif
+1587   2      
+1588   2      #ifdef NO_HOST
+1589   2          if(protocol == HPGP_MAC_ID)
+1590   2          {
+1591   3            if(command == HOST_CMD_SCANNETWORK_CNF)
+1592   3              event->eventHdr.eventClass = nma->msg_event_1.eventHdr.eventClass;
+1593   3            else
+1594   3              event->eventHdr.eventClass = nma->msg_event.eventHdr.eventClass;
+1595   3          }
+1596   2      #ifdef HYBRII_802154        
+1597   2          if(protocol == IEEE802_15_4_MAC_ID) 
+1598   2            event->eventHdr.eventClass = mac_host_db.msg_event.eventHdr.eventClass;
+1599   2      #endif    
+1600   2          if(protocol == SYS_MAC_ID) 
+1601   2            event->eventHdr.eventClass = EVENT_CLASS_MGMT;    
+1602   2      #else
+                  event->eventHdr.eventClass = evtClass;
+              #endif
+1605   2          event->eventHdr.type = command;     
+1606   2      
+1607   2      #ifdef NO_HOST  
+1608   2          rsp_msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;
+1609   2          rsp_msg_hdr->src_app_id = APP_FW_MSG_APPID;
+1610   2          if(protocol == HPGP_MAC_ID)   
+1611   2          {
+1612   3            if(command == HOST_CMD_SCANNETWORK_CNF)
+1613   3            {
+1614   4              rsp_msg_hdr->dst_app_id = nma->msg_hdr_1.src_app_id;
+1615   4              rsp_msg_hdr->type = nma->msg_hdr_1.type;
+1616   4            }
+1617   3            else
+1618   3            {
+1619   4              rsp_msg_hdr->dst_app_id = nma->msg_hdr.src_app_id;
+1620   4              rsp_msg_hdr->type = nma->msg_hdr.type;
+1621   4            }
+1622   3          }
+1623   2      #ifdef HYBRII_802154        
+1624   2          if(protocol == IEEE802_15_4_MAC_ID)
+1625   2          {
+1626   3            rsp_msg_hdr->dst_app_id = mac_host_db.msg_hdr.src_app_id;
+1627   3            rsp_msg_hdr->type = mac_host_db.msg_hdr.type;
+1628   3          }
+1629   2      #endif    
+1630   2          if(protocol == SYS_MAC_ID)
+1631   2          {
+1632   3            rsp_msg_hdr->dst_app_id = APP_BRDCST_MSG_APPID;
+1633   3            rsp_msg_hdr->type = APP_MSG_TYPE_FW;
+1634   3          }
+1635   2              
+1636   2          rsp_msg_hdr->len = event->buffDesc.datalen;
+1637   2      #endif
+1638   2          memcpy((u8*)(pHostHdr + 1),
+1639   2               ptr_packet, packetlen);
+1640   2      
+1641   2      #ifdef NO_HOST    
+1642   2          event->buffDesc.datalen = packetlen + sizeof(hostHdr_t) + sizeof(gv701x_app_msg_hdr_t);
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 28  
+
+1643   2      #else
+                  event->buffDesc.datalen = packetlen + sizeof(hostHdr_t);
+              #endif
+1646   2          pHostHdr->protocol = protocol;
+1647   2      #ifndef NO_HOST   
+                  pHostHdr->length   = cpu_to_le16(packetlen);
+              #else
+1650   2              pHostHdr->length   = packetlen;
+1651   2      #endif
+1652   2      #ifdef NO_HOST
+1653   2          if(protocol == HPGP_MAC_ID)   
+1654   2          {
+1655   3            if(command == HOST_CMD_SCANNETWORK_CNF)
+1656   3              pHostHdr->type     = nma->msg_hybrii_hdr_1.type;  
+1657   3            else
+1658   3              pHostHdr->type     = nma->msg_hybrii_hdr.type;  
+1659   3          }
+1660   2      #ifdef HYBRII_802154        
+1661   2          if(protocol == IEEE802_15_4_MAC_ID)   
+1662   2            pHostHdr->type     = mac_host_db.msg_hybrii_hdr.type; 
+1663   2      #endif    
+1664   2          if(protocol == SYS_MAC_ID)
+1665   2            pHostHdr->type     = MGMT_FRM_ID; 
+1666   2      #else
+                  pHostHdr->type     = frmType;
+              #endif
+1669   2        }
+1670   1      
+1671   1        return(event);
+1672   1      }
+1673          
+1674          
+1675          eStatus NMA_TransmitMgmtMsg(sEvent *event)
+1676          {
+1677   1      #ifdef SIMU
+                  sNmm *nmm = Host_GetNmm();
+                  NMM_PostEvent(nmm, event);
+              #else
+1681   1      #ifdef HPGP_MAC_SAP
+1682   1        SEND_HOST_EVENT(event);
+1683   1      #endif //HPGP_MAC_SAP
+1684   1      #endif
+1685   1          return STATUS_SUCCESS;
+1686   1      }
+1687          
+1688          void NMA_RecvMgmtPacket(hostHdr_t *pHostHdr, u16 packetlen)
+1689          {     
+1690   1        if((pHostHdr->type == CONTROL_FRM_ID) || (pHostHdr->type == MGMT_FRM_ID) &&
+1691   1          ((pHostHdr->protocol == APP_MAC_ID) || (pHostHdr->protocol == HPGP_MAC_ID) || (pHostHdr->protocol == IEE
+             -E802_15_4_MAC_ID)))   
+1692   1        {   
+1693   2          sEvent *event;
+1694   2          u8 *pos;
+1695   2          sNma *nma = HOMEPLUG_GetNma();
+1696   2      
+1697   2      
+1698   2            packetlen -= sizeof(hostHdr_t);
+1699   2            pHostHdr->length = HTONHS(pHostHdr->length);
+1700   2            if((packetlen) < pHostHdr->length)
+1701   2                return;
+1702   2            
+1703   2          pos = (u8 *)pHostHdr + sizeof(hostHdr_t); 
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 29  
+
+1704   2      
+1705   2      #ifdef NO_HOST
+1706   2          event = GV701x_EVENT_Alloc(sizeof(hostHdr_t) + pHostHdr->length + CRC_SIZE, H1MSG_HEADER_SIZE);
+1707   2      #else
+                  event = EVENT_Alloc( sizeof(hostHdr_t) + pHostHdr->length + CRC_SIZE, H1MSG_HEADER_SIZE);
+              #endif
+1710   2          
+1711   2          if (event == NULL)
+1712   2          {
+1713   3            return;
+1714   3          }
+1715   2          
+1716   2          if(pHostHdr->protocol == HPGP_MAC_ID)
+1717   2          {
+1718   3      
+1719   3            switch(pHostHdr->type)
+1720   3            {
+1721   4              case(CONTROL_FRM_ID):
+1722   4              case(MGMT_FRM_ID):
+1723   4              {           
+1724   5                switch((u8)(*pos))
+1725   5                {   
+1726   6                  case(APCM_SET_SECURITY_MODE_REQ):
+1727   6                  case(APCM_GET_SECURITY_MODE_REQ):
+1728   6                  case(APCM_SET_KEY_REQ):     
+1729   6                  case(APCM_STA_RESTART_REQ):   
+1730   6                  case(APCM_SET_NETWORKS_REQ):  
+1731   6                  case(APCM_NET_EXIT_REQ):    
+1732   6                  case(APCM_CCO_APPOINT_REQ):   
+1733   6                  case(APCM_AUTHORIZE_REQ):
+1734   6                    event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1735   6                  break;
+1736   6      
+1737   6                  case(HOST_CMD_DATAPATH_REQ):  
+1738   6                  case(HOST_CMD_SNIFFER_REQ):   
+1739   6                  case(HOST_CMD_BRIDGE_REQ):    
+1740   6                  case(HOST_CMD_DEVICE_MODE_REQ): 
+1741   6                  case(HOST_CMD_HARDWARE_SPEC_REQ):
+1742   6                  case(HOST_CMD_DEVICE_STATS_REQ):
+1743   6                  case(HOST_CMD_PEERINFO_REQ):
+1744   6                          case(HOST_CMD_SW_RESET_REQ):
+1745   6                          case(HOST_CMD_FW_READY):    
+1746   6                          case(HOST_CMD_TX_POWER_MODE_REQ):
+1747   6                          case(HOST_CMD_COMMIT_REQ):  
+1748   6                  case(HOST_CMD_GET_VERSION_REQ):
+1749   6                  case(HOST_CMD_SCANNETWORK_REQ):
+1750   6                  case(HOST_CMD_VENDORSPEC_REQ):              
+1751   6                    event->eventHdr.eventClass = EVENT_CLASS_MGMT;
+1752   6                  break;
+1753   6                  
+1754   6                  case(HOST_CMD_DEV_CAP_INFO_CNF):// GHDD and Application uses this msg to identify GV7011 (RF + PLC)
+1755   6                    EVENT_Free(event); // GHDD sends this response over raw socket, due to which firmware receives over
+             - SPI interface.[Kiran]
+1756   6                    return;
+1757   6                  break;
+1758   6                  
+1759   6                  default:
+1760   6                  {
+1761   7                    printf("\n Invalid hpgp command id received from host (%bx)", (u8)(*pos));
+1762   7                      EVENT_Free(event);
+1763   7                    return; 
+1764   7                  }
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 30  
+
+1765   6                  break;
+1766   6                }
+1767   5              }
+1768   4              break;
+1769   4      
+1770   4              case(DATA_FRM_ID):
+1771   4              {
+1772   5                event->eventHdr.eventClass = EVENT_CLASS_DATA;  
+1773   5              }
+1774   4              break;
+1775   4                  default:
+1776   4                  {
+1777   5                      printf("\n Invalid pHostHdr->type\n");
+1778   5                  EVENT_Free(event);
+1779   5                  return; 
+1780   5                  }
+1781   4            } 
+1782   3          }
+1783   2      #ifdef HYBRII_802154
+1784   2          else if(pHostHdr->protocol == IEEE802_15_4_MAC_ID)
+1785   2          { 
+1786   3            switch(pHostHdr->type)
+1787   3            {
+1788   4              case(CONTROL_FRM_ID):
+1789   4              case(MGMT_FRM_ID):
+1790   4              {           
+1791   5                FM_Printf(FM_APP, "\nrfc %bu", (u8)(*pos));               
+1792   5                switch((u8)(*pos))
+1793   5                {   
+1794   6                  case(MCPS_DATA_REQUEST):
+1795   6                  case(MCPS_PURGE_REQUEST):         
+1796   6                  case(MLME_START_REQUEST):
+1797   6                  case(MLME_ASSOCIATE_REQUEST):
+1798   6                  case(MLME_ASSOCIATE_RESPONSE):
+1799   6                  case(MLME_DISASSOCIATE_REQUEST):
+1800   6                  case(MLME_ORPHAN_RESPONSE):
+1801   6                  case(MLME_RESET_REQUEST):
+1802   6                  case(MLME_GET_REQUEST):
+1803   6                  case(MLME_SET_REQUEST):
+1804   6                  case(MLME_RX_ENABLE_REQUEST):
+1805   6                  case(MLME_SCAN_REQUEST):
+1806   6                  case(MLME_SYNC_REQUEST):
+1807   6                  case(MLME_POLL_REQUEST):
+1808   6                    event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+1809   6                  break;
+1810   6                  
+1811   6                  default:
+1812   6                  {
+1813   7                    printf("\n Invalid zb command id received from host (%bx)", (u8)(*pos));
+1814   7      #ifdef NO_HOST
+1815   7                    EVENT_Free(event);
+1816   7      #else
+                            EVENT_Free(event);
+              #endif
+1819   7                    return; 
+1820   7                  }
+1821   6                  break;
+1822   6                }
+1823   5              }
+1824   4              break;
+1825   4      
+1826   4              case(DATA_FRM_ID):
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 31  
+
+1827   4              {
+1828   5                event->eventHdr.eventClass = EVENT_CLASS_DATA;  
+1829   5              }
+1830   4              break;
+1831   4              default:
+1832   4              {
+1833   5                printf("\n Invalid pHostHdr->type\n");
+1834   5                EVENT_Free(event);
+1835   5                return; 
+1836   5              }
+1837   4            }
+1838   3          } 
+1839   2      #endif        
+1840   2          else if(pHostHdr->protocol == SYS_MAC_ID)
+1841   2          {
+1842   3            switch(pHostHdr->type)
+1843   3            {
+1844   4              case(CONTROL_FRM_ID):
+1845   4              case(MGMT_FRM_ID):
+1846   4              {           
+1847   5                switch((u8)(*pos))
+1848   5                { 
+1849   6      #ifndef NO_HOST
+                          case(HOST_CMD_GET_MACADDRESS_REQ):
+                            event->eventHdr.eventClass = EVENT_CLASS_CTRL;
+                          break;
+              #endif
+1854   6                  default:
+1855   6                  {
+1856   7                    printf("\n Invalid app command id received from host (%bx)", (u8)(*pos));
+1857   7                    EVENT_Free(event);
+1858   7                    return; 
+1859   7                  }             
+1860   6                }
+1861   5              }
+1862   4              break;
+1863   4      
+1864   4              default:
+1865   4              {
+1866   5                printf("\n Invalid pHostHdr->type\n");
+1867   5                EVENT_Free(event);
+1868   5                return; 
+1869   5              }
+1870   4            }     
+1871   3          }
+1872   2          
+1873   2          event->eventHdr.type = *pos;
+1874   2          event->buffDesc.datalen =  sizeof(hostHdr_t) + pHostHdr->length;
+1875   2          memcpy(event->buffDesc.dataptr, (u8*)pHostHdr,  event->buffDesc.datalen);
+1876   2          NMA_PostEvent((void*)nma, event);
+1877   2          os_set_ready(HPGP_TASK_ID_CTRL);      
+1878   2        }
+1879   1      }
+1880          
+1881          #ifdef SIMU
+              void NMA_PostEvent(sNma *nma, sEvent *event)
+              #else
+1884          void NMA_PostEvent(void* cookie,  sEvent *event)
+1885          #endif
+1886          {
+1887   1        sEvent* nmaevent = (sEvent *)event;
+1888   1      #ifndef SIMU
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 32  
+
+1889   1          sNma *nma = (sNma *)cookie;
+1890   1      #endif
+1891   1      
+1892   1      #ifdef P8051
+1893   1      __CRIT_SECTION_BEGIN__
+1894   1      #else
+                  SEM_WAIT(&nma->nmaSem);
+              #endif
+1897   1      
+1898   1          SLIST_Put(&nma->eventQueue, &nmaevent->link);
+1899   1      
+1900   1      #ifdef P8051
+1901   1      __CRIT_SECTION_END__
+1902   1      #else
+                  SEM_POST(&nma->nmaSem);
+              #endif
+1905   1          /* schedule the task */
+1906   1      #ifndef RTX51_TINY_OS
+                  SCHED_Sched(&nma->task);
+              #else
+1909   1      #ifndef UM
+                  os_set_ready(HPGP_TASK_ID_NMA);
+              #endif
+1912   1      #endif
+1913   1      }
+1914          
+1915          void NMA_SendFwReady(u8 link)
+1916          {    
+1917   1        u8* plink;
+1918   1        u8 slink;
+1919   1      
+1920   1        slink = link;
+1921   1        plink = &slink;
+1922   1      #ifdef NO_HOST  
+1923   1          Host_SendIndication(HOST_EVENT_FW_READY, SYS_MAC_ID, plink, sizeof(u8));    
+1924   1      #else
+                //Host_SendIndication(HOST_EVENT_FW_READY, HPGP_MAC_ID, NULL, 0); 
+                Host_SendIndication(HOST_EVENT_FW_READY, HPGP_MAC_ID, plink, sizeof(u8));
+              #endif  
+1928   1      }
+1929          
+1930          eStatus NMA_SendNetExitCnf(sNma *nma, u8 result)
+1931          {
+1932   1          hostCmdNetExit netexit;
+1933   1          eStatus ret = STATUS_FAILURE;
+1934   1          sEvent *event = NULL;
+1935   1         
+1936   1          /*Compiler warning suppression*/
+1937   1          nma = nma;
+1938   1        
+1939   1          netexit.command = APCM_NET_EXIT_CNF;
+1940   1          netexit.result = result;
+1941   1      
+1942   1          event = NMA_EncodeRsp(APCM_NET_EXIT_CNF, HPGP_MAC_ID,
+1943   1            (u8 *)&netexit, sizeof(hostCmdNetExit));
+1944   1      
+1945   1      #if 0
+                { 
+                  hostEvent_nextExit_t pNwExit; 
+                  pNwExit.reason = HPGP_NETWORK_EXIT_REASON_USER_REQ;
+                  Host_SendIndication(HOST_EVENT_NET_EXIT, HPGP_MAC_ID, (u8*)&pNwExit,
+                            sizeof(hostEvent_nextExit_t));
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 33  
+
+                }
+              #endif  
+1953   1          if(event != NULL)
+1954   1          {
+1955   2              NMA_TransmitMgmtMsg(event);
+1956   2              ret = STATUS_SUCCESS;
+1957   2          }
+1958   1          return ret;
+1959   1      }
+1960          
+1961          eStatus NMA_SendCcoApptCnf(sNma *nma, u8 result)
+1962          {
+1963   1          hostCmdAptCco appointcco;  
+1964   1          eStatus ret = STATUS_FAILURE;
+1965   1          sEvent *event = NULL;
+1966   1       
+1967   1          /*Compiler warning suppression*/
+1968   1          nma = nma;
+1969   1        
+1970   1          appointcco.result = result;
+1971   1          appointcco.command = APCM_CCO_APPOINT_CNF;
+1972   1          event = NMA_EncodeRsp(APCM_CCO_APPOINT_CNF, HPGP_MAC_ID,
+1973   1            (u8 *)&appointcco, sizeof(hostCmdAptCco));      
+1974   1      
+1975   1          if(event != NULL)
+1976   1          {
+1977   2              NMA_TransmitMgmtMsg(event);
+1978   2              ret = STATUS_SUCCESS;
+1979   2          }
+1980   1          
+1981   1          return ret;
+1982   1      }
+1983          
+1984          void GV701x_CmdSend(hostHdr_t *pHostHdr, u16 frm_len)
+1985          {
+1986   1        NMA_RecvMgmtPacket(pHostHdr, frm_len);  
+1987   1      }
+1988          
+1989          /** =========================================================
+1990           *
+1991           * Edit History
+1992           *
+1993           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/nma/nma.c,v $
+1994           *
+1995           * $Log: nma.c,v $
+1996           * Revision 1.20  2014/11/26 13:19:40  ranjan
+1997           * *** empty log message ***
+1998           *
+1999           * Revision 1.19  2014/11/11 14:52:58  ranjan
+2000           * 1.New Folder Architecture espically in /components
+2001           * 2.Modular arrangment of functionality in new files
+2002           *    anticipating the need for exposing them as FW App
+2003           *    development modules
+2004           * 3.Other improvisation in code and .h files
+2005           *
+2006           * Revision 1.18  2014/09/05 09:28:18  ranjan
+2007           * 1. uppermac cco-sta switching feature fix
+2008           * 2. general stability fixes for many station associtions
+2009           * 3. changed mgmt memory pool for many STA support
+2010           *
+2011           * Revision 1.17  2014/08/25 07:37:35  kiran
+2012           * 1) RSSI & LQI support
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 34  
+
+2013           * 2) Fixed Sync related issues
+2014           * 3) Fixed timer 0 timing drift for SDK
+2015           * 4) MMSG & Error Logging in Flash
+2016           *
+2017           * Revision 1.16  2014/07/30 12:26:26  kiran
+2018           * 1) Software Recovery for CCo
+2019           * 2) User appointed CCo support in SDK
+2020           * 3) Association process performance fixes
+2021           * 4) SSN related fixes
+2022           *
+2023           * Revision 1.15  2014/07/22 10:03:52  kiran
+2024           * 1) SDK Supports Power Save
+2025           * 2) Uart_Driver.c cleanup
+2026           * 3) SDK app memory pool optimization
+2027           * 4) Prints from STM.c are commented
+2028           * 5) Print messages are trimmed as common no memory left in common
+2029           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+2030           *
+2031           * Revision 1.14  2014/07/16 10:47:40  kiran
+2032           * 1) Updated SDK
+2033           * 2) Fixed Diag test in SDK
+2034           * 3) Ethernet and SPI interfaces removed from SDK as common memory is less
+2035           * 4) GPIO access API's added in SDK
+2036           * 5) GV701x chip reset command supported
+2037           * 6) Start network and Join network supported in SDK (Forced CCo and STA)
+2038           * 7) Some bug fixed in SDK (CP free, p app command issue etc.)
+2039           *
+2040           * Revision 1.13  2014/07/10 11:42:45  prashant
+2041           * power save commands added
+2042           *
+2043           * Revision 1.12  2014/07/01 09:49:57  kiran
+2044           * memory (xdata) improvement
+2045           *
+2046           * Revision 1.11  2014/06/24 16:26:45  ranjan
+2047           * -zigbee frame_handledata fix.
+2048           * -added reason code for uppermac host events
+2049           * -small cleanups
+2050           *
+2051           * Revision 1.10  2014/06/17 09:24:58  kiran
+2052           * interface selection issue fix, get version supported.
+2053           *
+2054           * Revision 1.9  2014/06/11 13:17:47  kiran
+2055           * UART as host interface and peripheral interface supported.
+2056           *
+2057           * Revision 1.8  2014/06/09 13:19:46  kiran
+2058           * Zigbee MAC SAP supported
+2059           *
+2060           * Revision 1.7  2014/06/05 08:38:41  ranjan
+2061           * -flash function enabled for uppermac
+2062           * - commit command after any change would flash systemprofiles
+2063           * - verfied upper mac
+2064           *
+2065           * Revision 1.6  2014/05/28 10:58:59  prashant
+2066           * SDK folder structure changes, Uart changes, removed htm (UI) task
+2067           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+2068           *
+2069           * Revision 1.5  2014/05/16 08:52:30  kiran
+2070           * - System Profile Flashing API's Added. Upper MAC functionality tested
+2071           *
+2072           * Revision 1.4  2014/05/12 08:09:57  prashant
+2073           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 35  
+
+2074           *
+2075           * Revision 1.3  2014/02/27 10:42:47  prashant
+2076           * Routing code added
+2077           *
+2078           * Revision 1.2  2014/01/10 17:19:39  yiming
+2079           * check in Rajan 1/8/2014 code release
+2080           *
+2081           * Revision 1.5  2014/01/08 10:53:54  ranjan
+2082           * Changes for LM OS support.
+2083           * New Datapath FrameTask
+2084           * LM and UM  datapath, feature verified.
+2085           *
+2086           * known issues : performance numbers needs revisit
+2087           *
+2088           * review : pending.
+2089           *
+2090           * Revision 1.4  2013/09/04 14:51:28  yiming
+2091           * New changes for Hybrii_A code merge
+2092           *
+2093           * Revision 1.18  2013/08/06 08:27:28  prashant
+2094           * Added txpowermode command
+2095           *
+2096           * Revision 1.17  2013/07/12 08:56:37  ranjan
+2097           * -UKE Push Button Security Feature.
+2098           * Verified : DirectEntry Security Works.Datapath Works.
+2099           *                 command SetSecMode for UKE works.
+2100           * Added against bug-160
+2101           *
+2102           * Revision 1.16  2013/04/17 13:00:59  ranjan
+2103           * Added FW ready event, Removed hybrii header from datapath, Modified hybrii header
+2104           *  formate
+2105           *
+2106           * Revision 1.15  2013/04/04 12:21:54  prashant
+2107           * Detecting PLC link failure for HMC. added project for HMC and Renesas
+2108           *
+2109           * Revision 1.14  2013/03/26 12:07:26  ranjan
+2110           * -added  host sw reset command
+2111           * - fixed issue in bcn update
+2112           *
+2113           * Revision 1.13  2013/03/21 13:32:46  ranjan
+2114           * host cmd : replaced tlvs with fixed structure
+2115           *
+2116           * Revision 1.12  2013/01/28 12:26:01  prashant
+2117           * STA keep on sending ASSOC but no hw hang issue fixed
+2118           *
+2119           * Revision 1.11  2013/01/04 16:11:23  prashant
+2120           * SPI to PLC bridgeing added, Queue added for SPI and Ethernet
+2121           *
+2122           * Revision 1.10  2012/11/02 07:36:32  ranjan
+2123           * Log : sniffer support for hal test project
+2124           *          fixes for mac-sap command handling
+2125           *
+2126           * Revision 1.9  2012/10/25 11:38:48  prashant
+2127           * Sniffer code added for MAC_SAP, Added new commands in MAC_SAP for sniffer, bridge,
+2128           *  hardware settings and peer information.
+2129           *
+2130           * Revision 1.8  2012/10/11 06:21:00  ranjan
+2131           * ChangeLog:
+2132           * 1. Added HPGP_MAC_SAP to support linux host data and command path.
+2133           *     define HPGP_MAC_SAP, NMA needs to be added in project.
+2134           *
+2135           * 2. Added 'p ping' command in htm.c . Feature is under AUTO_PING macro.
+C51 COMPILER V9.53.0.0   NMA                                                               11/04/2015 20:09:50 PAGE 36  
+
+2136           *
+2137           * 3. Extended  'p key' command to include PPEK support.
+2138           *
+2139           * verified :
+2140           *   1. Datapath ping works overnite after association,auth
+2141           *   2. HAL TEST project is intact
+2142           *
+2143           * Revision 1.7  2012/09/15 17:30:38  yuanhua
+2144           * fixed compilation errors and a missing field (hal) in NMA
+2145           *
+2146           * Revision 1.6  2012/09/11 05:00:06  yuanhua
+2147           * fixed an memory leak in NMA
+2148           *
+2149           * Revision 1.5  2012/06/05 22:37:12  son
+2150           * UART console does not get initialized due to task ID changed
+2151           *
+2152           * Revision 1.4  2012/05/14 05:22:29  yuanhua
+2153           * support the SCHED without using callback functions.
+2154           *
+2155           * Revision 1.3  2012/04/15 20:35:09  yuanhua
+2156           * integrated beacon RX changes in HAL and added HTM for on board test.
+2157           *
+2158           * Revision 1.2  2012/04/13 06:15:11  yuanhua
+2159           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+2160           *
+2161           * Revision 1.1  2012/03/11 17:02:25  yuanhua
+2162           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+2163           *
+2164           *
+2165           * =========================================================*/
+2166          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   7407    ----
+   CONSTANT SIZE    =    207    ----
+   XDATA SIZE       =      3     361
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

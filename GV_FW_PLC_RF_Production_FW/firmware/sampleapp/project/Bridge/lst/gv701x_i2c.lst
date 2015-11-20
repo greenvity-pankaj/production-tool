@@ -1,0 +1,473 @@
+C51 COMPILER V9.53.0.0   GV701X_I2C                                                        11/04/2015 20:09:40 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE GV701X_I2C
+OBJECT MODULE PLACED IN .\obj\gv701x_i2c.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\components\drivers\i2c\src\gv701x_i2c.c LARGE OBJECTADVANCED
+                    - OPTIMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\inclu
+                    -de;..\..\..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware
+                    -\hpgp\src\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\
+                    -..\..\..\firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\fir
+                    -mware\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utiliti
+                    -es\event\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\compon
+                    -ents\hpgp\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\a
+                    -pp_support;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\compone
+                    -nts\drivers\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\co
+                    -mponents;..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;.
+                    -.\..\..\..\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\compone
+                    -nts\drivers\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\componen
+                    -ts\utilities;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\component
+                    -s\drivers\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\i
+                    -nc;..\..\..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP
+                    -_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,N
+                    -MA,NEW_SYNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,
+                    -B2,FREQ_DETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GP
+                    -IO_INTERRUPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RT
+                    -OPO_APP,REGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\gv701x_i2c
+                    -.lst) TABS(2) OBJECT(.\obj\gv701x_i2c.obj)
+
+line level    source
+
+   1          /** =======================================================
+   2           * @file    gv701x_i2c.c
+   3           * 
+   4           * @brief  Contains the I2C read/write implementation
+   5           *
+   6           *  Copyright (C) 2010-2015, Greenvity Communications, Inc.
+   7           *  All Rights Reserved
+   8           *  
+   9           * ========================================================*/
+  10           
+  11          /****************************************************************************** 
+  12            * Includes
+  13            ******************************************************************************/
+  14          #include <stdio.h>
+  15          #include <string.h>
+  16          #include "papdef.h"
+  17          #include "gv701x_includes.h"
+  18          #include "gv701x_i2c.h"
+  19          #ifdef DEVICEINTF_APP
+  20          #include "deviceintfapp.h"
+  21          #endif
+  22          #include "sensor_driver.h"
+  23          
+  24          /****************************************************************************** 
+  25            * Global Data
+  26            ******************************************************************************/
+  27            
+  28          /*I2C driver data*/
+  29          volatile i2c_data_t i2c_data;
+  30          u8 datardy_retry = 0;
+  31          
+  32          /****************************************************************************** 
+  33            * External Data
+  34            ******************************************************************************/
+C51 COMPILER V9.53.0.0   GV701X_I2C                                                        11/04/2015 20:09:40 PAGE 2   
+
+  35          #ifdef SENSOR_DRIVER
+              extern sensor_data_t sensor_data;
+              #endif
+  38          
+  39          /******************************************************************************
+  40            * External Funtion prototypes
+  41            ******************************************************************************/
+  42          
+  43          extern void CHAL_DelayTicks(u32 num12Clks);
+  44          
+  45          /****************************************************************************** 
+  46            * Function Prototypes
+  47            ******************************************************************************/
+  48          
+  49          
+  50          /******************************************************************************
+  51           * @fn      GV701x_I2C_Init
+  52           *
+  53           * @brief   Initializes the I2C driver
+  54           *
+  55           * @param   none
+  56           *
+  57           * @return  none
+  58           */
+  59          
+  60          void GV701x_I2C_Init(u8 app_id)
+  61          { 
+  62   1        memset(&i2c_data, 0x00, sizeof(i2c_data_t));
+  63   1      
+  64   1        i2c_data.app_id = app_id; 
+  65   1        FM_Printf(FM_USER, "\nInit I2C (app id %bu)", app_id);
+  66   1        
+  67   1        SLIST_Init(&i2c_data.queues.appRxQueue);  
+  68   1        i2c_data.poll_timer = STM_AllocTimer(SW_LAYER_TYPE_APP, 
+  69   1                  I2C_POLL_TIMER_EVENT, &i2c_data.app_id);  
+  70   1      }
+  71          
+  72          /******************************************************************************
+  73           * @fn      GV701x_I2C_RxAppMsg
+  74           *
+  75           * @brief   Receives a message from another app/fw
+  76           *
+  77           * @params  event - message buffer
+  78           *
+  79           * @return  none
+  80           */
+  81          
+  82          void GV701x_I2C_RxAppMsg(sEvent* event)
+  83          {
+  84   1        gv701x_app_msg_hdr_t* msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;
+  85   1        hostHdr_t* hybrii_hdr;
+  86   1        hostEventHdr_t* evnt_hdr;
+  87   1      
+  88   1        hybrii_hdr = (hostHdr_t*)(msg_hdr + 1);
+  89   1      
+  90   1        if(msg_hdr->dst_app_id == i2c_data.app_id)
+  91   1        {
+  92   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+  93   2            (hybrii_hdr->type == EVENT_FRM_ID))     
+  94   2          {     
+  95   3            evnt_hdr = (hostEventHdr_t*)(hybrii_hdr + 1);
+  96   3            
+C51 COMPILER V9.53.0.0   GV701X_I2C                                                        11/04/2015 20:09:40 PAGE 3   
+
+  97   3            if(evnt_hdr->type == HOST_EVENT_APP_TIMER)
+  98   3            {
+  99   4              GV701x_I2C_Timerhandler((u8*)(evnt_hdr + 1)); 
+ 100   4              return;
+ 101   4            }
+ 102   3          }       
+ 103   2        }
+ 104   1      }
+ 105          
+ 106          /******************************************************************************
+ 107           * @fn         GV701x_I2C_Config
+ 108           *
+ 109           * @brief     Configures the I2C hardware
+ 110           *
+ 111           * @param  devaddr_disable - to enable/disable device addressing (TRUE - disable, FALSE - enable) ??
+ 112           *        devaddrlen - device addressable length  ??
+ 113           *        addr_disable - to enable/disable register addressing (TRUE - disable, FALSE - enable)  ??
+ 114           *        addrlen - register addressable length ??
+ 115           *        clk - the clockk frequency (in Khz)
+ 116           *
+ 117           * @return  none
+ 118           */
+ 119          void GV701x_I2C_Config(bool devaddr_disable, u8 devaddrlen,
+ 120                        bool addr_disable, u8 addrlen, u16 clk)
+ 121          {
+ 122   1        i2c_data.config.reg = 0;
+ 123   1        i2c_data.config.s.devaddis = devaddr_disable;
+ 124   1        i2c_data.config.s.addrdis = addr_disable;
+ 125   1        i2c_data.config.s.devadlen = devaddrlen;
+ 126   1        i2c_data.config.s.addrlen = addrlen;
+ 127   1      
+ 128   1          WriteU8Reg(I2C_CONFIG_REG, i2c_data.config.reg);
+ 129   1      
+ 130   1          /*Set I2C clock to 400 KHz, (div by 28)*/
+ 131   1        if(i2c_data.inst.active == FALSE)
+ 132   1        {
+ 133   2            clk = 0x1C;
+ 134   2            WriteU32Reg(I2C_CLKDIV_REG, ctorl(0x1C));     
+ 135   2        }
+ 136   1      }
+ 137          
+ 138          /******************************************************************************
+ 139           * @fn         GV701x_I2C_Send
+ 140           *
+ 141           * @brief     Sends a request on the bus
+ 142           *
+ 143           * @param   devaddr - the i2c device address 
+ 144           *        regaddr - the register address on the device
+ 145           *        regdata - the data to be written
+ 146           *        cmd - the command id
+ 147           *        op - the operation to be performed (READ_OP - read, WRITE_OP - write,
+ 148           *                     CMD_OP - command) 
+ 149           *        reqbytes - the number of bytes requested from the i2c device
+ 150           *
+ 151           * @return  none
+ 152           */
+ 153           void GV701x_I2C_Send(u8 devaddr, u8 regaddr, u8 regdata, u8 cmd, u8 op, u8 reqbytes)
+ 154          {    
+ 155   1        i2c_data.inst.op = op;
+ 156   1        if(i2c_data.inst.active == FALSE)
+ 157   1        {
+ 158   2          i2c_data.inst.devaddr = devaddr;
+C51 COMPILER V9.53.0.0   GV701X_I2C                                                        11/04/2015 20:09:40 PAGE 4   
+
+ 159   2          i2c_data.inst.regaddr = regaddr;
+ 160   2          i2c_data.inst.regdata = regdata;
+ 161   2          i2c_data.inst.cmd = cmd;
+ 162   2          i2c_data.inst.reqbytes = reqbytes;  
+ 163   2          i2c_data.inst.active = TRUE;  
+ 164   2          /*Clear the read byte holder before the operation*/
+ 165   2          memset(i2c_data.inst.data_buf.byte, 0x00, MAX_REQ_DATA);    
+ 166   2              
+ 167   2              /*Set the device and register addresses*/
+ 168   2              WriteU32Reg(I2C_DEVADDR_REG, ctorl((devaddr & 0x7F)));
+ 169   2              if(op == COMBINE_READ_OP)
+ 170   2              WriteU32Reg(I2C_ADDR_REG, ctorl(regaddr));
+ 171   2        }
+ 172   1        
+ 173   1        /*Write operation*/
+ 174   1        if(op == WRITE_OP)
+ 175   1        {
+ 176   2              WriteU32Reg(I2C_ADDR_REG, ctorl(regaddr));
+ 177   2          WriteU32Reg(I2C_DATAOUT_REG, ctorl(regdata & 0xFF));
+ 178   2          reqbytes = 1;
+ 179   2        }
+ 180   1        /*Read operation*/
+ 181   1        else if(op == READ_OP)
+ 182   1        {
+ 183   2          reqbytes = reqbytes;
+ 184   2        }   
+ 185   1        else if(op == COMBINE_READ_OP)
+ 186   1        {
+ 187   2          reqbytes = 1;
+ 188   2        } 
+ 189   1        
+ 190   1        /*Read/Write command operation*/
+ 191   1        else if((op == CMD_READ_OP) || (op == CMD_WRITE_OP))
+ 192   1        {
+ 193   2              WriteU32Reg(I2C_BYTECNT_REG, 0); 
+ 194   2          WriteU32Reg(I2C_DATAOUT_REG, ctorl(cmd & 0xFF));
+ 195   2          if(op == CMD_READ_OP)
+ 196   2            reqbytes = 1;
+ 197   2          else if(op == CMD_WRITE_OP)
+ 198   2            reqbytes = 2;
+ 199   2        }
+ 200   1      
+ 201   1        if(reqbytes == 1)
+ 202   1        {
+ 203   2          /*Set write byte count to 1 byte*/
+ 204   2              if((op != COMBINE_READ_OP) &&
+ 205   2                  (i2c_data.inst.active == FALSE)){
+ 206   3                  
+ 207   3                       WriteU32Reg(I2C_BYTECNT_REG, ctorl(0));
+ 208   3                  }
+ 209   2        }   
+ 210   1        else if(reqbytes == 2)
+ 211   1        {
+ 212   2          /*Set write byte count to 2 byte*/
+ 213   2              if(op == READ_OP)
+ 214   2              {
+ 215   3                WriteU32Reg(I2C_BYTECNT_REG, ctorl(0x1));
+ 216   3              }
+ 217   2        }
+ 218   1        /*Write the Start tx register*/
+ 219   1        i2c_data.starttxfr.reg = 0;
+ 220   1        if(op == COMBINE_READ_OP) 
+C51 COMPILER V9.53.0.0   GV701X_I2C                                                        11/04/2015 20:09:40 PAGE 5   
+
+ 221   1          i2c_data.starttxfr.s.nodata = 1;  
+ 222   1        else
+ 223   1          i2c_data.starttxfr.s.nodata = 0;
+ 224   1        if(op == READ_OP)
+ 225   1          i2c_data.starttxfr.s.rwdir = TRUE;
+ 226   1        else if(op == WRITE_OP) 
+ 227   1          i2c_data.starttxfr.s.rwdir = FALSE;
+ 228   1          else if(op == COMBINE_READ_OP)
+ 229   1              i2c_data.starttxfr.s.rwdir = FALSE;
+ 230   1        WriteU8Reg(I2C_STARTXFR_REG, i2c_data.starttxfr.reg);
+ 231   1      }
+ 232          
+ 233          /******************************************************************************
+ 234           * @fn         GV701x_I2C_Poll
+ 235           *
+ 236           * @brief     Polls for the status of each on the wire i2c operation, it also completes
+ 237           *               the rest of the operation issued (eg. in case of command read operation it fetches
+ 238           *               the remainder of bytes)
+ 239           *
+ 240           * @param  none
+ 241           *
+ 242           * @return   none
+ 243           */
+ 244          
+ 245          u8 GV701x_I2C_Poll(void)
+ 246          {
+ 247   1        static u8 idx = 0;
+ 248   1          static u16 busyretry =0;
+ 249   1          static u8 continue_Proc = 0;
+ 250   1          volatile uI2cStatusReg      I2C_Status;
+ 251   1          u8 retry= 0;    
+ 252   1      
+ 253   1        /*If there is no current operation return*/
+ 254   1        if((i2c_data.inst.op == 0) || (i2c_data.inst.active == FALSE))
+ 255   1          return FALSE;
+ 256   1      #if 1
+ 257   1      
+ 258   1          
+ 259   1        I2C_Status.reg = ReadU32Reg(I2C_STATUS_REG);  
+ 260   1        if (I2C_Status.s.lostarb || I2C_Status.s.ackerr ||(busyretry > 2000))
+ 261   1          { 
+ 262   2            continue_Proc = 1;
+ 263   2      
+ 264   2          }
+ 265   1        else if((I2C_Status.s.busy) && (continue_Proc == 0))
+ 266   1        {
+ 267   2            busyretry++;
+ 268   2          return FALSE;
+ 269   2        }
+ 270   1        else
+ 271   1      #endif        
+ 272   1        {
+ 273   2            continue_Proc = 0;
+ 274   2          {
+ 275   3            
+ 276   3            /*If a read operation was performed*/
+ 277   3            if(i2c_data.inst.op == READ_OP)
+ 278   3            {
+ 279   4              
+ 280   4              /*If data is present*/
+ 281   4      #if 1       
+ 282   4                     CHAL_DelayTicks(100);
+C51 COMPILER V9.53.0.0   GV701X_I2C                                                        11/04/2015 20:09:40 PAGE 6   
+
+ 283   4                     I2C_Status.reg = 0;
+ 284   4                     I2C_Status.reg = ReadU8Reg(I2C_STATUS_REG);
+ 285   4              
+ 286   4      #endif
+ 287   4                      if(I2C_Status.s.datardy)
+ 288   4              {
+ 289   5                /*Fetch the data bytes if requested for*/
+ 290   5                if((i2c_data.inst.reqbytes != 0) && (i2c_data.inst.reqbytes <= MAX_REQ_DATA))
+ 291   5                {
+ 292   6                  /*depending on the command the first byte will be stored at idx = 0*/
+ 293   6                  i2c_data.inst.data_buf.byte[idx] = ReadU8Reg(I2C_DATAIN_REG);
+ 294   6                  i2c_data.inst.reqbytes--;
+ 295   6                              idx++;
+ 296   6      
+ 297   6                                
+ 298   6                }
+ 299   5                  if(i2c_data.inst.reqbytes == 0)
+ 300   5                {
+ 301   6                  /*clear the last operation*/
+ 302   6                  idx = 0;
+ 303   6                  i2c_data.inst.op = 0;
+ 304   6                  i2c_data.inst.active = FALSE;
+ 305   6                  return TRUE;
+ 306   6                }
+ 307   5              }
+ 308   4              else
+ 309   4              {
+ 310   5                
+ 311   5                datardy_retry++;
+ 312   5      #if 1
+ 313   5                          if(datardy_retry == 50)
+ 314   5                          {
+ 315   6                              datardy_retry = 0;
+ 316   6                              idx = 0;
+ 317   6                  i2c_data.inst.devaddr = 0;
+ 318   6                  i2c_data.inst.regaddr = 0;
+ 319   6                  i2c_data.inst.regdata = 0;
+ 320   6                  i2c_data.inst.op = 0;
+ 321   6                  i2c_data.inst.reqbytes = 0;         
+ 322   6                  i2c_data.inst.active = FALSE;
+ 323   6      #ifdef SENSOR_DRIVER
+                                      sensor_data.sensor_poll_mask = 0;
+              #endif
+ 326   6      
+ 327   6                          }
+ 328   5      #endif                    
+ 329   5                return FALSE;
+ 330   5              }
+ 331   4            }
+ 332   3            /*If a combine read operation was performed*/
+ 333   3            else if(i2c_data.inst.op == COMBINE_READ_OP)
+ 334   3            {                   
+ 335   4              i2c_data.config.s.addrdis = TRUE;
+ 336   4                      i2c_data.config.s.devaddis = 0;
+ 337   4                i2c_data.config.s.devadlen= 6;
+ 338   4                i2c_data.config.s.addrlen= 7; 
+ 339   4              GV701x_I2C_Config(i2c_data.config.s.devaddis, i2c_data.config.s.devadlen,
+ 340   4                       i2c_data.config.s.addrdis, i2c_data.config.s.addrlen, 0);  
+ 341   4              
+ 342   4              /*Fetch the data bytes*/
+ 343   4              GV701x_I2C_Send(i2c_data.inst.devaddr, i2c_data.inst.regaddr, 0,
+ 344   4                      0, READ_OP, i2c_data.inst.reqbytes);                        
+C51 COMPILER V9.53.0.0   GV701X_I2C                                                        11/04/2015 20:09:40 PAGE 7   
+
+ 345   4            }     
+ 346   3            /*If a write operation was performed*/      
+ 347   3            else if(i2c_data.inst.op == WRITE_OP)
+ 348   3            {
+ 349   4              /*clear the last operation*/      
+ 350   4              idx = 0;
+ 351   4              i2c_data.inst.devaddr = 0;
+ 352   4              i2c_data.inst.regaddr = 0;
+ 353   4              i2c_data.inst.regdata = 0;        
+ 354   4              i2c_data.inst.op = 0;
+ 355   4              i2c_data.inst.reqbytes = 0;     
+ 356   4              i2c_data.inst.active = FALSE;
+ 357   4              return TRUE;
+ 358   4            }
+ 359   3            /*If a read command operation was performed*/
+ 360   3            else if(i2c_data.inst.op == CMD_READ_OP)
+ 361   3            {
+ 362   4              /*Fetch the data bytes*/
+ 363   4              GV701x_I2C_Send(i2c_data.inst.devaddr, i2c_data.inst.regaddr, 0,
+ 364   4                      0, READ_OP, i2c_data.inst.reqbytes);
+ 365   4              return TRUE;
+ 366   4            
+ 367   4            }
+ 368   3            /*If a write command operation was performed*/
+ 369   3            else if(i2c_data.inst.op == CMD_WRITE_OP)
+ 370   3            {
+ 371   4              /*Write the data bytes*/
+ 372   4              GV701x_I2C_Send(i2c_data.inst.devaddr, i2c_data.inst.regaddr, i2c_data.inst.regdata,
+ 373   4                      0, READ_OP, i2c_data.inst.reqbytes);
+ 374   4              return TRUE;
+ 375   4            }     
+ 376   3          }
+ 377   2        }
+ 378   1        return FALSE;
+ 379   1      }
+ 380          
+ 381          /******************************************************************************
+ 382           * @fn     GV701x_I2C_Timerhandler
+ 383           *
+ 384           * @brief    Timer handler for Sensor driver timer events
+ 385           *
+ 386           * @param  event - event from firmware
+ 387           *
+ 388           * @return  none
+ 389           *
+ 390           */
+ 391          
+ 392          void GV701x_I2C_Timerhandler(u8* buf)
+ 393          {
+ 394   1        hostTimerEvnt_t* timerevt = 
+ 395   1          (hostTimerEvnt_t*)buf;      
+ 396   1      
+ 397   1        if(buf == NULL)
+ 398   1          return;
+ 399   1          
+ 400   1        /*Demultiplexing the specific timer event*/           
+ 401   1        switch((u8)timerevt->type)
+ 402   1        {                   
+ 403   2          case I2C_POLL_TIMER_EVENT:
+ 404   2            STM_StartTimer(i2c_data.poll_timer, 100);     
+ 405   2          break;
+ 406   2      
+C51 COMPILER V9.53.0.0   GV701X_I2C                                                        11/04/2015 20:09:40 PAGE 8   
+
+ 407   2          default:
+ 408   2          break;
+ 409   2        }
+ 410   1      }
+ 411          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1880    ----
+   CONSTANT SIZE    =     23    ----
+   XDATA SIZE       =     25      27
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

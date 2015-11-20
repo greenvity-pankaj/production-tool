@@ -1,0 +1,796 @@
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE CRM
+OBJECT MODULE PLACED IN .\obj\crm.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\hpgp\src\link\crm.c LARGE OBJECTADVANCED OPTIMIZE(9
+                    -,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..
+                    -\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\h
+                    -al;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\fi
+                    -rmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbe
+                    -e;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\in
+                    -c;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\i
+                    -nc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;
+                    -..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers
+                    -\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..
+                    -\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\
+                    -components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers
+                    -\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilitie
+                    -s;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\n
+                    -wk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..
+                    -\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII
+                    -_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC
+                    -,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DET
+                    -ECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUP
+                    -T,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REG
+                    -ISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\crm.lst) TABS(2) OBJE
+                    -CT(.\obj\crm.obj)
+
+line level    source
+
+   1          /** =========================================================
+   2           *
+   3           *  @file crm.c
+   4           * 
+   5           *  @brief Central Resource Manager
+   6           *
+   7           *  Copyrighut (C) 2010-2011, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ===========================================================*/
+  11          
+  12          #include "fm.h"
+  13          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  16          #include "crm.h"
+  17          #include "nma.h"
+  18          #include "nma_fw.h"
+  19          #include "hpgpapi.h"
+  20          #include "linkl.h"
+  21          #include "timer.h"
+  22          #include "stm.h"
+  23          #include <string.h>
+  24          #include "hybrii_tasks.h"
+  25          #include "sys_common.h"
+  26          
+  27          #ifdef LOG_FLASH
+              u16 scbFreeReason = 0;
+              #endif
+  30          
+  31          void CRM_Init(sCrm *crm)
+  32          {
+  33   1          u8 i;
+  34   1        sScb* dstScb = NULL;
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 2   
+
+  35   1        sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+  36   1      
+  37   1        dstScb = CRM_GetNextScb(crm, dstScb);
+  38   1        while(dstScb)
+  39   1        {
+  40   2          STM_FreeTimer(dstScb->teiTimer);
+  41   2          STM_FreeTimer(dstScb->staTimer);
+  42   2          dstScb->teiTimer = STM_TIMER_ID_NULL;
+  43   2          dstScb->staTimer = STM_TIMER_ID_NULL;
+  44   2          dstScb = CRM_GetNextScb(crm, dstScb);
+  45   2        }
+  46   1        
+  47   1          //reset sta buckets in hash table
+  48   1          for(i = 0; i < CRM_SCB_HASH_TABLE_SIZE; i++)
+  49   1          {
+  50   2              SLIST_Init(&crm->scbBucket[i]);
+  51   2              crm->scbBucketSize[i] = 0;
+  52   2          }
+  53   1      
+  54   1      //    crm->scbBucketSize[0] = 0;
+  55   1      //    crm->scbBucketSize[CRM_SCB_HASH_TABLE_SIZE-1] = 0;
+  56   1      
+  57   1      //    crm->discBucket = 0;
+  58   1          //reset free queue 
+  59   1          SLIST_Init(&crm->freeQueue);
+  60   1          for(i = 0; i < CRM_SCB_MAX; i++)
+  61   1          {
+  62   2              memset(&crm->scb[i], 0, sizeof(sScb));
+  63   2              crm->scb[i].staTimer = STM_TIMER_ID_NULL;
+  64   2              crm->scb[i].teiTimer = STM_TIMER_ID_NULL;
+  65   2              SLIST_Put(&crm->freeQueue, &crm->scb[i].link);
+  66   2          }    
+  67   1      }
+  68          
+  69          
+  70          /*
+  71          sStaCb *SRM_GetSta(sCrm *crm, u16 tei)
+  72          {
+  73             
+  74          }
+  75          */
+  76          
+  77          
+  78          sScb *CRM_AllocScb(sCrm *crm)
+  79          {
+  80   1          u8 i, index; 
+  81   1          u16 size;
+  82   1          u8 mintei;
+  83   1          u8 maxtei;
+  84   1          sScb *scb = NULL;
+  85   1          sSlink *scblink;
+  86   1          sScb *currscb = NULL;
+  87   1          sSlink *currlink = NULL;
+  88   1          sScb *nextscb = NULL;
+  89   1          sSlink *nextlink = NULL;
+  90   1          sSlist *bucketlist = NULL;
+  91   1      
+  92   1          //check free SCB
+  93   1          if(SLIST_IsEmpty(&crm->freeQueue))
+  94   1              return NULL;
+  95   1      
+  96   1      //FM_Printf(FM_ERROR, "CRM: AllocScb \n"); 
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 3   
+
+  97   1      
+  98   1          
+  99   1          //search for the smallest bucket
+ 100   1          size = crm->scbBucketSize[0];
+ 101   1          index = 0;
+ 102   1          for(i = 0; i < CRM_SCB_HASH_TABLE_SIZE; i++)
+ 103   1          {
+ 104   2              if(crm->scbBucketSize[i] < size)
+ 105   2              {
+ 106   3                 size = crm->scbBucketSize[i];
+ 107   3                 index = i;
+ 108   3              }
+ 109   2          }
+ 110   1      
+ 111   1          if(size >= CRM_SCB_BUCKET_MAX)
+ 112   1          {
+ 113   2              //The table is full
+ 114   2      #ifndef RELEASE
+ 115   2              FM_Printf(FM_LINFO, "STA hash table full\n");
+ 116   2      #endif
+ 117   2              return NULL;
+ 118   2          }
+ 119   1      
+ 120   1          scblink = SLIST_Pop(&crm->freeQueue);
+ 121   1          scb = SLIST_GetEntry(scblink, sScb, link);
+ 122   1      //    memset(scb, 0, sizeof(sScb)); 
+ 123   1      
+ 124   1          if(index == 0)
+ 125   1          {
+ 126   2              mintei = 1;
+ 127   2          }
+ 128   1          else
+ 129   1          {
+ 130   2              mintei = index<<4;
+ 131   2          }
+ 132   1      
+ 133   1          if (index == 15)
+ 134   1          {
+ 135   2              maxtei = (index<<4)|0xE;
+ 136   2          }
+ 137   1          else
+ 138   1          {
+ 139   2              maxtei = (index<<4)|0xF;
+ 140   2          }
+ 141   1      
+ 142   1       
+ 143   1          bucketlist = &crm->scbBucket[index];
+ 144   1      
+ 145   1          if (SLIST_IsEmpty(bucketlist))
+ 146   1          {
+ 147   2              scb->tei = mintei;
+ 148   2              SLIST_Push(bucketlist, &scb->link);
+ 149   2              crm->scbBucketSize[index]++;
+ 150   2              return scb;
+ 151   2          }
+ 152   1      
+ 153   1          //at this point, bucket list is not empty
+ 154   1          currlink = SLIST_PeekHead(bucketlist);
+ 155   1          currscb = SLIST_GetEntry(currlink, sScb, link);
+ 156   1          if(currscb->tei > mintei)
+ 157   1          {
+ 158   2              scb->tei = mintei;
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 4   
+
+ 159   2              SLIST_Push(bucketlist, &scb->link);
+ 160   2              crm->scbBucketSize[index]++;
+ 161   2              return scb;
+ 162   2          }
+ 163   1      
+ 164   1          //at this point, the first entry has the minimum tei in the bucket
+ 165   1          nextlink = SLIST_Next(currlink);
+ 166   1          while(currlink && nextlink) 
+ 167   1          {
+ 168   2              nextscb = SLIST_GetEntry(nextlink, sScb, link);
+ 169   2              if (currscb->tei + 1 < nextscb->tei)
+ 170   2              {
+ 171   3                  scb->tei = currscb->tei+1;
+ 172   3                  //add after the currscb
+ 173   3                  SLIST_Add(bucketlist, &currscb->link, &scb->link);
+ 174   3                  crm->scbBucketSize[index]++;
+ 175   3                  return scb;
+ 176   3              }
+ 177   2      
+ 178   2              currlink = nextlink;
+ 179   2              currscb = nextscb;
+ 180   2              nextlink = SLIST_Next(nextlink);
+ 181   2          }
+ 182   1       
+ 183   1          // at this point, nextlink = NULL
+ 184   1          if(currscb->tei < maxtei)
+ 185   1          {
+ 186   2              scb->tei = currscb->tei+1;
+ 187   2              SLIST_Add(bucketlist, &currscb->link, &scb->link);
+ 188   2              //or SLIST_Put(bucketlist, &scb->link);
+ 189   2              crm->scbBucketSize[index]++;
+ 190   2              return scb;
+ 191   2          }
+ 192   1          else
+ 193   1          {
+ 194   2              //it should not come to this point
+ 195   2      #ifndef RELEASE
+ 196   2              FM_Printf(FM_ERROR, "CRM:TEI alloc err\n"); 
+ 197   2      #endif
+ 198   2              return NULL;
+ 199   2          }
+ 200   1      }
+ 201          
+ 202          
+ 203          
+ 204          sScb *CRM_AddScb(sCrm *crm, u8 tei)
+ 205          {
+ 206   1          sScb   *scb = NULL;
+ 207   1          sSlink *scblink = NULL;
+ 208   1          sScb   *currscb = NULL;
+ 209   1          sSlink *currlink;
+ 210   1          sScb   *nextscb = NULL;
+ 211   1          sSlink *nextlink;
+ 212   1          sSlist *bucketlist = NULL;
+ 213   1          u8      index = tei>>4;
+ 214   1          bucketlist = &crm->scbBucket[index];
+ 215   1      
+ 216   1          if (SLIST_IsEmpty(bucketlist))
+ 217   1          {
+ 218   2              scblink = SLIST_Pop(&crm->freeQueue);
+ 219   2              if(scblink == NULL)
+ 220   2              {
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 5   
+
+ 221   3                  return NULL;  //no resouce avaiable
+ 222   3              }
+ 223   2              scb = SLIST_GetEntry(scblink, sScb, link);
+ 224   2      //        memset(scb, 0, sizeof(sScb)); 
+ 225   2              scb->tei = tei;
+ 226   2              SLIST_Push(bucketlist, &scb->link);
+ 227   2              crm->scbBucketSize[index]++;
+ 228   2              return scb;
+ 229   2          }
+ 230   1      
+ 231   1          //at this point, bucket list is not empty
+ 232   1          currlink = SLIST_PeekHead(bucketlist);
+ 233   1          currscb = SLIST_GetEntry(currlink, sScb, link);
+ 234   1          if(currscb->tei == tei)
+ 235   1          {
+ 236   2              return currscb;
+ 237   2          }
+ 238   1      
+ 239   1          if(currscb->tei > tei)
+ 240   1          {
+ 241   2              scblink = SLIST_Pop(&crm->freeQueue);
+ 242   2              if(scblink == NULL)
+ 243   2              {
+ 244   3                  return NULL;  //no resouce avaiable
+ 245   3              }
+ 246   2              scb = SLIST_GetEntry(scblink, sScb, link);
+ 247   2      //        memset(scb, 0, sizeof(sScb)); 
+ 248   2              scb->tei = tei;
+ 249   2              SLIST_Push(bucketlist, &scb->link);
+ 250   2              crm->scbBucketSize[index]++;
+ 251   2              return scb;
+ 252   2          }
+ 253   1      
+ 254   1       
+ 255   1          //now the currscb->tei < tei
+ 256   1          nextlink = SLIST_Next(currlink);
+ 257   1          while(currlink && nextlink) 
+ 258   1          {
+ 259   2              
+ 260   2              nextscb = SLIST_GetEntry(nextlink, sScb, link);
+ 261   2              if (nextscb->tei > tei)
+ 262   2              {
+ 263   3                  break;
+ 264   3              }
+ 265   2              currlink = nextlink;
+ 266   2              currscb = nextscb;
+ 267   2              nextlink = SLIST_Next(nextlink);
+ 268   2          }
+ 269   1      
+ 270   1          //at this point, either nextscb->tei > tei or nextlink = NULL
+ 271   1          //in either case, currscb->scb <= tei
+ 272   1      
+ 273   1          if(currscb->tei == tei)
+ 274   1          {
+ 275   2              return currscb;
+ 276   2          }
+ 277   1      
+ 278   1          scblink = SLIST_Pop(&crm->freeQueue);
+ 279   1          if(scblink == NULL)
+ 280   1          {
+ 281   2              return NULL;  //no resouce avaiable
+ 282   2          }
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 6   
+
+ 283   1          scb = SLIST_GetEntry(scblink, sScb, link);
+ 284   1      //    memset(scb, 0, sizeof(sScb)); 
+ 285   1          scb->tei = tei;
+ 286   1          SLIST_Add(bucketlist, &currscb->link, &scb->link);
+ 287   1          return scb;
+ 288   1      }
+ 289          
+ 290          /* TEI reuse timer
+ 291          void LINKL_TeiReuseTimerHandler(void* cookie)
+ 292          {
+ 293              sEvent *event = NULL;
+ 294              sLinkLayer *linkLayer = (sLinkLayer *)HOMEPLUG_GetLayer(HP_LAYER_TYPE_LINK);
+ 295          
+ 296              //Generate a time event
+ 297              event = EVENT_Alloc(EVENT_DEFAULT_SIZE, 0);
+ 298              if(event == NULL)
+ 299              {
+ 300                  FM_Printf(FM_ERROR, "CRM: Cannot allocate an event.\n");
+ 301                  return;
+ 302              }
+ 303              
+ 304              event->eventHdr.type = EVENT_TYPE_TIMER_TEI_REUSE_IND;
+ 305              event->eventHdr.scb = cookie;
+ 306              //post the event to the event queue
+ 307              SLIST_Put(&linkLayer->eventQueue, &event->link);
+ 308          }
+ 309          */
+ 310              
+ 311          
+ 312          
+ 313          
+ 314          void CRM_FreeScb(sCrm *crm, sScb *scb)
+ 315          {
+ 316   1          sScb    *currscb = NULL;
+ 317   1          sSlink  *currlink = NULL;
+ 318   1          sScb    *nextscb = NULL;
+ 319   1          sSlink  *nextlink;
+ 320   1          sSlist  *bucketlist = NULL;
+ 321   1          u8      index;
+ 322   1      
+ 323   1      //    STM_FreeTimer(scb->teiReuseTimer); 
+ 324   1          scb->namState = STA_NAM_STATE_INIT;
+ 325   1          scb->homState = STA_HOM_STATE_INIT;
+ 326   1          scb->akmState = STA_AKM_STATE_INIT;
+ 327   1        scb->hitCount = 0;
+ 328   1          
+ 329   1          //the timers will be lost if they are not freed before free the scb  
+ 330   1      //    scb->staTimer = STM_TIMER_ID_NULL;
+ 331   1      //    scb->teiTimer = STM_TIMER_ID_NULL;
+ 332   1      
+ 333   1          index = (scb->tei)>>4;
+ 334   1          bucketlist = &crm->scbBucket[index];
+ 335   1      
+ 336   1          if (SLIST_IsEmpty(bucketlist))
+ 337   1          {
+ 338   2              FM_Printf(FM_ERROR, "CRM:scb already free\n"); 
+ 339   2              return;
+ 340   2          }
+ 341   1      #ifdef LOG_FLASH
+                  logEvent(SCB_UPDATE,SCB_FREE,scbFreeReason,&scb->tei,1);
+              #endif
+ 344   1          currlink = SLIST_PeekHead(bucketlist);
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 7   
+
+ 345   1          currscb = SLIST_GetEntry(currlink, sScb, link);
+ 346   1          if (currscb->tei == scb->tei)
+ 347   1          {
+ 348   2              currlink = SLIST_Pop(bucketlist);
+ 349   2      //currscb = SLIST_GetEntry(currlink, sScb, link);
+ 350   2      //FM_Printf(FM_ERROR, "CRM: free scb (%d)!\n", currscb->tei); 
+ 351   2      
+ 352   2              //reset the scb before placing it to the free queue
+ 353   2              STM_FreeTimer(currscb->staTimer);
+ 354   2          STM_FreeTimer(currscb->teiTimer);
+ 355   2              memset(currscb, 0, sizeof(sScb));
+ 356   2              currscb->staTimer = STM_TIMER_INVALID_ID;
+ 357   2              currscb->teiTimer = STM_TIMER_INVALID_ID;
+ 358   2      
+ 359   2              SLIST_Put(&crm->freeQueue, currlink);
+ 360   2              crm->scbBucketSize[index]--;
+ 361   2              return;
+ 362   2          }
+ 363   1      
+ 364   1      
+ 365   1          nextlink = SLIST_Next(currlink);
+ 366   1          while(currlink && nextlink) 
+ 367   1          {
+ 368   2              nextscb = SLIST_GetEntry(nextlink, sScb, link);
+ 369   2              if (scb->tei == nextscb->tei)
+ 370   2              {
+ 371   3                  SLIST_Remove(bucketlist, currlink, nextlink);
+ 372   3      
+ 373   3                  //reset the scb before placing it to the free queue
+ 374   3                  STM_FreeTimer(nextscb->staTimer);
+ 375   3            STM_FreeTimer(nextscb->teiTimer);
+ 376   3      
+ 377   3                  memset(nextscb, 0, sizeof(sScb));
+ 378   3                  nextscb->staTimer = STM_TIMER_INVALID_ID;
+ 379   3                  nextscb->teiTimer = STM_TIMER_INVALID_ID;
+ 380   3      
+ 381   3                  SLIST_Put(&crm->freeQueue, nextlink);
+ 382   3                  crm->scbBucketSize[index]--;
+ 383   3                  return; //done
+ 384   3              }
+ 385   2              currlink = nextlink;
+ 386   2              currscb = nextscb;
+ 387   2              nextlink = SLIST_Next(nextlink);
+ 388   2          }
+ 389   1      
+ 390   1          // at this point, no entry for tei is found 
+ 391   1          //it should not come to this point
+ 392   1              FM_Printf(FM_ERROR, "CRM:scb already free\n"); 
+ 393   1          return;
+ 394   1      }
+ 395          
+ 396          sScb *CRM_FindScbMacAddr(u8 *macAddr)
+ 397          {
+ 398   1        sScb* dstScb = NULL;
+ 399   1          sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 400   1          sCrm          *crm = LINKL_GetCrm(linkl);
+ 401   1          dstScb = CRM_GetNextScb(crm, dstScb);
+ 402   1          while(dstScb)
+ 403   1          {
+ 404   2          if(memcmp(macAddr, &dstScb->macAddr, MAC_ADDR_LEN) == 0)
+ 405   2          {
+ 406   3            break;
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 8   
+
+ 407   3          }
+ 408   2              dstScb = CRM_GetNextScb(crm, dstScb);
+ 409   2          }
+ 410   1         
+ 411   1          return dstScb;
+ 412   1      }
+ 413          
+ 414          u8 CRM_FindScbVendorField(u16 vendor_field, u8 *macAddr)
+ 415          {
+ 416   1        sScb* dstScb = NULL;
+ 417   1          sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 418   1          sCrm          *crm = LINKL_GetCrm(linkl);
+ 419   1          dstScb = CRM_GetNextScb(crm, dstScb);
+ 420   1          while(dstScb)
+ 421   1          {
+ 422   2          if(dstScb->vendor_field == vendor_field)
+ 423   2          {
+ 424   3            memcpy(macAddr, dstScb->macAddr, MAC_ADDR_LEN);
+ 425   3            return STATUS_SUCCESS;
+ 426   3          }
+ 427   2              dstScb = CRM_GetNextScb(crm, dstScb);
+ 428   2          }
+ 429   1      
+ 430   1          return STATUS_FAILURE;  
+ 431   1      }
+ 432          
+ 433          u8 CRM_AddScbVendorField(u8 *macAddr, u16 vendor_field)
+ 434          {
+ 435   1        sScb* dstScb = NULL;
+ 436   1          sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 437   1          sCrm          *crm = LINKL_GetCrm(linkl);
+ 438   1          dstScb = CRM_GetNextScb(crm, dstScb);
+ 439   1      
+ 440   1          while(dstScb)
+ 441   1          {
+ 442   2          if(memcmp(macAddr, &dstScb->macAddr, MAC_ADDR_LEN) == 0)
+ 443   2          {     
+ 444   3            dstScb->vendor_field = vendor_field;
+ 445   3            return STATUS_SUCCESS;
+ 446   3          }
+ 447   2              dstScb = CRM_GetNextScb(crm, dstScb);
+ 448   2          }
+ 449   1          
+ 450   1          return STATUS_FAILURE;
+ 451   1      }
+ 452          
+ 453          
+ 454          eStatus CRM_GetMacAddr(u8 tei, u8 *macAddr)
+ 455          {
+ 456   1        sScb    *scb = NULL;
+ 457   1          sSlist  *bucketlist = NULL;
+ 458   1        sLinkLayer    *linkl = (sLinkLayer *)HPGPCTRL_GetLayer(HP_LAYER_TYPE_LINK);
+ 459   1        sCrm          *crm = LINKL_GetCrm(linkl);
+ 460   1          u8      index = tei>>4;
+ 461   1      
+ 462   1          bucketlist = &crm->scbBucket[index];
+ 463   1      
+ 464   1          //SLIST_For_Each_Entry(scb, bucketlist, link)
+ 465   1          SLIST_For_Each_Entry(sScb, scb, bucketlist, link)
+ 466   1          {
+ 467   2              if (scb->tei == tei)
+ 468   2              {
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 9   
+
+ 469   3            memcpy(macAddr,scb->macAddr,MAC_ADDR_LEN);
+ 470   3                  return STATUS_SUCCESS;
+ 471   3              }
+ 472   2          }
+ 473   1        //FM_Printf(FM_ERROR, "TEI FAIL %bu\n", tei);     
+ 474   1        return STATUS_FAILURE;
+ 475   1      }
+ 476          
+ 477          sScb *CRM_GetScb(sCrm *crm, u8 tei)
+ 478          {
+ 479   1          sScb    *scb = NULL;
+ 480   1          sSlist  *bucketlist = NULL;
+ 481   1          u8      index = tei>>4;
+ 482   1      
+ 483   1          bucketlist = &crm->scbBucket[index];
+ 484   1      
+ 485   1          //SLIST_For_Each_Entry(scb, bucketlist, link)
+ 486   1          SLIST_For_Each_Entry(sScb, scb, bucketlist, link)
+ 487   1          {
+ 488   2              if (scb->tei == tei)
+ 489   2              {
+ 490   3                  return scb;
+ 491   3              }
+ 492   2          }
+ 493   1      
+ 494   1          return NULL;
+ 495   1      }
+ 496              
+ 497          
+ 498          u8 CRM_GetScbNum(sCrm *crm)
+ 499          {
+ 500   1          u8 i;
+ 501   1          u8 numScb = 0;
+ 502   1      
+ 503   1          for(i = 0; i< CRM_SCB_HASH_TABLE_SIZE; i++)
+ 504   1          {
+ 505   2              numScb += crm->scbBucketSize[i];
+ 506   2          }
+ 507   1      
+ 508   1          return numScb;
+ 509   1      }
+ 510          
+ 511          
+ 512          sScb *CRM_GetNextScb(sCrm *crm, sScb* scb)
+ 513          {
+ 514   1          sSlink  *currlink = NULL;
+ 515   1          sSlink  *nextlink = NULL;
+ 516   1          sSlist  *bucketlist = NULL;
+ 517   1          u8       bkt;
+ 518   1      
+ 519   1          if(scb == NULL)
+ 520   1          {
+ 521   2              //start from the first entry in the first bucket
+ 522   2              bkt = 0;
+ 523   2          }
+ 524   1          else
+ 525   1          {
+ 526   2              nextlink = SLIST_Next(&scb->link);
+ 527   2              if(nextlink)
+ 528   2              {
+ 529   3                  return SLIST_GetEntry(nextlink, sScb, link);
+ 530   3              }
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 10  
+
+ 531   2              else
+ 532   2              {
+ 533   3                  //at this point, the scb is the last entry in its bucket 
+ 534   3                  //thus go to the next bucket
+ 535   3                  bkt = ((scb->tei)>>4) + 1;
+ 536   3      #ifndef RELEASE
+ 537   3                  FM_Printf(FM_LINFO, "buckets(%d)\n", bkt); 
+ 538   3      #endif
+ 539   3                  if(bkt == CRM_SCB_HASH_TABLE_SIZE)
+ 540   3                  {
+ 541   4                      //reach the end of hash table
+ 542   4                      return NULL;
+ 543   4                  } 
+ 544   3              }
+ 545   2          }
+ 546   1      
+ 547   1      //FM_Printf(FM_ERROR, "CRM hash buckets(%d)!\n", bkt); 
+ 548   1          //starting with the bucket at bkt, search for the non-empty bucket
+ 549   1      //    while(!crm->scbBucketSize[bkt]&&(bkt<CRM_SCB_HASH_TABLE_SIZE))
+ 550   1          while((bkt < CRM_SCB_HASH_TABLE_SIZE) && SLIST_IsEmpty(&crm->scbBucket[bkt]))
+ 551   1          {
+ 552   2      //        FM_Printf(FM_ERROR, "CRM: bucket(%d) is empty!\n", bkt); 
+ 553   2              bkt++;
+ 554   2          }
+ 555   1      
+ 556   1          if(bkt == CRM_SCB_HASH_TABLE_SIZE)
+ 557   1          {
+ 558   2              //reach the end of hash table
+ 559   2              return NULL;
+ 560   2          }
+ 561   1      //FM_Printf(FM_ERROR, "CRM: nonempty hash buckets(%d)!\n", bkt); 
+ 562   1      
+ 563   1          bucketlist = &crm->scbBucket[bkt];
+ 564   1          currlink = SLIST_PeekHead(bucketlist);
+ 565   1          return SLIST_GetEntry(currlink, sScb, link);
+ 566   1      }
+ 567          
+ 568          
+ 569          #ifdef TEST
+              
+              void CRM_RemoveBucket(sCrm *crm, u8 bkt)
+              {
+                  sSlink  *currlink = NULL;
+                  sScb    *currscb = NULL;
+                  sSlist  *bucketlist = NULL;
+              
+                  bucketlist = &crm->scbBucket[bkt];
+              #ifdef CRM_PRINT  
+                  FM_Printf(FM_ERROR, "CRM:remove bucket %d\n", bkt); 
+              #endif
+                  while(!SLIST_IsEmpty(bucketlist))
+                  { 
+                     currlink = SLIST_Pop(bucketlist);
+                     currscb = SLIST_GetEntry(currlink, sScb, link);
+              #ifdef CRM_PRINT     
+              FM_Printf(FM_ERROR, "CRM:remove scb %d in bucket\n", currscb->tei,  bkt); 
+              #endif
+                     SLIST_Put(&crm->freeQueue, currlink);
+                     crm->scbBucketSize[bkt]--;
+                  }
+              
+              }
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 11  
+
+              
+              #endif
+ 595          
+ 596          /** =========================================================
+ 597           *
+ 598           * Edit History
+ 599           *
+ 600           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/link/crm.c,v $
+ 601           *
+ 602           * $Log: crm.c,v $
+ 603           * Revision 1.9  2015/01/02 14:55:36  kiran
+ 604           * 1) Timer Leak fixed while freeing SCB fixed
+ 605           * 2) Software broadcast supported for LG
+ 606           * 3) UART Loopback supported for LG
+ 607           * 4) Keep Alive feature to ageout defunctional STA
+ 608           * 5) Improved flash API's for NO Host Solution
+ 609           * 6) Imporved PLC Hang recovery mechanism
+ 610           * 7) Reduced nested call tree of common path functions
+ 611           * 8) Code optimization and cleanup (unused arguments, unused local variables)
+ 612           * 9) Work around for UART hardware interrupt issues (unintended interrupts and no interrupts)
+ 613           * 10) Use of memory specific pointers instead of generic pointers
+ 614           *
+ 615           * Revision 1.8  2014/11/11 14:52:58  ranjan
+ 616           * 1.New Folder Architecture espically in /components
+ 617           * 2.Modular arrangment of functionality in new files
+ 618           *    anticipating the need for exposing them as FW App
+ 619           *    development modules
+ 620           * 3.Other improvisation in code and .h files
+ 621           *
+ 622           * Revision 1.7  2014/08/25 07:37:34  kiran
+ 623           * 1) RSSI & LQI support
+ 624           * 2) Fixed Sync related issues
+ 625           * 3) Fixed timer 0 timing drift for SDK
+ 626           * 4) MMSG & Error Logging in Flash
+ 627           *
+ 628           * Revision 1.6  2014/07/22 10:03:52  kiran
+ 629           * 1) SDK Supports Power Save
+ 630           * 2) Uart_Driver.c cleanup
+ 631           * 3) SDK app memory pool optimization
+ 632           * 4) Prints from STM.c are commented
+ 633           * 5) Print messages are trimmed as common no memory left in common
+ 634           * 6) Prins related to Power save and some other modules are in compilation flags. To enable module specif
+             -ic prints please refer respective module
+ 635           *
+ 636           * Revision 1.5  2014/06/11 13:17:47  kiran
+ 637           * UART as host interface and peripheral interface supported.
+ 638           *
+ 639           * Revision 1.4  2014/05/28 10:58:59  prashant
+ 640           * SDK folder structure changes, Uart changes, removed htm (UI) task
+ 641           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+ 642           *
+ 643           * Revision 1.3  2014/05/12 08:09:57  prashant
+ 644           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+ 645           *
+ 646           * Revision 1.2  2014/02/27 10:42:47  prashant
+ 647           * Routing code added
+ 648           *
+ 649           * Revision 1.1  2013/12/18 17:05:23  yiming
+ 650           * no message
+ 651           *
+ 652           * Revision 1.1  2013/12/17 21:47:56  yiming
+ 653           * no message
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 12  
+
+ 654           *
+ 655           * Revision 1.4  2013/09/04 14:51:01  yiming
+ 656           * New changes for Hybrii_A code merge
+ 657           *
+ 658           * Revision 1.5  2012/10/25 11:38:48  prashant
+ 659           * Sniffer code added for MAC_SAP, Added new commands in MAC_SAP for sniffer, bridge,
+ 660           *  hardware settings and peer information.
+ 661           *
+ 662           * Revision 1.4  2012/10/11 06:21:00  ranjan
+ 663           * ChangeLog:
+ 664           * 1. Added HPGP_MAC_SAP to support linux host data and command path.
+ 665           *     define HPGP_MAC_SAP, NMA needs to be added in project.
+ 666           *
+ 667           * 2. Added 'p ping' command in htm.c . Feature is under AUTO_PING macro.
+ 668           *
+ 669           * 3. Extended  'p key' command to include PPEK support.
+ 670           *
+ 671           * verified :
+ 672           *   1. Datapath ping works overnite after association,auth
+ 673           *   2. HAL TEST project is intact
+ 674           *
+ 675           * Revision 1.3  2012/07/10 04:16:37  yuanhua
+ 676           * fixed a potential array overflow in CRM_GetNextScb().
+ 677           *
+ 678           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+ 679           * migrate the firmware code from the greenchip to the hybrii.
+ 680           *
+ 681           * Revision 1.7  2011/08/02 16:06:00  yuanhua
+ 682           * (1) Fixed a bug in STM (2) Made STA discovery work according to the standard, including aging timer. (3
+             -) release the resource after the STA leave (4) STA will switch to the backup CCo if the CCo failure occurs (5) At this p
+             -oint, the CCo could work with multiple STAs correctly, including CCo association/leave, TEI renew, TEI map updating, dis
+             -covery beacon scheduling, discovery STA list updating ang aging, CCo failure, etc.
+ 683           *
+ 684           * Revision 1.6  2011/07/22 18:51:04  yuanhua
+ 685           * (1) added the hardware timer tick simulation (hts.h/hts.c) (2) Added semaphors for sync in simulation a
+             -nd defined macro for critical section (3) Fixed some bugs in list.h and CRM (4) Modified and fixed bugs in SHAL (5) Chan
+             -ged SNSM/CNSM and SNAM/CNAM for bug fix (6) Added debugging prints, and more.
+ 686           *
+ 687           * Revision 1.5  2011/07/16 17:11:23  yuanhua
+ 688           * (1)Implemented SHOM and CHOM modules, including handover procedure, SCB resource updating for HO (2) Up
+             -date SNAM and CNAM modules to support uer-appointed CCo handover (3) Made the SCB resources to support the TEI MAP for t
+             -he STA mode and management of associated STA resources (e.g. TEI) (4) Modified SNSM and CNSM to perform all types of han
+             -dover switch (CCo handover to the new STA, STA taking over the CCo, STA switching to the new CCo)
+ 689           *
+ 690           * Revision 1.4  2011/07/08 22:23:48  yuanhua
+ 691           * (1) Implemented CNSM, including its state machine, beacon transmission and process, discover beacon sch
+             -eduling, auto CCo selection, discover list, handover countdown, etc. (2) Updated SNSM, including discover list processin
+             -g, triggering a switch to the new CCo, etc. (3) Updated CNAM and SNAM, adding the connection state in the SNAM, switch t
+             -o the new CCo, etc. (4) Other updates
+ 692           *
+ 693           * Revision 1.3  2011/07/02 22:09:01  yuanhua
+ 694           * Implemented both SNAM and CNAM modules, including network join and leave procedures, systemm resource (
+             -such as TEI) allocation and release, TEI renew/release timers, and TEI reuse timer, etc.
+ 695           *
+ 696           * Revision 1.2  2011/06/24 14:33:18  yuanhua
+ 697           * (1) Changed event structure (2) Implemented SNSM, including the state machines in network discovery and
+             - connection states, becaon process, discover process, and handover detection (3) Integrated the HPGP and SHAL
+ 698           *
+ 699           * Revision 1.1  2011/05/06 19:10:12  kripa
+ 700           * Adding link layer files to new source tree.
+ 701           *
+ 702           * Revision 1.2  2011/04/24 03:38:29  kripa
+C51 COMPILER V9.53.0.0   CRM                                                               11/04/2015 20:09:40 PAGE 13  
+
+ 703           * Passing 'struct type' as argument to SLIST_For_Each_Entry() macro.
+ 704           *
+ 705           * Revision 1.1  2011/04/08 21:42:45  yuanhua
+ 706           * Framework
+ 707           *
+ 708           *
+ 709           * =========================================================*/
+ 710          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3557    ----
+   CONSTANT SIZE    =     75    ----
+   XDATA SIZE       =   ----     150
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,353 @@
+C51 COMPILER V9.53.0.0   EVENT                                                             11/04/2015 20:09:38 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE EVENT
+OBJECT MODULE PLACED IN .\obj\event.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\common\event.c LARGE OBJECTADVANCED OPTIMIZE(9,SIZE
+                    -) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\..\f
+                    -irmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\hal;..
+                    -\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\firmwar
+                    -e\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee;..\
+                    -..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;..\
+                    -..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\inc;..
+                    -\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;..\..
+                    -\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\hpgp
+                    -\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\..\.
+                    -.\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\compo
+                    -nents\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\flas
+                    -h\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities;..\
+                    -..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nwk\in
+                    -c;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\..\c
+                    -omponents\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051
+                    -,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,UM,H
+                    -YBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETECT,H
+                    -YBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT,MCC
+                    -O,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGISTER
+                    -_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\event.lst) TABS(2) OBJECT(
+                    -.\obj\event.obj)
+
+line level    source
+
+   1          /** =======================================================
+   2           * @file event.c
+   3           * 
+   4           *  @brief Event Module
+   5           *
+   6           *  Copyright (C) 2010-2011, Greenvity Communications, Inc.
+   7           *  All Rights Reserved
+   8           *  
+   9           * ========================================================*/
+  10          
+  11          #include <assert.h>
+  12          #include <stdlib.h>
+  13          #include <string.h>
+  14          #include "papdef.h"
+  15          #include "list.h"
+  16          #include "event.h"
+  17          #include "fm.h"
+  18          #include "dmm.h"
+  19          
+  20          
+  21          sDb *DB_Alloc(u16 size, u16 headroom)
+  22          {
+  23   1           sDb xdata *db = NULL;
+  24   1           sDb *dbGen;
+  25   1      
+  26   1      //    db = ( sDb xdata *)malloc(sizeof(sDb) + size + headroom);
+  27   1        db = ( sDb xdata *)DMM_Alloc(FW_POOL_ID, sizeof(sDb) + size + headroom);
+  28   1          if(db == NULL)
+  29   1          {
+  30   2              FM_Printf(FM_ERROR, "DB: Fail to allocate a data buffer.\n");
+  31   2              return NULL;
+  32   2          }
+  33   1          else
+  34   1          {
+C51 COMPILER V9.53.0.0   EVENT                                                             11/04/2015 20:09:38 PAGE 2   
+
+  35   2              memset(db, 0, sizeof(sDb) + size + headroom);
+  36   2              db->buffDesc.buff = (u8 *)db + sizeof(sDb);
+  37   2              db->buffDesc.dataptr = db->buffDesc.buff + headroom;
+  38   2              db->buffDesc.datalen = 0;
+  39   2              db->buffDesc.bufflen = size + headroom;
+  40   2              SLINK_Init(&db->link);
+  41   2              dbGen = db;
+  42   2          }
+  43   1          return dbGen;
+  44   1      }
+  45          
+  46          
+  47          
+  48          void DB_Free(sDb *db)
+  49          {
+  50   1      //    free(db);
+  51   1          DMM_Free((u8 *)db);
+  52   1      }
+  53          
+  54          
+  55          
+  56          
+  57          sEvent * EVENT_BcnAlloc(u16 size, u16 headroom)
+  58          {
+  59   1          sEvent xdata *event = NULL;
+  60   1          //sEvent *eventGen;
+  61   1      //    event = (sEvent xdata*) malloc(sizeof(sEvent) + size + headroom);
+  62   1      #ifdef UART_HOST_INTF
+  63   1        u8 intFlag = EA;    
+  64   1        EA = 0;
+  65   1      #endif
+  66   1      
+  67   1        event = (sEvent *) DMM_Alloc(BCN_POOL_ID, sizeof(sEvent) + size + headroom);
+  68   1          if(event == NULL)
+  69   1          {
+  70   2              FM_Printf(FM_ERROR, "EVENTBcn: EAF\n");
+  71   2      #ifdef UART_HOST_INTF
+  72   2          EA = intFlag;
+  73   2      #endif
+  74   2              return NULL;
+  75   2          }
+  76   1          else
+  77   1          {
+  78   2              memset(event, 0, sizeof(sEvent) + size + headroom);
+  79   2              event->buffDesc.buff = (u8 *)event + sizeof(sEvent);
+  80   2              event->buffDesc.dataptr = event->buffDesc.buff + headroom;
+  81   2              event->buffDesc.datalen = 0;
+  82   2              event->buffDesc.bufflen = size + headroom;
+  83   2              event->eventHdr.status = EVENT_STATUS_COMPLETE;
+  84   2              SLINK_Init(&event->link);
+  85   2              //eventGen = event;
+  86   2          }
+  87   1      #ifdef UART_HOST_INTF
+  88   1        EA = intFlag;
+  89   1      #endif
+  90   1          return event;//eventGen;
+  91   1      }
+  92          
+  93          
+  94          sEvent * EVENT_MgmtAlloc(u16 size, u16 headroom)
+  95          {
+  96   1          sEvent xdata *event = NULL;
+C51 COMPILER V9.53.0.0   EVENT                                                             11/04/2015 20:09:38 PAGE 3   
+
+  97   1          //sEvent *eventGen;
+  98   1        event = (sEvent *) DMM_Alloc(MGMT_POOL_ID, sizeof(sEvent) + size + headroom);
+  99   1          if(event == NULL)
+ 100   1          {
+ 101   2              FM_Printf(FM_ERROR, "EVENT:EAF MGMT\n");    
+ 102   2              return NULL;
+ 103   2          }
+ 104   1          else
+ 105   1          {
+ 106   2              memset(event, 0, sizeof(sEvent) + size + headroom);
+ 107   2              event->buffDesc.buff = (u8 *)event + sizeof(sEvent);
+ 108   2              event->buffDesc.dataptr = event->buffDesc.buff + headroom;
+ 109   2              event->buffDesc.datalen = 0;
+ 110   2              event->buffDesc.bufflen = size + headroom;
+ 111   2              event->eventHdr.status = EVENT_STATUS_COMPLETE;
+ 112   2              SLINK_Init(&event->link);
+ 113   2              //eventGen = event;
+ 114   2          }
+ 115   1          return event;//eventGen;
+ 116   1      }
+ 117          
+ 118          sEvent* GV701x_EVENT_Alloc(u16 size, u16 headroom)  
+ 119          {
+ 120   1          sEvent xdata *event = NULL;
+ 121   1        u8 intEa = EA;
+ 122   1          sEvent *eventGen;
+ 123   1        EA = 0;
+ 124   1        event = (sEvent *) DMM_Alloc(APP_POOL_ID, sizeof(sEvent) + size + headroom);
+ 125   1        EA = intEa;
+ 126   1          if(event == NULL)
+ 127   1          {
+ 128   2              FM_Printf(FM_USER, "GV701x EVENTAPP: Fail \n");
+ 129   2              return NULL;
+ 130   2          }
+ 131   1          else
+ 132   1          {
+ 133   2              memset(event, 0, sizeof(sEvent) + size + headroom);
+ 134   2              event->buffDesc.buff = (u8 *)event + sizeof(sEvent);
+ 135   2              event->buffDesc.dataptr = event->buffDesc.buff + headroom;
+ 136   2              event->buffDesc.datalen = 0;
+ 137   2              event->buffDesc.bufflen = size + headroom;
+ 138   2              event->eventHdr.status = EVENT_STATUS_COMPLETE;
+ 139   2              SLINK_Init(&event->link);
+ 140   2              eventGen = event;
+ 141   2          }
+ 142   1        return eventGen;
+ 143   1      }
+ 144          
+ 145          static const u8 pool[] = {FW_POOL_ID,MGMT_POOL_ID,BCN_POOL_ID,APP_POOL_ID};
+ 146          
+ 147          sEvent * EVENT_Alloc(u16 size, u16 headroom) __REENTRANT__ 
+ 148          {
+ 149   1          sEvent xdata *event = NULL; 
+ 150   1      #if 0 
+                u8 i;
+              #endif  
+ 153   1          //sEvent *eventGen;
+ 154   1      //    event = (sEvent xdata*) malloc(sizeof(sEvent) + size + headroom);
+ 155   1      #if 0
+              #ifdef NO_HOST
+                for(i=0;i<=3;i++)
+              #else
+C51 COMPILER V9.53.0.0   EVENT                                                             11/04/2015 20:09:38 PAGE 4   
+
+                for(i=0;i<=2;i++)
+              #endif
+              #endif
+ 162   1      
+ 163   1        {
+ 164   2          event = (sEvent *) DMM_Alloc(FW_POOL_ID, sizeof(sEvent) + size + headroom);
+ 165   2            if(event == NULL)
+ 166   2            {
+ 167   3                FM_Printf(FM_ERROR, "EVENT:EAF\n");
+ 168   3            }
+ 169   2            else
+ 170   2            {
+ 171   3                memset(event, 0, sizeof(sEvent) + size + headroom);
+ 172   3                event->buffDesc.buff = (u8 *)event + sizeof(sEvent);
+ 173   3                event->buffDesc.dataptr = event->buffDesc.buff + headroom;
+ 174   3                event->buffDesc.datalen = 0;
+ 175   3                event->buffDesc.bufflen = size + headroom;
+ 176   3                event->eventHdr.status = EVENT_STATUS_COMPLETE;
+ 177   3                SLINK_Init(&event->link);
+ 178   3            return event;
+ 179   3                //eventGen = event;
+ 180   3            }
+ 181   2          
+ 182   2        }
+ 183   1          return NULL;
+ 184   1      }
+ 185          
+ 186          
+ 187          void EVENT_Free(sEvent *event)
+ 188          {
+ 189   1      //    free(event);
+ 190   1          DMM_Free((u8 *)event);
+ 191   1      }
+ 192          
+ 193          
+ 194          void EVENT_Assert(sEvent *event)
+ 195          {
+ 196   1          assert((event->buffDesc.dataptr >= event->buffDesc.buff)&&
+ 198   1                 ((event->buffDesc.dataptr - event->buffDesc.buff + 
+ 198   1                   event->buffDesc.datalen) <= event->buffDesc.bufflen));  
+ 199   1      }
+ 200          
+ 201          
+ 202           
+ 203          /** =========================================================
+ 204           *
+ 205           * Edit History
+ 206           *
+ 207           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/common/event.c,v $
+ 208           *
+ 209           * $Log: event.c,v $
+ 210           * Revision 1.6  2015/01/02 14:55:35  kiran
+ 211           * 1) Timer Leak fixed while freeing SCB fixed
+ 212           * 2) Software broadcast supported for LG
+ 213           * 3) UART Loopback supported for LG
+ 214           * 4) Keep Alive feature to ageout defunctional STA
+ 215           * 5) Improved flash API's for NO Host Solution
+ 216           * 6) Imporved PLC Hang recovery mechanism
+ 217           * 7) Reduced nested call tree of common path functions
+ 218           * 8) Code optimization and cleanup (unused arguments, unused local variables)
+ 219           * 9) Work around for UART hardware interrupt issues (unintended interrupts and no interrupts)
+ 220           * 10) Use of memory specific pointers instead of generic pointers
+C51 COMPILER V9.53.0.0   EVENT                                                             11/04/2015 20:09:38 PAGE 5   
+
+ 221           *
+ 222           * Revision 1.5  2014/11/11 14:52:56  ranjan
+ 223           * 1.New Folder Architecture espically in /components
+ 224           * 2.Modular arrangment of functionality in new files
+ 225           *    anticipating the need for exposing them as FW App
+ 226           *    development modules
+ 227           * 3.Other improvisation in code and .h files
+ 228           *
+ 229           * Revision 1.4  2014/09/25 10:57:41  prashant
+ 230           * 1. GPIO API swapping issue fixed.
+ 231           * 2. Supported 1 to 512 frame length for uart.
+ 232           * 3. list.h file cleanup (code deleted).
+ 233           * 4. Supporting minirobo for mgmt frames.
+ 234           *
+ 235           * Revision 1.3  2014/06/12 13:15:43  ranjan
+ 236           * -separated bcn,mgmt,um event pools
+ 237           * -fixed datapath issue due to previous checkin
+ 238           * -work in progress. neighbour cco detection
+ 239           *
+ 240           * Revision 1.2  2014/05/28 10:58:58  prashant
+ 241           * SDK folder structure changes, Uart changes, removed htm (UI) task
+ 242           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+ 243           *
+ 244           * Revision 1.1  2013/12/18 17:03:14  yiming
+ 245           * no message
+ 246           *
+ 247           * Revision 1.1  2013/12/17 21:42:26  yiming
+ 248           * no message
+ 249           *
+ 250           * Revision 1.2  2013/01/24 00:13:46  yiming
+ 251           * Use 01-23-2013 Hybrii-A code as first Hybrii-B code base
+ 252           *
+ 253           * Revision 1.7  2012/07/25 04:36:08  yuanhua
+ 254           * enable the DMM.
+ 255           *
+ 256           * Revision 1.6  2012/07/24 04:23:17  yuanhua
+ 257           * added DMM code for dynamic alloction with static memory to avoid memory fragmentation.
+ 258           *
+ 259           * Revision 1.5  2012/07/12 05:44:00  kripa
+ 260           * Use xdata pointers in Alloc() functions, to fix the 'never returns NULL' issue.
+ 261           * Committed on the Free edition of March Hare Software CVSNT Client.
+ 262           * Upgrade to CVS Suite for more features and support:
+ 263           * http://march-hare.com/cvsnt/
+ 264           *
+ 265           * Revision 1.4  2012/05/19 05:05:15  yuanhua
+ 266           * optimized the timer handlers in CTRL and LINK layers.
+ 267           *
+ 268           * Revision 1.3  2012/03/11 17:02:24  yuanhua
+ 269           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+ 270           *
+ 271           * Revision 1.2  2011/09/09 07:02:31  yuanhua
+ 272           * migrate the firmware code from the greenchip to the hybrii.
+ 273           *
+ 274           * Revision 1.3  2011/08/09 22:45:44  yuanhua
+ 275           * changed to event structure, seperating HPGP-related events from the general event defination so that th
+             -e general event could be used for other purposes than the HPGP.
+ 276           *
+ 277           * Revision 1.2  2011/06/24 14:33:18  yuanhua
+ 278           * (1) Changed event structure (2) Implemented SNSM, including the state machines in network discovery and
+             - connection states, becaon process, discover process, and handover detection (3) Integrated the HPGP and SHAL
+ 279           *
+C51 COMPILER V9.53.0.0   EVENT                                                             11/04/2015 20:09:38 PAGE 6   
+
+ 280           * Revision 1.1  2011/05/06 18:31:47  kripa
+ 281           * Adding common utils and isr files for Greenchip firmware.
+ 282           *
+ 283           * Revision 1.2  2011/04/23 23:09:10  kripa
+ 284           * EVENT_Alloc(); changed 'event->data' reference to 'event->eventData'.
+ 285           *
+ 286           * Revision 1.1  2011/04/08 21:40:59  yuanhua
+ 287           * Framework
+ 288           *
+ 289           *
+ 290           * ========================================================*/
+ 291          
+ 292          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1674    ----
+   CONSTANT SIZE    =    354    ----
+   XDATA SIZE       =      4      35
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

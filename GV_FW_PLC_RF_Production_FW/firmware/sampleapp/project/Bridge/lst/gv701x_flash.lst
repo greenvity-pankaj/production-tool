@@ -1,0 +1,250 @@
+C51 COMPILER V9.53.0.0   GV701X_FLASH                                                      11/04/2015 20:09:40 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE GV701X_FLASH
+OBJECT MODULE PLACED IN .\obj\gv701x_flash.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\common\gv701x_flash.c LARGE OBJECTADVANCED OPTIMIZE
+                    -(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\
+                    -..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src
+                    -\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\
+                    -firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zig
+                    -bee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\
+                    -inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp
+                    -\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_suppor
+                    -t;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drive
+                    -rs\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;
+                    -..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\.
+                    -.\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drive
+                    -rs\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilit
+                    -ies;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers
+                    -\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\
+                    -..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBR
+                    -II_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SY
+                    -NC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_D
+                    -ETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERR
+                    -UPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,R
+                    -EGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\gv701x_flash.lst) T
+                    -ABS(2) OBJECT(.\obj\gv701x_flash.obj)
+
+line level    source
+
+   1          #include "stdio.h"
+   2          #include "string.h"
+   3          #include "papdef.h"
+   4          #include "ctrll.h"
+   5          #include "gv701x_flash.h"
+   6          #include "gv701x_flash_fw.h"
+   7          #include "sys_config_data_utils.h"
+   8          #ifdef NO_HOST
+   9          #include "gv701x_osal.h"
+  10          #include "fm.h"
+  11          #endif
+  12          
+  13          #ifdef UM
+  14          extern sysProfile_t gSysProfile;
+  15          #endif
+  16          
+  17          static xdata u8 config_mem[GVTY_CONFIG_DATA_MAX];
+  18          
+  19          extern u8 spiflash_ReadByte(u32);
+  20          extern void spiflash_wrsr_unlock(u8);
+  21          extern void spiflash_WriteByte(u32, u8);
+  22          extern void spiflash_eraseConfigMem();
+  23          
+  24          eStatus isFlashProfileValid(void)
+  25          {
+  26   1        u8 i,j;
+  27   1        EA = 0;
+  28   1        i = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR + FLASH_SIGN_OFFSET));
+  29   1        j = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR + FLASH_SIGN_OFFSET +  1));
+  30   1        EA = 1;
+  31   1        if((i == 'G') && (j == 'V'))
+  32   1        {   
+  33   2          return STATUS_SUCCESS;
+  34   2        }
+C51 COMPILER V9.53.0.0   GV701X_FLASH                                                      11/04/2015 20:09:40 PAGE 2   
+
+  35   1        else
+  36   1        {
+  37   2          return STATUS_FAILURE;
+  38   2        }
+  39   1      }
+  40          
+  41          eStatus flashWrite_config( u8 xdata *srcMemAddr, u16 offset, u16 len)
+  42          { 
+  43   1        u16 count;
+  44   1        u16 tempOffset;
+  45   1        EA = 0;
+  46   1        if(len !=0)
+  47   1        {
+  48   2          tempOffset = offset + len;
+  49   2          
+  50   2          for(count = 0;count < GVTY_CONFIG_DATA_MAX;count++)
+  51   2          {
+  52   3            if( (count < offset) || (count >= (tempOffset)) )
+  53   3            {
+  54   4              config_mem[count] = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR + count));
+  55   4            }
+  56   3            else
+  57   3            {
+  58   4              config_mem[count] = *(srcMemAddr + (count - offset));
+  59   4            }
+  60   3          }
+  61   2          config_mem[GVTY_CONFIG_DATA_MAX - FLASH_SIGN_SIZE] = 'G';
+  62   2          config_mem[GVTY_CONFIG_DATA_MAX - FLASH_SIGN_SIZE + 1] = 'V';
+  63   2      
+  64   2          spiflash_eraseConfigMem();
+  65   2          spiflash_wrsr_unlock((u8)1);
+  66   2          
+  67   2          for(count=0;count<GVTY_CONFIG_DATA_MAX;count++)
+  68   2          {
+  69   3            spiflash_WriteByte(GVTY_CONFIG_DATA_ADDR + count,config_mem[count]);
+  70   3          }
+  71   2          spiflash_wrsr_unlock(0);
+  72   2          
+  73   2          EA = 1;
+  74   2          return STATUS_SUCCESS;
+  75   2        }
+  76   1        else
+  77   1        {
+  78   2          EA = 1;
+  79   2          return STATUS_FAILURE;
+  80   2        }
+  81   1      }
+  82          
+  83          eStatus flashRead_config( u8 xdata *dstMemAddr, u16 offset, u16 len)
+  84          {
+  85   1        xdata u8 *lmemAddr = dstMemAddr;
+  86   1        u16 count;
+  87   1        EA = 0;
+  88   1        
+  89   1        if(isFlashProfileValid() == STATUS_FAILURE)
+  90   1        {
+  91   2          EA = 1;
+  92   2          return STATUS_FAILURE;
+  93   2        }
+  94   1        
+  95   1          if((len !=0) && ((offset+len)<= (GVTY_CONFIG_DATA_MAX - FLASH_SIGN_SIZE)))
+  96   1        {
+C51 COMPILER V9.53.0.0   GV701X_FLASH                                                      11/04/2015 20:09:40 PAGE 3   
+
+  97   2          for(count = offset;count < (offset + len);count++)
+  98   2          {
+  99   3            *lmemAddr = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR + count));
+ 100   3            lmemAddr++;
+ 101   3          }
+ 102   2          EA = 1;
+ 103   2          return STATUS_SUCCESS;
+ 104   2        }
+ 105   1        else
+ 106   1        {
+ 107   2          EA = 1;
+ 108   2          return STATUS_FAILURE;
+ 109   2        }
+ 110   1      }
+ 111          
+ 112          #ifdef NO_HOST
+ 113          
+ 114          eStatus GV701x_FlashWrite(u8 app_id, u8 *srcMemAddr, u16 len)
+ 115          {
+ 116   1        u16 i;  
+ 117   1        u32 flashMemBaseAddress = 0;
+ 118   1        
+ 119   1        if((len > 100) || (len == 0))
+ 120   1          return STATUS_FAILURE;    
+ 121   1        
+ 122   1        if(app_id == APP_BRDCST_MSG_APPID)
+ 123   1          app_id = APP_MAX_APPLICATIONS;  
+ 124   1              
+ 125   1        EA = 0;
+ 126   1        flashMemBaseAddress = GVTY_APP_DATA_ADDR + (app_id * GVTY_CONFIG_SECTOR_SIZE);
+ 127   1        spiflash_eraseSector(GVTY_CONFIG_APP_SECTOR + app_id);
+ 128   1      
+ 129   1        for(i=0;i<len;i++)
+ 130   1        {
+ 131   2          spiflash_WriteByte((flashMemBaseAddress + i), srcMemAddr[i]);
+ 132   2        }
+ 133   1        spiflash_wrsr_unlock(0);
+ 134   1        EA = 1;
+ 135   1        
+ 136   1        return STATUS_SUCCESS;  
+ 137   1      }
+ 138          
+ 139          eStatus GV701x_FlashRead(u8 app_id, u8 *dstMemAddr, u16 len)
+ 140          {
+ 141   1        u16 i;
+ 142   1        u32 flashMemBaseAddress = 0;
+ 143   1        if((len > 100) || (len == 0))
+ 144   1          return STATUS_FAILURE;
+ 145   1      
+ 146   1        if(app_id == APP_BRDCST_MSG_APPID)
+ 147   1          app_id = APP_MAX_APPLICATIONS;
+ 148   1            
+ 149   1        EA = 0; 
+ 150   1        flashMemBaseAddress = GVTY_APP_DATA_ADDR + (app_id * GVTY_CONFIG_SECTOR_SIZE);  
+ 151   1        for(i = 0;i < len; i++)
+ 152   1        {
+ 153   2          *dstMemAddr = spiflash_ReadByte((u32)(flashMemBaseAddress + i));
+ 154   2          dstMemAddr++;
+ 155   2        }
+ 156   1        EA = 1;
+ 157   1        
+ 158   1        return STATUS_SUCCESS;  
+C51 COMPILER V9.53.0.0   GV701X_FLASH                                                      11/04/2015 20:09:40 PAGE 4   
+
+ 159   1      }
+ 160          
+ 161          u8 GV701x_FlashReadByte(u8 app_id, u16 addr)
+ 162          {
+ 163   1        u8 flashData = 0;
+ 164   1        u32 flashMemBaseAddress = 0;
+ 165   1      
+ 166   1        if(app_id == APP_BRDCST_MSG_APPID)
+ 167   1          app_id = APP_MAX_APPLICATIONS;
+ 168   1      
+ 169   1        EA = 0;
+ 170   1        flashMemBaseAddress = GVTY_APP_DATA_ADDR + (app_id * GVTY_CONFIG_SECTOR_SIZE);  
+ 171   1        flashData = spiflash_ReadByte((u32)(flashMemBaseAddress + addr));
+ 172   1        EA = 1;
+ 173   1        return flashData;
+ 174   1      }
+ 175          
+ 176          eStatus GV701x_FlashErase(u8 app_id)
+ 177          {   
+ 178   1        if(app_id == APP_BRDCST_MSG_APPID)
+ 179   1          app_id = APP_MAX_APPLICATIONS;  
+ 180   1              
+ 181   1        EA = 0;
+ 182   1        spiflash_eraseSector(GVTY_CONFIG_APP_SECTOR + app_id);
+ 183   1        spiflash_wrsr_unlock(0);
+ 184   1        EA = 1;
+ 185   1        
+ 186   1        return STATUS_SUCCESS;  
+ 187   1      }
+ 188          
+ 189          #ifdef UM
+ 190          u8* GV701x_ReadMacAddress(void)
+ 191          { 
+ 192   1        return &gSysProfile.macAddress;
+ 193   1      }
+ 194          #endif
+ 195          
+ 196          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1048    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    512      48
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

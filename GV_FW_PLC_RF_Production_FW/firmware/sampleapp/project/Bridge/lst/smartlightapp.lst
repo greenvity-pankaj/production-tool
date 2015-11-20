@@ -1,0 +1,696 @@
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE SMARTLIGHTAPP
+OBJECT MODULE PLACED IN .\obj\smartlightapp.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\sampleapp\src\smartlightapp.c LARGE OBJECTADVANCED OPTIMIZE(
+                    -9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\.
+                    -.\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\
+                    -hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\f
+                    -irmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigb
+                    -ee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\i
+                    -nc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\
+                    -inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support
+                    -;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\driver
+                    -s\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;.
+                    -.\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..
+                    -\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\driver
+                    -s\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utiliti
+                    -es;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\
+                    -nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\.
+                    -.\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRI
+                    -I_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYN
+                    -C,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DE
+                    -TECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRU
+                    -PT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,RE
+                    -GISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\smartlightapp.lst) T
+                    -ABS(2) OBJECT(.\obj\smartlightapp.obj)
+
+line level    source
+
+   1          /* ========================================================
+   2           *
+   3           * @file:  smartlightapp.c
+   4           * 
+   5           * @brief: This file contains the led driver for the GV701x LED boards
+   6           *         Its is a PWM driven or DC modulated Intensity dimming/Color change board.
+   7           *         There is provision for 4 PWM channels or 4 Modulated-DC channel 
+   8           *       (use LED_PWM or LED_DC respectively) and 2 dedicated O/P pins for 
+   9           *         control of Digital O/P device or relays(as in this example)
+  10           *
+  11           *       This function incorporates more than one logical device type 
+  12           *       (LIGHT_RGB - RGB light, LIGHT_TEMP - Light temperature interpretation
+  13           *          LIGHT_DIMM - single channel dimmer device, LED_SMART_LIGHT device)
+  14           *
+  15           *  Copyright (C) 2010-2015, Greenvity Communications, Inc.
+  16           *  All Rights Reserved
+  17           *  
+  18           * =========================================================*/
+  19          
+  20          #if ((defined SMARTLIGHT_APP) && ((defined LED_RGB_LIGHT) || (defined LED_WNC_LIGHT) \
+  21            || (defined LED_WHITE_LIGHT) || (defined LED_SMART_LIGHT)))
+  22          
+  23          /****************************************************************************** 
+  24            * Includes
+  25            ******************************************************************************/
+  26          
+  27          #include <stdio.h>
+  28          #include <string.h>
+  29          #include "gv701x_includes.h"
+  30          #ifdef DEVICEINTF_APP
+  31          #include "deviceintfapp.h"
+  32          #endif
+  33          #include "smartlightapp.h"
+  34          #ifdef MOTION_DRIVER
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 2   
+
+              #include "motion_driver.h"
+              #endif
+  37          #ifdef LLP_APP
+  38          #include "llpapp.h"
+  39          #endif
+  40          
+  41          /****************************************************************************** 
+  42            * Global Data
+  43            ******************************************************************************/
+  44          
+  45          /*Led Database*/
+  46          led_drv_db_t led_drv_db;
+  47          
+  48          /*Led Database*/
+  49          led_reg_map_t XDATA led_reg_map[LED_MAX_IO] = {
+  50            {0, CH0_CFG1_REG, CH0_CFG2_REG, CH0_CFG3_REG, CH0_OP1_REG, CH0_OP2_REG},
+  51            {1, CH1_CFG1_REG, CH1_CFG2_REG, CH1_CFG3_REG, CH1_OP1_REG, CH1_OP2_REG},    
+  52            {2, CH2_CFG1_REG, CH2_CFG2_REG, CH2_CFG3_REG, CH2_OP1_REG, CH2_OP2_REG},  
+  53            {3, CH3_CFG1_REG, CH3_CFG2_REG, CH3_CFG3_REG, CH3_OP1_REG, CH3_OP2_REG},  
+  54            {4, CH4_CFG1_REG, CH4_CFG2_REG, CH4_CFG3_REG, CH4_OP1_REG, CH4_OP2_REG},  
+  55            {5, CH5_CFG1_REG, CH5_CFG2_REG, CH5_CFG3_REG, CH5_OP1_REG, CH5_OP2_REG},    
+  56          };  
+  57          
+  58          #ifdef LED_RGB_LIGHT
+              /*RGB I/O's*/
+              io_list_t led_rgb_io_list[] = 
+              {{"red", RED_CH1, 1, &led_drv_db.led_val.ch[0], FALSE}, 
+               {"green", GREEN_CH2, 1, &led_drv_db.led_val.ch[1], FALSE}, 
+               {"blue", BLUE_CH3, 1, &led_drv_db.led_val.ch[2], FALSE},
+               {"none", DEVINTF_IO_NONE, 0, NULL, FALSE}
+              };
+              #endif
+  67          
+  68          #ifdef LED_WNC_LIGHT
+              /*Light Temperature(Warm, Natural, Cool)  I/O's*/
+              io_list_t led_temp_io_list[] = 
+              {{"warm",  WARM_CH1, 1, &led_drv_db.led_val.ch[0], FALSE},  
+               {"natural", NATURAL_CH2, 1, &led_drv_db.led_val.ch[1], FALSE}, 
+               {"cool", COOL_CH3, 1, &led_drv_db.led_val.ch[2], FALSE},
+               {"none", DEVINTF_IO_NONE, 0, NULL, FALSE}
+              };
+              #endif 
+  77          
+  78          #ifdef LED_WHITE_LIGHT
+              /*Led Dimmer  I/O's*/
+              io_list_t led_dim_io_list[] = 
+              {{"dimm", DIMM_CH4, 1, &led_drv_db.led_val.ch[3], TRUE},
+               {"none", DEVINTF_IO_NONE, 0, NULL, FALSE}
+              };
+              #endif 
+  85          
+  86          #ifdef LED_SMART_LIGHT
+  87          io_list_t led_smartlight_io_list[] = 
+  88          {{"onoff", ENABLE_CH, 1, &led_drv_db.led_val.enable, FALSE}, 
+  89           {"relaych1", RELAY_1, 1, &led_drv_db.led_val.ch[4], FALSE},
+  90           {"relaych2", RELAY_2, 1, &led_drv_db.led_val.ch[5], FALSE}, 
+  91           {"red", RED_CH1, 1, &led_drv_db.led_val.ch[0], FALSE}, 
+  92           {"green", GREEN_CH2, 1, &led_drv_db.led_val.ch[1], FALSE}, 
+  93           {"blue", BLUE_CH3, 1, &led_drv_db.led_val.ch[2], FALSE},
+  94           {"white", WHITE_CH4, 1, &led_drv_db.led_val.ch[3], FALSE}, 
+  95          #ifdef MOTION_DRIVER 
+               {"sensor", MOTION_CH, 1, &motion_driver_db.motion.detected, FALSE},
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 3   
+
+              #endif 
+  98           {"none", DEVINTF_IO_NONE, 0, NULL, FALSE}
+  99          };
+ 100          #endif
+ 101          
+ 102          /****************************************************************************** 
+ 103            * Function Prototypes
+ 104            ******************************************************************************/
+ 105          void led_driver_cfg(void) ;
+ 106          void led_driver_write(u8 led_tlv, u8 led_val);
+ 107          void led_driver_cmdprocess(char* CmdBuf);
+ 108          
+ 109          /******************************************************************************
+ 110           * @fn      led_driver_init
+ 111           *
+ 112           * @brief   Initializes the Led driver
+ 113           *
+ 114           * @param   app_id - application identification number
+ 115           *
+ 116           * @return  none
+ 117           */
+ 118          
+ 119          void led_driver_init(u8 app_id)
+ 120          { 
+ 121   1        u8 idx, jdx;
+ 122   1        device_inst_msg_t device_inst;
+ 123   1        
+ 124   1        memset(&led_drv_db, 0x00, sizeof(led_ioval_t));   
+ 125   1        led_drv_db.appid = app_id;
+ 126   1          SLIST_Init(&led_drv_db.queues.appRxQueue);
+ 127   1      
+ 128   1        FM_Printf(FM_USER, "\nInit SmartLightApp (app id %bu)", led_drv_db.appid);
+ 129   1      
+ 130   1        //FM_SetDebugLevel(FM_MASK_DEFAULT | FM_APP);
+ 131   1        led_driver_cfg();
+ 132   1      
+ 133   1      #ifdef DEVICEINTF_APP
+ 134   1        device_inst.event = DEVINTF_IO_INSTRUCTION;         
+ 135   1      #ifdef LED_RGB_LIGHT  
+                device_inst.dev_type = LIGHT_RGB;           
+              #endif
+ 138   1      #ifdef LED_WNC_LIGHT  
+                device_inst.dev_type = LIGHT_TEMP;            
+              #endif
+ 141   1      #ifdef LED_WHITE_LIGHT  
+                device_inst.dev_type = LIGHT_DIMM;            
+              #endif
+ 144   1      #ifdef LED_SMART_LIGHT  
+ 145   1        device_inst.dev_type = LIGHT_SMART;           
+ 146   1      #endif
+ 147   1      #endif  
+ 148   1      
+ 149   1        /*Turning the lights to defaults(ON currently)*/
+ 150   1        for(idx = 0; (dev_list[idx].type != DEVINTF_NONE); idx++)
+ 151   1        {
+ 152   2          if(dev_list[idx].type != DEVINTF_NONE)
+ 153   2          {
+ 154   3            dev_list[idx].subtype = led_drv_db.nv.dev_subtype;
+ 155   3          
+ 156   3            for(jdx = 0; (dev_list[idx].io_list[jdx].type != DEVINTF_IO_NONE); jdx++)
+ 157   3            {
+ 158   4              dev_list[idx].io_list[jdx].trigger = TRUE;  
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 4   
+
+ 159   4              memset((u8*)dev_list[idx].io_list[jdx].p_val, 0xFF, 
+ 160   4                  dev_list[idx].io_list[jdx].len);
+ 161   4              
+ 162   4      #ifdef LED_SMART_LIGHT    
+ 163   4              if((dev_list[idx].io_list[jdx].type == ENABLE_CH) || 
+ 164   4                (dev_list[idx].io_list[jdx].type == RELAY_1) || 
+ 165   4                (dev_list[idx].io_list[jdx].type == RELAY_2) ||
+ 166   4                (dev_list[idx].io_list[jdx].type == MOTION_CH))
+ 167   4              {     
+ 168   5                if(dev_list[idx].io_list[jdx].type == MOTION_CH)
+ 169   5                {
+ 170   6                  *((u8*)dev_list[idx].io_list[jdx].p_val) = FALSE;
+ 171   6                  dev_list[idx].io_list[jdx].trigger = FALSE;
+ 172   6                }       
+ 173   5                if((dev_list[idx].io_list[jdx].type == RELAY_1) || 
+ 174   5                   (dev_list[idx].io_list[jdx].type == RELAY_2))
+ 175   5                {       
+ 176   6                  dev_list[idx].io_list[jdx].trigger = TRUE;
+ 177   6                  *((u8*)dev_list[idx].io_list[jdx].p_val) = 0x01;
+ 178   6                }       
+ 179   5              }
+ 180   4      #endif      
+ 181   4            }   
+ 182   3            break;
+ 183   3          }
+ 184   2        }
+ 185   1        
+ 186   1      #ifdef DEVICEINTF_APP   
+ 187   1        GV701x_SendAppEvent(led_drv_db.appid, deviceintf_data.app_id, APP_MSG_TYPE_APPEVENT,
+ 188   1              APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID,      
+ 189   1              &device_inst, sizeof(device_inst_msg_t), 0);  
+ 190   1      #endif  
+ 191   1      }
+ 192          
+ 193          /******************************************************************************
+ 194           * @fn      led_driver_cfg
+ 195           *
+ 196           * @brief   Configures the Led driver based on values stored in flash
+ 197           *
+ 198           * @param   none
+ 199           *
+ 200           * @return  none
+ 201           */
+ 202          
+ 203          void led_driver_cfg(void)
+ 204          {
+ 205   1          u8 idx;
+ 206   1      
+ 207   1        GV701x_FlashRead(led_drv_db.appid, (u8*)&led_drv_db.nv, sizeof(led_drv_db.nv)); 
+ 208   1        
+ 209   1        WriteU8Reg(0x4FA, 0x01);
+ 210   1        WriteU8Reg(0x45C, 0x0);
+ 211   1        WriteU8Reg(0x45D, 0x0);
+ 212   1        WriteU8Reg(0x45E, 0x0);
+ 213   1        WriteU8Reg(0x45F, 0x0);
+ 214   1        WriteU8Reg(0x460, 0x0);
+ 215   1        WriteU8Reg(0x461, 0x0);
+ 216   1        WriteU8Reg(0x462, 0x0);
+ 217   1        WriteU8Reg(0x463, 0x0);
+ 218   1        WriteU8Reg(0x464, 0x0);
+ 219   1        WriteU8Reg(0x465, 0x0);
+ 220   1        WriteU8Reg(0x466, 0x0);
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 5   
+
+ 221   1        WriteU8Reg(0x467, 0x0);
+ 222   1        WriteU8Reg(0x468, 0x0);
+ 223   1        WriteU8Reg(0x469, 0x0);
+ 224   1        WriteU8Reg(0x46A, 0x0);
+ 225   1        WriteU8Reg(0x46B, 0x0);
+ 226   1        WriteU8Reg(0x45A, 0xEC);
+ 227   1        WriteU8Reg(0x45B, 0x02);
+ 228   1        WriteU8Reg(0x458, 0x11);
+ 229   1        WriteU8Reg(0x459, 0x11);
+ 230   1        WriteU8Reg(0x4FA, 0x0);
+ 231   1        WriteU8Reg(0x4FA, 0x01);
+ 232   1      
+ 233   1      
+ 234   1        FM_Printf(FM_USER, "\nSubtype: %bu", led_drv_db.nv.dev_subtype);
+ 235   1      
+ 236   1        for(idx = 0; idx < LED_MAX_IO; idx++)
+ 237   1        {
+ 238   2          switch(led_drv_db.nv.io_cfg.io[idx])
+ 239   2          {
+ 240   3            case LED_PWM:
+ 241   3              FM_Printf(FM_USER, " Ch%bu: %s", idx, "PWM");
+ 242   3              WriteU8Reg(led_reg_map[idx].cfg1_reg, 0x01);
+ 243   3              WriteU8Reg(led_reg_map[idx].cfg2_reg, 0x00);
+ 244   3            break;
+ 245   3            
+ 246   3            case LED_DC:
+ 247   3              FM_Printf(FM_USER, " Ch%bu: %s", idx, "DC");
+ 248   3              WriteU8Reg(led_reg_map[idx].cfg1_reg, 0x08);
+ 249   3            break;
+ 250   3      
+ 251   3            case LED_GPIO:
+ 252   3              FM_Printf(FM_USER, " Ch%bu: %s", idx, "GPIO");
+ 253   3              if((idx == LED_CH4) || (idx == LED_CH5))
+ 254   3              {
+ 255   4      #ifndef HQ_LINK_TEST
+ 256   4                WriteU8Reg(led_reg_map[idx].cfg1_reg, 
+ 258   4                       (ReadU8Reg(led_reg_map[idx].cfg1_reg) & 
+ 258   4                      led_reg_map[idx].op2_reg));
+ 259   4      #endif
+ 260   4              }
+ 261   3              else
+ 262   3              {
+ 263   4                WriteU8Reg(led_reg_map[idx].cfg1_reg, 0xED);
+ 264   4                WriteU8Reg(led_reg_map[idx].cfg2_reg, 0x02);        
+ 265   4              }
+ 266   3            break;      
+ 267   3            
+ 268   3            default:        
+ 269   3            break;
+ 270   3          }
+ 271   2        }
+ 272   1        FM_Printf(FM_USER, "\n");     
+ 273   1        WriteU8Reg(0x4FA, 0x0); 
+ 274   1      }
+ 275          
+ 276          /******************************************************************************
+ 277           * @fn      led_driver_rxappmsg
+ 278           *
+ 279           * @brief   Receives a message from another app/fw
+ 280           *
+ 281           * @params  event - message buffer
+ 282           *
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 6   
+
+ 283           * @return  none
+ 284           */
+ 285          
+ 286          void led_driver_rxappmsg(sEvent* event)
+ 287          {
+ 288   1        gv701x_app_msg_hdr_t* msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;
+ 289   1        hostHdr_t* hybrii_hdr;
+ 290   1        hostEventHdr_t* evnt_hdr;
+ 291   1      
+ 292   1        hybrii_hdr = (hostHdr_t*)(msg_hdr + 1);
+ 293   1      
+ 294   1        if(msg_hdr->dst_app_id == led_drv_db.appid)
+ 295   1        {
+ 296   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 297   2            (hybrii_hdr->type == EVENT_FRM_ID))     
+ 298   2          {     
+ 299   3            evnt_hdr = (hostEventHdr_t*)(hybrii_hdr + 1);
+ 300   3            
+ 301   3            if(evnt_hdr->type == HOST_EVENT_APP_TIMER)
+ 302   3            {
+ 303   4              led_driver_timerhandler((u8*)(evnt_hdr + 1)); 
+ 304   4              return;
+ 305   4            }
+ 306   3            else if(evnt_hdr->type == HOST_EVENT_APP_CMD)
+ 307   3            {
+ 308   4              led_driver_cmdprocess((char*)(evnt_hdr + 1)); 
+ 309   4              return;
+ 310   4            }     
+ 311   3          }       
+ 312   2        }
+ 313   1        else if(msg_hdr->dst_app_id == APP_BRDCST_MSG_APPID)
+ 314   1        {
+ 315   2          u8 *event = (u8*)(hybrii_hdr + 1);
+ 316   2          return;
+ 317   2        } 
+ 318   1      }
+ 319          
+ 320          /******************************************************************************
+ 321           * @fn    led_driver_timerhandler
+ 322           *
+ 323           * @brief Timer handler for Led timer events
+ 324           *
+ 325           * @param event - event from firmware
+ 326           *
+ 327           * @return  none
+ 328           *
+ 329           */ 
+ 330          void led_driver_timerhandler(u8* buf)
+ 331          {   
+ 332   1        hostTimerEvnt_t* timerevt = (hostTimerEvnt_t*)buf;      
+ 333   1      
+ 334   1        if(buf == NULL)
+ 335   1          return; 
+ 336   1          
+ 337   1        /*Demultiplexing the specific timer event*/           
+ 338   1        switch((u8)timerevt->type)
+ 339   1        {               
+ 340   2          
+ 341   2          default:
+ 342   2          break;
+ 343   2        }
+ 344   1      }
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 7   
+
+ 345            
+ 346          
+ 347          /******************************************************************************
+ 348           * @fn      led_driver_control
+ 349           *
+ 350           * @brief   Parses the Tlv's(exchanged over LLP) to interepret the channel
+ 351           *      over which action is being requested
+ 352           *
+ 353           * @param   led_tlv - the type of TLV
+ 354           *      
+ 355           * @return  none
+ 356           */
+ 357          
+ 358          void led_driver_control(u8 led_tlv)
+ 359          {
+ 360   1      #ifdef LED_RGB_LIGHT
+                /*RGB device*/
+                switch(led_tlv)
+                { 
+                  case RED_CH1:     
+                    FM_Printf(FM_APP, "\n| R %bu | ",led_drv_db.led_val.ch[LED_CH0]);
+                    led_driver_write(LED_CH0, led_drv_db.led_val.ch[LED_CH0]);
+                  break;      
+              
+                  case GREEN_CH2:             
+                    FM_Printf(FM_APP, "\n| G %bu | ",led_drv_db.led_val.ch[LED_CH1]);
+                    led_driver_write(LED_CH1, led_drv_db.led_val.ch[LED_CH1]);
+                  break;      
+              
+                  case BLUE_CH3:    
+                    FM_Printf(FM_APP, "\n| B %bu | ",led_drv_db.led_val.ch[LED_CH2]);
+                    led_driver_write(LED_CH2, led_drv_db.led_val.ch[LED_CH2]);
+                  break;      
+              
+                  default:
+                  break;
+                }
+              #endif /*LED_RGB_LIGHT*/  
+ 383   1      
+ 384   1      #ifdef LED_WNC_LIGHT
+                /*Light temperature device*/
+                switch(led_tlv)
+                {
+                  case WARM_CH1:      
+                    FM_Printf(FM_APP, "\n| W %bu | ",led_drv_db.led_val.ch[LED_CH0]);
+                    led_driver_write(LED_CH0, led_drv_db.led_val.ch[LED_CH0]);
+                  break;      
+                  
+                  case NATURAL_CH2:     
+                    FM_Printf(FM_APP, "\n| N %bu | ",led_drv_db.led_val.ch[LED_CH1]);
+                    led_driver_write(LED_CH1, led_drv_db.led_val.ch[LED_CH1]);
+                  break;      
+                  
+                  case COOL_CH3:    
+                    FM_Printf(FM_APP, "\n| C %bu | ",led_drv_db.led_val.ch[LED_CH2]);
+                    led_driver_write(LED_CH2, led_drv_db.led_val.ch[LED_CH2]);
+                  break;      
+              
+                  default:
+                  break;
+                }
+              #endif /*LED_WNC_LIGHT*/    
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 8   
+
+ 407   1      
+ 408   1      #ifdef LED_WHITE_LIGHT
+                /*Single channel dimming device*/
+                switch(led_tlv)
+                {
+                  case DIMM_CH4:      
+                    FM_Printf(FM_APP, "\n| D %bu | ", led_drv_db.led_val.ch[LED_CH0]);
+                    led_driver_write(LED_CH0, led_drv_db.led_val.ch[LED_CH0]);
+                  break;      
+              
+                  default:
+                  break;
+                }
+              #endif /*LED_WHITE_LIGHT*/  
+ 421   1      
+ 422   1      #ifdef LED_SMART_LIGHT
+ 423   1        switch(led_tlv)
+ 424   1        {   
+ 425   2          case ENABLE_CH:   
+ 426   2            FM_Printf(FM_APP, "\n| ENABLE_CH %bu | ", led_drv_db.led_val.enable);
+ 427   2          break;        
+ 428   2          
+ 429   2          case RED_CH1:     
+ 430   2            FM_Printf(FM_APP, "\n| R %bu | ", led_drv_db.led_val.ch[LED_CH0]);
+ 431   2            led_driver_write(LED_CH0, led_drv_db.led_val.ch[LED_CH0]);
+ 432   2          break;      
+ 433   2      
+ 434   2          case GREEN_CH2:     
+ 435   2            FM_Printf(FM_APP, "\n| G %bu | ",led_drv_db.led_val.ch[LED_CH1]);
+ 436   2            led_driver_write(LED_CH1, led_drv_db.led_val.ch[LED_CH1]);
+ 437   2          break;      
+ 438   2      
+ 439   2          case BLUE_CH3:    
+ 440   2            FM_Printf(FM_APP, "\n| B %bu | ",led_drv_db.led_val.ch[LED_CH2]);
+ 441   2            led_driver_write(LED_CH2, led_drv_db.led_val.ch[LED_CH2]);
+ 442   2          break;      
+ 443   2      
+ 444   2          case WHITE_CH4:     
+ 445   2            FM_Printf(FM_APP, "\n| W %bu | ",led_drv_db.led_val.ch[LED_CH3]);
+ 446   2            led_driver_write(LED_CH3, led_drv_db.led_val.ch[LED_CH3]);
+ 447   2          break;      
+ 448   2      
+ 449   2      #ifndef HQ_LINK_TEST    
+ 450   2          case RELAY_1:   
+ 451   2            FM_Printf(FM_APP, "\n| Relay1 %bu | ", led_drv_db.led_val.ch[LED_CH4]);
+ 452   2            led_driver_write(LED_CH4, led_drv_db.led_val.ch[LED_CH4]);
+ 453   2          break;      
+ 454   2      
+ 455   2          case RELAY_2:   
+ 456   2            FM_Printf(FM_APP, "\n| Relay2 %bu | ", led_drv_db.led_val.ch[LED_CH5]);
+ 457   2            led_driver_write(LED_CH5, led_drv_db.led_val.ch[LED_CH5]);
+ 458   2          break;  
+ 459   2      #endif
+ 460   2          default:
+ 461   2          break;
+ 462   2        }
+ 463   1      #endif /*LED_SMART_LIGHT*/  
+ 464   1      }
+ 465          
+ 466          /******************************************************************************
+ 467           * @fn      led_driver_write
+ 468           *
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 9   
+
+ 469           * @brief   Maps the dimming values(echanged over LLP) to the h/w values
+ 470           *
+ 471           * @param   led_ch - the channel on which values are to be written
+ 472           *      led_val - the value to be written 
+ 473           *      dev_type - the device (device type connected to LLP) 
+ 474           *
+ 475           * @return  none
+ 476           */
+ 477          
+ 478          void led_driver_write(u8 led_ch, u8 led_val)
+ 479          {   
+ 480   1        u8 x;
+ 481   1        u8 y; 
+ 482   1        u16 hw_value = 0;         
+ 483   1      
+ 484   1        WriteU8Reg(0x4FA, 0x01);        
+ 485   1          if(led_drv_db.nv.io_cfg.io[led_ch] == LED_GPIO)
+ 486   1          {  
+ 487   2            hw_value = led_val;
+ 488   2            x = hw_value & 0x00FF;
+ 489   2            y = (hw_value >> 8) & 0x00FF;     
+ 490   2          if (x > 0)
+ 491   2          {
+ 492   3            if((led_ch == LED_CH4) || (led_ch == LED_CH5))
+ 493   3            {         
+ 494   4              WriteU8Reg(led_reg_map[led_ch].cfg3_reg,  
+ 496   4                    (ReadU8Reg(led_reg_map[led_ch].cfg3_reg) | 
+ 496   4                     led_reg_map[led_ch].op1_reg));         
+ 497   4            }
+ 498   3            else
+ 499   3            {
+ 500   4              WriteU8Reg(led_reg_map[led_ch].cfg3_reg, 
+ 502   4                    (ReadU8Reg(led_reg_map[led_ch].cfg3_reg) & 
+ 502   4                          led_reg_map[led_ch].op1_reg));
+ 503   4            }
+ 504   3          }
+ 505   2          else
+ 506   2          {
+ 507   3            if((led_ch == LED_CH4) || (led_ch == LED_CH5))
+ 508   3            {
+ 509   4              WriteU8Reg(led_reg_map[led_ch].cfg3_reg,  
+ 511   4                      (ReadU8Reg(led_reg_map[led_ch].cfg3_reg) &
+ 511   4                       led_reg_map[led_ch].op2_reg));   
+ 512   4            }
+ 513   3            else
+ 514   3            {
+ 515   4              WriteU8Reg(led_reg_map[led_ch].cfg3_reg,  
+ 517   4                      (ReadU8Reg(led_reg_map[led_ch].cfg3_reg) | 
+ 517   4                       led_reg_map[led_ch].op2_reg));   
+ 518   4            }
+ 519   3          }
+ 520   2          }
+ 521   1          else if(led_drv_db.nv.io_cfg.io[led_ch] == LED_PWM)
+ 522   1          {
+ 523   2            if((led_val == 0) || (led_val == 1))
+ 524   2            {
+ 525   3              hw_value = 0x02FF;
+ 526   3            }
+ 527   2          else
+ 528   2          {
+ 529   3                hw_value = (255 - led_val)*3;
+ 530   3          }
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 10  
+
+ 531   2          
+ 532   2          if(hw_value == 0)
+ 533   2            hw_value = 1;
+ 534   2            
+ 535   2          x = hw_value & 0x00FF;
+ 536   2          y = (hw_value >> 8) & 0x00FF;       
+ 537   2      
+ 538   2          WriteU8Reg(led_reg_map[led_ch].cfg1_reg, x);
+ 539   2          WriteU8Reg(led_reg_map[led_ch].cfg2_reg, y);    
+ 540   2          }
+ 541   1          else if(led_drv_db.nv.io_cfg.io[led_ch] == LED_DC)
+ 542   1          {
+ 543   2            if((led_val == 0) || (led_val == 1))
+ 544   2            {
+ 545   3              hw_value = 0x02FF;
+ 546   3            }
+ 547   2          else
+ 548   2          {
+ 549   3      #if 0    
+                    /* Mapping light level 1 ~ 255 to 40 ~ 8 */    
+                    hw_value =  64 - (led_val*2 /9);
+              #else
+ 553   3            /* Mapping light level 1 ~ 255 to 96 ~11 
+ 554   3              (0x60 to 0xB)register value */
+ 555   3            hw_value =  96 - (led_val/3);       
+ 556   3      #endif
+ 557   3            
+ 558   3          }   
+ 559   2          
+ 560   2          if(hw_value == 0)
+ 561   2            hw_value = 1;
+ 562   2          
+ 563   2            x = hw_value & 0x00FF;
+ 564   2            y = (hw_value >> 8) & 0x00FF;     
+ 565   2          WriteU8Reg(led_reg_map[led_ch].cfg1_reg, x);
+ 566   2          WriteU8Reg(led_reg_map[led_ch].cfg2_reg, y);
+ 567   2        }
+ 568   1      
+ 569   1        WriteU8Reg(0x4FA, 0x0);
+ 570   1      #if 0 
+                FM_Printf(FM_APP, "\nProgram CH = %bu, value = %u, x = %bu, y = %bu\n", led_ch, hw_value, x, y);    
+              #endif
+ 573   1      }
+ 574          
+ 575          /******************************************************************************
+ 576           * @fn      led_driver_cmdprocess
+ 577           *
+ 578           * @brief   It handles application command line requests
+ 579           *
+ 580           * @param   CmdBuf - command string
+ 581           *
+ 582           * @return  none
+ 583           *
+ 584           */
+ 585          
+ 586          void led_driver_cmdprocess(char* CmdBuf) 
+ 587          {
+ 588   1        u8 cmd[30];
+ 589   1        
+ 590   1        if((sscanf(CmdBuf, "%s", &cmd) < 1) || strcmp(cmd, "?") == 0)
+ 591   1          return;
+ 592   1          
+C51 COMPILER V9.53.0.0   SMARTLIGHTAPP                                                     11/04/2015 20:09:39 PAGE 11  
+
+ 593   1        if(strcmp(cmd, "cfg") == 0) 
+ 594   1        { 
+ 595   2          if(sscanf(CmdBuf + sizeof("cfg"),"%bu %bu %bu %bu %bu %bu %bu",
+ 596   2             &led_drv_db.nv.dev_subtype, &led_drv_db.nv.io_cfg.io[0],
+ 597   2             &led_drv_db.nv.io_cfg.io[1], &led_drv_db.nv.io_cfg.io[2],
+ 598   2             &led_drv_db.nv.io_cfg.io[3], &led_drv_db.nv.io_cfg.io[4],
+ 599   2             &led_drv_db.nv.io_cfg.io[5]) >= 1)
+ 600   2          {        
+ 601   3            GV701x_FlashWrite(led_drv_db.appid, (u8*)&led_drv_db.nv, sizeof(led_drv_db.nv));      
+ 602   3          }
+ 603   2        }
+ 604   1        else if(strcmp(cmd, "test") == 0) 
+ 605   1        {
+ 606   2          if(sscanf(CmdBuf + sizeof("test"), "%bu %bu %bu %bu %bu %bu", 
+ 607   2            &led_drv_db.led_val.ch[0], &led_drv_db.led_val.ch[1],
+ 608   2            &led_drv_db.led_val.ch[2], &led_drv_db.led_val.ch[3],
+ 609   2            &led_drv_db.led_val.ch[4], &led_drv_db.led_val.ch[5]) >= 1)
+ 610   2          {       
+ 611   3      #ifdef LED_SMART_LIGHT    
+ 612   3            led_driver_control(RED_CH1);
+ 613   3            led_driver_control(GREEN_CH2);      
+ 614   3            led_driver_control(BLUE_CH3);               
+ 615   3            led_driver_control(WHITE_CH4);      
+ 616   3            led_driver_control(RELAY_1);      
+ 617   3            led_driver_control(RELAY_2);            
+ 618   3      #endif      
+ 619   3          } 
+ 620   2        }
+ 621   1        else if(strcmp(cmd, "nvclear") == 0) 
+ 622   1        {
+ 623   2          GV701x_FlashErase(led_drv_db.appid);
+ 624   2        } 
+ 625   1      }
+ 626          
+ 627          #endif /*((SMARTLIGHT_APP) && (LED_RGB_LIGHT || LED_WNC_LIGHT \
+ 628                *LED_WHITE_LIGHT || LED_SMART_LIGHT))*/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2592    ----
+   CONSTANT SIZE    =    248    ----
+   XDATA SIZE       =    255      60
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

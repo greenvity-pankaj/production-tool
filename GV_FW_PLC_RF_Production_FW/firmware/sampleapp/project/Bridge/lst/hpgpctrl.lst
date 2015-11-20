@@ -1,0 +1,168 @@
+C51 COMPILER V9.53.0.0   HPGPCTRL                                                          11/04/2015 20:09:39 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE HPGPCTRL
+OBJECT MODULE PLACED IN .\obj\hpgpctrl.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\hpgp\src\hpgpctrl.c LARGE OBJECTADVANCED OPTIMIZE(9
+                    -,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..
+                    -\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\h
+                    -al;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\fi
+                    -rmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbe
+                    -e;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\in
+                    -c;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\i
+                    -nc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;
+                    -..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers
+                    -\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..
+                    -\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\
+                    -components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers
+                    -\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilitie
+                    -s;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\n
+                    -wk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..
+                    -\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII
+                    -_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC
+                    -,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DET
+                    -ECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUP
+                    -T,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REG
+                    -ISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\hpgpctrl.lst) TABS(2)
+                    - OBJECT(.\obj\hpgpctrl.obj)
+
+line level    source
+
+   1          /** =========================================================
+   2           *
+   3           *  @file hpgpctrl.c
+   4           * 
+   5           *  @brief HPGP Control Plane
+   6           *
+   7           *  Copyright (C) 2010-2012, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ==========================================================*/
+  11          #include "papdef.h"
+  12          #include "hpgpdef.h"
+  13          #ifdef ROUTE
+              #include "hpgp_route.h"
+              #endif
+  16          #include "list.h"
+  17          #include "event.h"
+  18          #include "nma.h"
+  19          #include "nma_fw.h"
+  20          #include "hpgpctrl.h"
+  21          #include "hpgpapi.h"
+  22          #include "hybrii_tasks.h"
+  23          
+  24          static sHpgpCtrl *gHpgpCtrl = NULL;
+  25          
+  26          void HPGPCTRL_Init(sHpgpCtrl *hpgpCtrl)
+  27          {
+  28   1          gHpgpCtrl = hpgpCtrl;
+  29   1          //Initialize MUX
+  30   1          MUXL_Init(&hpgpCtrl->muxLayer);
+  31   1          //Initialize Link Layer
+  32   1          LINKL_Init(&hpgpCtrl->linkLayer);
+  33   1          //Initialize Control Layer
+  34   1          CTRLL_Init(&hpgpCtrl->ctrlLayer);
+C51 COMPILER V9.53.0.0   HPGPCTRL                                                          11/04/2015 20:09:39 PAGE 2   
+
+  35   1      }
+  36          
+  37          #if 0
+              void HPGPCTRL_Proc(sHpgpCtrl *hpgpCtrl)
+              {
+                    //Mux Layer
+                    MUXL_Proc(&hpgpCtrl->muxLayer);
+                    //Link Layer
+                    LINKL_Proc(&hpgpCtrl->linkLayer);
+                    //Control Layer
+                    CTRLL_Proc(&hpgpCtrl->ctrlLayer);
+              }
+              #endif
+  48          
+  49          
+  50          void* HPGPCTRL_GetLayer(u8 layer)
+  51          {
+  52   1          switch(layer)
+  53   1          {
+  54   2      #if 0
+                      case HP_LAYER_TYPE_HA:
+              #ifdef SIMU
+                          return (void*) &(gHpgpCtrl->simuHal);
+              #else
+                          return (void*) &(gHpgpCtrl->haLayer);
+              #endif
+              #endif
+  62   2              case HP_LAYER_TYPE_MUX:
+  63   2                  return (void*) &(gHpgpCtrl->muxLayer);
+  64   2              case HP_LAYER_TYPE_LINK:
+  65   2                  return (void*) &(gHpgpCtrl->linkLayer);
+  66   2              case HP_LAYER_TYPE_CTRL:
+  67   2                  return (void*) &(gHpgpCtrl->ctrlLayer);
+  68   2              default:
+  69   2                  return NULL;
+  70   2          }
+  71   1      }
+  72          
+  73          
+  74          /** =========================================================
+  75           *
+  76           * Edit History
+  77           *
+  78           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/hpgp/src/hpgpctrl.c,v $
+  79           *
+  80           * $Log: hpgpctrl.c,v $
+  81           * Revision 1.5  2014/11/11 14:52:58  ranjan
+  82           * 1.New Folder Architecture espically in /components
+  83           * 2.Modular arrangment of functionality in new files
+  84           *    anticipating the need for exposing them as FW App
+  85           *    development modules
+  86           * 3.Other improvisation in code and .h files
+  87           *
+  88           * Revision 1.4  2014/05/28 10:58:59  prashant
+  89           * SDK folder structure changes, Uart changes, removed htm (UI) task
+  90           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+  91           *
+  92           * Revision 1.3  2014/05/12 08:09:57  prashant
+  93           * Route fix, STA sync issue with AV CCO and handling discover bcn issue fix
+  94           *
+  95           * Revision 1.2  2014/02/27 10:42:47  prashant
+  96           * Routing code added
+C51 COMPILER V9.53.0.0   HPGPCTRL                                                          11/04/2015 20:09:39 PAGE 3   
+
+  97           *
+  98           * Revision 1.1  2013/12/18 17:04:24  yiming
+  99           * no message
+ 100           *
+ 101           * Revision 1.1  2013/12/17 21:45:54  yiming
+ 102           * no message
+ 103           *
+ 104           * Revision 1.4  2013/09/04 14:49:33  yiming
+ 105           * New changes for Hybrii_A code merge
+ 106           *
+ 107           * Revision 1.2  2012/04/13 06:15:11  yuanhua
+ 108           * integrate the HPGP protocol stack with the HAL for the beacon TX/RX and mgmt msg RX.
+ 109           *
+ 110           * Revision 1.1  2012/03/11 17:02:24  yuanhua
+ 111           * (1) added NEK auth in AKM (2) added NMA (3) modified hpgp layer data structures (4) added Makefile for 
+             -linux simulation
+ 112           *
+ 113           *
+ 114           * =========================================================*/
+ 115          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    123    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      3       3
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

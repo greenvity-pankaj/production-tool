@@ -1,0 +1,613 @@
+C51 COMPILER V9.53.0.0   MAC_HAL_PIB                                                       11/04/2015 20:09:49 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE MAC_HAL_PIB
+OBJECT MODULE PLACED IN .\obj\mac_hal_pib.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\zigbee\mac_hal_pib.c LARGE OBJECTADVANCED OPTIMIZE(
+                    -9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\.
+                    -.\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\
+                    -hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\f
+                    -irmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigb
+                    -ee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\i
+                    -nc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\
+                    -inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support
+                    -;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\driver
+                    -s\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;.
+                    -.\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..
+                    -\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\driver
+                    -s\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utiliti
+                    -es;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\
+                    -nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\.
+                    -.\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRI
+                    -I_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYN
+                    -C,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DE
+                    -TECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRU
+                    -PT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,RE
+                    -GISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\mac_hal_pib.lst) TAB
+                    -S(2) OBJECT(.\obj\mac_hal_pib.obj)
+
+line level    source
+
+   1          /**
+   2           * @file mac_hal_pib.c
+   3           *
+   4           * This file handles the HAL PIB attributes initialization and set/get
+   5           *
+   6           * $Id: mac_hal_pib.c,v 1.4 2014/11/11 14:52:59 ranjan Exp $
+   7           *
+   8           * Copyright (c) 2011, Greenvity Communication All rights reserved.
+   9           *
+  10           */
+  11          #ifdef HYBRII_802154
+  12          
+  13          /* === INCLUDES ============================================================ */
+  14          
+  15          #include <string.h>
+  16          #include <stdio.h>
+  17          #include "hal_common.h"
+  18          #include "gv701x_cfg.h"
+  19          #include "hybrii_802_15_4_regs.h"
+  20          #include "return_val.h"
+  21          #include "mac_const.h"
+  22          #include "bmm.h"
+  23          #include "qmm.h"
+  24          #include "utils_fw.h"
+  25          #include "mac_msgs.h"
+  26          #include "mac_hal.h"
+  27          #include "fm.h"
+  28          
+  29          /* === TYPES =============================================================== */
+  30          
+  31          /* === MACROS ============================================================== */
+  32          
+  33          /* === GLOBALS ============================================================= */
+  34          
+C51 COMPILER V9.53.0.0   MAC_HAL_PIB                                                       11/04/2015 20:09:49 PAGE 2   
+
+  35          /*
+  36           * HAL PIBs
+  37           */
+  38          /**
+  39           * The maximum number of symbols to wait for an acknowledgment frame to
+  40           * arrive following a transmitted data frame.
+  41           * macAckWaitDuration = aUnitBackoffPeriod + aTurnaroundTime +
+  42           *                      phySHRDuration + (6 * phySymbolsPerOctet)
+  43           */
+  44          uint8_t hal_pib_macAckWaitDuration;
+  45          
+  46          /**
+  47           * The maximum number of back-offs the CSMA-CA algorithm will attempt
+  48           * before declaring a CSMA_CA failure.
+  49           */
+  50          uint8_t hal_pib_MaxCSMABackoffs;
+  51          
+  52          /**
+  53           * The minimum value of the backoff exponent BE in the CSMA-CA algorithm.
+  54           */
+  55          uint8_t hal_pib_MinBE;
+  56          
+  57          /**
+  58           * 16-bit PAN ID.
+  59           */
+  60          uint16_t hal_pib_PANId;
+  61          
+  62          /**
+  63           * Node's 16-bit short address.
+  64           */
+  65          uint16_t hal_pib_ShortAddress;
+  66          
+  67          /**
+  68           * Node's 64-bit (IEEE) address.
+  69           */
+  70          uint64_t hal_pib_IeeeAddress;
+  71          
+  72          /**
+  73           * Current RF channel to be used for all transmissions and receptions.
+  74           */
+  75          uint8_t hal_pib_CurrentChannel;
+  76          
+  77          /**
+  78           * Supported channels
+  79           */
+  80          uint32_t hal_pib_SupportedChannels;
+  81          
+  82          /**
+  83           * Current channel page; supported: page 0; high-data rate mode: 2, 16, 17
+  84           */
+  85          uint8_t hal_pib_CurrentPage;
+  86          
+  87          /**
+  88           * Maximum number of symbols in a frame:
+  89           * = phySHRDuration + ceiling([aMaxPHYPacketSize + 1] x phySymbolsPerOctet)
+  90           */
+  91          uint16_t hal_pib_MaxFrameDuration;
+  92          
+  93          /**
+  94           * Duration of the synchronization header (SHR) in symbols for the current PHY.
+  95           */
+  96          uint8_t hal_pib_SHRDuration;
+C51 COMPILER V9.53.0.0   MAC_HAL_PIB                                                       11/04/2015 20:09:49 PAGE 3   
+
+  97          
+  98          /**
+  99           * Number of symbols per octet for the current PHY.
+ 100           */
+ 101          uint8_t hal_pib_SymbolsPerOctet;
+ 102          
+ 103          /**
+ 104           * The maximum value of the backoff exponent BE in the CSMA-CA algorithm.
+ 105           */
+ 106          uint8_t hal_pib_MaxBE;
+ 107          
+ 108          /**
+ 109           * The maximum number of retries allowed after a transmission failure.
+ 110           */
+ 111          uint8_t hal_pib_MaxFrameRetries;
+ 112          
+ 113          /**
+ 114           * Default value of transmit power of transceiver
+ 115           * using IEEE defined format of phyTransmitPower.
+ 116           */
+ 117          uint8_t hal_pib_TransmitPower;
+ 118          
+ 119          /**
+ 120           * CCA Mode
+ 121           */
+ 122          uint8_t hal_pib_CCAMode;
+ 123          
+ 124          /**
+ 125           * Indicates if the node is a PAN coordinator or not.
+ 126           */
+ 127          bool hal_pib_PrivatePanCoordinator;
+ 128          
+ 129          /**
+ 130           * Promiscuous Mode
+ 131           */
+ 132          bool hal_pib_PromiscuousMode;
+ 133          
+ 134          /**
+ 135           * Indication of whether battery life extension is enabled or not.
+ 136           */
+ 137          bool hal_pib_BattLifeExt;
+ 138          
+ 139          /**
+ 140           * Beacon order
+ 141           */
+ 142          uint8_t hal_pib_BeaconOrder;
+ 143          
+ 144          /**
+ 145           * Superframe order
+ 146           */
+ 147          uint8_t hal_pib_SuperFrameOrder;
+ 148          
+ 149          /**
+ 150           * Holds the time at which last beacon was transmitted or received.
+ 151           */
+ 152          uint32_t hal_pib_BeaconTxTime;
+ 153          
+ 154          /* === PROTOTYPES ========================================================== */
+ 155          
+ 156          /* === IMPLEMENTATION ====================================================== */
+ 157          static uint8_t mac_hal_pib_tx_pwr (uint8_t tx_power)
+ 158          {
+C51 COMPILER V9.53.0.0   MAC_HAL_PIB                                                       11/04/2015 20:09:49 PAGE 4   
+
+ 159   1          // FIXME - Add code to compute the TX Power
+ 160   1        tx_power = tx_power;
+ 161   1          return (0);
+ 162   1      }
+ 163          
+ 164          /**
+ 165           * Initialize the PIB
+ 166           *
+ 167           * This function initializes the HAL information base attributes
+ 168           * to their default values.
+ 169           */
+ 170          void mac_hal_pib_init (void)
+ 171          {
+ 172   1          hal_pib_MaxCSMABackoffs = HAL_MAX_CSMA_BACKOFFS_DEFAULT;
+ 173   1          hal_pib_MinBE = HAL_MINBE_DEFAULT;
+ 174   1          hal_pib_PANId = HAL_PANID_BC_DEFAULT;
+ 175   1          hal_pib_ShortAddress = HAL_SHORT_ADDRESS_DEFAULT;
+ 176   1      #ifndef Flash_Config  
+ 177   1          hal_pib_CurrentChannel = HAL_CURRENT_CHANNEL_DEFAULT;
+ 178   1      #else
+                  /* [YM] Get the channel from the flash and set
+                   * hal_pib_CurrentChannel = to that */
+                hal_pib_CurrentChannel = sysConfig.defaultCH;
+              #endif
+ 183   1          hal_pib_SupportedChannels = HAL_SUPPORTED_CHANNELS;
+ 184   1          hal_pib_CurrentPage = HAL_CURRENT_PAGE_DEFAULT;
+ 185   1          hal_pib_MaxFrameDuration = HAL_MAX_FRAME_DURATION_DEFAULT;
+ 186   1          hal_pib_SHRDuration = HAL_SHR_DURATION_DEFAULT;
+ 187   1          hal_pib_SymbolsPerOctet = HAL_SYMBOLS_PER_OCTET_DEFAULT;
+ 188   1          hal_pib_MaxBE = HAL_MAXBE_DEFAULT;
+ 189   1          hal_pib_MaxFrameRetries = HAL_MAXFRAMERETRIES_DEFAULT;
+ 190   1          hal_pib_TransmitPower = mac_hal_pib_tx_pwr(HAL_TRANSMIT_POWER_DEFAULT);
+ 191   1          hal_pib_CCAMode = HAL_CCA_MODE_DEFAULT;
+ 192   1          hal_pib_PrivatePanCoordinator = HAL_PAN_COORDINATOR_DEFAULT;
+ 193   1          hal_pib_BattLifeExt = HAL_BATTERY_LIFE_EXTENSION_DEFAULT;
+ 194   1          hal_pib_BeaconOrder = HAL_BEACON_ORDER_DEFAULT;
+ 195   1          hal_pib_SuperFrameOrder = HAL_SUPERFRAME_ORDER_DEFAULT;
+ 196   1          hal_pib_PromiscuousMode = HAL_PIB_PROMISCUOUS_MODE_DEFAULT;
+ 197   1          hal_pib_macAckWaitDuration = aUnitBackoffPeriod + aTurnaroundTime +
+ 198   1                                       hal_pib_SHRDuration +
+ 199   1                                       (6 * hal_pib_SymbolsPerOctet);
+ 200   1      }
+ 201          
+ 202          
+ 203          /**
+ 204           * Write all shadow PIB variables to the MAC Asic 
+ 205           *
+ 206           * This function writes all shadow PIB variables to the MAC Asic Registers.
+ 207           */
+ 208          void mac_hal_pib_write_to_asic (void)
+ 209          {
+ 210   1          /* Configure the PAN ID */
+ 211   1          hal_common_bit_field_reg_write(ZIG_MAC_PAN_ID, hal_pib_PANId);
+ 212   1      
+ 213   1          /* Configure the IEEE Extended Address */
+ 214   1          hal_common_bit_field_reg_write(ZIG_MAC_ID_IEEE_EXT_ADDR_LO,
+ 215   1                                         hal_pib_IeeeAddress.lo_u32);
+ 216   1          hal_common_bit_field_reg_write(ZIG_MAC_ID_IEEE_EXT_ADDR_HI,
+ 217   1                                         hal_pib_IeeeAddress.hi_u32);
+ 218   1      
+ 219   1          /* Configure the Short Address */
+ 220   1          hal_common_bit_field_reg_write(ZIG_MAC_ID_SHORT, hal_pib_ShortAddress);
+C51 COMPILER V9.53.0.0   MAC_HAL_PIB                                                       11/04/2015 20:09:49 PAGE 5   
+
+ 221   1      
+ 222   1          /* Configure CCA Mode */
+ 223   1          hal_common_bit_field_reg_write(ZIG_PHY_CCA_MODE, hal_pib_CCAMode);
+ 224   1      
+ 225   1          /* Configure CSMA/CA parameters */
+ 226   1          hal_common_bit_field_reg_write(ZIG_MIN_BE, hal_pib_MinBE);
+ 227   1          hal_common_bit_field_reg_write(ZIG_MAX_BE, hal_pib_MaxBE);
+ 228   1          hal_common_bit_field_reg_write(ZIG_NO_CCA_MAX_RETRY,
+ 229   1                                         hal_pib_MaxCSMABackoffs);
+ 230   1          hal_common_bit_field_reg_write(ZIG_NO_ACK_MAX_RETRY,
+ 231   1                                         hal_pib_MaxFrameRetries);
+ 232   1         
+ 233   1      
+ 234   1          hal_common_bit_field_reg_write(ZIG_COO_EN, hal_pib_PrivatePanCoordinator);
+ 235   1      
+ 236   1          /* 
+ 237   1           * Always enable security in h/w. S/w will check for 
+ 238   1           * mac_pib_macSecurityEnabled when send/receive packets
+ 239   1           */
+ 240   1          // FIXME hal_common_bit_field_reg_write(ZIG_AES_ENGINE_EN, TRUE);
+ 241   1      
+ 242   1          /* FIXME - Add code to configure the channel */
+ 243   1      
+ 244   1          if (hal_pib_BeaconOrder == NON_BEACON_NWK) {
+ 245   2              hal_common_bit_field_reg_write(ZIG_NON_BEACON_NWK, TRUE);
+ 246   2          }
+ 247   1      
+ 248   1          hal_common_bit_field_reg_write(ZIG_SIFS_PERIOD, macMinSIFSPeriod_def);
+ 249   1          hal_common_bit_field_reg_write(ZIG_LIFS_PERIOD, macMinLIFSPeriod_def);
+ 250   1          hal_common_bit_field_reg_write(ZIG_ACK_TX_TIME, aTurnaroundTime);
+ 251   1          hal_common_bit_field_reg_write(ZIG_ACK_TIMEOUT, hal_pib_macAckWaitDuration);
+ 252   1      }
+ 253          
+ 254          
+ 255          /**
+ 256           * Gets a HAL PIB attribute
+ 257           *
+ 258           * This function is called to retrieve the HAL information base
+ 259           * attributes.
+ 260           *
+ 261           */
+ 262          retval_t mac_hal_pib_get (uint8_t attribute, uint8_t *value)
+ 263          {
+ 264   1          switch (attribute) {
+ 265   2          case macMaxCSMABackoffs:
+ 266   2              *value = hal_pib_MaxCSMABackoffs;
+ 267   2              break;
+ 268   2      
+ 269   2          case macMinBE:
+ 270   2              *value = hal_pib_MinBE;
+ 271   2              break;
+ 272   2      
+ 273   2          case macPANId:
+ 274   2              *(uint16_t *)value = hal_pib_PANId;
+ 275   2              break;
+ 276   2      
+ 277   2          case macPromiscuousMode:
+ 278   2              *(uint16_t *)value = hal_pib_PromiscuousMode;
+ 279   2              break;
+ 280   2      
+ 281   2          case macShortAddress:
+ 282   2              *(uint16_t *)value = hal_pib_ShortAddress;
+C51 COMPILER V9.53.0.0   MAC_HAL_PIB                                                       11/04/2015 20:09:49 PAGE 6   
+
+ 283   2              break;
+ 284   2      
+ 285   2          case phyCurrentChannel:
+ 286   2              *value = hal_pib_CurrentChannel;
+ 287   2              break;
+ 288   2      
+ 289   2          case phyChannelsSupported:
+ 290   2              *(uint32_t *)value = hal_pib_SupportedChannels;
+ 291   2              break;
+ 292   2      
+ 293   2          case phyTransmitPower:
+ 294   2              *value = hal_pib_TransmitPower;
+ 295   2              break;
+ 296   2      
+ 297   2          case phyCCAMode:
+ 298   2              *value = hal_pib_CCAMode;
+ 299   2              break;
+ 300   2      
+ 301   2          case phyCurrentPage:
+ 302   2              *value = hal_pib_CurrentPage;
+ 303   2              break;
+ 304   2      
+ 305   2          case phyMaxFrameDuration:
+ 306   2              *(uint16_t *)value = hal_pib_MaxFrameDuration;
+ 307   2              break;
+ 308   2      
+ 309   2          case phySymbolsPerOctet:
+ 310   2              *value = hal_pib_SymbolsPerOctet;
+ 311   2              break;
+ 312   2      
+ 313   2          case phySHRDuration:
+ 314   2              *value = hal_pib_SHRDuration;
+ 315   2              break;
+ 316   2      
+ 317   2          case macMaxBE:
+ 318   2              *value = hal_pib_MaxBE;
+ 319   2              break;
+ 320   2      
+ 321   2          case macMaxFrameRetries:
+ 322   2              *value = hal_pib_MaxFrameRetries;
+ 323   2              break;
+ 324   2      
+ 325   2          case macIeeeAddress:
+ 326   2              *(uint64_t *)value = hal_pib_IeeeAddress;
+ 327   2              break;
+ 328   2      
+ 329   2          case macBattLifeExt:
+ 330   2              *(bool *)value = hal_pib_BattLifeExt;
+ 331   2              break;
+ 332   2      
+ 333   2          case macBeaconOrder:
+ 334   2              *value = hal_pib_BeaconOrder;
+ 335   2              break;
+ 336   2      
+ 337   2          case macSuperframeOrder:
+ 338   2              *value = hal_pib_SuperFrameOrder;
+ 339   2              break;
+ 340   2      
+ 341   2          case macBeaconTxTime:
+ 342   2              *(uint32_t *)value = hal_pib_BeaconTxTime;
+ 343   2              break;
+ 344   2      
+C51 COMPILER V9.53.0.0   MAC_HAL_PIB                                                       11/04/2015 20:09:49 PAGE 7   
+
+ 345   2          case I_AM_PAN_COORDINATOR:
+ 346   2              *(bool *)value = hal_pib_PrivatePanCoordinator;
+ 347   2              break;
+ 348   2      
+ 349   2          case macAckWaitDuration:
+ 350   2              break;
+ 351   2      
+ 352   2          default:
+ 353   2              /* Invalid attribute id */
+ 354   2              return MAC_UNSUPPORTED_ATTRIBUTE;
+ 355   2          }
+ 356   1      
+ 357   1          return MAC_SUCCESS;
+ 358   1      }
+ 359          
+ 360          retval_t mac_hal_pib_set_trx_state_check (uint8_t attribute,
+ 361                                                    pib_value_t *value)
+ 362          {
+ 363   1          // FIXME - Need to check ASIC status before changing the attributes
+ 364   1      
+ 365   1          switch (attribute) {
+ 366   2          case macMinBE:
+ 367   2              hal_pib_MinBE = value->pib_value_8bit;
+ 368   2              /*
+ 369   2               * macMinBE must not be larger than macMaxBE
+ 370   2               */
+ 371   2              if (hal_pib_MinBE > hal_pib_MaxBE) {
+ 372   3                  hal_pib_MinBE = hal_pib_MaxBE;
+ 373   3              }
+ 374   2              hal_common_bit_field_reg_write(ZIG_MIN_BE, hal_pib_MinBE);
+ 375   2              break;
+ 376   2      
+ 377   2          case macMaxBE:
+ 378   2              hal_pib_MaxBE = value->pib_value_8bit;
+ 379   2              if (hal_pib_MaxBE < hal_pib_MinBE) {
+ 380   3                  hal_pib_MinBE = hal_pib_MaxBE;
+ 381   3              }
+ 382   2              hal_common_bit_field_reg_write(ZIG_MAX_BE, hal_pib_MaxBE);
+ 383   2              break;
+ 384   2      
+ 385   2          case macPANId:    
+ 386   2              hal_pib_PANId = value->pib_value_16bit;
+ 387   2              hal_common_bit_field_reg_write(ZIG_MAC_PAN_ID, hal_pib_PANId);
+ 388   2          FM_Printf(FM_APP, "\nPanid:%x", hal_pib_PANId); 
+ 389   2              break;
+ 390   2      
+ 391   2          case macShortAddress:     
+ 392   2              hal_pib_ShortAddress = value->pib_value_16bit;
+ 393   2              hal_common_bit_field_reg_write(ZIG_MAC_ID_SHORT, hal_pib_ShortAddress);
+ 394   2          FM_Printf(FM_APP, "\nShartaddr:%x", hal_pib_ShortAddress);    
+ 395   2              break;
+ 396   2      
+ 397   2          case phyCurrentChannel:
+ 398   2              hal_pib_CurrentChannel = value->pib_value_8bit;
+ 399   2          FM_Printf(FM_APP, "\nCH:%bx", hal_pib_CurrentChannel);
+ 400   2      #ifdef HYBRII_ASIC
+ 401   2              gv701x_cfg_zb_afe_init(hal_pib_CurrentChannel, FALSE);
+ 402   2      #endif
+ 403   2              break;
+ 404   2      
+ 405   2          case phyCurrentPage:
+ 406   2              break;
+C51 COMPILER V9.53.0.0   MAC_HAL_PIB                                                       11/04/2015 20:09:49 PAGE 8   
+
+ 407   2      
+ 408   2          case phyTransmitPower:
+ 409   2              hal_pib_TransmitPower = value->pib_value_8bit;
+ 410   2              /* FIXME - Add code to convert to AFE value */
+ 411   2              break;
+ 412   2      
+ 413   2          case phyCCAMode:
+ 414   2              hal_pib_CCAMode = value->pib_value_8bit;
+ 415   2              hal_common_bit_field_reg_write(ZIG_PHY_CCA_MODE, hal_pib_CCAMode);
+ 416   2              break;
+ 417   2      
+ 418   2          case macIeeeAddress:
+ 419   2              hal_pib_IeeeAddress.lo_u32 = value->pib_value_64bit.lo_u32;
+ 420   2              hal_pib_IeeeAddress.hi_u32 = value->pib_value_64bit.hi_u32;
+ 421   2              hal_common_bit_field_reg_write(ZIG_MAC_ID_IEEE_EXT_ADDR_LO,
+ 422   2                                             hal_pib_IeeeAddress.lo_u32);
+ 423   2              hal_common_bit_field_reg_write(ZIG_MAC_ID_IEEE_EXT_ADDR_HI,
+ 424   2                                             hal_pib_IeeeAddress.hi_u32);
+ 425   2              break;
+ 426   2      
+ 427   2          case I_AM_PAN_COORDINATOR:
+ 428   2              hal_pib_PrivatePanCoordinator = value->pib_value_bool;
+ 429   2          hal_pib_PrivatePanCoordinator = true;
+ 430   2              hal_common_bit_field_reg_write(ZIG_COO_EN,
+ 431   2                                             hal_pib_PrivatePanCoordinator);
+ 432   2              break;
+ 433   2      
+ 434   2          default:
+ 435   2              return MAC_UNSUPPORTED_ATTRIBUTE;
+ 436   2          }
+ 437   1      
+ 438   1          return MAC_SUCCESS;
+ 439   1      }
+ 440          
+ 441          /**
+ 442           * Sets a HAL PIB attribute
+ 443           *
+ 444           * This function is called to set the HAL information base
+ 445           * attributes.
+ 446           *
+ 447           */
+ 448          retval_t mac_hal_pib_set (uint8_t attribute, pib_value_t *value)
+ 449          {
+ 450   1          retval_t status = MAC_SUCCESS;
+ 451   1      
+ 452   1          /*
+ 453   1           * FIXME - Check for ED state before allow HAL PIB to be changed
+ 454   1           */
+ 455   1      
+ 456   1          switch (attribute) {
+ 457   2          case macMaxFrameRetries:
+ 458   2              hal_pib_MaxFrameRetries = value->pib_value_8bit;
+ 459   2              hal_common_bit_field_reg_write(ZIG_NO_ACK_MAX_RETRY,
+ 460   2                                             hal_pib_MaxFrameRetries);
+ 461   2              break;
+ 462   2      
+ 463   2          case macMaxCSMABackoffs:
+ 464   2              hal_pib_MaxCSMABackoffs = value->pib_value_8bit;
+ 465   2              break;
+ 466   2      
+ 467   2          case macBattLifeExt:
+ 468   2              hal_pib_BattLifeExt = value->pib_value_bool;
+C51 COMPILER V9.53.0.0   MAC_HAL_PIB                                                       11/04/2015 20:09:49 PAGE 9   
+
+ 469   2              break;
+ 470   2      
+ 471   2          case macBeaconOrder:
+ 472   2              if (hal_pib_BeaconOrder != value->pib_value_8bit) {
+ 473   3                  hal_pib_BeaconOrder = value->pib_value_8bit;
+ 474   3                  if (NON_BEACON_NWK == hal_pib_BeaconOrder) {
+ 475   4                      hal_common_reg_bit_set(ZigCtrl, ZIG_CTRL_NON_BEACON);
+ 476   4                      hal_common_reg_32_write(ZigTxBeaconPeriod, 0x0fffffff);
+ 477   4                      mac_hal_zigbee_interrupt_control(FALSE,
+ 478   4                                                       CPU_INT_ZB_BC_TX_TIME     |
+ 479   4                                                       CPU_INT_ZB_PRE_BC_TX_TIME  );
+ 480   4                  } else {
+ 481   4                      uint32_t bi;  /* Beacon Interval in symbols */
+ 482   4                      uint32_t interrupt_types;
+ 483   4      
+ 484   4                      hal_common_reg_bit_clear(ZigCtrl, ZIG_CTRL_NON_BEACON);
+ 485   4                      bi = HAL_GET_BEACON_INTERVAL_TIME(hal_pib_BeaconOrder);
+ 486   4                      hal_common_reg_32_write(ZigTxBeaconPeriod, bi);
+ 487   4                      hal_common_bit_field_reg_write(ZIG_PRE_BEACON_INTERVAL_INT,
+ 488   4                                                     140);
+ 489   4                      if (TRUE == hal_pib_PrivatePanCoordinator) {
+ 490   5                          interrupt_types = CPU_INT_ZB_BC_TX_TIME     |
+ 491   5                                            CPU_INT_ZB_PRE_BC_TX_TIME;
+ 492   5                      } else {
+ 493   5                          /*
+ 494   5                           * Might need to use this to detect no beacon
+ 495   5                           * has been received
+ 496   5                           */
+ 497   5                          interrupt_types = CPU_INT_ZB_BC_TX_TIME;
+ 498   5                      }
+ 499   4                      mac_hal_zigbee_interrupt_control(TRUE, interrupt_types);
+ 500   4                  }
+ 501   3                  hal_common_reg_bit_clear(ZigTxBlockEn, ZIG_BLK_TIMING_EN);
+ 502   3                  hal_common_reg_bit_set(ZigTxBlockEn, ZIG_BLK_TIMING_EN);
+ 503   3              }
+ 504   2              break;
+ 505   2      
+ 506   2          case macSuperframeOrder:
+ 507   2              if (hal_pib_SuperFrameOrder != value->pib_value_8bit) {
+ 508   3                  hal_pib_SuperFrameOrder = value->pib_value_8bit;
+ 509   3                  if (NON_BEACON_NWK != hal_pib_SuperFrameOrder) {
+ 510   4                      uint32_t cap;  /* cap interval in symbols */
+ 511   4      
+ 512   4                      cap = HAL_GET_SUPERFRAME_DURATION_TIME(hal_pib_SuperFrameOrder);
+ 513   4                      /*
+ 514   4                       * GTS is negotiated on the fly. We only need to
+ 515   4                       * program the CAP region
+ 516   4                       */
+ 517   4                      hal_common_reg_32_write(ZigTxCAPPeriod, cap);
+ 518   4                  }
+ 519   3                  hal_common_reg_bit_clear(ZigTxBlockEn, ZIG_BLK_TIMING_EN);
+ 520   3                  hal_common_reg_bit_set(ZigTxBlockEn, ZIG_BLK_TIMING_EN);
+ 521   3              }
+ 522   2              break;
+ 523   2      
+ 524   2          case macBeaconTxTime:
+ 525   2              hal_pib_BeaconTxTime = value->pib_value_32bit;
+ 526   2              break;
+ 527   2      
+ 528   2          case macPromiscuousMode:
+ 529   2              hal_pib_PromiscuousMode = value->pib_value_8bit;
+ 530   2              hal_common_bit_field_reg_write(ZIG_PROMISCUOUS_EN,
+C51 COMPILER V9.53.0.0   MAC_HAL_PIB                                                       11/04/2015 20:09:49 PAGE 10  
+
+ 531   2                                             hal_pib_PromiscuousMode);
+ 532   2              break;
+ 533   2      
+ 534   2          case macAckWaitDuration:
+ 535   2              return MAC_READ_ONLY;
+ 536   2              break;
+ 537   2      
+ 538   2          default:
+ 539   2              status = mac_hal_pib_set_trx_state_check(attribute, value);
+ 540   2              break;
+ 541   2      
+ 542   2          }
+ 543   1      
+ 544   1          return (status);
+ 545   1      }
+ 546          
+ 547          #endif /*HYBRII_802154*/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2302    ----
+   CONSTANT SIZE    =     32    ----
+   XDATA SIZE       =     38      19
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

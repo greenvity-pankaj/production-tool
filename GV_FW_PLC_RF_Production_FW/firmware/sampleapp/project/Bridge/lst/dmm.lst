@@ -1,0 +1,633 @@
+C51 COMPILER V9.53.0.0   DMM                                                               11/04/2015 20:09:38 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE DMM
+OBJECT MODULE PLACED IN .\obj\dmm.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\common\dmm.c LARGE OBJECTADVANCED OPTIMIZE(9,SIZE) 
+                    -BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;..\..\..\..\fir
+                    -mware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpgp\src\hal;..\.
+                    -.\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\..\..\firmware\
+                    -hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmware\zigbee;..\..
+                    -\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;..\..
+                    -\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\hpgp\inc;..\.
+                    -.\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_support;..\..\.
+                    -.\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\drivers\hpgp\i
+                    -nc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components;..\..\..\
+                    -..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\compone
+                    -nts\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\drivers\flash\
+                    -inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\utilities;..\..
+                    -\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\drivers\nwk\inc;
+                    -..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;..\..\..\..\com
+                    -ponents\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL,HYBRII_8051,H
+                    -YBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,NEW_SYNC,UM,HYB
+                    -RII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,FREQ_DETECT,HYB
+                    -RII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_INTERRUPT,MCCO,
+                    -SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_APP,REGISTER_A
+                    -PP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\dmm.lst) TABS(2) OBJECT(.\ob
+                    -j\dmm.obj)
+
+line level    source
+
+   1          /** ==========================================================
+   2           *
+   3           * @file dmm.c
+   4           * 
+   5           *  @brief Dynamic Memory Management
+   6           *
+   7           *  Copyright (C) 2012, Greenvity Communications, Inc.
+   8           *  All Rights Reserved
+   9           *  
+  10           * ============================================================ */
+  11          
+  12          
+  13          #include <string.h>
+  14          #include "fm.h"
+  15          #include "dmm.h"
+  16          #include "sys_common.h"
+  17          #include "list.h"
+  18          #include "event.h"
+  19          
+  20          #ifdef RTX51_TINY_OS
+  21          #include <rtx51tny.h>
+  22          #endif
+  23          
+  24          
+  25          sDmm BcnDmm;
+  26          sDmm MgmtDmm;
+  27          sDmm FwDmm;
+  28          sDmm AppDmm;
+  29          
+  30          #if 0
+              void DMM_DisplayFreeList(sDmm* pDmm)
+              {
+                  u8 i;
+                  sSlink    *slink = NULL;
+C51 COMPILER V9.53.0.0   DMM                                                               11/04/2015 20:09:38 PAGE 2   
+
+                  sSegDesc  *segdesc = NULL; 
+                  sSlab     *slab = NULL;
+                  FM_Printf(FM_WARN, "DMM: Display mem segment \n");
+                  for (i = 0; i < pDmm->slabnum; i++)
+                  {
+              #ifdef P8051
+                      FM_Printf(FM_WARN, "DMM: Slab %bu \n", i);
+              #else
+                      FM_Printf(FM_WARN, "DMM: Slab %d \n", i);
+              #endif
+                      slab = &(pDmm->slab[i]);  
+                      while(!SLIST_IsEmpty(&(pDmm->slab[i].freelist)))
+                      {
+                          slink = SLIST_Pop(&(pDmm->slab[i].freelist));
+                          segdesc = SLIST_GetEntry(slink, sSegDesc, link);  
+              #ifdef P8051
+                  FM_Printf(FM_WARN, "DMM: allocate mem seg %d, mem (%p, %p), data %p\n", 
+              segdesc->segsize, segdesc->mem, (u8 *)segdesc, (u8 *)segdesc + sizeof(sSegDesc));
+              #else
+                  FM_Printf(FM_WARN, "DMM: allocate mem seg %d, mem (0x%lx, 0x%lx), data 0x%lx\n", 
+              segdesc->segsize, segdesc->mem, segdesc, (u8 *)segdesc + sizeof(sSegDesc));
+              #endif
+              FM_HexDump(FM_DATA|FM_MINFO, "segment:", (u8 *)segdesc, segdesc->segsize + sizeof(sSegDesc) );
+                      }
+                  }
+              }
+              #endif
+  62          
+  63          extern u8 XDATA BcnMemPool[];
+  64          extern u8 XDATA MgmtMemPool[];
+  65          
+  66          extern u8 XDATA MemPool[];
+  67          
+  68          
+  69          void DMM_DisplayEventBody(u8 pool_id, u8 *poolBuff)
+  70          {
+  71   1        sSegDesc *pSegDesc = (sSegDesc*)poolBuff;
+  72   1        u8 *ptr = poolBuff;
+  73   1        u16 poolsize;
+  74   1          
+  75   1        sDmm *pDmm;
+  76   1        
+  77   1      
+  78   1        if(pool_id == FW_POOL_ID)
+  79   1          pDmm = &FwDmm;
+  80   1        else if(pool_id == APP_POOL_ID)   
+  81   1          pDmm = &AppDmm;     
+  82   1        else if(pool_id == BCN_POOL_ID)   
+  83   1          pDmm = &BcnDmm; 
+  84   1        else if(pool_id == MGMT_POOL_ID)    
+  85   1          pDmm = &MgmtDmm;
+  86   1      
+  87   1        poolsize = pDmm->poolSize;
+  88   1      
+  89   1        while(poolsize)
+  90   1        {
+  91   2          sEvent *event;
+  92   2          
+  93   2          pSegDesc = (sSegDesc*)ptr;
+  94   2      
+  95   2          if (pSegDesc->active)
+  96   2          {
+C51 COMPILER V9.53.0.0   DMM                                                               11/04/2015 20:09:38 PAGE 3   
+
+  97   3            event = (sEvent*)(ptr + sizeof(sSegDesc));
+  98   3            
+  99   3            FM_Printf(FM_USER,"cl %bu \n", event->eventHdr.eventClass);
+ 100   3            
+ 101   3            FM_HexDump(FM_USER, "ty", (u8*)&event->eventHdr.type, 2);
+ 102   3      
+ 103   3            FM_HexDump(FM_USER, "bd", (u8*)event->buffDesc.dataptr,
+ 104   3                   event->buffDesc.datalen);    
+ 105   3          }
+ 106   2          
+ 107   2          ptr += ( sizeof (pSegDesc) + pSegDesc->segsize );
+ 108   2          poolsize -= (sizeof(pSegDesc) + pSegDesc->segsize);
+ 109   2      
+ 110   2        }
+ 111   1      
+ 112   1      
+ 113   1      }
+ 114          
+ 115          void DMM_DisplayEventTypes(u8 pool_id, u8 *poolBuff)
+ 116          {
+ 117   1        sSegDesc *pSegDesc = (sSegDesc*)poolBuff;
+ 118   1        u8 *ptr = poolBuff;
+ 119   1        sDmm *pDmm;
+ 120   1        
+ 121   1        u16 poolsize;
+ 122   1        
+ 123   1      
+ 124   1        if(pool_id == FW_POOL_ID)
+ 125   1          {
+ 126   2          pDmm = &FwDmm;
+ 127   2          
+ 128   2          }
+ 129   1        else if(pool_id == APP_POOL_ID)
+ 130   1          {
+ 131   2          pDmm = &AppDmm; 
+ 132   2          
+ 133   2          }
+ 134   1        else if(pool_id == BCN_POOL_ID)
+ 135   1          {
+ 136   2            pDmm = &BcnDmm; 
+ 137   2            
+ 138   2          }
+ 139   1        else if(pool_id == MGMT_POOL_ID)
+ 140   1          {
+ 141   2            pDmm = &MgmtDmm;
+ 142   2            
+ 143   2      
+ 144   2          }
+ 145   1      
+ 146   1        poolsize = pDmm->poolSize;
+ 147   1        
+ 148   1        while(poolsize)
+ 149   1        {
+ 150   2          sEvent *event;
+ 151   2          
+ 152   2          pSegDesc = (sSegDesc*)ptr;
+ 153   2      
+ 154   2          if (pSegDesc->active)
+ 155   2          {
+ 156   3            event = (sEvent*)(ptr + sizeof(sSegDesc));
+ 157   3            
+ 158   3            FM_Printf(FM_USER, "cl %bu \n", event->eventHdr.eventClass);
+C51 COMPILER V9.53.0.0   DMM                                                               11/04/2015 20:09:38 PAGE 4   
+
+ 159   3            
+ 160   3            FM_HexDump(FM_USER, "ev", (u8*)&event->eventHdr.type, 2);
+ 161   3          }
+ 162   2          
+ 163   2          ptr += ( sizeof(sSegDesc) + pSegDesc->segsize );
+ 164   2          poolsize -= (sizeof(sSegDesc) + pSegDesc->segsize);
+ 165   2      
+ 166   2          os_switch_task();
+ 167   2      
+ 168   2        }
+ 169   1      
+ 170   1      
+ 171   1      }
+ 172          
+ 173          void DMM_eventMem()
+ 174          {
+ 175   1        DMM_DisplayMemUsage(&FwDmm);
+ 176   1        DMM_DisplayEventTypes(FW_POOL_ID, MemPool);
+ 177   1      
+ 178   1      }
+ 179          
+ 180          void DMM_MgmtMem()
+ 181          {
+ 182   1        DMM_DisplayMemUsage(&MgmtDmm);
+ 183   1        DMM_DisplayEventTypes(MGMT_POOL_ID, MgmtMemPool);
+ 184   1      
+ 185   1      }
+ 186          void DMM_BcnMem()
+ 187          {
+ 188   1        DMM_DisplayMemUsage(&BcnDmm);
+ 189   1        DMM_DisplayEventTypes(BCN_POOL_ID, BcnMemPool);
+ 190   1        
+ 191   1      
+ 192   1      }
+ 193          
+ 194          void DMM_DisplayMemUsage(sDmm* pDmm)
+ 195          {
+ 196   1          u8 i;
+ 197   1          sSlab     *slab = NULL;
+ 198   1          FM_Printf(FM_WARN, "DMM:Disp mem usage:\n");
+ 199   1          for (i = 0; i < pDmm->slabnum; i++)
+ 200   1          {
+ 201   2            u8 boolval = SLIST_IsEmpty(&slab->freelist);
+ 202   2          
+ 203   2              slab = &(pDmm->slab[i]); 
+ 204   2      #ifdef P8051
+ 205   2              FM_Printf(FM_WARN, "DMM:Slab %bu\n", i);
+ 206   2              FM_Printf(FM_WARN, "DMM:mem seg total  %bu\n", slab->total);
+ 207   2              FM_Printf(FM_WARN, "DMM:mem seg use %bu\n", slab->inuse);
+ 208   2              FM_Printf(FM_WARN, "DMM:isEmpty %bu\n",boolval );
+ 209   2      #else 
+                      FM_Printf(FM_WARN, "DMM:Slab %d\n", i);
+                      FM_Printf(FM_WARN, "DMM:total %d\n", slab->total);
+              #endif
+ 213   2          }
+ 214   1      
+ 215   1      }
+ 216          
+ 217          u8 DMM_CheckDepth(sDmm* pDmm, u16 size)
+ 218          {
+ 219   1          u8 i;
+ 220   1          u8 freeCnt = 0;
+C51 COMPILER V9.53.0.0   DMM                                                               11/04/2015 20:09:38 PAGE 5   
+
+ 221   1          sSlab     *slab = NULL;
+ 222   1      
+ 223   1          size += sizeof(sEvent);
+ 224   1      
+ 225   1          for(i=0; i< pDmm->slabnum; i++)
+ 226   1          {
+ 227   2              slab = &(pDmm->slab[i]); 
+ 228   2              if(slab->segsize >= size)
+ 229   2              {
+ 230   3                  freeCnt += (slab->total - slab->inuse);
+ 231   3              }
+ 232   2          }
+ 233   1          if(freeCnt < 3)
+ 234   1          {
+ 235   2              FM_Printf(FM_ERROR,"Pool Full: %u\n",size);
+ 236   2              return FALSE;
+ 237   2          }
+ 238   1          else
+ 239   1          {
+ 240   2              return TRUE;
+ 241   2          }
+ 242   1      }
+ 243          
+ 244          eStatus DMM_Init(u8 pool_id)
+ 245          {
+ 246   1          u8 i;
+ 247   1        sDmm* pDmm;
+ 248   1        if(pool_id == FW_POOL_ID)
+ 249   1          pDmm = &FwDmm;
+ 250   1        else if(pool_id == APP_POOL_ID)
+ 251   1          pDmm = &AppDmm; 
+ 252   1        else if(pool_id == BCN_POOL_ID)
+ 253   1          pDmm = &BcnDmm; 
+ 254   1        else if(pool_id == MGMT_POOL_ID)
+ 255   1          pDmm = &MgmtDmm;  
+ 256   1        
+ 257   1          memset(pDmm, 0, sizeof(sDmm));
+ 258   1      
+ 259   1          for (i = 0; i < DMM_SLAB_MAX; i++)
+ 260   1          {
+ 261   2              SLIST_Init(&(pDmm->slab[i].freelist));
+ 262   2          }
+ 263   1          return STATUS_SUCCESS;
+ 264   1      }
+ 265          
+ 266          
+ 267          
+ 268          eStatus DMM_InitMemPool(u8 pool_id, u8 *mempool, u16 poolsize, sSlabDesc *slabdesc, u8 slabnum)
+ 269          {
+ 270   1      
+ 271   1          u8  i = 0;
+ 272   1          u16 memsize = 0;
+ 273   1          u8  segnum = 0;
+ 274   1          u8  *mem = mempool;
+ 275   1          sSegDesc  *segdesc = NULL; 
+ 276   1          sSlab     *slab = NULL;
+ 277   1        sDmm* pDmm;    
+ 278   1      
+ 279   1          if (slabnum > DMM_SLAB_MAX)
+ 280   1              return STATUS_FAILURE;
+ 281   1         
+ 282   1        if(pool_id == FW_POOL_ID)
+C51 COMPILER V9.53.0.0   DMM                                                               11/04/2015 20:09:38 PAGE 6   
+
+ 283   1          {
+ 284   2          pDmm = &FwDmm;
+ 285   2          }
+ 286   1        else if(pool_id == APP_POOL_ID)
+ 287   1          {
+ 288   2          pDmm = &AppDmm; 
+ 289   2          }
+ 290   1        else if(pool_id == BCN_POOL_ID)
+ 291   1          {
+ 292   2            pDmm = &BcnDmm; 
+ 293   2          }
+ 294   1        else if(pool_id == MGMT_POOL_ID)
+ 295   1          {
+ 296   2            pDmm = &MgmtDmm;
+ 297   2      
+ 298   2          }
+ 299   1      
+ 300   1        //pDmm->poolSize = poolsize;
+ 301   1          memset(mempool, 0, poolsize);  
+ 302   1      
+ 303   1          for (i = 0; i < slabnum; i++)
+ 304   1          {
+ 305   2      //        FM_Printf(FM_WARN, "DMM: Slab %bu \n", i);
+ 306   2              slab = &(pDmm->slab[i]);  
+ 307   2              pDmm->slab[i].segsize = slabdesc[i].segsize;
+ 308   2          pDmm->slab[i].inuse = 0;
+ 309   2              pDmm->slab[i].total = slabdesc[i].segnum;
+ 310   2              segnum = 0;
+ 311   2              while (((memsize + sizeof(sSegDesc) + slabdesc[i].segsize) <= poolsize)
+ 312   2                     && (segnum < slabdesc[i].segnum))
+ 313   2              {
+ 314   3                  segdesc = (sSegDesc *)mem;
+ 315   3                  SLINK_Init(&segdesc->link);          
+ 316   3                  segdesc->segsize = slabdesc[i].segsize;
+ 317   3                  segdesc->mem = mem;
+ 318   3            segdesc->active = 0;        
+ 319   3            segdesc->poolid = pool_id;      
+ 320   3            //FM_Printf(FM_USER,"seg %u \n", mem);
+ 321   3            //FM_HexDump(FM_USER,"seg", mem, sizeof(sSegDesc));   
+ 322   3                  SLIST_Put(&slab->freelist, &segdesc->link);                     
+ 323   3                  mem += sizeof(sSegDesc) + segdesc->segsize;
+ 324   3                  memsize += sizeof(sSegDesc) + segdesc->segsize;
+ 325   3                  segnum++;
+ 326   3      #if 0
+              
+                  FM_Printf(FM_WARN, "DMM: init mem seg %d, mem (%p, %p), data %p\n", 
+              segdesc->segsize, segdesc->mem, (u8 *)segdesc, (u8 *)segdesc + sizeof(sSegDesc));
+              FM_HexDump(FM_DATA|FM_MINFO, "init segment:", (u8 *)segdesc, segdesc->segsize + sizeof(sSegDesc) );
+              #endif
+ 332   3              }
+ 333   2          if (segnum < slabdesc[i].segnum)
+ 334   2          {
+ 335   3            FM_Printf(FM_ERROR, "DMM:mem pool small\n");
+ 336   3            return STATUS_FAILURE;
+ 337   3          }
+ 338   2            
+ 339   2          }
+ 340   1          pDmm->slabnum = slabnum;
+ 341   1        pDmm->poolSize = memsize;
+ 342   1          FM_Printf(FM_WARN, "DMM:mem pool init done\n");
+ 343   1      //    DMM_DisplayFreeList();
+ 344   1          return STATUS_SUCCESS;
+C51 COMPILER V9.53.0.0   DMM                                                               11/04/2015 20:09:38 PAGE 7   
+
+ 345   1      }
+ 346          
+ 347          
+ 348          
+ 349          u8 *DMM_Alloc(u8 pool_id, u16 size)
+ 350          {
+ 351   1          u8         i;
+ 352   1          sSlink  xdata  *slink = NULL;
+ 353   1          sSegDesc xdata *segdesc = NULL; 
+ 354   1        sDmm* pDmm;
+ 355   1      #ifdef UART_HOST_INTF
+ 356   1        u8 intFlag = EA;       
+ 357   1        EA = 0;
+ 358   1      #endif
+ 359   1      
+ 360   1        if(pool_id == FW_POOL_ID)
+ 361   1          pDmm = &FwDmm;
+ 362   1        else if(pool_id == APP_POOL_ID)
+ 363   1          pDmm = &AppDmm;
+ 364   1        else if(pool_id == BCN_POOL_ID)
+ 365   1          pDmm = &BcnDmm;
+ 366   1        else if(pool_id == MGMT_POOL_ID)
+ 367   1          pDmm = &MgmtDmm;    
+ 368   1        else
+ 369   1          FM_Printf(FM_ERROR,"poolerror %bu\n", pool_id); 
+ 370   1        
+ 371   1          /* search for the closest memory segment */
+ 372   1          for (i = 0; i < pDmm->slabnum; i++)
+ 373   1          {
+ 374   2              if (size <= pDmm->slab[i].segsize)
+ 375   2              {             
+ 376   3                  if (!SLIST_IsEmpty(&(pDmm->slab[i].freelist)))
+ 377   3                  {
+ 378   4                      slink = SLIST_Pop(&(pDmm->slab[i].freelist));
+ 379   4                      segdesc = SLIST_GetEntry(slink, sSegDesc, link);  
+ 380   4              segdesc->poolid = pool_id;
+ 381   4              segdesc->active = 1;
+ 382   4                      pDmm->slab[i].inuse++;
+ 383   4              if (pDmm->slab[i].inuse > pDmm->slab[i].maxuse)
+ 384   4              {
+ 385   5                pDmm->slab[i].maxuse = pDmm->slab[i].inuse;
+ 386   5              }
+ 387   4      #ifdef P8051
+ 388   4      //    FM_Printf(FM_WARN, "DMM: alloc mem seg %d, mem (%p, %p), data %p\n", segdesc->segsize, segdesc->mem,
+             - segdesc, (u8 *)segdesc + sizeof(sSegDesc));
+ 389   4      //    FM_HexDump(FM_DATA|FM_MINFO, "alloc segment:", (u8 *)segdesc, Dmm.slab[i].segsize + sizeof(sSegDesc)
+             - );
+ 390   4      #else
+              //    FM_Printf(FM_WARN, "DMM: alloc mem seg %d, mem 0x%lx, 0x%lx, payload 0x%lx\n", segdesc->segsize, seg
+             -desc->mem, segdesc, (u8 *)segdesc + sizeof(sSegDesc));
+              #endif
+ 393   4      #ifdef UART_HOST_INTF
+ 394   4              EA = intFlag;
+ 395   4      #endif
+ 396   4                      return (u8 *)segdesc + sizeof(sSegDesc);
+ 397   4                  }
+ 398   3              }
+ 399   2          }
+ 400   1      #ifdef UART_HOST_INTF
+ 401   1        EA = intFlag;
+ 402   1      #endif
+ 403   1      #ifdef LOG_FLASH
+C51 COMPILER V9.53.0.0   DMM                                                               11/04/2015 20:09:38 PAGE 8   
+
+                  logEvent(MEM_ERROR, pool_id, 0, &size, sizeof(u16));
+              #endif
+ 406   1          return NULL;
+ 407   1      }
+ 408          
+ 409          
+ 410          void DMM_Free(u8 *mem)
+ 411          {
+ 412   1          u8         i;
+ 413   1          sSegDesc  *segdesc = (sSegDesc *)(mem - sizeof(sSegDesc)); 
+ 414   1        sDmm* pDmm;
+ 415   1      #ifdef UART_HOST_INTF
+ 416   1        u8 intFlag = EA;
+ 417   1        EA = 0;
+ 418   1      #endif
+ 419   1        if(segdesc->poolid == FW_POOL_ID)
+ 420   1          pDmm = &FwDmm;  
+ 421   1        else if(segdesc->poolid == APP_POOL_ID)
+ 422   1          pDmm = &AppDmm;   
+ 423   1        else if(segdesc->poolid == BCN_POOL_ID)
+ 424   1          pDmm = &BcnDmm; 
+ 425   1        else if(segdesc->poolid == MGMT_POOL_ID)
+ 426   1          pDmm = &MgmtDmm;  
+ 427   1        else
+ 428   1          FM_Printf(FM_ERROR,"freePool %bu\n", segdesc->poolid);
+ 429   1          
+ 430   1          for (i = 0; i < pDmm->slabnum; i++)
+ 431   1          {
+ 432   2              if(segdesc->segsize == pDmm->slab[i].segsize)
+ 433   2              {
+ 434   3      #ifdef P8051
+ 435   3      //      FM_Printf(FM_WARN, "DMM: free mem seg %d, mem (%p, %p), data %p\n", segdesc->segsize, segdesc->mem
+             -, segdesc, mem);
+ 436   3      //    FM_HexDump(FM_DATA|FM_MINFO, "free segment:", (u8 *)segdesc, segdesc->segsize + sizeof(sSegDesc) );
+ 437   3      //    FM_HexDump(FM_DATA|FM_MINFO, "free segment:", (u8 *)segdesc, 256);
+ 438   3      #else
+              //    FM_Printf(FM_WARN, "DMM: free mem seg %d, mem 0x%lx, 0x%lx, payload 0x%lx\n", segdesc->segsize, segd
+             -esc->mem, segdesc, mem);
+              #endif
+ 441   3                  SLINK_Init(&segdesc->link);
+ 442   3            segdesc->active = 0;
+ 443   3                  SLIST_Put(&(pDmm->slab[i].freelist), &segdesc->link);
+ 444   3                  pDmm->slab[i].inuse--;
+ 445   3      #ifdef UART_HOST_INTF
+ 446   3            EA = intFlag;
+ 447   3      #endif
+ 448   3                  return;
+ 449   3              }
+ 450   2          }
+ 451   1      #ifdef UART_HOST_INTF
+ 452   1        EA = intFlag;
+ 453   1      #endif
+ 454   1         // FM_Printf(FM_ERROR, "DMM: cannot find the memory segment to free %d.\n", segdesc->segsize);
+ 455   1      }
+ 456          
+ 457          /** =========================================================
+ 458           *
+ 459           * Edit History
+ 460           *
+ 461           * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/common/dmm.c,v $
+ 462           *
+ 463           * $Log: dmm.c,v $
+C51 COMPILER V9.53.0.0   DMM                                                               11/04/2015 20:09:38 PAGE 9   
+
+ 464           * Revision 1.12  2015/01/02 14:55:35  kiran
+ 465           * 1) Timer Leak fixed while freeing SCB fixed
+ 466           * 2) Software broadcast supported for LG
+ 467           * 3) UART Loopback supported for LG
+ 468           * 4) Keep Alive feature to ageout defunctional STA
+ 469           * 5) Improved flash API's for NO Host Solution
+ 470           * 6) Imporved PLC Hang recovery mechanism
+ 471           * 7) Reduced nested call tree of common path functions
+ 472           * 8) Code optimization and cleanup (unused arguments, unused local variables)
+ 473           * 9) Work around for UART hardware interrupt issues (unintended interrupts and no interrupts)
+ 474           * 10) Use of memory specific pointers instead of generic pointers
+ 475           *
+ 476           * Revision 1.11  2014/11/11 14:52:56  ranjan
+ 477           * 1.New Folder Architecture espically in /components
+ 478           * 2.Modular arrangment of functionality in new files
+ 479           *    anticipating the need for exposing them as FW App
+ 480           *    development modules
+ 481           * 3.Other improvisation in code and .h files
+ 482           *
+ 483           * Revision 1.10  2014/10/28 16:27:42  kiran
+ 484           * 1) Software recovery using Watchdog Timer
+ 485           * 2) Hardware recovery monitor and policies
+ 486           * 3) Timer Polling in Control Task and Frame task for better accuracy
+ 487           * 4) Common memory optimized by reducing prints
+ 488           * 5) Discovered netlist corruption fixed
+ 489           * 6) VCO fix in HHAL_AFEInit()
+ 490           * 7) Idata optimized by removing floating point operation
+ 491           * 8) Fixed EVENT_TYPE_CC_BCN_IND false indication during association @ CCO
+ 492           * 9) Beacon processing protected from interrupts
+ 493           * 10) Corrupted Beacons are dropped
+ 494           * 11) Some unused arguments removed to improve code size
+ 495           *
+ 496           * Revision 1.9  2014/09/25 10:57:41  prashant
+ 497           * 1. GPIO API swapping issue fixed.
+ 498           * 2. Supported 1 to 512 frame length for uart.
+ 499           * 3. list.h file cleanup (code deleted).
+ 500           * 4. Supporting minirobo for mgmt frames.
+ 501           *
+ 502           * Revision 1.8  2014/09/19 06:23:59  prashant
+ 503           * Uart data flow changed
+ 504           *
+ 505           * Revision 1.7  2014/08/25 07:37:34  kiran
+ 506           * 1) RSSI & LQI support
+ 507           * 2) Fixed Sync related issues
+ 508           * 3) Fixed timer 0 timing drift for SDK
+ 509           * 4) MMSG & Error Logging in Flash
+ 510           *
+ 511           * Revision 1.6  2014/06/24 16:26:44  ranjan
+ 512           * -zigbee frame_handledata fix.
+ 513           * -added reason code for uppermac host events
+ 514           * -small cleanups
+ 515           *
+ 516           * Revision 1.5  2014/06/19 17:13:19  ranjan
+ 517           * -uppermac fixes for lvnet and reset command for cco and sta mode
+ 518           * -backup cco working
+ 519           *
+ 520           * Revision 1.4  2014/06/12 13:15:43  ranjan
+ 521           * -separated bcn,mgmt,um event pools
+ 522           * -fixed datapath issue due to previous checkin
+ 523           * -work in progress. neighbour cco detection
+ 524           *
+ 525           * Revision 1.3  2014/05/28 10:58:58  prashant
+C51 COMPILER V9.53.0.0   DMM                                                               11/04/2015 20:09:38 PAGE 10  
+
+ 526           * SDK folder structure changes, Uart changes, removed htm (UI) task
+ 527           * Varified - UM, LM - iperf (UDP/TCP), overnight test pass
+ 528           *
+ 529           * Revision 1.2  2014/01/10 17:02:18  yiming
+ 530           * check in Rajan 1/8/2014 code release
+ 531           *
+ 532           * Revision 1.3  2014/01/08 10:53:53  ranjan
+ 533           * Changes for LM OS support.
+ 534           * New Datapath FrameTask
+ 535           * LM and UM  datapath, feature verified.
+ 536           *
+ 537           * known issues : performance numbers needs revisit
+ 538           *
+ 539           * review : pending.
+ 540           *
+ 541           * Revision 1.2  2013/01/24 00:13:46  yiming
+ 542           * Use 01-23-2013 Hybrii-A code as first Hybrii-B code base
+ 543           *
+ 544           * Revision 1.5  2012/07/30 04:37:55  yuanhua
+ 545           * fixed an issue that an event memory could be overwritten in the HAL when the HAL receives a mgmt messag
+             -e.
+ 546           *
+ 547           * Revision 1.4  2012/07/29 02:59:22  yuanhua
+ 548           * Initialize the internel queue of CTRL Layer to fix an issue of unexpected event free error message.
+ 549           *
+ 550           * Revision 1.3  2012/07/25 04:36:08  yuanhua
+ 551           * enable the DMM.
+ 552           *
+ 553           * Revision 1.2  2012/07/24 04:27:46  yuanhua
+ 554           * update the project to include DMM.
+ 555           *
+ 556           * Revision 1.1  2012/07/24 04:23:17  yuanhua
+ 557           * added DMM code for dynamic alloction with static memory to avoid memory fragmentation.
+ 558           *
+ 559           *
+ 560           * ==========================================================*/
+ 561          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2847    ----
+   CONSTANT SIZE    =    203    ----
+   XDATA SIZE       =    364     102
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

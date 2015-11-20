@@ -1,0 +1,266 @@
+C51 COMPILER V9.53.0.0   HHAL_LED                                                          11/04/2015 20:09:42 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE HHAL_LED
+OBJECT MODULE PLACED IN .\obj\hhal_led.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\firmware\project\hal\src\hhal_led.c LARGE OBJECTADVANCED OPT
+                    -IMIZE(9,SIZE) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\common\include;.
+                    -.\..\..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\firmware\hpg
+                    -p\src\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src\nma;..\..\.
+                    -.\..\firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\..\..\firmwar
+                    -e\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\e
+                    -vent\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components
+                    -\hpgp\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\firmware\app_s
+                    -upport;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\
+                    -drivers\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\compon
+                    -ents;..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..
+                    -\..\..\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\
+                    -drivers\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\components\u
+                    -tilities;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\components\dr
+                    -ivers\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src;..\..\inc;.
+                    -.\..\..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,C51,HPGP_HAL
+                    -,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_MAC_SAP,NMA,N
+                    -EW_SYNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAIN_TABLE,B2,F
+                    -REQ_DETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF,UART_GPIO_I
+                    -NTERRUPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUTE_APP,RTOPO_
+                    -APP,REGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\hhal_led.lst) 
+                    -TABS(2) OBJECT(.\obj\hhal_led.obj)
+
+line level    source
+
+   1          /*
+   2          * $Id: hhal_led.c,v 1.3 2014/11/11 14:52:58 ranjan Exp $
+   3          *
+   4          * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/project/hal/src/hhal_led.c,v $
+   5          *
+   6          * Description : HPGP Tx fuctions for LED Demo.
+   7          *
+   8          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+   9          * All rights reserved.
+  10          *
+  11          * Purpose :
+  12          *     Defines functions for sending LED Demo command frame.
+  13          *
+  14          *
+  15          */
+  16          
+  17          #include <stdio.h>
+  18          #include <string.h>
+  19          #include <intrins.h>
+  20          #include "fm.h"
+  21          #include "hal_common.h"
+  22          #include "hal_hpgp.h"
+  23          #include "hal_tst.h"
+  24          #ifdef _LED_DEMO_
+              #include "papdef.h"
+              #include "led_board.h"
+              #include "utils_fw.h"
+              #include "utils.h"
+              #endif
+  30          
+  31          int getline(char *s, int lim);
+  32          u8 led_demo_pkt_retry = 10;
+  33          u16 led_demo_tx_drop = 0;
+  34          
+C51 COMPILER V9.53.0.0   HHAL_LED                                                          11/04/2015 20:09:42 PAGE 2   
+
+  35          #ifdef POWER_SAVE
+              extern u8 ethDebugON;
+              #endif
+  38                  
+  39          bool HHT_DemoModeTx(u8* demoFrm, u16 frmLen)
+  40          {
+  41   1          /* Compiler warning suppression */
+  42   1          demoFrm = demoFrm;
+  43   1          frmLen = frmLen;
+  44   1      #ifdef _LED_DEMO_
+                  sTxFrmSwDesc    plcTxFrmSwDesc;
+                  eStatus         status;
+                  volatile u8 xdata *       cellAddr;
+                  u8              cp;
+                  u16             tmpFrmLen;
+                u8              actualDescLen;
+                  u16             i,j;
+                  bool            rc = FALSE;
+                  memset(&plcTxFrmSwDesc, 0, sizeof(sTxFrmSwDesc));
+              
+                  plcTxFrmSwDesc.frmLen     = frmLen+1;  // account for the i byte seq num
+                                                         // that will be prepended
+                  tmpFrmLen                 = 0;
+              
+                  plcTxFrmSwDesc.frmInfo.plc.mcstMode   = HPGP_UCST;
+                  plcTxFrmSwDesc.frmInfo.plc.plid       = HPGP_PLID0;
+                  plcTxFrmSwDesc.frmType    = HPGP_HW_FRMTYPE_MSDU;
+                  plcTxFrmSwDesc.frmInfo.plc.stdModeSel = 1;
+                  plcTxFrmSwDesc.frmInfo.plc.dtei       = gHpgpHalCB.remoteTei;
+                  plcTxFrmSwDesc.frmInfo.plc.stei       = gHpgpHalCB.selfTei;
+                  plcTxFrmSwDesc.frmInfo.plc.bcnDetectFlag = 1;
+                  plcTxFrmSwDesc.frmInfo.plc.eks        = HPGP_UNENCRYPTED_EKS;
+                  plcTxFrmSwDesc.frmInfo.plc.phyPendBlks = HPGP_PPB_CAP0;
+                  plcTxFrmSwDesc.frmInfo.plc.clst = HPGP_CONVLYRSAPTYPE_RSV;
+                  plcTxFrmSwDesc.cpCount     = 0;
+              
+                while(tmpFrmLen < plcTxFrmSwDesc.frmLen)
+                {
+                      i = plcTxFrmSwDesc.cpCount;
+                      // Fetch CP
+                      status = CHAL_RequestCP(&cp);
+                      if (status == STATUS_FAILURE) 
+                      {
+                          return (rc);
+                      }
+              
+                      actualDescLen =  (plcTxFrmSwDesc.frmLen-tmpFrmLen)>HYBRII_CELLBUF_SIZE?HYBRII_CELLBUF_SIZE:(plcTxF
+             -rmSwDesc.frmLen-tmpFrmLen);
+              
+                      // Fill Buffer with pattern
+                      cellAddr = CHAL_GetAccessToCP(cp);
+                      if( i==0 )
+                      {
+                          cellAddr[0] = (u8)gHpgpHalCB.halStats.TxSeqNum+1;
+                      }
+                      for( j=1 ; j<actualDescLen ;j++)
+                      {
+                          cellAddr[j] = demoFrm[j-1];
+                      }
+              
+                  plcTxFrmSwDesc.cpArr[i].offsetU32 = 0;
+                  plcTxFrmSwDesc.cpArr[i].len  = actualDescLen;
+C51 COMPILER V9.53.0.0   HHAL_LED                                                          11/04/2015 20:09:42 PAGE 3   
+
+              
+                      tmpFrmLen += plcTxFrmSwDesc.cpArr[i].len; 
+                      plcTxFrmSwDesc.cpArr[i].cp = cp;
+                      plcTxFrmSwDesc.cpCount++;
+                  }
+              
+                  // queue this frame to PLC Tx queue
+                  status = HHAL_PlcTxQWrite(&plcTxFrmSwDesc);
+                  if (status == STATUS_FAILURE)
+                  {
+                      led_demo_tx_drop++;
+                      CHAL_FreeFrameCp(plcTxFrmSwDesc.cpArr, plcTxFrmSwDesc.cpCount);
+                      return (FALSE);
+                  }
+              
+                  // gHpgpHalCB.halStats.CurTxTestFrmCnt will be incremented in HHAL_ProcessPlcTxDone()   
+                  gHpgpHalCB.halStats.TxSeqNum++;
+              #endif
+ 114   1          return (TRUE);
+ 115   1      }
+ 116          
+ 117          void HHT_TxLedDemo(u8 *payload_p)
+ 118          {
+ 119   1          /* Compiler warning suppression */
+ 120   1          payload_p = payload_p;
+ 121   1      #ifdef _LED_DEMO_
+                  sPlcDemoFrame   plcDemoFrm;
+                  u8 retry = 0;
+                  bool rc;
+              
+                  memset(&plcDemoFrm, 0, sizeof(plcDemoFrm));
+                  memcpy(plcDemoFrm.hdrStr, PLC_LED_DEMO_CMD, strlen(PLC_LED_DEMO_CMD));
+                  memcpy(plcDemoFrm.disStr, payload_p, strlen(payload_p));
+                  printf("\nSend LED command: <%s>\n", plcDemoFrm.disStr);
+                  while (retry++ < led_demo_pkt_retry) {
+                      rc = HHT_DemoModeTx( (u8*) &plcDemoFrm, sizeof(sPlcDemoFrame));
+                      if (rc) {
+                          gHpgpHalCB.halStats.TxSeqNum--;
+                      }
+                      mac_utils_delay_ms(200);
+                  }
+                  gHpgpHalCB.halStats.TxSeqNum++;
+              #endif   
+ 139   1      }
+ 140          
+ 141          void HHT_LedDemoTxMenu(u8* CmdBuf)
+ 142          {
+ 143   1          /* Compiler warning suppression */
+ 144   1          CmdBuf = CmdBuf;
+ 145   1      #ifdef _LED_DEMO_
+                  u8              i = 0;
+                  char            input[10];
+              
+                  //printf("\n\n%s", CmdBuf);
+              
+                  while (CmdBuf[i++] == 0x20);
+                  if(i)
+                      i--;
+                  CmdBuf = &CmdBuf[i];
+                  
+                  if(strncmp(CmdBuf, PLC_DISP_GVC_CMD, strlen(PLC_DISP_GVC_CMD)) == 0)
+                  {  
+C51 COMPILER V9.53.0.0   HHAL_LED                                                          11/04/2015 20:09:42 PAGE 4   
+
+                      CmdBuf+= strlen(PLC_DISP_GVC_CMD) + 1;
+                      HHT_TxLedDemo(CmdBuf);
+                  }
+                  else if(strncmp(CmdBuf, PLC_LED_DEMO_RETRY_CMD, 
+                          strlen(PLC_LED_DEMO_RETRY_CMD)) == 0) {
+                      printf("Enter Retry(%bu) value: ", led_demo_pkt_retry);
+                      while (getline(input, sizeof(input)) > 0)
+                      {
+                          if (sscanf(input,"%bd", &led_demo_pkt_retry) >= 1)
+                              break;
+                      }
+                  }
+                  else if(strncmp(CmdBuf, PLC_LED_DEMO_STATS_CMD, 
+                          strlen(PLC_LED_DEMO_STATS_CMD)) == 0) 
+                  {
+                      printf("TotalTxLedFrmDrop     = %d\n", led_demo_tx_drop);
+                  }
+                  else if(strncmp(CmdBuf, PLC_LED_DEMO_RSTSTATS_CMD, 
+                          strlen(PLC_LED_DEMO_RSTSTATS_CMD)) == 0) 
+                  {
+                      led_demo_tx_drop = 0;
+                  }
+                  else
+                  {
+                      printf("Command not supported\n");
+                  }
+              
+              #else
+ 186   1          printf("Command not supported\n");
+ 187   1      #endif
+ 188   1      }
+ 189          
+ 190          u8  HHT_DemoModeRx(u8* demoFrm)
+ 191          {
+ 192   1           bool bDemoMode = 0;
+ 193   1          /* Compiler warning suppression */
+ 194   1          demoFrm= demoFrm;
+ 195   1      #ifdef _LED_DEMO_
+              
+                  if(strncmp(demoFrm, PLC_LED_DEMO_CMD, strlen(PLC_LED_DEMO_CMD)) == 0 )
+                  {
+                      sPlcDemoFrame*  pPlcDemoFrame;
+              
+                      bDemoMode    = 1;
+                      pPlcDemoFrame = ( sPlcDemoFrame* ) demoFrm;
+                      printf("\n<%s>\n", pPlcDemoFrame->disStr);
+                      led_msg_decode(pPlcDemoFrame->disStr);
+                      printf("\n");
+                  }
+              #endif
+ 208   1          return bDemoMode;
+ 209   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     16    ----
+   CONSTANT SIZE    =     23    ----
+   XDATA SIZE       =      3    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+C51 COMPILER V9.53.0.0   HHAL_LED                                                          11/04/2015 20:09:42 PAGE 5   
+
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

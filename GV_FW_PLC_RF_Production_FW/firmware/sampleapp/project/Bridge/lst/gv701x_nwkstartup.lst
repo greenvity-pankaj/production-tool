@@ -1,0 +1,697 @@
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE GV701X_NWKSTARTUP
+OBJECT MODULE PLACED IN .\obj\gv701x_nwkstartup.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\..\..\components\drivers\nwk\src\gv701x_nwkstartup.c LARGE OBJECTA
+                    -DVANCED OPTIMIZE(9,SPEED) BROWSE INTVECTOR(0X2100) INCDIR(..\..\..\..\firmware\common\datapath;..\..\..\..\firmware\comm
+                    -on\include;..\..\..\..\firmware\hal;..\..\..\..\firmware\hpgp\src\crypto;..\..\..\..\firmware\hpgp\src\ctrl;..\..\..\..\
+                    -firmware\hpgp\src\hal;..\..\..\..\firmware\hpgp\src\link;..\..\..\..\firmware\hpgp\src\mux;..\..\..\..\firmware\hpgp\src
+                    -\nma;..\..\..\..\firmware\hpgp\src\route;..\..\..\..\firmware\hpgp\src\test;..\..\..\..\firmware\project\hal\src;..\..\.
+                    -.\..\firmware\zigbee;..\..\..\..\components\aps\inc;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components
+                    -\utilities\event\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\.
+                    -.\components\hpgp\inc;..\..\..\..\firmware\common;..\..\..\..\firmware\hpgp;..\..\..\..\firmware\hpgp\src;..\..\..\..\fi
+                    -rmware\app_support;..\..\..\..\firmware\HybriiB_configuration_rw\src;..\..\..\..\components\drivers\gpio\inc;..\..\..\..
+                    -\components\drivers\hpgp\inc;..\..\..\..\components\drivers\nwk\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\
+                    -..\..\components;..\..\..\..\components\osal\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee8021
+                    -54\inc;..\..\..\..\components\nma;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\hpgp\inc;..\..\..\..
+                    -\components\drivers\flash\inc;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\drivers\uart\inc;..\..\..\..\
+                    -components\utilities;..\..\..\..\components\drivers\hpgp\inc;..\..\..\..\components\drivers\ieee802154\inc;..\..\..\..\c
+                    -omponents\drivers\nwk\inc;..\..\..\..\components\utilities\debug\inc;..\..\..\..\sampleapp\inc;..\..\..\..\sampleapp\src
+                    -;..\..\inc;..\..\..\..\components\drivers\i2c\inc;..\..\..\..\components\drivers\gvspi\inc) NOAREGS DEFINE(inline,P8051,
+                    -C51,HPGP_HAL,HYBRII_8051,HYBRII_HPGP,CCO_FUNC,STA_FUNC,HPGP_TEST,HPGP_DEBUG,RTX51_TINY_OS,HYBRII_ASIC,PLC_SW_SYNC,HPGP_M
+                    -AC_SAP,NMA,NEW_SYNC,UM,HYBRII_B,Hybrii_B,HW_SPI_TX_CRC,HW_SPI_RX_CRC,B_ASICPLC,HYBRII_ASIC_A2,BB_CAL,_CRC_VERIFY_,BB_GAI
+                    -N_TABLE,B2,FREQ_DETECT,HYBRII_B_AFE,_BC_SECURE_TEST_,FREQ_DETECT,BCN_ERR,NO_HOST,MCCO,KEEP_ALIVE,UART_RAW,UART_HOST_INTF
+                    -,UART_GPIO_INTERRUPT,MCCO,SW_RECOVERY,HYBRII_802154,DEBUG_DATAPATH,HPGP_DRIVER_APP,LRWPAN_DRIVER_APP,NWKSTARTUP_APP,ROUT
+                    -E_APP,RTOPO_APP,REGISTER_APP,LLP_APP,BRIDGE,DEVICEINTF_APP,SMARTLIGHT_APP,LED_SMART_LIGHT,ROUTE_RECOVERY) PRINT(.\lst\gv
+                    -701x_nwkstartup.lst) TABS(2) OBJECT(.\obj\gv701x_nwkstartup.obj)
+
+line level    source
+
+   1          #ifdef NWKSTARTUP_APP
+   2          
+   3          /****************************************************************************** 
+   4            * Includes
+   5            ******************************************************************************/
+   6            
+   7          #include <string.h>
+   8          #include <stdio.h>
+   9          #include "gv701x_includes.h"
+  10          #include "gv701x_nwkstartup.h"
+  11          #ifdef HPGP_DRIVER_APP
+  12          #include "gv701x_hpgpdriver.h"
+  13          #endif
+  14          #ifdef LRWPAN_DRIVER_APP
+  15          #include "gv701x_lrwpandriver.h"
+  16          #endif
+  17          
+  18          /****************************************************************************** 
+  19            * Global Data
+  20            ******************************************************************************/
+  21          /*Driver Data*/
+  22          nwkstartup_data_t nwkstartup_data;
+  23          
+  24          /*Driver State Machines*/
+  25          gv701x_state_t nwkstartup_state;
+  26            
+  27          /****************************************************************************** 
+  28            * External Data
+  29            ******************************************************************************/
+  30          
+  31          /******************************************************************************
+  32            * Funtion prototypes
+  33            ******************************************************************************/
+  34          void GV701x_NwkSendEvent(u8 ind, u8 link);
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 2   
+
+  35          
+  36          /******************************************************************************
+  37            * External Funtion prototypes
+  38            ******************************************************************************/
+  39          
+  40          /******************************************************************************
+  41           * @fn      GV701x_NwkInit
+  42           *
+  43           * @brief   Initializes the driver
+  44           *
+  45           * @param   app_id - application identification number
+  46           *
+  47           * @return  none
+  48           */
+  49          
+  50          void GV701x_NwkInit(u8 app_id)
+  51          { 
+  52   1        u8* macaddr;
+  53   1        /*Initialize the database*/
+  54   1        memset(&nwkstartup_data, 0x00, sizeof(nwkstartup_data_t));
+  55   1        memset(&nwkstartup_state, 0x00, sizeof(gv701x_state_t));  
+  56   1      
+  57   1        macaddr = GV701x_ReadMacAddress();
+  58   1        /*Initialize the State Machines*/
+  59   1        nwkstartup_data.app_id = app_id;  
+  60   1        SLIST_Init(&nwkstartup_data.queues.appRxQueue);
+  61   1        
+  62   1        FM_Printf(FM_USER, "\nInit NwkApp (app id %bu)", app_id);
+  63   1        
+  64   1        memcpy((u8*)nwkstartup_data.link.long_addr.mac_addr, (u8*)macaddr, MAC_ADDR_LEN);
+  65   1      #if 0 
+                FM_HexDump(FM_APP, "MAC: ", (u8*)nwkstartup_data.link.long_addr.mac_addr, MAC_ADDR_LEN);      
+              #endif
+  68   1      
+  69   1        nwkstartup_state.state = NWK_INIT;
+  70   1        nwkstartup_state.event = NWK_IDLE_EVENT;  
+  71   1        nwkstartup_state.statedata = NULL;    
+  72   1        nwkstartup_state.statedatalen = 0;    
+  73   1      
+  74   1        /*Initial state of the links*/
+  75   1        nwkstartup_data.link.fw_ready.wireless = FALSE;
+  76   1        nwkstartup_data.link.fw_ready.power_line = FALSE; 
+  77   1        nwkstartup_data.link.power_line.state = LINK_DOWN;
+  78   1      #ifdef BRIDGE 
+  79   1        nwkstartup_data.link.wireless.state = LINK_DOWN;
+  80   1      #endif  
+  81   1      
+  82   1      #ifdef HPGP_DRIVER_APP
+  83   1        nwkstartup_data.link.power_line.addr = hpgp_nwk_data.params.nwk.tei;  
+  84   1      #endif
+  85   1      #ifdef LRWPAN_DRIVER_APP
+  86   1        nwkstartup_data.link.wireless.addr = lrwpan_db.short_addr;  
+  87   1      #endif
+  88   1      }
+  89          
+  90          /******************************************************************************
+  91           * @fn      GV701x_NwkInit
+  92           *
+  93           * @brief   Starts the network profile
+  94           *
+  95           * @param   link - The link to start with (PLC_NIC - PLC link or 
+  96           *                 RF_NIC - Wireless link of bitmap of both)(defines found in nma.h)
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 3   
+
+  97           *
+  98           * @return  none
+  99           */
+ 100          
+ 101          void GV701x_NwkStart(u8 link)
+ 102          { 
+ 103   1        /*Start PLC link*/
+ 104   1        if((nwkstartup_data.link.power_line.state != LINK_DISABLE) &&
+ 105   1            (nwkstartup_data.link.fw_ready.power_line == TRUE) &&
+ 106   1          (link & PLC_NIC))
+ 107   1        { 
+ 108   2      #ifdef HPGP_DRIVER_APP    
+ 109   2          hpgp_drv_start_evnt_msg_t hpgp_start; 
+ 110   2          nwkstartup_state.state = NWK_START;
+ 111   2          nwkstartup_data.link.power_line.state = LINK_DOWN;
+ 112   2          hpgp_start.event = HPGPDRV_START_EVNT;
+ 113   2          GV701x_SendAppEvent(nwkstartup_data.app_id, hpgp_drv_data.app_id, APP_MSG_TYPE_APPEVENT, 
+ 114   2            APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &hpgp_start, 
+ 115   2            sizeof(hpgp_drv_start_evnt_msg_t), 0);
+ 116   2      #endif
+ 117   2        }
+ 118   1      
+ 119   1        /*Start Wireless link*/ 
+ 120   1        if((nwkstartup_data.link.wireless.state != LINK_DISABLE) &&
+ 121   1           (nwkstartup_data.link.fw_ready.wireless == TRUE) &&
+ 122   1           (link & RF_NIC))
+ 123   1        {
+ 124   2      #ifdef LRWPAN_DRIVER_APP
+ 125   2          lrwpan_start_evnt_msg_t lrwpan_start;
+ 126   2          nwkstartup_state.state = NWK_START;
+ 127   2          nwkstartup_data.link.wireless.state = LINK_DOWN;
+ 128   2          
+ 129   2          /*Start LRWPAN Driver */
+ 130   2          lrwpan_start.event = LRWPAN_START_EVNT;
+ 131   2          lrwpan_db.short_addr = nwkstartup_data.link.wireless.addr;  
+ 132   2          GV701x_SendAppEvent(nwkstartup_data.app_id, lrwpan_db.app_id, APP_MSG_TYPE_APPEVENT, 
+ 133   2            APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID,&lrwpan_start, 
+ 134   2            sizeof(lrwpan_start_evnt_msg_t), 0);
+ 135   2      #endif    
+ 136   2        } 
+ 137   1      }
+ 138          
+ 139          /******************************************************************************
+ 140           * @fn      GV701x_NwkStop
+ 141           *
+ 142           * @brief   Starts the network profile
+ 143           *
+ 144           * @param   link - The link to start with (PLC_NIC - PLC link or 
+ 145           *                 RF_NIC - Wireless link of bitmap of both)(defines found in nma.h)
+ 146           *
+ 147           * @return  none
+ 148           */
+ 149          
+ 150          void GV701x_NwkStop(u8 link)
+ 151          { 
+ 152   1        /*Stop PLC link*/
+ 153   1        if((nwkstartup_data.link.power_line.state != LINK_DISABLE) &&
+ 154   1            (nwkstartup_data.link.fw_ready.power_line == TRUE) &&
+ 155   1          (link & PLC_NIC))
+ 156   1        { 
+ 157   2      #ifdef HPGP_DRIVER_APP    
+ 158   2          hpgp_drv_stop_evnt_msg_t hpgp_stop; 
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 4   
+
+ 159   2          hpgp_stop.event = HPGPDRV_STOP_EVNT;
+ 160   2          GV701x_SendAppEvent(nwkstartup_data.app_id, hpgp_drv_data.app_id, APP_MSG_TYPE_APPEVENT,
+ 161   2            APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &hpgp_stop, 
+ 162   2            sizeof(hpgp_drv_stop_evnt_msg_t), 0);
+ 163   2      #endif
+ 164   2        }
+ 165   1        
+ 166   1        /*Stop Wireless link*/  
+ 167   1        if((nwkstartup_data.link.wireless.state != LINK_DISABLE) &&
+ 168   1           (nwkstartup_data.link.fw_ready.wireless == TRUE) &&
+ 169   1           (link & RF_NIC))
+ 170   1        {
+ 171   2      #ifdef LRWPAN_DRIVER_APP
+ 172   2          lrwpan_stop_evnt_msg_t lrwpan_stop;
+ 173   2          lrwpan_stop.event = LRWPAN_STOP_EVNT;
+ 174   2          GV701x_SendAppEvent(nwkstartup_data.app_id, lrwpan_db.app_id, APP_MSG_TYPE_APPEVENT,
+ 175   2            APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID,&lrwpan_stop, 
+ 176   2            sizeof(lrwpan_stop_evnt_msg_t), 0);
+ 177   2      #endif    
+ 178   2        } 
+ 179   1      }
+ 180          
+ 181          /******************************************************************************
+ 182           * @fn      GV701x_NwkRxAppMsg
+ 183           *
+ 184           * @brief   Receives a message from another app/fw
+ 185           *
+ 186           * @params  msg_buf - message buffer
+ 187           *
+ 188           * @return  none
+ 189           */
+ 190          
+ 191          void GV701x_NwkRxAppMsg(sEvent* event)
+ 192          {
+ 193   1        gv701x_app_msg_hdr_t* msg_hdr = (gv701x_app_msg_hdr_t*)event->buffDesc.dataptr;
+ 194   1        hostHdr_t* hybrii_hdr;
+ 195   1        hostEventHdr_t* evnt_hdr;
+ 196   1      
+ 197   1        hybrii_hdr = (hostHdr_t*)(msg_hdr + 1);
+ 198   1          
+ 199   1        if((msg_hdr->dst_app_id == nwkstartup_data.app_id) ||
+ 200   1          (msg_hdr->dst_app_id == APP_BRDCST_MSG_APPID))
+ 201   1        { 
+ 202   2          memcpy(&nwkstartup_state.msg_hdr, msg_hdr, sizeof(gv701x_app_msg_hdr_t));
+ 203   2          nwkstartup_state.eventproto = hybrii_hdr->protocol;
+ 204   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 205   2            (hybrii_hdr->type == EVENT_FRM_ID))
+ 206   2          {
+ 207   3            evnt_hdr = (hostEventHdr_t*)(hybrii_hdr + 1);
+ 208   3            nwkstartup_state.event = evnt_hdr->type;    
+ 209   3            nwkstartup_state.statedata = (u8*)(evnt_hdr + 1);
+ 210   3            nwkstartup_state.statedatalen = (u16)(hybrii_hdr->length - sizeof(hostEventHdr_t));     
+ 211   3          }
+ 212   2          else
+ 213   2          {
+ 214   3            nwkstartup_state.event = (u8)(*((u8*)(hybrii_hdr + 1)));
+ 215   3            nwkstartup_state.statedata = (u8*)(hybrii_hdr + 1);
+ 216   3            nwkstartup_state.statedatalen = (u16)hybrii_hdr->length;
+ 217   3          }   
+ 218   2          nwkstartup_state.eventtype = hybrii_hdr->type;
+ 219   2          nwkstartup_state.eventclass = event->eventHdr.eventClass; 
+ 220   2          if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 5   
+
+ 221   2            (hybrii_hdr->type == EVENT_FRM_ID) &&
+ 222   2            (nwkstartup_state.event == HOST_EVENT_APP_TIMER))
+ 223   2          {     
+ 224   3            return;
+ 225   3          }
+ 226   2          else if((msg_hdr->src_app_id == APP_FW_MSG_APPID) && 
+ 227   2            (hybrii_hdr->type == EVENT_FRM_ID) &&
+ 228   2            (nwkstartup_state.event == HOST_EVENT_APP_CMD))
+ 229   2          {
+ 230   3            GV701x_Nwk_CmdProcess((char*)(evnt_hdr + 1)); 
+ 231   3            return;
+ 232   3          }       
+ 233   2        }
+ 234   1        GV701x_NwkStartupSM(&nwkstartup_state);
+ 235   1      }
+ 236          
+ 237          /******************************************************************************
+ 238           * @fn      GV701x_NwkStartupSM
+ 239           *
+ 240           * @brief   The NetworkStartup State Machine, it executes all internal/external 
+ 241           *      events triggered
+ 242           *
+ 243           * @param   state - state machine object of the driver
+ 244           *          (passed as a reference incase there are more than one object)
+ 245           *
+ 246           * @return  none
+ 247           *
+ 248           */
+ 249          
+ 250          void GV701x_NwkStartupSM(gv701x_state_t* state) 
+ 251          {
+ 252   1        if(state == NULL)
+ 253   1          return;
+ 254   1      
+ 255   1      #if 1
+ 256   1        if(state->event != NWK_IDLE_EVENT)
+ 257   1          FM_Printf(FM_APP, "\nNwk S %bu E %bu P %bu C %bu E %bu Da %bu Sa %bu T %bu", 
+ 258   1              state->state, state->event,
+ 259   1              state->eventproto, state->eventclass, state->eventtype, 
+ 260   1              state->msg_hdr.dst_app_id, state->msg_hdr.src_app_id, state->msg_hdr.type);
+ 261   1      #endif
+ 262   1      
+ 263   1        switch(state->state)
+ 264   1        {
+ 265   2          case NWK_INIT:      
+ 266   2            if(state->eventproto == SYS_MAC_ID)
+ 267   2            {
+ 268   3              if((state->eventclass == EVENT_CLASS_CTRL) && 
+ 269   3                 (state->eventtype == EVENT_FRM_ID))        
+ 270   3              {
+ 271   4                switch(state->event)
+ 272   4                {
+ 273   5                  /*Firmware ready event*/
+ 274   5                  case HOST_EVENT_FW_READY:
+ 275   5                  {                   
+ 276   6                    if(state->statedata)
+ 277   6                    {
+ 278   7                      u8* link = (u8*)state->statedata;
+ 279   7                      u8 allowedlink = 0;
+ 280   7                      
+ 281   7                      /*Check if PLC or Wireless firmware is present*/
+ 282   7                      if(((*link & PLC_NIC) ? ((nwkstartup_data.link.power_line.state != LINK_DISABLE) ? (1):(0)): (0)) 
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 6   
+
+             -&& 
+ 283   7                        ((*link & RF_NIC) ? ((nwkstartup_data.link.wireless.state != LINK_DISABLE) ? (1):(0)): (0)) )
+ 284   7                      {             
+ 285   8                        nwkstartup_data.link.fw_ready.power_line = TRUE;
+ 286   8                        nwkstartup_data.link.fw_ready.wireless = TRUE;  
+ 287   8                        allowedlink |= PLC_NIC;
+ 288   8                        allowedlink |= RF_NIC;
+ 289   8                      }
+ 290   7                      else if((*link & PLC_NIC) ? ((nwkstartup_data.link.power_line.state != LINK_DISABLE) ? (1):(0)): (
+             -0))
+ 291   7                      {           
+ 292   8                        nwkstartup_data.link.fw_ready.power_line = TRUE;
+ 293   8                        allowedlink |= PLC_NIC;
+ 294   8                      }
+ 295   7                      else if((*link & RF_NIC) ? ((nwkstartup_data.link.wireless.state != LINK_DISABLE) ? (1):(0)): (0))
+ 296   7                      {
+ 297   8                        nwkstartup_data.link.fw_ready.wireless = TRUE;
+ 298   8                        allowedlink |= RF_NIC;                  
+ 299   8                      } 
+ 300   7                      
+ 301   7                      if(allowedlink != 0)
+ 302   7                        GV701x_NwkSendEvent(NWK_START_IND, allowedlink);                
+ 303   7                    }     
+ 304   6                  }
+ 305   5                  break;
+ 306   5      
+ 307   5                  default:
+ 308   5                  break;
+ 309   5                }
+ 310   4              }     
+ 311   3              else if((state->eventclass == EVENT_CLASS_MGMT) && 
+ 312   3                 (state->eventtype == MGMT_FRM_ID))
+ 313   3              {         
+ 314   4                switch(state->event)
+ 315   4                {             
+ 316   5                  default:
+ 317   5                  break;
+ 318   5                }
+ 319   4              }
+ 320   3            }
+ 321   2            else if(state->eventproto == APP_MAC_ID)
+ 322   2            {
+ 323   3              if(state->msg_hdr.type == APP_MSG_TYPE_APPEVENT)
+ 324   3              {     
+ 325   4                switch(state->event)
+ 326   4                {
+ 327   5                  /*Start event*/
+ 328   5                  case NWK_START_EVENT:
+ 329   5                  {
+ 330   6                    nwk_start_evnt_msg_t* nwk_start = (nwk_start_evnt_msg_t*)state->statedata;
+ 331   6                    GV701x_NwkStart(nwk_start->link);
+ 332   6                  }
+ 333   5                  break;
+ 334   5      
+ 335   5                  default:
+ 336   5                  break;
+ 337   5                }
+ 338   4              }
+ 339   3            }
+ 340   2          break;
+ 341   2          
+ 342   2          case NWK_START:
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 7   
+
+ 343   2          case NWK_DOWN:
+ 344   2            if(state->eventproto == APP_MAC_ID)
+ 345   2            {   
+ 346   3      #ifdef HPGP_DRIVER_APP      
+ 347   3              if(state->msg_hdr.src_app_id == hpgp_drv_data.app_id)
+ 348   3              {
+ 349   4                if(state->msg_hdr.type == APP_MSG_TYPE_APPIND)
+ 350   4                {       
+ 351   5                  switch(state->event)
+ 352   5                  {
+ 353   6                    case HPGPDRV_DWN_IND: 
+ 354   6                    {
+ 355   7                      sEvent* event = NULL;
+ 356   7                      state->state = NWK_DOWN;
+ 357   7                      GV701x_NwkSendEvent(NWK_LINKDWN_IND, PLC_NIC);
+ 358   7                    }
+ 359   6                    break;
+ 360   6                  
+ 361   6                    case HPGPDRV_UP_IND:
+ 362   6                      if(nwkstartup_data.link.power_line.state != LINK_DISABLE)         
+ 363   6                        nwkstartup_data.link.power_line.state = LINK_UP;
+ 364   6      
+ 365   6                      state->state = NWK_UP;
+ 366   6                      GV701x_NwkSendEvent(NWK_LINKUP_IND, PLC_NIC);
+ 367   6                    break;                  
+ 368   6                  
+ 369   6                    default:
+ 370   6                    break;
+ 371   6                  }
+ 372   5                }
+ 373   4              }
+ 374   3      #endif        
+ 375   3      #ifdef LRWPAN_DRIVER_APP
+ 376   3              else if(state->msg_hdr.src_app_id == lrwpan_db.app_id)
+ 377   3              {
+ 378   4                if(state->msg_hdr.type == APP_MSG_TYPE_APPIND)
+ 379   4                {       
+ 380   5                  switch(state->event)
+ 381   5                  {
+ 382   6                    case LRWPAN_DWN_IND:
+ 383   6                      state->state = NWK_DOWN;
+ 384   6                      GV701x_NwkSendEvent(NWK_LINKDWN_IND, RF_NIC);
+ 385   6                    break;
+ 386   6                    
+ 387   6                    case LRWPAN_UP_IND:
+ 388   6                      if(nwkstartup_data.link.wireless.state != LINK_DISABLE)
+ 389   6                        nwkstartup_data.link.wireless.state = LINK_UP;
+ 390   6                                      
+ 391   6                      state->state = NWK_UP;          
+ 392   6                      GV701x_NwkSendEvent(NWK_LINKUP_IND, RF_NIC);            
+ 393   6                    break;  
+ 394   6                  
+ 395   6                    default:
+ 396   6                    break;
+ 397   6                  }
+ 398   5                }
+ 399   4              }
+ 400   3      #endif        
+ 401   3              else
+ 402   3              {
+ 403   4                if(state->msg_hdr.dst_app_id != APP_BRDCST_MSG_APPID)         
+ 404   4                {
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 8   
+
+ 405   5                  if(state->msg_hdr.type == APP_MSG_TYPE_APPEVENT)
+ 406   5                  {
+ 407   6                    switch(state->event)
+ 408   6                    {     
+ 409   7                      /*Start event*/
+ 410   7                      case NWK_START_EVENT:           
+ 411   7                      {
+ 412   8                        nwk_start_evnt_msg_t* nwk_start = (nwk_start_evnt_msg_t*)state->statedata;
+ 413   8                        GV701x_NwkStart(nwk_start->link);
+ 414   8                      }
+ 415   7                      break;
+ 416   7      
+ 417   7                      case NWK_STOP_EVENT:
+ 418   7                      {
+ 419   8                        nwk_stop_evnt_msg_t* nwk_stop = (nwk_stop_evnt_msg_t*)state->statedata;               
+ 420   8                        GV701x_NwkStop(nwk_stop->link);
+ 421   8                      }
+ 422   7                      break;
+ 423   7      
+ 424   7                      default:
+ 425   7                      break;
+ 426   7                    }
+ 427   6                  }
+ 428   5                }
+ 429   4              }
+ 430   3            }         
+ 431   2          break;    
+ 432   2      
+ 433   2          case NWK_UP:
+ 434   2            if(state->eventproto == APP_MAC_ID)
+ 435   2            {   
+ 436   3      #ifdef HPGP_DRIVER_APP      
+ 437   3              if(state->msg_hdr.src_app_id == hpgp_drv_data.app_id)
+ 438   3              {
+ 439   4                if(state->msg_hdr.type == APP_MSG_TYPE_APPIND)
+ 440   4                {       
+ 441   5                  switch(state->event)
+ 442   5                  {           
+ 443   6                    case HPGPDRV_DWN_IND:
+ 444   6                      if(nwkstartup_data.link.power_line.state != LINK_DISABLE)         
+ 445   6                        nwkstartup_data.link.power_line.state = LINK_DOWN;          
+ 446   6      
+ 447   6                      /*Network is down if both the links are down*/
+ 448   6                      if((nwkstartup_data.link.wireless.state == LINK_DISABLE) ? (1) :
+ 449   6                          (nwkstartup_data.link.wireless.state == LINK_DOWN))
+ 450   6                      {       
+ 451   7                        state->state = NWK_DOWN;
+ 452   7                        GV701x_NwkSendEvent(NWK_LINKDWN_IND, (PLC_NIC | RF_NIC));             
+ 453   7                      } 
+ 454   6                      else
+ 455   6                        GV701x_NwkSendEvent(NWK_LINKDWN_IND, PLC_NIC);
+ 456   6                    break;
+ 457   6                  
+ 458   6                    case HPGPDRV_UP_IND:  
+ 459   6                      if(nwkstartup_data.link.power_line.state != LINK_DISABLE)                   
+ 460   6                        nwkstartup_data.link.power_line.state = LINK_UP;  
+ 461   6      
+ 462   6                      GV701x_NwkSendEvent(NWK_LINKUP_IND, PLC_NIC);
+ 463   6                    break;          
+ 464   6      
+ 465   6                    default:
+ 466   6                    break;
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 9   
+
+ 467   6                  }
+ 468   5                }
+ 469   4              }
+ 470   3      #endif      
+ 471   3      #ifdef LRWPAN_DRIVER_APP
+ 472   3              else if(state->msg_hdr.src_app_id == lrwpan_db.app_id) 
+ 473   3              {   
+ 474   4                if(state->msg_hdr.type == APP_MSG_TYPE_APPIND)
+ 475   4                {       
+ 476   5                  switch(state->event)
+ 477   5                  {     
+ 478   6                    case LRWPAN_DWN_IND:
+ 479   6                      if(nwkstartup_data.link.wireless.state != LINK_DISABLE)
+ 480   6                        nwkstartup_data.link.wireless.state = LINK_DOWN;
+ 481   6      
+ 482   6                      /*Network is down if both the links are down*/                    
+ 483   6                      if((nwkstartup_data.link.power_line.state == LINK_DISABLE) ? (1) :
+ 484   6                          (nwkstartup_data.link.power_line.state == LINK_DOWN))
+ 485   6                      {
+ 486   7                        state->state = NWK_DOWN;
+ 487   7                        GV701x_NwkSendEvent(NWK_LINKDWN_IND, (PLC_NIC | RF_NIC));
+ 488   7                      }
+ 489   6                      else
+ 490   6                        GV701x_NwkSendEvent(NWK_LINKDWN_IND, RF_NIC);
+ 491   6                    break;
+ 492   6                            
+ 493   6                    case LRWPAN_UP_IND:     
+ 494   6                      if(nwkstartup_data.link.wireless.state != LINK_DISABLE)         
+ 495   6                        nwkstartup_data.link.wireless.state = LINK_UP;
+ 496   6      
+ 497   6                      GV701x_NwkSendEvent(NWK_LINKUP_IND, RF_NIC);
+ 498   6                    break;  
+ 499   6                            
+ 500   6                    default:
+ 501   6                    break;        
+ 502   6                  }
+ 503   5                }
+ 504   4              }
+ 505   3      #endif            
+ 506   3              else
+ 507   3              {
+ 508   4                if(state->msg_hdr.dst_app_id != APP_BRDCST_MSG_APPID) 
+ 509   4                {
+ 510   5                  if(state->msg_hdr.type == APP_MSG_TYPE_APPEVENT)
+ 511   5                  {         
+ 512   6                    switch(state->event)
+ 513   6                    {     
+ 514   7                      /*Start event*/
+ 515   7                      case NWK_START_EVENT:           
+ 516   7                      {
+ 517   8                        nwk_start_evnt_msg_t* nwk_start = (nwk_start_evnt_msg_t*)state->statedata;
+ 518   8                        GV701x_NwkStart(nwk_start->link);
+ 519   8                      }
+ 520   7                      break;
+ 521   7      
+ 522   7                      case NWK_STOP_EVENT:
+ 523   7                      {
+ 524   8                        nwk_stop_evnt_msg_t* nwk_stop = (nwk_stop_evnt_msg_t*)state->statedata;
+ 525   8                        GV701x_NwkStop(nwk_stop->link);
+ 526   8                      }
+ 527   7                      break;
+ 528   7                    
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 10  
+
+ 529   7                      default:
+ 530   7                      break;
+ 531   7                    }
+ 532   6                  }
+ 533   5                }
+ 534   4              }
+ 535   3            }       
+ 536   2          break;
+ 537   2          
+ 538   2          default:
+ 539   2          break;
+ 540   2        }
+ 541   1      
+ 542   1        state->event = NWK_IDLE_EVENT;
+ 543   1        state->eventtype = 0;
+ 544   1        state->eventclass = 0;
+ 545   1        state->eventproto = 0;
+ 546   1        state->statedata = NULL;  
+ 547   1        state->statedatalen = 0;  
+ 548   1        memset((u8*)&state->msg_hdr, 0x00, sizeof(gv701x_app_msg_hdr_t)); 
+ 549   1      }
+ 550          
+ 551          /******************************************************************************
+ 552           * @fn      GV701x_NwkSendEvent
+ 553           *
+ 554           * @brief   Broadcasts an indication to all applications based on its state change
+ 555           *      events triggered
+ 556           *
+ 557           * @param   ind - indication type
+ 558           *          link - link on which the transition occured
+ 559           *
+ 560           * @return  none
+ 561           *
+ 562           */
+ 563          
+ 564          void GV701x_NwkSendEvent(u8 ind, u8 link) 
+ 565          { 
+ 566   1        if(ind == NWK_START_IND)
+ 567   1        {
+ 568   2          nwk_start_ind_msg_t nwk_start_msg;
+ 569   2          nwk_start_msg.event = ind;
+ 570   2          nwk_start_msg.link = link;
+ 571   2          GV701x_SendAppEvent(nwkstartup_data.app_id, APP_BRDCST_MSG_APPID, APP_MSG_TYPE_APPIND,
+ 572   2            APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &nwk_start_msg, sizeof(nwk_start_ind_msg_t), 0);   
+ 573   2        }
+ 574   1        else if(ind == NWK_LINKUP_IND)
+ 575   1        {
+ 576   2          nwk_up_ind_msg_t nwk_up_msg;
+ 577   2          nwk_up_msg.event = ind;
+ 578   2          nwk_up_msg.link = link;
+ 579   2          GV701x_SendAppEvent(nwkstartup_data.app_id, APP_BRDCST_MSG_APPID, APP_MSG_TYPE_APPIND,
+ 580   2            APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &nwk_up_msg, sizeof(nwk_up_ind_msg_t), 0);   
+ 581   2        }
+ 582   1        else if(ind == NWK_LINKDWN_IND)
+ 583   1        {
+ 584   2          sEvent* event =NULL;
+ 585   2          nwk_dwn_ind_msg_t nwk_dwn_msg;
+ 586   2          nwk_dwn_msg.event = ind;
+ 587   2          nwk_dwn_msg.link = link;
+ 588   2          GV701x_SendAppEvent(nwkstartup_data.app_id, APP_BRDCST_MSG_APPID, APP_MSG_TYPE_APPIND,
+ 589   2            APP_MAC_ID, EVENT_CLASS_CTRL, MGMT_FRM_ID, &nwk_dwn_msg, sizeof(nwk_dwn_ind_msg_t), 0);   
+ 590   2        }
+C51 COMPILER V9.53.0.0   GV701X_NWKSTARTUP                                                 11/04/2015 20:09:43 PAGE 11  
+
+ 591   1        else
+ 592   1          return;
+ 593   1      }
+ 594          
+ 595          /******************************************************************************
+ 596           * @fn      GV701x_Nwk_CmdProcess
+ 597           *
+ 598           * @brief   It handles application command line requests
+ 599           *
+ 600           * @param   CmdBuf - command string
+ 601           *
+ 602           * @return  none
+ 603           *
+ 604           */
+ 605          
+ 606          void GV701x_Nwk_CmdProcess(char* CmdBuf) 
+ 607          {
+ 608   1        if(strcmp(CmdBuf, "state") == 0) 
+ 609   1        {
+ 610   2          printf("\nNwk S %bu E %bu pl %bu wl: %bu", nwkstartup_state.state, nwkstartup_state.event, 
+ 611   2              nwkstartup_data.link.power_line.state,
+ 612   2              nwkstartup_data.link.wireless.state);
+ 613   2        }
+ 614   1        else if(strcmp(CmdBuf, "stats") == 0) 
+ 615   1        {
+ 616   2          printf("\nNwk p(fw) %bu w(fw) %bu pl %bu wl %bu pa %x wa %x", 
+ 617   2              nwkstartup_data.link.fw_ready.power_line, nwkstartup_data.link.fw_ready.wireless, 
+ 618   2              nwkstartup_data.link.power_line.state, nwkstartup_data.link.wireless.state, 
+ 619   2              nwkstartup_data.link.power_line.addr, nwkstartup_data.link.wireless.addr);
+ 620   2        }
+ 621   1        else if(strcmp(CmdBuf, "nvclear") == 0) 
+ 622   1        {
+ 623   2          GV701x_FlashErase(nwkstartup_data.app_id);
+ 624   2        } 
+ 625   1      }         
+ 626          
+ 627          #endif /*NWKSTARTUP_APP*/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2887    ----
+   CONSTANT SIZE    =    184    ----
+   XDATA SIZE       =     39      37
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,8 @@
+".\main.obj",
+".\uart.obj",
+".\STARTUP.obj",
+".\sys_config_data_utils.obj" 
+TO "hybrii_prameter_rw" 
+RAMSIZE(256) 
+CODE( 0X2100-0X50FE )
+XDATA( 0X2100-0X30FE )

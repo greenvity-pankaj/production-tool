@@ -4,7 +4,7 @@ Imports System.Runtime.InteropServices
 
 Public Class spiTXTestSettings
     '   <summary>
-    '       Structure Declarations for tests
+    '       Enum declarations
     '   </summary>
 #Region "Enum Declaration"
 
@@ -79,52 +79,69 @@ Public Class spiTXTestSettings
     '   </summary>
 #Region "Structure Declerations"
 
-    <StructLayout(LayoutKind.Explicit, Size:=37, pack:=1)> _
+    <StructLayout(LayoutKind.Sequential, Size:=37, pack:=1)> _
     Public Structure _sPlcSimTxTestParams
         '   Security
-        <FieldOffset(0)> <MarshalAsAttribute(UnmanagedType.U1)> Public eks As Byte
-        <FieldOffset(1)> <MarshalAsAttribute(UnmanagedType.U1)> Public secTestMode As Byte
+        Public eks As Byte
+        Public secTestMode As Byte
 
         'frame type
-        <FieldOffset(2)> <MarshalAsAttribute(UnmanagedType.U1)> Public frmType As Byte
-        <FieldOffset(3)> <MarshalAsAttribute(UnmanagedType.U1)> Public altFrmTypeTest As Byte           'overrides frmType
+        Public frmType As Byte
+        Public altFrmTypeTest As Byte           'overrides frmType
 
         'ucst/mcst/bcst
-        <FieldOffset(4)> <MarshalAsAttribute(UnmanagedType.U1)> Public mcstMode As Byte
-        <FieldOffset(5)> <MarshalAsAttribute(UnmanagedType.U1)> Public altMcstTest As Byte
+        Public mcstMode As Byte
+        Public altMcstTest As Byte
 
         'plid
-        <FieldOffset(6)> <MarshalAsAttribute(UnmanagedType.U1)> Public plid As Byte
-        <FieldOffset(7)> <MarshalAsAttribute(UnmanagedType.U1)> Public altPlidTest As Byte              'overrides plid
+        Public plid As Byte
+        Public altPlidTest As Byte              'overrides plid
 
         'offset descLen
-        <FieldOffset(8)> <MarshalAsAttribute(UnmanagedType.U1)> Public offsetDW As Byte
-        <FieldOffset(9)> <MarshalAsAttribute(UnmanagedType.U1)> Public descLen As Byte
-        <FieldOffset(10)> <MarshalAsAttribute(UnmanagedType.U1)> Public altOffsetDescLenTest As Byte
+        Public offsetDW As Byte
+        Public descLen As Byte
+        Public altOffsetDescLenTest As Byte
 
         'robo mode/ lengths
-        <FieldOffset(11)> <MarshalAsAttribute(UnmanagedType.U1)> Public stdModeSel As Byte               'for frm lens b/w Mini Robo Max & STD/2PB HS Max
-        <FieldOffset(12)> <MarshalAsAttribute(UnmanagedType.U1)> Public lenTestMode As Byte
-        <FieldOffset(13)> <MarshalAsAttribute(UnmanagedType.U1)> Public roboTestMode As Byte             'for single robo inc len test
+        Public stdModeSel As Byte               'for frm lens b/w Mini Robo Max & STD/2PB HS Max
+        Public lenTestMode As Byte
+        Public roboTestMode As Byte             'for single robo inc len test
 
-        <FieldOffset(14)> <MarshalAsAttribute(UnmanagedType.U1)> Public contMode As Byte
-        <FieldOffset(15)> <MarshalAsAttribute(UnmanagedType.U2)> Public frmLen As UShort
-        <FieldOffset(17)> <MarshalAsAttribute(UnmanagedType.U4)> Public numFrames As UInteger
-        <FieldOffset(21)> <MarshalAsAttribute(UnmanagedType.U4)> Public delay As UInteger
-        <FieldOffset(25)> <MarshalAsAttribute(UnmanagedType.U1)> Public dt_av As Byte
-        <FieldOffset(26)> <MarshalAsAttribute(UnmanagedType.U1)> Public src As Byte                      'Sound Reason Code
-        <FieldOffset(27)> <MarshalAsAttribute(UnmanagedType.U1)> Public saf As Byte
-        <FieldOffset(28)> <MarshalAsAttribute(UnmanagedType.U1)> Public scf As Byte
-        <FieldOffset(29)> <MarshalAsAttribute(UnmanagedType.U1)> Public plcMultiPktTest As Byte
-        <FieldOffset(30)> <MarshalAsAttribute(UnmanagedType.U1)> Public dbc As Byte
-        <FieldOffset(31)> <MarshalAsAttribute(UnmanagedType.U1)> Public pattern As Byte
+        Public contMode As Byte
+        Public frmLen As UShort
+        Public numFrames As UInteger
+        Public delay As UInteger
+        Public dt_av As Byte
+        Public src As Byte                      'Sound Reason Code
+        Public saf As Byte
+        Public scf As Byte
+        Public plcMultiPktTest As Byte
+        Public dbc As Byte
+        Public pattern As Byte
 
-        <FieldOffset(32)> <MarshalAsAttribute(UnmanagedType.U1)> Public snid As Byte
-        <FieldOffset(33)> <MarshalAsAttribute(UnmanagedType.U1)> Public dtei As Byte
-        <FieldOffset(34)> <MarshalAsAttribute(UnmanagedType.U1)> Public stei As Byte
+        Public snid As Byte
+        Public dtei As Byte
+        Public stei As Byte
 
-        <FieldOffset(35)> <MarshalAsAttribute(UnmanagedType.U1)> Public txpowermode As Byte
-        <FieldOffset(36)> <MarshalAsAttribute(UnmanagedType.U1)> Public ermode As Byte
+        Public txpowermode As Byte
+        Public ermode As Byte
+    End Structure
+
+    Const MAC_ADD_LEN As Integer = 8
+
+    '
+    '   RF Parameters
+    '
+    <StructLayout(LayoutKind.Sequential, Pack:=1, size:=20)> _
+    Public Structure sRfTxTestParams
+        <FieldOffset(0)> <MarshalAs(UnmanagedType.ByValArray, SizeConst:=MAC_ADD_LEN)> Public macAddress As Byte()
+        <FieldOffset(8)> <MarshalAsAttribute(UnmanagedType.U2)> Public macShortAddress As UShort
+        <FieldOffset(10)> <MarshalAsAttribute(UnmanagedType.U2)> Public dstShortAddress As UShort
+        <FieldOffset(12)> <MarshalAsAttribute(UnmanagedType.U1)> Public ch As Byte
+        <FieldOffset(13)> <MarshalAsAttribute(UnmanagedType.U2)> Public panId As UShort
+        <FieldOffset(15)> <MarshalAsAttribute(UnmanagedType.U1)> Public frameLength As Byte
+        <FieldOffset(16)> <MarshalAsAttribute(UnmanagedType.U2)> Public frameCount As UShort
+        <FieldOffset(18)> <MarshalAsAttribute(UnmanagedType.U2)> Public interFrameDelay As UShort
     End Structure
 
 #End Region

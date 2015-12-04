@@ -10,7 +10,8 @@ Public Class RunTest
     Private headerFrmType As Byte
     Private payloadLength As UShort
     Private headerFrmID As Byte
-    Public gtxTest As New spiTXTestSettings._sPlcSimTxTestParams  'global
+    Public gtxTest As New spiTXTestSettings._sPlcSimTxTestParams 'global variable to carry PLC params
+    Public rftestParams As New spiTXTestSettings.sRfTxTestParams    'global variable to carry rf params
     Public Const ProductionToolProtocol As Byte = &H8F
     Public Const MAX_FW_VER_LEN As Integer = 16
 
@@ -43,6 +44,7 @@ Public Class RunTest
         STATE_GET_RESULT_CNF
         STATE_DEVICE_SEARCH
         STATE_DEVICE_UP
+        STATE_NONE
     End Enum
 
     '
@@ -61,6 +63,13 @@ Public Class RunTest
         SUCCESS
     End Enum
 
+    '
+    '   Test Interface
+    '
+    Enum TestInterface
+        TEST_PLC_ID
+        TEST_802_15_5_ID
+    End Enum
 #End Region
 
     '   <summary>
@@ -71,20 +80,29 @@ Public Class RunTest
     '
     '   Header strucutre
     '
-    <StructLayout(LayoutKind.Explicit, Pack:=1, size:=5)> _
+    '<StructLayout(LayoutKind.Explicit, Pack:=1, size:=5)> _
+    'Public Structure frmHeader
+    '    <FieldOffset(0)> <MarshalAsAttribute(UnmanagedType.U1)> Public protocolID As Byte
+    '    <FieldOffset(1)> <MarshalAsAttribute(UnmanagedType.U2)> Public length As UShort
+    '    <FieldOffset(3)> <MarshalAsAttribute(UnmanagedType.U1)> Public frmType As Byte
+    '    <FieldOffset(4)> <MarshalAsAttribute(UnmanagedType.U1)> Public cmdid As Byte
+    'End Structure
+
+    <StructLayout(LayoutKind.Sequential, Pack:=1, size:=5)> _
     Public Structure frmHeader
-        <FieldOffset(0)> <MarshalAsAttribute(UnmanagedType.U1)> Public protocolID As Byte
-        <FieldOffset(1)> <MarshalAsAttribute(UnmanagedType.U2)> Public length As UShort
-        <FieldOffset(3)> <MarshalAsAttribute(UnmanagedType.U1)> Public frmType As Byte
-        <FieldOffset(4)> <MarshalAsAttribute(UnmanagedType.U1)> Public cmdid As Byte
+        Public protocolID As Byte
+        Public length As UShort
+        Public frmType As Byte
+        Public cmdid As Byte
     End Structure
 
     '
     '   Device UP Event strucutre
     '
-    <StructLayout(LayoutKind.Sequential, Size:=21, pack:=1)> _
+    <StructLayout(LayoutKind.Sequential, Size:=22, pack:=1)> _
     Public Structure sDevUpEvent
         Public deviceType As Byte
+        Public capabilityInfo As Byte
         <MarshalAs(UnmanagedType.ByValArray, SizeConst:=MAX_FW_VER_LEN)> _
         Public FWVer As Byte()
         Public bMapTests As UInteger
@@ -96,16 +114,20 @@ Public Class RunTest
     <StructLayout(LayoutKind.Sequential, Size:=1, pack:=1)> _
     Public Structure sResponse
         Public rsp As Byte
+        'Public calStatus As Byte
     End Structure
 
-   
+
+    <StructLayout(LayoutKind.Sequential, Size:=1, pack:=1)> _
+    Public Structure sProdPrepRfStatusCnf
+        Public calStatus As Byte
+    End Structure
 #End Region
     '
     '   Main form load
     '
     Private Sub RunTest_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        lblSessionName.Text = HomeScreen.lblSessionName.Text
-        lblTestName.Text = HomeScreen.tests.TEST_ID_PLC_TX.ToString
+
     End Sub
     '
     '   Swap stei and dtei
@@ -122,34 +144,87 @@ Public Class RunTest
         Return x
     End Function
 
+    '
+    '   Get interface
+    '
+    Public Function get_interface(ByVal t As HomeScreen.tests) As TestInterface
+        Select Case t
+            Case HomeScreen.tests.TEST_ID_PLC_RX
+                Return TestInterface.TEST_PLC_ID
+                Exit Select
+            Case HomeScreen.tests.TEST_ID_PLC_RX_SWEEP
+                Return TestInterface.TEST_PLC_ID
+                Exit Select
+            Case HomeScreen.tests.TEST_ID_PLC_TX
+                Return TestInterface.TEST_PLC_ID
+                Exit Select
+            Case HomeScreen.tests.TEST_ID_PLC_TX_SWEEP
+                Return TestInterface.TEST_PLC_ID
+                Exit Select
+
+            Case HomeScreen.tests.TEST_ID_RF_RX
+                Return TestInterface.TEST_802_15_5_ID
+                Exit Select
+            Case HomeScreen.tests.TEST_ID_RF_TX
+                Return TestInterface.TEST_802_15_5_ID
+                Exit Select
+            Case HomeScreen.tests.TEST_ID_RF_RX_SWEEP
+                Return TestInterface.TEST_802_15_5_ID
+                Exit Select
+            Case HomeScreen.tests.TEST_ID_RF_TX_SWEEP
+                Return TestInterface.TEST_802_15_5_ID
+                Exit Select
+
+        End Select
+        Return -1
+    End Function
+
+    '
+    '   fill header for the payload
+    '
+    Private Sub fill_header(ByRef header As frmHeader, ByVal len As UShort, ByVal cmd As HomeScreen.commandIDs)
+
+        '   fill header 
+        header.protocolID = ProductionToolProtocol
+        header.frmType = HomeScreen.headerID.headerRequest
+        header.length = len
+        header.cmdid = cmd
+
+    End Sub
 
     '   <summary>
-    '       Get payload 
+    '       Prepare payload to send to device
     '   </summary>
-
     Private Function getPayload(ByVal state As states, ByVal test As HomeScreen.tests) As Byte()
 
         Dim txMsg() = New Byte() {}
         Dim header As New frmHeader
+        Dim payloadLen As UShort
+        Dim structByte() = New Byte() {}
 
         Select Case state
 
             Case states.STATE_PREPARE_DUT
-                Dim structByte As Byte() = StructToByte(gtxTest)
-                Dim payloadLen As UShort = structByte.Length
-                payloadLen += 1 ' for test
+
+                If get_interface(test) = TestInterface.TEST_PLC_ID Then
+                    structByte = StructToByte(gtxTest)
+                ElseIf get_interface(test) = TestInterface.TEST_802_15_5_ID Then
+                    structByte = StructToByte(rftestParams)
+                End If
+                payloadLen = structByte.Length
+                'payloadLen += 1 ' for test
+                payloadLen += 2 ' for test and interface
 
                 '   fill header 
-                header.protocolID = ProductionToolProtocol
-                header.frmType = HomeScreen.headerID.headerRequest
-                header.length = payloadLen
-                header.cmdid = HomeScreen.commandIDs.TOOL_CMD_PREPARE_DUT
+                fill_header(header, payloadLen, HomeScreen.commandIDs.TOOL_CMD_PREPARE_DUT)
 
                 Dim headerByte As Byte() = StructToByte(header)
                 '   fill payload
                 Array.Resize(txMsg, headerByte.Length)
                 Array.Copy(headerByte, 0, txMsg, 0, headerByte.Length)
 
+                '   Add interface
+                Add(txMsg, CType([Enum].Parse(GetType(TestInterface), get_interface(test)), TestInterface))
                 '   fill in the test
                 Add(txMsg, test)
 
@@ -161,23 +236,30 @@ Public Class RunTest
                 Exit Select
 
             Case states.STATE_PREPARE_REFERENCE
+
                 Dim gtxTest_forREF As spiTXTestSettings._sPlcSimTxTestParams = Nothing
-                gtxTest_forREF = swapNWIDsforREF(gtxTest)
-                Dim structByte As Byte() = StructToByte(gtxTest_forREF)
-                Dim payloadLen As UShort = structByte.Length
-                payloadLen += 1 ' for test
+
+                If get_interface(test) = TestInterface.TEST_PLC_ID Then
+                    gtxTest_forREF = swapNWIDsforREF(gtxTest)
+                    structByte = StructToByte(gtxTest_forREF)
+                ElseIf get_interface(test) = TestInterface.TEST_802_15_5_ID Then
+                    structByte = StructToByte(rftestParams)
+                End If
+
+                payloadLen = structByte.Length
+                'payloadLen += 1 ' for test
+                payloadLen += 2 ' for test and interface
 
                 '   fill header 
-                header.protocolID = ProductionToolProtocol
-                header.frmType = HomeScreen.headerID.headerRequest
-                header.length = payloadLen
-                header.cmdid = HomeScreen.commandIDs.TOOL_CMD_PREPARE_REFERENCE
+                fill_header(header, payloadLen, HomeScreen.commandIDs.TOOL_CMD_PREPARE_REFERENCE)
 
                 Dim headerByte As Byte() = StructToByte(header)
                 '   fill payload
                 Array.Resize(txMsg, headerByte.Length)
                 Array.Copy(headerByte, 0, txMsg, 0, headerByte.Length)
 
+                '   Add interface
+                Add(txMsg, CType([Enum].Parse(GetType(TestInterface), get_interface(test)), TestInterface))
                 '   fill in the test
                 Add(txMsg, test)
 
@@ -187,32 +269,44 @@ Public Class RunTest
                 Next
                 Exit Select
 
-            Case states.STATE_STOP_TEST
-                Dim payloadLen As New UShort
-                payloadLen = 0
+            Case states.STATE_START_TEST
+                'payloadLen = 1
+                payloadLen = 2   'test id and interface
 
                 '   fill header 
-                header.protocolID = ProductionToolProtocol
-                header.frmType = HomeScreen.headerID.headerRequest
-                header.length = payloadLen
-                header.cmdid = HomeScreen.commandIDs.TOOL_CMD_STOP_TEST
+                fill_header(header, payloadLen, HomeScreen.commandIDs.TOOL_CMD_START_TEST)
 
                 Dim headerByte As Byte() = StructToByte(header)
                 '   fill payload
                 Array.Resize(txMsg, headerByte.Length)
                 Array.Copy(headerByte, 0, txMsg, 0, headerByte.Length)
-                HomeScreen.dumpMsg(txMsg.ToArray.ToString)
+
+                '   Add interface
+                Add(txMsg, CType([Enum].Parse(GetType(TestInterface), get_interface(test)), TestInterface))
+                '   fill payload
+                Add(txMsg, test)
+                Exit Select
+
+            Case states.STATE_STOP_TEST
+                payloadLen = 1
+
+                '   fill header 
+                fill_header(header, payloadLen, HomeScreen.commandIDs.TOOL_CMD_STOP_TEST)
+
+                Dim headerByte As Byte() = StructToByte(header)
+                '   fill payload
+                Array.Resize(txMsg, headerByte.Length)
+                Array.Copy(headerByte, 0, txMsg, 0, headerByte.Length)
+                '   Add interface
+                Add(txMsg, CType([Enum].Parse(GetType(TestInterface), get_interface(test)), TestInterface))
+
                 Exit Select
 
             Case states.STATE_DEVICE_RESET
-                Dim payloadLen As New UShort
                 payloadLen = 0
 
                 '   fill header 
-                header.protocolID = ProductionToolProtocol
-                header.frmType = HomeScreen.headerID.headerRequest
-                header.length = payloadLen
-                header.cmdid = HomeScreen.commandIDs.TOOL_CMD_DEVICE_RESET
+                fill_header(header, payloadLen, HomeScreen.commandIDs.TOOL_CMD_DEVICE_RESET)
 
                 Dim headerByte As Byte() = StructToByte(header)
                 '   fill payload
@@ -222,14 +316,10 @@ Public Class RunTest
                 Exit Select
 
             Case states.STATE_DEVICE_SEARCH
-                Dim payloadLen As New UShort
                 payloadLen = 0
 
                 '   fill header 
-                header.protocolID = ProductionToolProtocol
-                header.frmType = HomeScreen.headerID.headerRequest
-                header.length = payloadLen
-                header.cmdid = HomeScreen.commandIDs.TOOL_CMD_DEVICE_SEARCH
+                fill_header(header, payloadLen, HomeScreen.commandIDs.TOOL_CMD_DEVICE_SEARCH)
 
                 Dim headerByte As Byte() = StructToByte(header)
                 '   fill payload
@@ -239,40 +329,18 @@ Public Class RunTest
                 Exit Select
 
             Case states.STATE_GET_RESULT
-                Dim payloadLen As New UShort
-                payloadLen = 0
-
-                '   fill header 
-                header.protocolID = ProductionToolProtocol
-                header.frmType = HomeScreen.headerID.headerRequest
-                header.length = payloadLen
-                header.cmdid = HomeScreen.commandIDs.TOOL_CMD_GET_RESULT
-
-                Dim headerByte As Byte() = StructToByte(header)
-                '   fill payload
-                Array.Resize(txMsg, headerByte.Length)
-                Array.Copy(headerByte, 0, txMsg, 0, headerByte.Length)
-
-                Exit Select
-
-
-            Case states.STATE_START_TEST
-                Dim payloadLen As New UShort
                 payloadLen = 1
 
                 '   fill header 
-                header.protocolID = ProductionToolProtocol
-                header.frmType = HomeScreen.headerID.headerRequest
-                header.length = payloadLen
-                header.cmdid = HomeScreen.commandIDs.TOOL_CMD_START_TEST
+                fill_header(header, payloadLen, HomeScreen.commandIDs.TOOL_CMD_GET_RESULT)
 
                 Dim headerByte As Byte() = StructToByte(header)
                 '   fill payload
                 Array.Resize(txMsg, headerByte.Length)
                 Array.Copy(headerByte, 0, txMsg, 0, headerByte.Length)
+                '   Add interface
+                Add(txMsg, CType([Enum].Parse(GetType(TestInterface), get_interface(test)), TestInterface))
 
-                '   fill payload
-                Add(txMsg, test)
                 Exit Select
 
         End Select
@@ -290,17 +358,8 @@ Public Class RunTest
     Public Sub beginSend(ByVal state As states, mClient As ConnectedClient, ByVal t As HomeScreen.tests)
 
         Dim txMsg() = New Byte() {}
-        Dim SelectedTests() = New Byte() {}
-
-        '   For multiple tests
-        Dim multiTests As Boolean = False
-        multiTests = isMultipleTestSelected(SelectedTests)
-
         txMsg = getPayload(state, t)
-        'If state = states.STATE_PREPARE_DUT Then
-        '    Dim s As New shpgpStats
-        '    s.dumpinFile(txMsg)
-        'End If
+        
         If txMsg IsNot Nothing Then
             mClient.SendMessage(txMsg)
         End If
@@ -308,6 +367,7 @@ Public Class RunTest
     End Sub
 
 #End Region
+
     '   <summary>
     '       General purpose utility functions needed 
     '   </summary>
@@ -378,13 +438,13 @@ Public Class RunTest
             count += 1
             Add(SelectedTests, HomeScreen.tests.TEST_ID_PLC_TX)
         End If
-        If HomeScreen.Checkbox.Checked Then
+        If HomeScreen.chkbx_RFTX.Checked Then
             count += 1
             Add(SelectedTests, HomeScreen.tests.TEST_ID_PLC_RX)
         End If
         If HomeScreen.chkbxPLCRX.Checked Then
             count += 1
-            Add(SelectedTests, HomeScreen.tests.TEST_ID_SPI_TX)
+            Add(SelectedTests, HomeScreen.tests.TEST_ID_RF_TX)
         End If
 
         If count > 1 Then

@@ -308,7 +308,7 @@
             <InterruptVectorAddress>8448</InterruptVectorAddress>
             <VariousControls>
               <MiscControls></MiscControls>
-              <Define>P8051  HYBRII_802154, HYBRII_ASIC, HYBRII_SPI, HPGP_HAL_TEST, RTX51_TINY_OS, SPI_DIAG, HYBRII_ASIC_A2, HYBRII_HPGP, HYBRII_ETH, PLC_SW_SYNC, inline, BB_GAIN_TABLE,  BB_CAL, HYBRII_B, HYBRII_B_AFE, B_ASICPLC, FT, Z_P_BRIDGE, B2,  Flash_Config, MPER, ZBMAC_DIAG, MAC_802154_TASK, HAL_802154_TASK</Define>
+              <Define>P8051  HYBRII_802154, HYBRII_ASIC, HYBRII_SPI, HPGP_HAL_TEST, RTX51_TINY_OS, SPI_DIAG, HYBRII_ASIC_A2, HYBRII_HPGP, HYBRII_ETH, PLC_SW_SYNC, inline, BB_GAIN_TABLE,  BB_CAL, HYBRII_B, HYBRII_B_AFE, B_ASICPLC, FT, Z_P_BRIDGE, B2, Flash_Config, MPER_, ZBMAC_DIAG, MAC_802154_TASK, HAL_802154_TASK_,TIMER_POLL</Define>
               <Undefine></Undefine>
               <IncludePath>..\..\..\zigbee;..\..\..\common;..\..\..\hal;..\..\..\hpgp\src;..\..\..\project\hal\src;..\..\..\hpgp\src\hal;..\..\..\hpgp\src\nma;..\..\..\common\datapath;..\..\..\hpgp\src\link;..\..\..\..\components\utilities\datatype\inc;..\..\..\..\components\utilities\event\inc;..\..\..\..\components\utilities\linklist\inc;..\..\..\..\components\utilities\timer\inc;..\..\..\..\components\drivers\gpio\inc;..\..\..\..\components\osal\inc;..\..\..\HybriiB_configuration_rw\src;..\..\..\..\components\ieee802154\inc;..\..\..\..\components\hpgp\inc;..\..\..\..\components\nma\hpgp\inc;..\..\..\..\components\nma\ieee802154\inc;..\..\..\..\components\nma;..\..\..\..\components\drivers\flash\inc;..\..\..\..\components\utilities;..\..\..\..\components\utilities\debug\inc</IncludePath>
             </VariousControls>
@@ -783,7 +783,7 @@
 
 </OverlayString>
             <MiscControls></MiscControls>
-            <DisableWarningNumbers></DisableWarningNumbers>
+            <DisableWarningNumbers>16,15,57</DisableWarningNumbers>
             <LinkerCmdFile></LinkerCmdFile>
             <Assign></Assign>
             <ReserveString></ReserveString>
@@ -840,6 +840,47 @@
               <FileName>stm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\common\stm.c</FilePath>
+              <FileOption>
+                <CommonProperty>
+                  <UseCPPCompiler>2</UseCPPCompiler>
+                  <RVCTCodeConst>0</RVCTCodeConst>
+                  <RVCTZI>0</RVCTZI>
+                  <RVCTOtherData>0</RVCTOtherData>
+                  <ModuleSelection>0</ModuleSelection>
+                  <IncludeInBuild>2</IncludeInBuild>
+                  <AlwaysBuild>2</AlwaysBuild>
+                  <GenerateAssemblyFile>2</GenerateAssemblyFile>
+                  <AssembleAssemblyFile>2</AssembleAssemblyFile>
+                  <PublicsOnly>2</PublicsOnly>
+                  <StopOnExitCode>11</StopOnExitCode>
+                  <CustomArgument></CustomArgument>
+                  <IncludeLibraryModules></IncludeLibraryModules>
+                  <ComprImg>1</ComprImg>
+                  <BankNo>1</BankNo>
+                </CommonProperty>
+                <File51>
+                  <C51>
+                    <RegisterColoring>2</RegisterColoring>
+                    <VariablesInOrder>2</VariablesInOrder>
+                    <IntegerPromotion>2</IntegerPromotion>
+                    <uAregs>2</uAregs>
+                    <UseInterruptVector>2</UseInterruptVector>
+                    <Fuzzy>8</Fuzzy>
+                    <Optimize>10</Optimize>
+                    <WarningLevel>3</WarningLevel>
+                    <SizeSpeed>2</SizeSpeed>
+                    <ObjectExtend>2</ObjectExtend>
+                    <ACallAJmp>2</ACallAJmp>
+                    <InterruptVectorAddress>0</InterruptVectorAddress>
+                    <VariousControls>
+                      <MiscControls></MiscControls>
+                      <Define></Define>
+                      <Undefine></Undefine>
+                      <IncludePath></IncludePath>
+                    </VariousControls>
+                  </C51>
+                </File51>
+              </FileOption>
             </File>
             <File>
               <FileName>list.c</FileName>
@@ -1327,6 +1368,47 @@
               <FileName>fm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\..\components\utilities\debug\src\fm.c</FilePath>
+              <FileOption>
+                <CommonProperty>
+                  <UseCPPCompiler>2</UseCPPCompiler>
+                  <RVCTCodeConst>0</RVCTCodeConst>
+                  <RVCTZI>0</RVCTZI>
+                  <RVCTOtherData>0</RVCTOtherData>
+                  <ModuleSelection>0</ModuleSelection>
+                  <IncludeInBuild>2</IncludeInBuild>
+                  <AlwaysBuild>2</AlwaysBuild>
+                  <GenerateAssemblyFile>2</GenerateAssemblyFile>
+                  <AssembleAssemblyFile>2</AssembleAssemblyFile>
+                  <PublicsOnly>2</PublicsOnly>
+                  <StopOnExitCode>11</StopOnExitCode>
+                  <CustomArgument></CustomArgument>
+                  <IncludeLibraryModules></IncludeLibraryModules>
+                  <ComprImg>1</ComprImg>
+                  <BankNo>1</BankNo>
+                </CommonProperty>
+                <File51>
+                  <C51>
+                    <RegisterColoring>2</RegisterColoring>
+                    <VariablesInOrder>2</VariablesInOrder>
+                    <IntegerPromotion>2</IntegerPromotion>
+                    <uAregs>2</uAregs>
+                    <UseInterruptVector>2</UseInterruptVector>
+                    <Fuzzy>8</Fuzzy>
+                    <Optimize>10</Optimize>
+                    <WarningLevel>3</WarningLevel>
+                    <SizeSpeed>2</SizeSpeed>
+                    <ObjectExtend>2</ObjectExtend>
+                    <ACallAJmp>2</ACallAJmp>
+                    <InterruptVectorAddress>0</InterruptVectorAddress>
+                    <VariousControls>
+                      <MiscControls></MiscControls>
+                      <Define></Define>
+                      <Undefine></Undefine>
+                      <IncludePath></IncludePath>
+                    </VariousControls>
+                  </C51>
+                </File51>
+              </FileOption>
             </File>
           </Files>
         </Group>

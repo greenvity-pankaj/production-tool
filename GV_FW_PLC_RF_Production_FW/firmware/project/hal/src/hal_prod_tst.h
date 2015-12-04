@@ -139,6 +139,7 @@ void prodTestSendRespOrEvent(u8 frmType ,u8 cmdId, u8 status);
 void correctEndieness_shpgpHalStats(shpgpHalStats *stats);
 void correctEndieness_sPlcSimTxTestParams(sPlcSimTxTestParams *pTestParams);
 void copy_plcTxTestStats (txTestResults *stats);
+void rf_test_prepare_reconfig();
 
 
 

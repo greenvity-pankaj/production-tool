@@ -1422,7 +1422,6 @@ static bool mac_data_handle_mac_poll_sm (buffer_t *buf_p, frame_info_t *frame_p)
             /* Scanning is ongoing. */ 
             processed_data_ind = process_data_ind_scanning(buf_p);
             track = 2;
-            processed_data_ind = false;
         }
         break;
 
@@ -1465,11 +1464,14 @@ static bool mac_data_handle_mac_poll_sm (buffer_t *buf_p, frame_info_t *frame_p)
         } else if (FCF_FRAMETYPE_DATA == mac_parse_data.frame_type) { 
             mac_process_data_frame(buf_p);
             track = 7;
-        }
+        } else {
+            processed_data_ind = false;
+            track = 8;
+        }		
         break;
 
     default:
-        track = 8;
+        track = 9;
         processed_data_ind = false;
         break;
     }

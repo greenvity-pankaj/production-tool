@@ -76,6 +76,8 @@
 #ifdef PROD_TEST
 //#include "hal_tst.h"
 #include "hal_prod_tst.h"
+#include "hal_rf_prod_test.h"
+#include "crc32.h"
 #endif
 
 #define HYBRII_FW_VER_MAJOR     1
@@ -89,11 +91,13 @@ extern void HHT_SendBcn(u8 bcnType);
 extern void clear_getchar(void);
  
 #ifdef FREQ_DETECT
-
 extern u32 PLC_DC_LINE_CYCLE_FREQENCY;
- 
-
 #endif
+
+#ifdef PROD_TEST
+	sProdConfigProfile gProdFlashProfile;
+#endif
+
 static char xdata CmdBuf[128];
 
 #ifdef UART_16550
@@ -842,6 +846,63 @@ void main()
 	ET0 = 0;
 	TR0 = 1;
 #endif
+
+#ifdef PROD_TEST
+	memset(&gProdFlashProfile,0x00,sizeof(sProdConfigProfile));
+	chksum_crc32gentab ();
+
+	if(Gv701x_FlashReadProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile) == STATUS_SUCCESS)
+	{
+		if(gProdFlashProfile.signature != PROD_VALID_SIGNATURE)
+		{
+			FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
+			printf("\nProd Flash Signature corrupted %lx\n",gProdFlashProfile.signature);
+			memset(&gProdFlashProfile,0x00,sizeof(sProdConfigProfile));
+			gProdFlashProfile.signature = PROD_VALID_SIGNATURE;
+			gProdFlashProfile.rfProfile.rfCalStatus = RF_NOT_CALIBRATED;
+			gProdFlashProfile.rfProfile.rfCalAttemptCount = 0;
+			gProdFlashProfile.rfProfile.autoCalibrated = 0;
+			gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
+			gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
+			gProdFlashProfile.rfProfile.testActionPreparePending = 0;
+			//gProdFlashProfile.checksum =  Gv701x_CalcCheckSum16((u8*)&gProdFlashProfile,
+				//(sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.checksum)));
+			gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+			FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
+			Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
+		}
+		else
+		{
+			if(chksum_crc32 ((u8*)&gProdFlashProfile, sizeof(sProdConfigProfile)-sizeof(gProdFlashProfile.crc))\
+				!= gProdFlashProfile.crc)
+				
+			{
+				printf("Prod Crc failed %lx,%lx\n",gProdFlashProfile.crc,chksum_crc32 ((u8*)&gProdFlashProfile, sizeof(sProdConfigProfile)));
+				memset(&gProdFlashProfile,0x00,sizeof(sProdConfigProfile));
+				gProdFlashProfile.signature = PROD_VALID_SIGNATURE;
+				gProdFlashProfile.rfProfile.rfCalStatus = RF_NOT_CALIBRATED;
+				gProdFlashProfile.rfProfile.rfCalAttemptCount = 0;
+				gProdFlashProfile.rfProfile.autoCalibrated = 0;
+				gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
+				gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
+				gProdFlashProfile.rfProfile.testActionPreparePending = 0;
+				//gProdFlashProfile.checksum =  Gv701x_CalcCheckSum16((u8*)&gProdFlashProfile,
+				//	(sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.checksum)));
+				gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+				FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
+				Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
+				
+			}
+			else
+			{
+				printf("Memory CRC Ok\n");
+				FM_HexDump(FM_USER,"Flash Profile OK",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
+			}
+
+		}
+	}
+#endif
+
 #ifdef HYBRII_802154
     mac_init();
 #ifdef ZBMAC_DIAG
@@ -867,6 +928,7 @@ void main()
 
 	while (1)
 	{ 
+#ifdef PROD_TEST	
 		if(spi_tx_flag == 1) 
 		{
 			{
@@ -887,6 +949,7 @@ void main()
 				}
 			}
 		}
+#endif		
 #ifdef RTX51_TINY_OS
 
 #if INT_POLL

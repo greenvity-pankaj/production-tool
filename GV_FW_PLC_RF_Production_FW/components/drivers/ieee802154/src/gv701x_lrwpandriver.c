@@ -225,8 +225,8 @@ static void lrwpan_device_config(void)
 		uint8_t seq = 0x84;
 		bool pan_coord = TRUE;		
 		uint8_t association_permit;
-		uint8_t beacon_payload_len = 10;		
-		uint8_t beacon_payload[10];
+		uint8_t beacon_payload_len = 8;		
+		uint8_t beacon_payload[8];
 		
 		mlme_set.PIBAttribute = macPANId;				
 		
@@ -266,7 +266,7 @@ static void lrwpan_device_config(void)
 		memcpy((u8*)&mlme_set.PIBAttributeValue, beacon_payload, beacon_payload_len);											
 		GV701x_SendAppEvent(lrwpan_db.app_id, APP_FW_MSG_APPID, APP_MSG_TYPE_FW, IEEE802_15_4_MAC_ID,
 							EVENT_CLASS_MGMT, MGMT_FRM_ID, &mlme_set, 
-							sizeof(mlme_set_req_t) - sizeof(pib_value_t) + beacon_payload_len, 0);
+							sizeof(mlme_set_req_t), 0);
 
 		mlme_set.PIBAttribute = macBSN;
 		memcpy((u8*)&mlme_set.PIBAttributeValue, &seq, sizeof(uint8_t));			

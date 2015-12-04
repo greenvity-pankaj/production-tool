@@ -1,7 +1,9 @@
 #include "stdio.h"
 #include "string.h"
 #include "papdef.h"
+#ifdef UM
 #include "ctrll.h"
+#endif
 #include "gv701x_flash.h"
 #include "gv701x_flash_fw.h"
 #include "sys_config_data_utils.h"

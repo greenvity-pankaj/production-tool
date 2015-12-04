@@ -252,57 +252,7 @@ u8 ui_utils_cmd_get_poll(u8 *cmd_buf_p, u8 max_cmd_buff_size)
 	
 }
 
-#if 0
-void ui_utils_cmd_get (u8 *cmd_buf_p, u8 max_cmd_buff_size)
-{
-    char  c;
-    u8    idx = 0;
 
-    while (1) {
-        c = _getkey();
-
-        switch (c) {
-        case '\b':    // backspace
-            if (idx > 0) {
-                printf("\b \b");
-                idx--;
-            }
-            break;
-
-        case 0x1B:    // ESC
-        case '`':
-            *cmd_buf_p = 0;
-            printf("\n");
-            return;
-            break;
-
-        
-        case '\r':    // enter
-        case '\n':
-                   printf(" \n");
-                   if (idx == 0)
-                   {
-                       *cmd_buf_p = 0;
-                       printf("> ");
-                       break;
-                   }
-                   
-                   while (idx < max_cmd_buff_size) {
-                       *(cmd_buf_p + idx++) = 0;
-                   }
-                   return;
-        
-
-        default:
-            if (idx < max_cmd_buff_size) {
-                *(cmd_buf_p + idx) = c;
-                putchar(*(cmd_buf_p + idx++));
-            }
-            break;
-        }
-    }
-}
-#endif
 #endif
 void ui_utils_reg_read (uint8_t *cmd_buf_p)
 {

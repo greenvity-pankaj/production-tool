@@ -10,7 +10,7 @@
 
 #include "papdef.h"
 #include "gv701x_gpiodriver.h"
-
+#include <stdio.h>
 /******************************************************************************
  * @fn      GV701x_GPIO_Config
  *
@@ -102,6 +102,7 @@ u8 GV701x_GPIO_Read(u32 gpio)
  */
 void GV701x_Chip_Reset(void)
 {
+	printf("\nChip Reset\n");
 	GV701x_GPIO_Config(WRITE_ONLY, CPU_GPIO_IO_PIN0);
 	GV701x_GPIO_Write(CPU_GPIO_WR_PIN0,1);
 }

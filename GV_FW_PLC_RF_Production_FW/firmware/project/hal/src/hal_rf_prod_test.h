@@ -7,12 +7,7 @@
 #include "mac_msgs.h"
 #include "mac_diag.h"
 
-#if 0
-typedef unsigned char U8, u8;
-typedef unsigned long U32, u32;
-typedef unsigned int  U16, u16;
-typedef unsigned short int ui8, UI8;
-#endif
+
 extern void prod_rf_test_timer_cb(void *cookie);
 
 enum {
@@ -21,7 +16,6 @@ enum {
 	LRWPAN_MAC_PREMITIVE_READY,
 	LRWPAN_DEV_START,
 	LRWPAN_DEV_READY,
-
 };
 
 enum{
@@ -75,7 +69,7 @@ typedef struct _sRfTxTimerCookie
 	uint8_t 			msduHandle;
 	uint8_t 			TxOptions;
 	security_info_t 	*sec_p;
-}__PACKED__ sRfTxTimerCookie;
+}__PACKED__ sRfTxTimerCookie; // This structure is passed during timer allocation
 
 #define RF_MAX_PAYLOAD 102
 
@@ -123,6 +117,70 @@ typedef struct _sRfStats
 	uint16_t tx_unsupported_security;
 	uint16_t tx_invalid_parameter;
 }__PACKED__ sRfStats;
+
+#define PROD_AUTO_CALIBRATION
+
+#ifdef PROD_AUTO_CALIBRATION
+
+//List of APIs
+
+#define RF_CALIBRATION_FAILED		0x00
+#define RF_CALIBRATED 				0x01
+#define RF_NOT_CALIBRATED 			0xFF
+
+#define PROD_VALID_SIGNATURE 			0x47565052  // GVPR is the signature in hex
+
+typedef struct _sProdConfigProfile
+{
+	u32 signature;
+	u8  testIntf;
+	struct
+	{
+		u8 rfCalStatus;// LO Leakage for RF calibration status 
+		u8 rfCalAttemptCount;// Maximum number of attempts made by software during calibration
+		u8 autoCalibrated;// If board is manually calibrated or software calibrated
+		
+		struct
+		{
+			u8 reg23;
+			u8 reg24;
+		} calRegister;
+
+		u8 cmdId;
+		u8 testId;
+		u8 testActionPreparePending; // This flag will be set if software is not able to calibrate rf in 1st attempt 
+		sRfRxTestHostParams rxTestParams; // These parameters will be stored in to memory if hw fails to calibrate in 1st attempt
+		sRfTxTestHostParams txTestParams;
+	} rfProfile;
+	
+	u32 crc;
+}__PACKED__  sProdConfigProfile;
+
+#define FLASH_ENTIRE_SECTOR 0
+#define FLASH_SECTOR_SIZE 4096
+#define FLASH_DEFAULT_MEM_VALUE 0xFF
+#define PROD_CONFIG_SECTOR 257
+#define PROD_SECTOR_ADDRESS (PROD_CONFIG_SECTOR * FLASH_SECTOR_SIZE)
+
+
+
+eStatus Gv701x_CheckFlashSectorErased(u32 sectorNo, u16 byteCount); // Byte count is zero then whole sector will be checked for 0xFF signature
+u16 Gv701x_CalcCheckSum16(u8 *dataPtr, u16 length);
+eStatus Gv701x_CheckSum16Valid(u8 *dataPtr, u16 length);
+eStatus Gv701x_FlashWriteProdProfile(u32 sectorNo, sProdConfigProfile *profile);
+eStatus Gv701x_FlashReadProdProfile(u32 sectorNo, sProdConfigProfile *profile);
+
+
+
+
+
+
+
+
+
+
+#endif
+
 
 
 #if 1

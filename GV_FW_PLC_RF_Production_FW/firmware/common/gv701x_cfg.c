@@ -24,6 +24,23 @@
 #include "ctrll.h"
 #include "fm.h"
 #endif
+#include "gv701x_gpiodriver.h"
+#ifdef Flash_Config
+#include "gv701x_flash_fw.h"
+#endif
+#ifdef PROD_TEST
+	#include "hal_rf_prod_test.h"
+	#include "fm.h"
+	#include "crc32.h"
+#endif
+
+#ifdef UM
+extern sysProfile_t gSysProfile;
+#endif
+#ifdef PROD_TEST
+extern	sProdConfigProfile gProdFlashProfile;
+
+#endif
 #ifdef HYBRII_802154
 #ifdef HYBRII_B
 /* From Rachel 05/19/2014 @ 10 dB Gain for RX */
@@ -122,6 +139,7 @@ static uint16_t afe_channel_to_vco_rx_freq[16] = {
     0xae60, 0xb4a0, 0xbae0, 0xc120, 0xc760, 0xcda0, 0xd3e0, 0xda20,
 };
 
+bool calibration_good = TRUE;
 u16 rx_dco_cal_threshold = 400;
 
 /* === Externals ============================================================ */
@@ -132,23 +150,74 @@ uint16_t gv701x_zb_read_bb_fft (void)
 {
     uint16_t bb_fft;
     
-    mac_utils_delay_ms(1);
+    mac_utils_delay_ms(1);	
     WriteU8Reg(0x442, 1);
+	//WriteU8Reg(0x442, 3);
     //WriteU8Reg(0x442, 5); /* HW is doing average */
     mac_utils_delay_ms(1);
     WriteU8Reg(0x442, 0);
+	//WriteU8Reg(0x442, 2);
     WriteU8Reg(0x4fa, 1);  /* Select Bank 3 */
     //printf("\n452 = %bx, 453 = %bx", ReadU8Reg(PHY_FFT_LSB),
     //       ReadU8Reg(PHY_FFT_MSB));
     bb_fft = (ReadU8Reg(PHY_FFT_MSB) << 8) | ReadU8Reg(PHY_FFT_LSB);
-    //printf("\n456 = %bx, 457 = %bx", ReadU8Reg(0x456),
-    //       ReadU8Reg(0x457));
+    //printf("\n452 = %bx, 453 = %bx", ReadU8Reg(0x452),
+           //ReadU8Reg(0x453));
     //bb_fft = (ReadU8Reg(0x457) << 8) | ReadU8Reg(0x456);
     WriteU8Reg(0x4fa, 0);  /* Select Bank 0 */
     bb_fft &= 0xfff;       /* 12-bit value  */
 
     return (bb_fft);
 }
+/*==============================================================rz*/
+uint16_t gv701x_zb_read_bb_pos (void)
+{
+    uint16_t bb_pos;
+    
+    mac_utils_delay_ms(1);	
+    WriteU8Reg(0x442, 1);
+	//WriteU8Reg(0x442, 3);
+    //WriteU8Reg(0x442, 5); /* HW is doing average */
+    mac_utils_delay_ms(1);
+    WriteU8Reg(0x442, 0);
+	//WriteU8Reg(0x442, 2);
+    WriteU8Reg(0x4fa, 1);  /* Select Bank 3 */
+    //printf("\n452 = %bx, 453 = %bx", ReadU8Reg(PHY_FFT_LSB),
+    //       ReadU8Reg(PHY_FFT_MSB));
+    bb_pos = (ReadU8Reg(0x455) << 8) | ReadU8Reg(0x454);
+    printf("\n454 = %bx, 455 = %bx", ReadU8Reg(0x454),
+           ReadU8Reg(0x455));
+    //bb_fft = (ReadU8Reg(0x457) << 8) | ReadU8Reg(0x456);
+    WriteU8Reg(0x4fa, 0);  /* Select Bank 0 */
+    bb_pos &= 0xfff;       /* 12-bit value  */
+
+    return (bb_pos);
+}
+
+uint16_t gv701x_zb_read_bb_neg (void)
+{
+    uint16_t bb_neg;
+    
+    mac_utils_delay_ms(1);	
+    WriteU8Reg(0x442, 1);
+	//WriteU8Reg(0x442, 3);
+    //WriteU8Reg(0x442, 5); /* HW is doing average */
+    mac_utils_delay_ms(1);
+    WriteU8Reg(0x442, 0);
+	//WriteU8Reg(0x442, 2);
+    WriteU8Reg(0x4fa, 1);  /* Select Bank 3 */
+    //printf("\n452 = %bx, 453 = %bx", ReadU8Reg(PHY_FFT_LSB),
+    //       ReadU8Reg(PHY_FFT_MSB));
+    bb_neg = (ReadU8Reg(0x457) << 8) | ReadU8Reg(0x456);
+    printf("\n456 = %bx, 457 = %bx", ReadU8Reg(0x456),
+           ReadU8Reg(0x457));
+    //bb_fft = (ReadU8Reg(0x457) << 8) | ReadU8Reg(0x456);
+    WriteU8Reg(0x4fa, 0);  /* Select Bank 0 */
+    bb_neg &= 0xfff;       /* 12-bit value  */
+
+    return (bb_neg);
+}
+/*==============================================================rz*/
 #ifndef B2
 void gv701x_zb_lock_channel (uint8_t channel)
 {
@@ -161,8 +230,8 @@ void gv701x_zb_lock_channel (uint8_t channel)
      * cal_val = read_flash_lock_channel_value(channel);
      */
 #ifdef Flash_Config
-	  cal_val = sysConfig.VCOCal[channel];
-	  printf("lock channel %bx VCO cal value = %bx\n", channel+ MIN_CHANNEL, cal_val);
+	cal_val = sysConfig.VCOCal[channel];
+	printf("lock channel %bx VCO cal value = %bx\n", channel+ MIN_CHANNEL, cal_val);
 
     mac_utils_spi_write(AFE_CAL_CNTRL, 
                         0x70 | AFE_CAL_CNTRL_RESET);  /* 04 = 0x72 */
@@ -218,40 +287,65 @@ void gv701x_zb_set_afe_channel (uint8_t channel, bool afe_rx_cal)
 }
 
 /* Can's AFE TX Calibration */
+
 void gv701x_zb_lo_leakage_calibration_init (void)
 {
+	uint8_t   sd_sync_temp;//rz
+	uint8_t		sd_sync_pw;
+
     mac_utils_spi_write(AFE_MODE_CNTRL_1,
                         AFE_SPI_MODE_EN  |
                         AFE_SPI_WL_RX_EN |
-                        AFE_SPI_WL_HB_EN); /* 0xE4 - Enable TX and RX */
+                        AFE_SPI_WL_HB_EN); /* 0xC4 - Enable RX only */
+    
     mac_utils_spi_write(AFE_MODE_CNTRL_2, AFE_SPI_WL_PA_EN);
 
     mac_utils_spi_write(AFE_ZIG_GC_TX_FLTR_GAIN, 0x0f); /* Set PA power to max. */
 
+	mac_utils_spi_write(AFE_ZIG_GC_TX_PA_CNTRL, 0x20);	/*rz 6dB lower than max gain*/
     /* 
      * RX DC offset calibration after enable peek detector
      * according to spec
      */
+
+    mac_utils_spi_write(AFE_ZIG_PEEK_DETECT_TX, 0x04); /* Enable Power Detector */
+
     gv701x_cfg_zb_dc_offset_calibration();
     mac_utils_spi_write(AFE_MODE_CNTRL_1,
                         AFE_SPI_MODE_EN  |
                         AFE_SPI_WL_RX_EN |
                         AFE_SPI_WL_TX_EN |
                         AFE_SPI_WL_HB_EN);
-    mac_utils_spi_write(AFE_ZIG_PEEK_DETECT_TX, 0x04); /* Enable Power Detector */
+    
 
     WriteU8Reg(PHY_DECI_SEL_GARF_CFG, 0x40);  /* Set DAC clock to 12 Mhz */
     WriteU8Reg(PHY_DAC_TEST_CONTROL, 0x25);   /* Enable 1 Mhz tone from DAC */
-    WriteU8Reg(PHY_ECO_CFG, 0x0f);            /* Turn of phy rx */
+    //WriteU8Reg(PHY_ECO_CFG, 0x0f);            /* Turn of phy rx */
+	
+	sd_sync_temp = ReadU8Reg(0x417);//rz
+	printf("\nsd_sync_temp:%bx", sd_sync_temp);//rz
+	sd_sync_temp = sd_sync_temp|0x10;
+	WriteU8Reg(0x417, sd_sync_temp);
+	sd_sync_temp = ReadU8Reg(0x417);
+	printf("\nenable: sd_sync_temp:%bx", sd_sync_temp);//rz
+
+	sd_sync_pw = ReadU8Reg(0x410);
+	printf("\nsd_sync_pw:%bx", sd_sync_pw);//rz
+	//sd_sync_pw = 0x10;
+	sd_sync_pw = 0x80;
+	WriteU8Reg(0x410, sd_sync_pw);
+	sd_sync_pw = ReadU8Reg(0x410);
+	printf("\nenable: sd_sync_pw:%bx", sd_sync_pw);//rz
+
+	WriteU8Reg(PHY_ECO_CFG, 0x0f);            /* Turn on phy rx */
 }
 
 #define NUM_READ    8
+#define MIN_DIF     64
+#define MAX_NUM_MIN 4
 
 uint32_t  min_bb_fft = 0xffffffff;
 
-#ifdef UM
-extern sysProfile_t gSysProfile;
-#endif
 void gv701x_zb_lo_leakage_calibration_start ()
 {
     uint8_t   i;
@@ -264,61 +358,105 @@ void gv701x_zb_lo_leakage_calibration_start ()
     uint8_t   afe_q;
     bool      change_dir_i;
     bool      change_dir_q;
-
+	uint32_t  one_bb_fft;//rz
+	uint32_t  avg_bb_fft;//rz
+	uint32_t  dif_bb_fft;//rz
+	uint32_t  num_min;//rz
+	//uint8_t  read_afe_i;//rz
+	//uint8_t  read_afe_q;//rz
+	uint32_t  one_bb_pos;//rz
+	uint32_t  one_bb_neg;//rz
+#ifdef PROD_TEST	
+	u8		  prod_dco_cal_failed = 0;
+#endif
     /* [YM] min_afe_i = Read register 23 value from flash
      *      min_afe_q = Read register 24 value from flash
-     */
-		/*Compiler warning suppression*/		
-		i = i;
-		j = j;
-		cur_bb_fft = cur_bb_fft;
-		num_read = num_read;
-		afe_i = afe_i;
-		afe_q = afe_q;
-		change_dir_i = change_dir_i;
-		change_dir_q = change_dir_q;
-		
-#if 1 
+     */	
+#ifdef PROD_TEST
+	if(gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATED)
+	{
+		min_afe_i = gProdFlashProfile.rfProfile.calRegister.reg23 ;
+		min_afe_q = gProdFlashProfile.rfProfile.calRegister.reg24 ;
+	
+		mac_utils_spi_write(AFE_ZIG_TX_OC_I_MSB, min_afe_i);
+    	mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, min_afe_q);
+	
+		FM_Printf(FM_USER,"\n%bx/%bx", min_afe_i, min_afe_q);
+		return;
+	}
+#endif
+	
+#if 0 
 //#ifdef Flash_Config
 #ifdef UM
 	min_afe_i = gSysProfile.rfParam.reg_23;
 	min_afe_q = gSysProfile.rfParam.reg_24;
+	
+	mac_utils_spi_write(AFE_ZIG_TX_OC_I_MSB, min_afe_i);
+    mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, min_afe_q);
+	
 	FM_Printf(FM_WARN,"\n%bx/%bx", min_afe_i, min_afe_q);
 #else
 	min_afe_i = sysConfig.defaultLOLeak23;
-	min_afe_q = sysConfig.defaultLOLeak24;		
-	printf("\n%bx/%bx", min_afe_i, min_afe_q);
+	min_afe_q = sysConfig.defaultLOLeak24;
+	if (sysConfig.defaultLOLeak23 != 0xff) {		
+		printf("\n%bx/%bx", min_afe_i, min_afe_q);
+	 /* Values in flash are valid. Use them and done */
+        mac_utils_spi_write(AFE_ZIG_TX_OC_I_MSB, min_afe_i);
+        mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, min_afe_q);
+        return;
+    }
 #endif
 	
-    mac_utils_spi_write(AFE_ZIG_TX_OC_I_MSB, min_afe_i);
-    mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, min_afe_q);
+
 //#endif
 #else
-
+zb_txlo_cal://rz
     afe_i = 0xf0;
     change_dir_i = FALSE;
     /*
      * Adjust I and Q by 16 steps
      */
+    avg_bb_fft = 0;
+    num_min = 0;
     for (i = 0; i < 15; i++) {
         mac_utils_spi_write(AFE_ZIG_TX_OC_I_MSB, afe_i);
         afe_q = 0xf0;
         change_dir_q = FALSE;
         for (j = 0; j < 15; j++){
             mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, afe_q);
+            //read_afe_i = mac_utils_spi_read(AFE_ZIG_TX_OC_I_MSB);//rz
+            //read_afe_q = mac_utils_spi_read(AFE_ZIG_TX_OC_Q_MSB);//rz
+            //printf("\nread back:%bx/%bx", read_afe_i, read_afe_q);//rz
             num_read = NUM_READ;
             cur_bb_fft = 0;
+			
+			//one_bb_pos = gv701x_zb_read_bb_pos();
+			//one_bb_neg = gv701x_zb_read_bb_neg();
             while (num_read--){
-                cur_bb_fft += gv701x_zb_read_bb_fft();
+                one_bb_fft = gv701x_zb_read_bb_fft();
+				//one_bb_pos = gv701x_zb_read_bb_pos();
+				//one_bb_neg = gv701x_zb_read_bb_neg();
+                cur_bb_fft += one_bb_fft;
+                //rz cur_bb_fft += gv701x_zb_read_bb_fft();
+                //printf("\neach time: %bx/%bx %lx", afe_i, afe_q, one_bb_fft);
             }
+			
             cur_bb_fft /= NUM_READ;
+            avg_bb_fft += cur_bb_fft; //rz
 
-            // printf("\n%bx/%bx %lx", afe_i, afe_q, cur_bb_fft);
+            //printf("\n%bx/%bx %lx", afe_i, afe_q, cur_bb_fft);
             if (cur_bb_fft < min_bb_fft) {
                 min_bb_fft = cur_bb_fft;
                 min_afe_i = mac_utils_spi_read(AFE_ZIG_TX_OC_I_MSB);
                 min_afe_q = mac_utils_spi_read(AFE_ZIG_TX_OC_Q_MSB);
-            }
+                num_min = 0;//rz
+            } else if (cur_bb_fft == min_bb_fft) {
+                //printf("\nhere");
+                num_min = num_min + 1;
+			}
+            //printf("\n%bx/%bx cur=%lx min=%lx num_min=%lx", 
+            //       afe_i, afe_q, cur_bb_fft, min_bb_fft, num_min);
             if (afe_q == 0x80) {
                 afe_q = 0;
                 change_dir_q = TRUE;
@@ -339,7 +477,69 @@ void gv701x_zb_lo_leakage_calibration_start ()
             afe_i -= 0x10;
         }
     }
-    printf("\nMin FFT %bx/%bx %lx", min_afe_i, min_afe_q, min_bb_fft);
+	avg_bb_fft = (avg_bb_fft - min_bb_fft) / 224; //15*15-1 rz
+	dif_bb_fft = avg_bb_fft - min_bb_fft;
+    //printf("\nMin FFT %bx/%bx %lx", min_afe_i, min_afe_q, min_bb_fft);
+	printf("\nMin FFT %bx/%bx min=%lx avg=%lx dif=%lu num_min=%lu", 
+           min_afe_i, min_afe_q, min_bb_fft, avg_bb_fft, dif_bb_fft, num_min); //rz
+    if ((dif_bb_fft < MIN_DIF) || (num_min > MAX_NUM_MIN)) {
+        printf("\nnote: reading not valid");
+        calibration_good = FALSE;
+#ifdef Flash_Config
+#ifndef PROD_TEST
+		printf("\ndco cal attempt %bu\n",sysConfig.dco_cal_failed);
+        if (sysConfig.dco_cal_failed == 0xff) {
+            sysConfig.dco_cal_failed = 1;
+        } else {
+            sysConfig.dco_cal_failed++;
+        }
+        //flashWrite_config((u8 *)&sysConfig,FLASH_SYS_CONFIG_OFFSET,
+						   //sizeof(sysConfig_t));
+				   
+        if (sysConfig.dco_cal_failed < 10) {
+            //printf("\nChip Reset (%bu)", sysConfig.dco_cal_failed);
+            //GV701x_Chip_Reset();//rz
+			mac_utils_spi_write(0x37, 0x03);
+			mac_utils_spi_write(0x37, 0x02);
+			printf("\nreset rf");
+			goto zb_txlo_cal;
+        } else {
+            printf("\nPlease perform DCO calibration manually");
+        }
+#else
+#ifdef PROD_TEST
+	//prod_dco_cal_failed++;
+	if (gProdFlashProfile.rfProfile.rfCalAttemptCount < 10) 
+	{
+            printf("\nChip Reset (%bu)",gProdFlashProfile.rfProfile.rfCalAttemptCount);
+            //GV701x_Chip_Reset();//rz
+			mac_utils_spi_write(0x37, 0x03);//Kiran - Unable to resolve chip reset requirement
+			mac_utils_spi_write(0x37, 0x02);
+			printf("\nreset rf");
+			//goto zb_txlo_cal;
+    } else {
+            printf("\nPlease perform DCO calibration manually");
+    }
+#if 0
+	if(gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATED)
+	{
+		min_afe_i = gProdFlashProfile.rfProfile.calRegister.reg23 ;
+		min_afe_q = gProdFlashProfile.rfProfile.calRegister.reg24 ;
+	
+		mac_utils_spi_write(AFE_ZIG_TX_OC_I_MSB, min_afe_i);
+    	mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, min_afe_q);
+	
+		FM_Printf(FM_WARN,"\n%bx/%bx", min_afe_i, min_afe_q);
+		return;
+	}
+#endif	
+#endif
+
+#endif
+#else
+        GV701x_Chip_Reset();
+#endif
+    }
     mac_utils_spi_write(AFE_ZIG_TX_OC_I_MSB, min_afe_i);
     mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, min_afe_q);
 
@@ -420,7 +620,7 @@ void gv701x_zb_lo_leakage_read (void)
         bb_fft_curr += gv701x_zb_read_bb_fft();
     }
     bb_fft_curr /= NUM_READ;
-    //printf("%x\n", bb_fft_curr);
+    printf("%x\n", bb_fft_curr);
 }
 #endif
 
@@ -434,17 +634,20 @@ void gv701x_zb_lo_leakage_calibration (uint8_t channel)
     uint32_t  bb_fft_curr;
     uint32_t  min_bb_fft = 0x0fff;
 #else
-    uint8_t   cal_time = 8;
+    uint8_t   cal_time = 1;
+	//uint8_t		cal_time = 10;//rz
 #endif
 
     gv701x_zb_set_afe_channel(channel, TRUE);
 
     //gv701x_zb_lo_leakage_calibration_init();
     //mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, 0);
+	//printf("\ncal_time=%bx", cal_time);
     while (cal_time --) {
         gv701x_zb_lo_leakage_calibration_init();
         gv701x_zb_lo_leakage_calibration_start();
         gv701x_zb_lo_leakage_calibration_done();
+		//printf("\ncal_time=%bx", cal_time);
 #ifdef CAL_MULTIPLE        
         num_read = NUM_READ;
         while (num_read--){
@@ -462,6 +665,61 @@ void gv701x_zb_lo_leakage_calibration (uint8_t channel)
 #ifdef CAL_MULTIPLE
     mac_utils_spi_write(AFE_ZIG_TX_OC_I_MSB, i_min_bb_fft);
     mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, q_min_bb_fft);
+#endif
+
+#ifdef Flash_Config
+#ifndef PROD_TEST
+    if (sysConfig.defaultLOLeak23 == 0xff && calibration_good) {
+        sysConfig.defaultLOLeak23 = mac_utils_spi_read(AFE_ZIG_TX_OC_I_MSB);
+        sysConfig.defaultLOLeak24 = mac_utils_spi_read(AFE_ZIG_TX_OC_Q_MSB);
+        flashWrite_config((u8 *)&sysConfig,FLASH_SYS_CONFIG_OFFSET,
+						   sizeof(sysConfig_t));
+    }
+#else
+if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED) || \
+						(gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED))
+{
+	if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED) && calibration_good)
+	{
+		gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATED;
+		gProdFlashProfile.rfProfile.autoCalibrated = 1;
+		gProdFlashProfile.rfProfile.calRegister.reg23 = mac_utils_spi_read(AFE_ZIG_TX_OC_I_MSB);
+		gProdFlashProfile.rfProfile.calRegister.reg24 = mac_utils_spi_read(AFE_ZIG_TX_OC_Q_MSB);
+	}
+	else if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED) && (!calibration_good))
+	{
+		gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATION_FAILED;
+		gProdFlashProfile.rfProfile.rfCalAttemptCount++;
+		gProdFlashProfile.rfProfile.autoCalibrated = 0;
+		printf("Calibration Fail count %bu\n",gProdFlashProfile.rfProfile.rfCalAttemptCount);
+	}
+	else if((gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && calibration_good)
+	{
+		gProdFlashProfile.rfProfile.calRegister.reg23 = mac_utils_spi_read(AFE_ZIG_TX_OC_I_MSB);
+		gProdFlashProfile.rfProfile.calRegister.reg24 = mac_utils_spi_read(AFE_ZIG_TX_OC_Q_MSB);
+		//gProdFlashProfile.rfProfile.rfCalAttemptCount = 0;// To identify yield of calibration it is not initialized
+		gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATED;
+		gProdFlashProfile.rfProfile.autoCalibrated = 1;//If software calibrated then true if manually calibrated then it is 0
+	}
+	else if((gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && (!calibration_good))
+	{
+		gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATION_FAILED;
+		gProdFlashProfile.rfProfile.rfCalAttemptCount++;
+		gProdFlashProfile.rfProfile.autoCalibrated = 0;
+		printf("Calibration Fail count %bu\n",gProdFlashProfile.rfProfile.rfCalAttemptCount);
+	}
+	
+	gProdFlashProfile.crc =	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+	FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
+	Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
+	if((gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && \
+		(gProdFlashProfile.rfProfile.rfCalAttemptCount < 10) && (gProdFlashProfile.rfProfile.testActionPreparePending == 1))
+	{
+		GV701x_Chip_Reset();
+		while(1);
+	}
+}
+#endif
 #endif
 
     //gv701x_zb_lo_leakage_calibration_done();
@@ -567,16 +825,23 @@ static bool abs_12bit_compare (u16 a, u16 b)
 
 static void gv701x_cfg_read_phy_i_q (u16 *i, u16 *q)
 {
-    u16 temp;
+    u16 temp = 0;
     
     WriteU8Reg(PHY_PD_THRESHOLD_MSB, 0x29);    // Clear BB RX DCO calc
     WriteU8Reg(PHY_PD_THRESHOLD_MSB, 0x2d);    // Start BB RX DCO calc
     mac_utils_delay_ms(1);
 
+#ifdef CAL_DEB_RX
+    printf("\n44D = %bx, 44E = %bx. 44F = %bx", 
+           ReadU8Reg(PHY_DC_OFFSET_I_LSB),
+           ReadU8Reg(PHY_DC_OFFSET_I_Q), 
+           ReadU8Reg(PHY_DC_OFFSET_Q_MSB));
+#endif
+    
     temp = (ReadU8Reg(PHY_DC_OFFSET_I_Q) & DC_OFFSET_I_MSB_MASK) << 8;
     *i =  temp | ReadU8Reg(PHY_DC_OFFSET_I_LSB);
 
-    temp = ReadU8Reg(PHY_DC_OFFSET_Q_MSB);
+    temp = ReadU8Reg(PHY_DC_OFFSET_Q_MSB) & 0xFF;
     *q = (temp << 4) | (ReadU8Reg(PHY_DC_OFFSET_I_Q) >> 4);
 }
 
@@ -744,6 +1009,7 @@ void gv701x_cfg_zb_dc_offset_calibration ()
 }
 
 #ifdef HYBRII_B_AFE
+//#define CAL_DEB_RX 0
 /* Rachel's AFE RX Calibration steps */
 void gv701x_cfg_rx_dco_bb_cal ()
 {
@@ -771,12 +1037,12 @@ void gv701x_cfg_rx_dco_bb_cal ()
     mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG_I, 0xa0);           // 07 = a0 Cal DAC2
 
     gv701x_cfg_read_phy_i_q(&cur_phy_i, &cur_phy_q);
-#ifdef CAL_DEB 
+#ifdef CAL_DEB_RX 
     printf("\nIL/QL I = %d, Q = %d", cur_phy_i, cur_phy_q);
 #endif
 
     cur_phy_i_q = abs_12bit(cur_phy_i) + abs_12bit(cur_phy_q);
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
     printf("\nIL/QL |I + Q| = %d", cur_phy_i_q);
 #endif
     
@@ -793,11 +1059,11 @@ void gv701x_cfg_rx_dco_bb_cal ()
     mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG1A, 0x09);           // 08 = 09 Enable ihi/qlow
     mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG_I, 0xa0);           // 07 = a0 Cal DAC2
     gv701x_cfg_read_phy_i_q(&cur_phy_i, &cur_phy_q); 
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
     printf("\nIH/QL I = %d, Q = %d", cur_phy_i, cur_phy_q);
 #endif
     cur_phy_i_q = abs_12bit(cur_phy_i) + abs_12bit(cur_phy_q);
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
     printf("\nIH/QL |I + Q| = %d", cur_phy_i_q);
 #endif
 
@@ -815,11 +1081,11 @@ void gv701x_cfg_rx_dco_bb_cal ()
     mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG1A, 0x06);           // 08 = 06 Enable ilow/qhi
     mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG_I, 0xa0);           // 07 = a0 Cal DAC2
     gv701x_cfg_read_phy_i_q(&cur_phy_i, &cur_phy_q);
-#ifdef CAL_DEB 
+#ifdef CAL_DEB_RX 
     printf("\nIL/QH I = %d, Q = %d", cur_phy_i, cur_phy_q);
 #endif
     cur_phy_i_q = abs_12bit(cur_phy_i) + abs_12bit(cur_phy_q);
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
     printf("\nIL/QH |I + Q| = %d", cur_phy_i_q);
 #endif
 
@@ -837,11 +1103,11 @@ void gv701x_cfg_rx_dco_bb_cal ()
     mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG1A, 0x0a);           // 08 = 0a Enable ihi/qhi
     mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG_I, 0xa0);           // 07 = a0 Cal DAC2
     gv701x_cfg_read_phy_i_q(&cur_phy_i, &cur_phy_q); 
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
     printf("\nIL/QH I = %d, Q = %d", cur_phy_i, cur_phy_q);
 #endif
     cur_phy_i_q = abs_12bit(cur_phy_i) + abs_12bit(cur_phy_q);
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
     printf("\nIL/QH |I + Q| = %d", cur_phy_i_q);
 #endif
 
@@ -857,25 +1123,25 @@ void gv701x_cfg_rx_dco_bb_cal ()
     mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG_I, 0x00);           // 07  = 0
     switch (i_q_cfg) {
     case IL_QL:
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
         printf("\nIL/QL");
 #endif
         mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG1A, 0x05);
         break;
     case IH_QL:
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
         printf("\nIH/QL");
 #endif
         mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG1A, 0x09);
         break;
     case IL_QH:
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
         printf("\nIL/QH");
 #endif
         mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG1A, 0x06);
         break;
     case IH_QH:
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
         printf("\nIH/QH");
 #endif
         mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG1A, 0x0a);
@@ -883,11 +1149,11 @@ void gv701x_cfg_rx_dco_bb_cal ()
     }
     mac_utils_spi_write(AFE_ZIG_RX_OC_ZIG_I, 0xa0);           // 07 = a0 Cal DAC2
     gv701x_cfg_read_phy_i_q(&cur_phy_i, &cur_phy_q);
-#ifdef CAL_DEB 
+#ifdef CAL_DEB_RX 
     printf("\nI = %d, Q = %d", cur_phy_i, cur_phy_q);
 #endif
     cur_phy_i_q = abs_12bit(cur_phy_i) + abs_12bit(cur_phy_q);
-#ifdef CAL_DEB
+#ifdef CAL_DEB_RX
     printf("\n|I + Q| = %d", cur_phy_i_q);
 #endif
 

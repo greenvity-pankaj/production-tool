@@ -440,7 +440,6 @@ void os_mac_task (void) _task_ MAC_802154_TASK_ID
 		os_switch_task();
         mac_task();
         mac_hal_sm_handler();
-		//STM_Proc();
 #ifndef HAL_802154_TASK
         mac_hal_task();
 #endif

@@ -34,9 +34,13 @@
 #include "mac_hal.h"
 #include "mac_internal.h"
 #include "hal_prod_tst.h"
+
+#include "Gv701x_flash.h"
+#include "Gv701x_flash_fw.h"
+
 #include "hal_rf_prod_test.h"
 #include "hybrii_tasks.h"
-
+#include "fm.h"
 
 tTimerId prod_test_rf_timer;
 
@@ -90,6 +94,100 @@ static void mac_diag_config_tx_rx (bool promis_en)
 }
 
 #endif
+
+extern u8 spiflash_ReadByte(u32);
+extern void spiflash_wrsr_unlock(u8);
+extern void spiflash_WriteByte(u32, u8);
+extern void spiflash_eraseConfigMem();
+
+eStatus Gv701x_CheckFlashSectorErased(u32 sectorNo, u16 byteCount) // Byte count is zero then whole sector will be checked for 0xFF signature
+{
+	u16 counter;// used to count flash memory read address
+	u32 address = (sectorNo * FLASH_SECTOR_SIZE);
+
+	if(byteCount == FLASH_ENTIRE_SECTOR)
+	{
+		for(counter = 0;counter < FLASH_SECTOR_SIZE;counter++)
+		{
+			if(spiflash_ReadByte(address + counter)!= FLASH_DEFAULT_MEM_VALUE)
+			{
+				return STATUS_FAILURE;
+			}
+		}
+	}
+	else
+	{
+		if(byteCount > FLASH_SECTOR_SIZE)
+		{
+			return STATUS_FAILURE;
+		}
+		
+		for(counter = 0;counter < byteCount;counter++)
+		{
+			if(spiflash_ReadByte(address + counter)!= FLASH_DEFAULT_MEM_VALUE)
+			{
+				return STATUS_FAILURE;
+			}
+		}
+	}
+	return STATUS_SUCCESS;
+}
+
+u16 Gv701x_CalcCheckSum16(u8 *dataPtr,u16 length)
+{
+	
+    u16 checksum = 0;             /* The checksum mod 2^16. */
+	printf("ptr in %p\n",dataPtr);
+    while (length--) {
+        checksum = (checksum >> 1) + ((checksum & 1) << 15);
+        checksum += *dataPtr++;
+        checksum &= 0xffff;       /* Keep it within bounds. */
+    }
+	printf("ptr out %p\n",dataPtr);
+    return checksum;
+
+}
+eStatus Gv701x_CheckSum16Valid(u8 *dataPtr, u16 length)
+{
+	if(Gv701x_CalcCheckSum16(dataPtr,length)!=0)
+	{
+		return STATUS_FAILURE;
+	}
+	else
+	{
+		return STATUS_SUCCESS;
+	}
+}
+
+eStatus Gv701x_FlashWriteProdProfile(u32 sectorNo, sProdConfigProfile *profile)
+{
+	u16 counter;// used to count flash memory write address
+	u32 address = (sectorNo * FLASH_SECTOR_SIZE);
+	spiflash_eraseSector(sectorNo);
+	
+	FM_HexDump(FM_USER,"Write profile",(u8*)profile,sizeof(sProdConfigProfile));
+	for(counter=0;counter<sizeof(sProdConfigProfile);counter++)
+	{
+		spiflash_WriteByte(address + counter,((u8 *)profile)[counter]);
+	}
+	spiflash_wrsr_unlock(0);
+	return STATUS_SUCCESS;
+}
+
+eStatus Gv701x_FlashReadProdProfile(u32 sectorNo, sProdConfigProfile *profile)
+{
+	u16 counter;// used to count flash memory read address
+	u32 address = (sectorNo * FLASH_SECTOR_SIZE);
+
+	for(counter = 0;counter < sizeof(sProdConfigProfile);counter++)
+	{
+		((u8 *)profile)[counter] = spiflash_ReadByte(address + counter);	
+	}
+	return STATUS_SUCCESS;
+}
+
+
+
 eStatus rfStartTxTest(sRfTxTestHostParams *pTxParams)
 {
 

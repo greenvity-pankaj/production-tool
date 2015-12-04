@@ -31,12 +31,20 @@
 #include "mac_diag.h"
 #include "gv701x_gpiodriver.h"
 
+#ifdef PROD_TEST
+#include "hal_rf_prod_test.h"
+#include "fm.h"
+#include "crc32.h"
+#endif
 
 extern void mac_hal_mac_busy_recover();
 extern void ISM_PollInt(void);
 
 #ifdef PROD_TEST
 extern tTimerId prod_test_rf_timer;
+extern void spiflash_eraseSector(u32 Sector);
+extern void spiflash_wrsr_unlock(u8 const unlock);
+extern sProdConfigProfile gProdFlashProfile;
 #endif
 #define DEBUG 0
 
@@ -447,7 +455,6 @@ void mac_diag_tx_action (mac_diag_tx_params_t *tx_params_p)
  #endif
 #endif
                 }
-				printf("api in\n");
                 mac_api_mcps_data_req(src_addr_mode_in,
                                       &addr_spec,
                                       payload_size,
@@ -455,7 +462,6 @@ void mac_diag_tx_action (mac_diag_tx_params_t *tx_params_p)
                                       msdu_handle++,
                                       tx_option,
                                       &sec);
-				printf("api out\n");
                 break;
             case 1:
                 mac_data_build_and_tx_data_req(true, false, dst_addr_mode_in,
@@ -1654,7 +1660,9 @@ void mac_diag_show (u8 *cmd_buf_p)
     mac_diag_show_config();
     mac_diag_display_tx_stats();
 }
+#ifdef PROD_TEST
 u8 txControl = 0;
+#endif
 void mac_diag_zb_cmd (char* cmd_buf_p)
 {
     char action;
@@ -1702,6 +1710,16 @@ void mac_diag_zb_cmd (char* cmd_buf_p)
         mac_diag_ed_scan(cmd_buf_p+1);
         break;
 
+    case 'E':
+        printf("\nErase Flash Config");
+#ifndef PROD_TEST		
+        spiflash_eraseConfigMem();
+#else        
+        spiflash_eraseSector(PROD_CONFIG_SECTOR);
+		spiflash_wrsr_unlock((u8)0);
+#endif		
+        break;
+
     case 'g':
         mac_diag_gpio_test(cmd_buf_p+1);
         break;
@@ -1731,7 +1749,9 @@ void mac_diag_zb_cmd (char* cmd_buf_p)
         break;
 #endif
 
-    case 'T':
+    
+#ifdef PROD_TEST
+	case 'T':
 		txControl = !txControl;
 		if(txControl){
 			STM_StartTimer(prod_test_rf_timer,500);
@@ -1741,7 +1761,42 @@ void mac_diag_zb_cmd (char* cmd_buf_p)
 			STM_StopTimer(prod_test_rf_timer);
 			printf("\nTest Stopped\n");
 		}
-		break;
+	break;
+
+	case 'l':
+	case 'L':
+		{
+			u8 cmd_arg[64];
+
+			memset(&gProdFlashProfile,0x00,sizeof(sProdConfigProfile));
+			FM_Printf(FM_USER,"\n@0x23:");				
+			while (getline(cmd_arg, sizeof(cmd_arg)) > 0)
+			{
+				if(sscanf(cmd_arg,"%bx",&gProdFlashProfile.rfProfile.calRegister.reg23) >= 1)
+				break;
+			}
+			
+			memset(cmd_arg, 0x00, 10);	
+			FM_Printf(FM_USER,"\n@0x24:");				
+			while (getline(cmd_arg, sizeof(cmd_arg)) > 0)
+			{
+				if(sscanf(cmd_arg,"%bx",&gProdFlashProfile.rfProfile.calRegister.reg24) >= 1)
+				break;
+			}	
+			gProdFlashProfile.signature = PROD_VALID_SIGNATURE;
+			gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATED;
+			gProdFlashProfile.rfProfile.rfCalAttemptCount = 0;
+			gProdFlashProfile.rfProfile.testActionPreparePending = 0;
+			gProdFlashProfile.rfProfile.autoCalibrated = 0;
+			//gProdFlashProfile.checksum =  Gv701x_CalcCheckSum16((u8*)&gProdFlashProfile,
+				//(sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.checksum)));
+			gProdFlashProfile.crc =	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+			FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
+			Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
+		}
+	break;	
+#endif		
+		
     case 't':
         mac_diag_tx_test(cmd_buf_p+1);
         break;
@@ -1781,6 +1836,10 @@ void mac_diag_zb_cmd (char* cmd_buf_p)
 
     case 'u':
         mac_hal_mac_busy_recover();
+        break;
+        
+    case 'z':
+        GV701x_Chip_Reset();
         break; 
 
 #ifdef _LED_DEMO_

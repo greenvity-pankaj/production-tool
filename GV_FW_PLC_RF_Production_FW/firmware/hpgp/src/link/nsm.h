@@ -208,8 +208,9 @@ void CNSM_StartHo(sCnsm *cnsm, u8 nctei);
 void CNSM_UpdateDiscBcnSched(sCnsm *cnsm, sScb *scb);
 void LINKL_CcoProcBcnHandler(void *cookie, sEvent *event, u32 bts);
 void CNSM_ProcBcnHigh(sCnsm *cnsm, u8* bcn, u32 bts );
+#ifdef MCCO
 void LINKL_PassiveCcoProcBcnHandler(void *cookie, sEvent *event, u32 bts);
-
+#endif
 /* ===========================
  * STA network system manager
  * =========================== */

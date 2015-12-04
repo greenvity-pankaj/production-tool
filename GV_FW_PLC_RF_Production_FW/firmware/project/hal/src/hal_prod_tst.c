@@ -14,7 +14,7 @@
 #include "nma.h"
 #include "hal_prod_tst.h"
 #include "hal_rf_prod_test.h"
-
+#include "crc32.h"
 #include "Gv701x_gpiodriver.h"
 
 sToolCmdPrep prepProdCmd;
@@ -30,7 +30,7 @@ u8 testCmd = 0;
 extern u8  volatile spi_tx_flag;
 extern u8  checkSPITxDone();
 extern u8 gDefKey[10][16];
-
+extern sProdConfigProfile gProdFlashProfile;
 void config_plc_test_parameters(u8 *parms);
 
 
@@ -133,8 +133,8 @@ void prodTest_init()
 	payload->devType = gHpgpHalCB.prodTestDevType;
 	
 #if (defined HYBRII_802154) && (defined HYBRII_HPGP)
-		payload->capabilityInfo = (PLC_NIC | RF_NIC);//Both PLC & RF -- GV7011
-		printf("GV7011 Chip Found\n");
+	payload->capabilityInfo = (PLC_NIC | RF_NIC);//Both PLC & RF -- GV7011
+	printf("\nGV7011 Chip Found\n");
 #elif (defined HYBRII_HPGP) && !(defined HYBRII_802154)
 		payload->capabilityInfo = (PLC_NIC); // Only PLC -- GV7013
 #elif !(defined HYBRII_HPGP) && (defined HYBRII_802154)
@@ -145,8 +145,19 @@ void prodTest_init()
 		payload->fwVer[i] = 1;
 	}
 	payload->bMapTests = cpu_to_le32(0x0F);	// for now allow all possible tests
-	gvspi_send(&spiTXBuf, sizeof(upHeader) + sizeof(sDevUpEvnt));
-
+	if(gProdFlashProfile.rfProfile.testActionPreparePending != 1)// If before reset device was not calibrated and 
+																//host has not issued prepare command then send firmware ready to host
+	{
+		gvspi_send(&spiTXBuf, sizeof(upHeader) + sizeof(sDevUpEvnt));
+	}
+	else // If before reset device was not calibrated and 														
+	{	 //host has not issued prepare command then send prepare confirm/failed status to host
+		if(gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATED)
+		{
+			printf("\nBoard is calibrated and prepare pending found\n");
+			rf_test_prepare_reconfig();
+		}
+	}
 }
 
 bool gvspi_send(u8 *spiTXBuff, u16 buffSize){
@@ -320,6 +331,27 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 						printf("config failed\n");
 						break;
 					}
+					if(gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED && \
+						gProdFlashProfile.rfProfile.rfCalAttemptCount < 10)
+					{
+						memcpy((u8*)&gProdFlashProfile.rfProfile.txTestParams,prepProdCmd.parms,sizeof(sRfTxTestHostParams));
+						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
+						gProdFlashProfile.rfProfile.testId = prepProdCmd.testId;
+						gProdFlashProfile.rfProfile.cmdId = pprodTestCmd->cmdId;
+
+						gProdFlashProfile.signature = PROD_VALID_SIGNATURE;
+						gProdFlashProfile.testIntf  = TEST_802_15_5_ID;
+						gProdFlashProfile.rfProfile.autoCalibrated = 0;
+						gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
+						gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
+						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
+						gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+						FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
+						Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
+						GV701x_Chip_Reset();
+						while(1);
+					}
+					
 				}
 				else if (prepProdCmd.testId == TEST_ID_802_15_4_RX)
 				{
@@ -344,6 +376,26 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 												PRODTEST_STAT_INVALID_TEST);
 						printf("Config failed\n");
 						break;
+					}
+					if(gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED && \
+						gProdFlashProfile.rfProfile.rfCalAttemptCount < 10)
+					{
+						memcpy((u8*)&gProdFlashProfile.rfProfile.rxTestParams,prepProdCmd.parms,sizeof(sRfRxTestHostParams));
+						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
+						gProdFlashProfile.rfProfile.testId = prepProdCmd.testId;
+						gProdFlashProfile.rfProfile.cmdId = pprodTestCmd->cmdId;
+
+						gProdFlashProfile.signature = PROD_VALID_SIGNATURE;
+						gProdFlashProfile.testIntf  = TEST_802_15_5_ID;
+						gProdFlashProfile.rfProfile.autoCalibrated = 0;
+						gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
+						gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
+						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
+						gProdFlashProfile.crc =	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+						FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
+						Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
+						GV701x_Chip_Reset();
+						while(1);
 					}
 					
 				}
@@ -422,7 +474,27 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 						printf("config failed\n");
 						break;
 					}
+					
+					if(gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED && \
+						gProdFlashProfile.rfProfile.rfCalAttemptCount < 10)
+					{
+						memcpy((u8*)&gProdFlashProfile.rfProfile.rxTestParams,prepProdCmd.parms,sizeof(sRfRxTestHostParams));
+						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
+						gProdFlashProfile.rfProfile.testId = prepProdCmd.testId;
+						gProdFlashProfile.rfProfile.cmdId = pprodTestCmd->cmdId;
 
+						gProdFlashProfile.signature = PROD_VALID_SIGNATURE;
+						gProdFlashProfile.testIntf  = TEST_802_15_5_ID;
+						gProdFlashProfile.rfProfile.autoCalibrated = 0;
+						gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
+						gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
+						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
+						gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+						FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
+						Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
+						GV701x_Chip_Reset();
+						while(1);
+					}
 				//////////////////////////////////////////////////////////////
 				}
 				else if (prepProdCmd.testId == TEST_ID_802_15_4_RX)
@@ -449,6 +521,26 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 												PRODTEST_STAT_INVALID_TEST);
 						printf("config failed\n");
 						break;
+					}
+					if(gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED && \
+						gProdFlashProfile.rfProfile.rfCalAttemptCount < 10)
+					{
+						memcpy((u8*)&gProdFlashProfile.rfProfile.txTestParams,prepProdCmd.parms,sizeof(sRfTxTestHostParams));
+						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
+						gProdFlashProfile.rfProfile.testId = prepProdCmd.testId;
+						gProdFlashProfile.rfProfile.cmdId = pprodTestCmd->cmdId;
+
+						gProdFlashProfile.signature = PROD_VALID_SIGNATURE;
+						gProdFlashProfile.testIntf  = TEST_802_15_5_ID;
+						gProdFlashProfile.rfProfile.autoCalibrated = 0;
+						gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
+						gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
+						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
+						gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+						FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
+						Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
+						GV701x_Chip_Reset();
+						while(1);
 					}
 				}
 				else
@@ -799,6 +891,89 @@ void config_plc_test_parameters(u8 *parms)
 
 	HHAL_SetSnid(gHpgpHalCB.snid);	
 
+}
+
+void rf_test_prepare_reconfig()
+{
+	eStatus status = STATUS_SUCCESS;
+	prepProdCmd.cmdId = gProdFlashProfile.rfProfile.cmdId;
+	prepProdCmd.testId = gProdFlashProfile.rfProfile.testId;
+
+	if (prodTestDev.devType == DEV_DUT)
+	{
+		if (prepProdCmd.testId == TEST_ID_802_15_4_TX)
+		{
+			printf("Dut Prepare Tx\n");
+			memcpy(&prepProdCmd.parms, &gProdFlashProfile.rfProfile.txTestParams, 
+							sizeof(sRfTxTestHostParams));
+			printf("Channel %bx\n",((sRfTxTestHostParams*)&prepProdCmd.parms)->ch);
+			if (STATUS_SUCCESS != config_rf_test_parameters(prepProdCmd.parms,RF_TX))
+			{
+				prodTestSendRespOrEvent(headerResponse,TOOL_CMD_PREPARE_DUT_CNF,
+													PRODTEST_STAT_INVALID_TEST);
+				status = STATUS_FAILURE;									
+				printf("config failed\n");	
+			}
+		}
+		else if (prepProdCmd.testId == TEST_ID_802_15_4_RX)
+		{
+			printf("Test RX\n");
+			memcpy(&prepProdCmd.parms, &gProdFlashProfile.rfProfile.rxTestParams, 
+							sizeof(sRfRxTestHostParams));
+			printf("channel %bx\n",((sRfRxTestHostParams*)&prepProdCmd.parms)->ch);
+			if (STATUS_SUCCESS != config_rf_test_parameters(prepProdCmd.parms,RF_RX))
+			{
+				prodTestSendRespOrEvent(headerResponse,TOOL_CMD_PREPARE_DUT_CNF,
+													PRODTEST_STAT_INVALID_TEST);
+				status = STATUS_FAILURE;
+				printf("Config failed\n");
+			}
+			
+		}
+		if(status == STATUS_SUCCESS)
+		{
+			prodTestSendRespOrEvent(headerResponse, TOOL_CMD_PREPARE_DUT_CNF,
+					PRODTEST_STAT_SUCCESS);
+		}
+	}
+	else if(prodTestDev.devType == DEV_REF)
+	{
+		if (prepProdCmd.testId == TEST_ID_802_15_4_TX)
+		{
+			printf("Ref Prepare Tx\n");
+			memcpy(&prepProdCmd.parms, &gProdFlashProfile.rfProfile.rxTestParams, 
+							sizeof(sRfRxTestHostParams));
+			printf("Channel %bx\n",((sRfRxTestHostParams*)&prepProdCmd.parms)->ch);
+			if (STATUS_SUCCESS != config_rf_test_parameters(prepProdCmd.parms,RF_RX))
+			{
+				prodTestSendRespOrEvent(headerResponse,TOOL_CMD_PREPARE_REF_CNF,
+													PRODTEST_STAT_INVALID_TEST);
+				status = STATUS_FAILURE;									
+				printf("config failed\n");	
+			}
+		}
+		else if (prepProdCmd.testId == TEST_ID_802_15_4_RX)
+		{
+			printf("Test RX\n");
+			memcpy(&prepProdCmd.parms, &gProdFlashProfile.rfProfile.txTestParams, 
+							sizeof(sRfTxTestHostParams));
+			printf("channel %bx\n",((sRfTxTestHostParams*)&prepProdCmd.parms)->ch);
+			if (STATUS_SUCCESS != config_rf_test_parameters(prepProdCmd.parms,RF_TX))
+			{
+				prodTestSendRespOrEvent(headerResponse,TOOL_CMD_PREPARE_REF_CNF,
+													PRODTEST_STAT_INVALID_TEST);
+				status = STATUS_FAILURE;
+				printf("Config failed\n");
+			}
+			
+		}
+		if(status == STATUS_SUCCESS)
+		{
+			prodTestSendRespOrEvent(headerResponse, TOOL_CMD_PREPARE_REF_CNF, 
+					PRODTEST_STAT_SUCCESS);
+		}
+
+	}
 }
 
 #endif

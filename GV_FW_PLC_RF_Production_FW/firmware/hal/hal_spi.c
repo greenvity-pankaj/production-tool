@@ -1394,6 +1394,7 @@ void hal_spi_init (void)
     gpio_cfg = 0x3F;    // Config as input for all GPIO pins
     // Config as output for the following pins
     gpio_cfg &= ~(SPI_TX_REQ_PIN         |
+				  CPU_GPIO_IO_PIN0       |
                   SPI_RX_PAYLOAD_RDY_PIN |
                   SPI_RX_CMDLEN_RDY_PIN);
 

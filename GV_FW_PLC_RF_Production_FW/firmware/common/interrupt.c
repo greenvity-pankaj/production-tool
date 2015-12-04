@@ -19,10 +19,13 @@
 #include "timer.h"
 #include "list.h"
 #include "stm.h"
+#include "hal_common.h"
 
 extern volatile sStm Stm;
 extern void CHAL_IncTimerIntCnt();
 extern u32 gtimer2, gtimer1;
+extern sHalCB     gHalCB;    // Common  HAL Control Block  
+
 #ifndef UART_HOST_INTF
 #ifndef TIMER_POLL
 void timer_handler (void) using 2 //__INTERRUPT1__   //[YM] For Hybrii_B ASIC SPI TEST

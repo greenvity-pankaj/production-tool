@@ -23,8 +23,6 @@
 #ifdef ROUTE
 #include "hpgp_route.h"
 #endif
-#include <REG51.H> 
-
 #include "hal_common.h"
 #include "hal.h"
 #include "fm.h"
@@ -712,7 +710,7 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
 
 
     stdModeSel                    = pTestParams->stdModeSel;
-	//printf("a %bu\n",SP);
+
     // Incremental/alternating length modes
     if(pTestParams->frmLen == 0)   //Continuous Tx mode
     {
@@ -738,7 +736,7 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
         u8  frmData = 0;
         tmpFrmLen   = 0;
         tmpPayloadLen = 0;
-		//printf("b %bu\n",SP);
+
         if (plcTxFrmSwDesc.frmType == HPGP_HW_FRMTYPE_SOUND)
         {
             if(pTestParams->frmLen <= 136)
@@ -848,7 +846,6 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
 				}
 			}
         }
-		//printf("c %bu\n",SP);
 
             plcTxFrmSwDesc.cpCount        = 0; 
 			plcTxFrmSwDesc.frmInfo.plc.phyPendBlks    = pTestParams->plid>0 ? HPGP_PPB_CAP123 : HPGP_PPB_CAP0;
@@ -883,7 +880,6 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
             tmpDescLen  =      curDescLen; 
             // Fetch CP
 			//printf("(C)\n");
-		//	printf("d %bu\n",SP);
             do
             {
                 status = CHAL_RequestCP(&cp);
@@ -907,13 +903,12 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
             {
                 break;
             }
-			//printf("e %bu\n",SP);
+			
             i = plcTxFrmSwDesc.cpCount;
             // test offset and desc len - only for first CPs
             if((i==0 || i==1) && (pTestParams->frmType != 2))
             //if(i==0 || i==1)
             { 
-            	//printf("e1 %bu\n",SP);
                 if(pTestParams->altOffsetDescLenTest)
                 {
                     curOffsetDW--;
@@ -926,20 +921,17 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
                         curDescLen   = pTestParams->descLen;  //HYBRII_DEFAULT_SNID;
 //                        FM_Printf(FM_LINFO,"OffsetDW & DescLen resetting to %bu & %bu respectively\n", curOffsetDW, curDescLen);
                     }
-					//printf("e2 alt val %bu\n",pTestParams->altOffsetDescLenTest);
                 } //printf("curOffsetDW = %bu, tempDescLen=%bu\n", tmpOffsetDW, tmpDescLen);                            
             }
             else if(pTestParams->frmType == 2)
             {
                   tmpOffsetDW =      0;  
                   tmpDescLen  =      curDescLen;  
-				  //printf("e3 %bu\n",SP);
             }
             else
             {
                 tmpOffsetDW = 0;
                 tmpDescLen  = HYBRII_CELLBUF_SIZE;
-				//printf("e4 %bu\n",SP);
             }
 
             tmpOffsetByte = tmpOffsetDW << 2;
@@ -950,7 +942,6 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
             {
               //  FM_Printf(FM_LINFO,"curFrmLen = %u, curOffsetDW = %bu, curDescLen=%bu, free CPCnt = %bu\n", 
               //                               plcTxFrmSwDesc.frmLen, tmpOffsetDW, actualDescLen, CHAL_GetFreeCPCnt());
-             // printf("e5 tmpOffsetDW %bu\n",tmpOffsetDW);
             }
             //FM_Printf(FM_LINFO,"curOffsetByte = %bu, curDescLen=%bu\n", tmpOffsetByte, actualDescLen);
             
@@ -959,9 +950,7 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
 			// Get local CP buffer
 			cellAddr = &cp_localBuf[0];
 #else
-			//printf("e6 %bu\n",SP);
             cellAddr = CHAL_GetAccessToCP(cp);
-	//		printf("e7 %bu\n",SP);
 #endif
 			memset(&cp_localBuf[0], 0, HYBRII_CELLBUF_SIZE);	// clear read buf for every new test
          //   FM_Printf(FM_LINFO,"cp = %bu, cellAddr=%08lX, seqNum=%bu\n",cp,(u32)cellAddr, gHpgpHalCB.halStats.TxSeqNum);
@@ -969,7 +958,7 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
 			
             // Add Seq Num as first byte of first CP
             if ( i==0 )
-            {	//printf("e8 %bu\n",SP);
+            {
                 if (pTestParams->frmType != 2)
                 {
 #if  PLC_BCNDATA_FIXED_PATTERN
@@ -983,7 +972,6 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
                 // Alternatig frame bytes
                 frmData = ((gHpgpHalCB.halStats.TxSeqNum + 1) & 0x01) ?  0xAA : 0x55 ;
 #endif        
-				//printf("e9 %bu\n",SP);
                 tmpOffsetByte +=1;
                 remDescLen    -=1; 
                 }
@@ -992,7 +980,7 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
                     //cellAddr[tmpOffsetByte] = (u8)((gHpgpHalCB.halStats.TxSeqNum + 1) & 0xFF);
                     // Alternatig frame bytes
                     frmData = ((gHpgpHalCB.halStats.TxSeqNum + 1) & 0x01) ?  0x00 : 0x00 ;
- 					//printf("e10 %bu\n",SP);
+ 
                     //tmpOffsetByte +=1;
                     //remDescLen    -=1; 
                 }
@@ -1007,7 +995,6 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
             }
             else
             {
-            	//printf("e11 %bu\n",SP);
                 for( j=tmpOffsetByte ; j<tmpOffsetByte+remDescLen ; j++)
                 {
     #if  PLC_BCNDATA_FIXED_PATTERN
@@ -1049,7 +1036,6 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
                 plcTxFrmSwDesc.frmInfo.plc.eks  = gAltEksTstArr[eksArrIdx++];
                 plcTxFrmSwDesc.frmInfo.plc.dtei = gHpgpHalCB.remoteTei;
             }
-			//printf("f %bu\n",SP);
 
 #ifdef MEM_PROTECTION
 			// now copy the CP local buf to the actual CP memory
@@ -1116,7 +1102,6 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
             {
                 // Transmit the frame;
                 //printf("(D)\n");
-                //printf("g %bu\n",SP);
 #ifdef HPGP_HAL_TEST
                 status = HHAL_PlcTxQWrite(&plcTxFrmSwDesc);
 #else
@@ -1154,7 +1139,7 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
 			        pkt_retry = 0;
         }
 
-		//printf("h %bu\n",SP); 
+		 
         if(status == STATUS_SUCCESS)
         {
             gHpgpHalCB.halStats.CurTxTestFrmCnt++;
@@ -1236,7 +1221,7 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
 			}
 				
         }
-		//printf("i %bu\n",SP);
+		
         if((gHpgpHalCB.halStats.CurTxTestFrmCnt & (u32)(0xFF)) == 0)
         {  
             printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b");
@@ -1316,16 +1301,13 @@ void HHT_SimulateTx(sPlcSimTxTestParams* pTestParams)
 					   cmd_num--;
 		}
 //#endif
-		  // printf("j %bu\n",SP);
 
 
            // printf("Sent %ld HPGP frames.\n", gHpgpHalCB.halStats.CurTxTestFrmCnt);
            // printf("Quit Tx: Free CP Cnt = %bu, curFrmLen = %u\n", CHAL_GetFreeCPCnt(), curFrmLen);
             break;
-        }     
-		//printf("k %bu\n",SP);
+        }       
     } // while(1)   
-    //printf("l %bu\n",SP);
 }
 
 #endif
@@ -3457,7 +3439,6 @@ void HHAL_Init(sHaLayer *hal, sHpgpHalCB **ppHhalCb)
 #endif
 }
 
-    
 void HHAL_ResetPlcStat()
 {   
     memset(&gHpgpHalCB.halStats, 0, sizeof(shpgpHalStats));

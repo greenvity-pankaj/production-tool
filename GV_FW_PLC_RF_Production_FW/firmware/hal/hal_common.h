@@ -211,7 +211,8 @@ typedef struct _sysConfig_t
 	u8 defaultLOLeak23;
 	u8 defaultLOLeak24;
 	u8 VCOCal[16];
-    u8 rsvd5[5];
+    u8 dco_cal_failed;
+    u8 rsvd5[4];
 	
 	//Device Initialization Parameters -96 bytes
 	u8 rsvd6[32];

@@ -42,7 +42,7 @@
 #include "hybrii_tasks.h"
 #include "fm.h"
 
-tTimerId prod_test_rf_timer;
+tTimerId prod_test_rf_timer = STM_TIMER_ID_NULL;
 
 
 
@@ -94,6 +94,9 @@ static void mac_diag_config_tx_rx (bool promis_en)
 }
 
 #endif
+
+
+#if 1
 
 extern u8 spiflash_ReadByte(u32);
 extern void spiflash_wrsr_unlock(u8);
@@ -186,7 +189,7 @@ eStatus Gv701x_FlashReadProdProfile(u32 sectorNo, sProdConfigProfile *profile)
 	return STATUS_SUCCESS;
 }
 
-
+#endif
 
 eStatus rfStartTxTest(sRfTxTestHostParams *pTxParams)
 {

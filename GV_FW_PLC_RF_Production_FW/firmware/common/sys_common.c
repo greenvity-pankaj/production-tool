@@ -38,8 +38,10 @@ u8 gVersion[20] = TOSTRING (VERSION);
 #else
 #if defined(HYBRII_HPGP) && defined(HYBRII_802154) && defined(POWER_SAVE)
 u8 gVersion[20] = "ZP-V2.20.9.9\0";
-#elif defined(HYBRII_HPGP) && defined(HYBRII_802154)
+#elif defined(HYBRII_HPGP) && defined(HYBRII_802154) && !defined(PROD_TEST)
 u8 gVersion[20] = "ZP-V2.20.11.7.11\0";
+#elif defined(HYBRII_HPGP) && defined(HYBRII_802154) && defined(PROD_TEST)
+u8 gVersion[20] = "PT-V1.0.3\0";
 #elif defined(HPGP_HAL_TEST) && defined(POWER_SAVE) 
 u8 gVersion[20] = "P-V1.10.2.3\0";
 #elif defined(HPGP_HAL_TEST) && defined(MPER)

@@ -79,6 +79,12 @@ typedef enum
 	RF_RX,
 } eRfTestType;
 
+typedef enum
+{
+	RF_CAL_MANUAL = 0,
+	RF_CAL_AUTO   = 1,
+}eRfCalType;
+
 typedef struct _sRfTestParams
 {
 	u8					macAddress[8];
@@ -116,6 +122,10 @@ typedef struct _sRfStats
 	uint16_t tx_unavailable_key;
 	uint16_t tx_unsupported_security;
 	uint16_t tx_invalid_parameter;
+
+	uint8_t rfCalAttemptCount;// Maximum number of attempts made by software during calibration
+	uint8_t autoCalibrated;// If board is manually calibrated or software calibrated
+	
 }__PACKED__ sRfStats;
 
 #define PROD_AUTO_CALIBRATION
@@ -155,6 +165,11 @@ typedef struct _sProdConfigProfile
 	
 	u32 crc;
 }__PACKED__  sProdConfigProfile;
+
+typedef struct _sProdPrepRfStatusCnf
+{
+	u8 calStatus;
+}sProdPrepRfStatusCnf;
 
 #define FLASH_ENTIRE_SECTOR 0
 #define FLASH_SECTOR_SIZE 4096

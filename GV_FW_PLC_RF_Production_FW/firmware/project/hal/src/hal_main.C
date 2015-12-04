@@ -849,7 +849,7 @@ void main()
 
 #ifdef PROD_TEST
 	memset(&gProdFlashProfile,0x00,sizeof(sProdConfigProfile));
-	chksum_crc32gentab ();
+	chksum_crc32gentab();
 
 	if(Gv701x_FlashReadProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile) == STATUS_SUCCESS)
 	{
@@ -861,7 +861,7 @@ void main()
 			gProdFlashProfile.signature = PROD_VALID_SIGNATURE;
 			gProdFlashProfile.rfProfile.rfCalStatus = RF_NOT_CALIBRATED;
 			gProdFlashProfile.rfProfile.rfCalAttemptCount = 0;
-			gProdFlashProfile.rfProfile.autoCalibrated = 0;
+			gProdFlashProfile.rfProfile.autoCalibrated = RF_CAL_MANUAL;
 			gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
 			gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
 			gProdFlashProfile.rfProfile.testActionPreparePending = 0;
@@ -882,7 +882,7 @@ void main()
 				gProdFlashProfile.signature = PROD_VALID_SIGNATURE;
 				gProdFlashProfile.rfProfile.rfCalStatus = RF_NOT_CALIBRATED;
 				gProdFlashProfile.rfProfile.rfCalAttemptCount = 0;
-				gProdFlashProfile.rfProfile.autoCalibrated = 0;
+				gProdFlashProfile.rfProfile.autoCalibrated = RF_CAL_MANUAL;
 				gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
 				gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
 				gProdFlashProfile.rfProfile.testActionPreparePending = 0;
@@ -902,6 +902,10 @@ void main()
 		}
 	}
 #endif
+#ifdef TIMER_POLL
+
+	timer0Poll();
+#endif
 
 #ifdef HYBRII_802154
     mac_init();
@@ -910,20 +914,20 @@ void main()
 #endif
 #endif
 
-	#ifdef UART_HOST_INTF 
-		UART_Init16550();
-	#endif
+#ifdef UART_HOST_INTF 
+	UART_Init16550();
+#endif
 
 #ifdef FREQ_DETECT
     FREQDET_FreqDetectInit();
     Read_FlashProfile();
 #endif
-#ifdef TIMER_POLL
 
-	timer0Poll();
-#endif
 #ifdef PROD_TEST
-	prodTest_init();
+	prodTest_init(0);
+
+	FM_Printf(FM_USER, "\nProduction Tool: Device Type: %s VERSION: %s\n",\
+		(gHpgpHalCB.prodTestDevType == DEV_DUT) ? "DUT\0":"REF\0",get_Version());
 #endif
 
 	while (1)
@@ -931,22 +935,19 @@ void main()
 #ifdef PROD_TEST	
 		if(spi_tx_flag == 1) 
 		{
+			if((STM_GetTick() - spi_tx_time) > MAX_SPI_TX_TIMEOUT)
 			{
+				//hal_spi_cleanup();
+				hal_spi_tx_cleanup ();
+				printf("spitmO\n");		
+				
+				hal_spi_prepare_rx_cmd_engine();
+				
+				spi_tx_flag = 0;					
+							
+				hal_spi_set_rx_cmd_len_rdy();
 
-				if((STM_GetTick() - spi_tx_time) > MAX_SPI_TX_TIMEOUT)
-				{
-					//hal_spi_cleanup();
-					hal_spi_tx_cleanup ();
-					printf("spitmO\n");		
-					
-					hal_spi_prepare_rx_cmd_engine();
-					
-					spi_tx_flag = 0;					
-								
-					hal_spi_set_rx_cmd_len_rdy();
-
-					//FM_Printf(FM_USER,"spi tx tm1\n");
-				}
+				//FM_Printf(FM_USER,"spi tx tm1\n");
 			}
 		}
 #endif		

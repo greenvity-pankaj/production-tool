@@ -1787,7 +1787,7 @@ void mac_diag_zb_cmd (char* cmd_buf_p)
 			gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATED;
 			gProdFlashProfile.rfProfile.rfCalAttemptCount = 0;
 			gProdFlashProfile.rfProfile.testActionPreparePending = 0;
-			gProdFlashProfile.rfProfile.autoCalibrated = 0;
+			gProdFlashProfile.rfProfile.autoCalibrated = RF_CAL_MANUAL;
 			//gProdFlashProfile.checksum =  Gv701x_CalcCheckSum16((u8*)&gProdFlashProfile,
 				//(sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.checksum)));
 			gProdFlashProfile.crc =	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));

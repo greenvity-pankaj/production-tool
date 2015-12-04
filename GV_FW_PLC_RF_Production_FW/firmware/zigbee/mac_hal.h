@@ -120,7 +120,7 @@
 /*
  * Default value of current channel in HAL
  */
-#define HAL_CURRENT_CHANNEL_DEFAULT         (0x11)
+#define HAL_CURRENT_CHANNEL_DEFAULT         (0x0B)
 
 /*
  * Default value of promiscuous mode in HAL

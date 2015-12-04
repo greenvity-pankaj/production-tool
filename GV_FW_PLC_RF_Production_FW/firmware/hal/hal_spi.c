@@ -479,6 +479,7 @@ void hal_spi_frame_rx (sHaLayer *hal,  sCommonRxFrmSwDesc* rx_frame_info_p)
 	if (isProdTstCmd(cp_addr_p, data_size, &prodCmd))
 	{
 		prodTestExecCmd(&prodCmd);	// execute the cmd
+		printf("\nFree Frame\n");
         hal_common_free_frame(rx_frame_info_p);	// free the Rx frame (must be after call to ProdTestExecCnd())
 	}
 	else
@@ -506,7 +507,7 @@ void hal_spi_frame_rx (sHaLayer *hal,  sCommonRxFrmSwDesc* rx_frame_info_p)
     hal_spi_tx_dma(spi_tx_data, j - 2);
 #endif
 #endif // UM
-
+	printf("\nSPI frame rx exit\n");
 }
 
 void hal_spi_tx_done_handler (void)

@@ -682,7 +682,7 @@ if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED) || \
 	if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED) && calibration_good)
 	{
 		gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATED;
-		gProdFlashProfile.rfProfile.autoCalibrated = 1;
+		gProdFlashProfile.rfProfile.autoCalibrated = RF_CAL_AUTO;
 		gProdFlashProfile.rfProfile.calRegister.reg23 = mac_utils_spi_read(AFE_ZIG_TX_OC_I_MSB);
 		gProdFlashProfile.rfProfile.calRegister.reg24 = mac_utils_spi_read(AFE_ZIG_TX_OC_Q_MSB);
 	}
@@ -690,7 +690,7 @@ if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED) || \
 	{
 		gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATION_FAILED;
 		gProdFlashProfile.rfProfile.rfCalAttemptCount++;
-		gProdFlashProfile.rfProfile.autoCalibrated = 0;
+		gProdFlashProfile.rfProfile.autoCalibrated = RF_CAL_MANUAL;
 		printf("Calibration Fail count %bu\n",gProdFlashProfile.rfProfile.rfCalAttemptCount);
 	}
 	else if((gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && calibration_good)
@@ -699,13 +699,13 @@ if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED) || \
 		gProdFlashProfile.rfProfile.calRegister.reg24 = mac_utils_spi_read(AFE_ZIG_TX_OC_Q_MSB);
 		//gProdFlashProfile.rfProfile.rfCalAttemptCount = 0;// To identify yield of calibration it is not initialized
 		gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATED;
-		gProdFlashProfile.rfProfile.autoCalibrated = 1;//If software calibrated then true if manually calibrated then it is 0
+		gProdFlashProfile.rfProfile.autoCalibrated = RF_CAL_AUTO;//If software calibrated then true if manually calibrated then it is 0
 	}
 	else if((gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && (!calibration_good))
 	{
 		gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATION_FAILED;
 		gProdFlashProfile.rfProfile.rfCalAttemptCount++;
-		gProdFlashProfile.rfProfile.autoCalibrated = 0;
+		gProdFlashProfile.rfProfile.autoCalibrated = RF_CAL_MANUAL;
 		printf("Calibration Fail count %bu\n",gProdFlashProfile.rfProfile.rfCalAttemptCount);
 	}
 	

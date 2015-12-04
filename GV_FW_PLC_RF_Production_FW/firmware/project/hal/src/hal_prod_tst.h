@@ -26,6 +26,8 @@
 #define EVENT_DEVICE_UP 			0
 #define EVENT_TEST_DONE			 	1
 
+#define EVENT_MAX_PAYLOAD 255
+
 
 //	Header Event/Command IDs
 enum {
@@ -129,7 +131,7 @@ typedef struct plcTxTestResults
 
 }__PACKED__ txTestResults;
 
-void prodTest_init();
+void prodTest_init(u8 resetFlag);
 bool isProdTstCmd(u8 *pCpAddr, u8 cpLen, sprodTstCmd *pprodCmdTst);
 void prodTestExecCmd(sprodTstCmd *pprodTestCmd);
 void fillBuffer(u8 *buff, u8 *bLen);

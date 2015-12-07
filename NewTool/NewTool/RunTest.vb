@@ -56,14 +56,6 @@ Public Class RunTest
     End Enum
 
     '
-    '   Device Type
-    '
-    Enum Response
-        FAILURE
-        SUCCESS
-    End Enum
-
-    '
     '   Test Interface
     '
     Enum TestInterface
@@ -80,14 +72,6 @@ Public Class RunTest
     '
     '   Header strucutre
     '
-    '<StructLayout(LayoutKind.Explicit, Pack:=1, size:=5)> _
-    'Public Structure frmHeader
-    '    <FieldOffset(0)> <MarshalAsAttribute(UnmanagedType.U1)> Public protocolID As Byte
-    '    <FieldOffset(1)> <MarshalAsAttribute(UnmanagedType.U2)> Public length As UShort
-    '    <FieldOffset(3)> <MarshalAsAttribute(UnmanagedType.U1)> Public frmType As Byte
-    '    <FieldOffset(4)> <MarshalAsAttribute(UnmanagedType.U1)> Public cmdid As Byte
-    'End Structure
-
     <StructLayout(LayoutKind.Sequential, Pack:=1, size:=5)> _
     Public Structure frmHeader
         Public protocolID As Byte

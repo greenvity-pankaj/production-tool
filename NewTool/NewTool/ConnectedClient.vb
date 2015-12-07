@@ -2,7 +2,7 @@
 
 Public Class ConnectedClient
 
-    Const BYTES_TO_READ As Integer = 256
+    Const BYTES_TO_READ As Integer = 512
     Public mClient As System.Net.Sockets.TcpClient
     Public mDevType As UInteger
     Private readThread As System.Threading.Thread
@@ -21,7 +21,15 @@ Public Class ConnectedClient
         readThread = New System.Threading.Thread(AddressOf doRead)
         readThread.IsBackground = True
         readThread.Start()
-        HomeScreen.dumpMsg("")
+    End Sub
+    '
+    '   Clear connection and terminate thread
+    '
+    Private Sub clearConnection()
+        mClient.GetStream.Flush()
+        mClient.GetStream.Close()
+        mClient.Close()
+        readThread.Abort()
     End Sub
     '
     '   Read data
@@ -29,39 +37,45 @@ Public Class ConnectedClient
     Private Sub doRead()
 
         Dim readBuffer As Byte() = New Byte(BYTES_TO_READ) {}
-        Dim bytesRead As Integer
+        Dim bytesRead = New Integer
 
-        Try
-            Do
-                If mClient.GetStream.CanRead Then
-                    bytesRead = mClient.GetStream.Read(readBuffer, 0, BYTES_TO_READ)
-                    If (bytesRead > 0) Then
+        Do
+            Try
+                If mClient.Connected Then
+                    If mClient.GetStream.CanRead Then
+                        bytesRead = mClient.GetStream.Read(readBuffer, 0, BYTES_TO_READ)
+                        If (bytesRead > 0) Then
 
-                        'The first element in the subMessages string array must be the last part of the current message.
-                        'So we append it to the StringBuilder and raise the dataReceived event
-                        'Dim lastByte As Byte = readBuffer(bytesRead)
-                        'If ControlChars.Cr.CompareTo(Convert.ToChar(lastByte)) Then
-                        'Dim packet(bytesRead) As Byte
-                        'Array.Copy(readBuffer, packet, bytesRead)
+                            SyncLock lockObj
+                                RaiseEvent dataReceived(Me, readBuffer)
+                            End SyncLock
 
-                        SyncLock lockObj
-                            RaiseEvent dataReceived(Me, readBuffer)
-                        End SyncLock
+                            mClient.GetStream.Flush()
+                        End If
 
-                        mClient.GetStream.Flush()
+                        If bytesRead = 0 Then
+                            clearConnection()
+                        End If
+
                         Array.Clear(readBuffer, 0, BYTES_TO_READ)
                         bytesRead = 0
 
+                    Else    ' if networkstream is not readable
+                        clearConnection()
                     End If
-
-                    'If bytesRead = 0 Then
-                    '    mClient.Close()
-                    'End If
                 End If
-            Loop
-        Catch ex As SocketException
-            MessageBox.Show(ex.ToString)
-        End Try
+
+            Catch ex As SocketException
+
+                If ex.NativeErrorCode.Equals(10053) Then
+                    clearConnection()
+                    Array.Clear(readBuffer, 0, BYTES_TO_READ)
+                    bytesRead = 0
+                End If
+
+            End Try
+            Threading.Thread.Sleep(5)
+        Loop
 
     End Sub
 

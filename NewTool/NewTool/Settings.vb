@@ -9,6 +9,16 @@ Public Class spiTXTestSettings
 #Region "Enum Declaration"
 
     '
+    '   TXPowerMode
+    '
+    Enum eTxPwrMode As Byte
+        AUTOMOTIVE_TX_POWER_MODE = &H0
+        NORMAL_TX_POWER_MODE = &H1
+        HIGH_TX_POWER_MODE = &H2
+        DEFAULT_TX_POWER_MODE = &HFF
+    End Enum
+
+    '
     '   Security Modes
     '
     Enum eSecTestMode As Byte

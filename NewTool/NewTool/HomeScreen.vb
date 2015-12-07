@@ -242,7 +242,6 @@ Public Class HomeScreen
     '
     Enum response As Byte
         SUCCESS
-        FAILURE
         INVALID
         FAILED = &HFF
     End Enum
@@ -262,15 +261,6 @@ Public Class HomeScreen
     '   Terminates all socket connections and disposes TCP Client
     '
     Private Sub HomeScreen_Disposed(sender As Object, e As EventArgs) Handles Me.Disposed
-        Try
-            For Each cl As ConnectedClient In clients
-                cl.mClient.Client.Shutdown(SocketShutdown.Both)
-                'cl.mClient.Client.Close()
-            Next
-        Catch ex As Exception
-            MessageBox.Show(ex.ToString)
-        End Try
-
         Try
             If Me.serverStream IsNot Nothing Then
                 Me.serverStream.Close()
@@ -391,6 +381,7 @@ Public Class HomeScreen
             Dim incomingClient As New System.Net.Sockets.TcpClient
             incomingClient = listener.AcceptTcpClient
             Dim connClient As New ConnectedClient(incomingClient)
+            '   Event for data received
             AddHandler connClient.dataReceived, AddressOf Me.messageReceived
             clients.Add(connClient)
             lvClients.Items.Add(incomingClient.Client.RemoteEndPoint.ToString.Split(":"c).First)
@@ -402,17 +393,26 @@ Public Class HomeScreen
     '   Add client (invoke by Delegate)
     '
     Public Sub AddClient(ByVal client As Socket, ByVal type As RunTest.ClientType)
+
         Dim clIP As String() = client.RemoteEndPoint.ToString.Split(":"c)
+
+        Dim ip As String = clIP.First
+        lvClients.SelectedIndex = lvClients.FindString(ip)
+        If lvClients.SelectedIndex <> -1 Then
+            lvClients.Items.RemoveAt(lvClients.SelectedIndex)
+        End If
+
         Dim lvi As New ListViewItem(clIP.First & " " & type.ToString)
         lvi.Text = clIP.First & " " & type.ToString
         lvi.Tag = client
         lvClients.Items.Add(lvi.Text)
+
     End Sub
 
     '
     '   Remove client
     '
-    Public Sub removeClient(ByVal client As ConnectedClient)
+    Private Sub removeClient(ByVal client As ConnectedClient)
 
         If clients.Contains(client) Then
             clients.Remove(client)
@@ -447,7 +447,12 @@ Public Class HomeScreen
                 End Try
 
                 For Each cl As ConnectedClient In clients
-                    RunTest.beginSend(RunTest.states.STATE_DEVICE_SEARCH, cl, Nothing)
+                    If cl.mClient.Connected Then
+                        RunTest.beginSend(RunTest.states.STATE_DEVICE_SEARCH, cl, Nothing)
+                    Else
+                        'cl.mClient.Client.Close()
+                        'removeClient(cl)
+                    End If
                 Next
             Else
                 MessageBox.Show("No clients Detected !")
@@ -500,7 +505,7 @@ Public Class HomeScreen
     End Function
 
     '
-    '   to get the selected client
+    '   get the selected client
     '
     Public Function getSelectedClientList() As List(Of ConnectedClient)
 
@@ -513,7 +518,9 @@ Public Class HomeScreen
             Else
                 For Each s As String In lvClients.Items
                     cl = clDirectory(s.Split(" "c).First)
-                    list.Add(cl)
+                    If cl.mClient.Connected Then
+                        list.Add(cl)
+                    End If
                 Next
             End If
         Catch ex As Exception
@@ -1080,8 +1087,8 @@ Public Class HomeScreen
                                 m.rf_rsp = resp
                             End If
 
+                            'decideTestStatus()
                             updatemetadata()
-                            decideTestStatus()
 
                             Dim result = New shpgpStats
                             result.logResultinTextFile(m)
@@ -1453,6 +1460,13 @@ Public Class HomeScreen
             dumpMsg("Status" & " : " & "FAIL" & vbNewLine)
         End If
 
+        ' Save the test result of the board in the test list of summary
+        Dim x As New variations
+        x.name = m.name
+        x.result = m.testStatus
+        's = New summary
+        's.tests = New List(Of variations)
+        s.tests.Add(x)
     End Sub
 
     '
@@ -1521,14 +1535,6 @@ Public Class HomeScreen
             m.name = "RF Receive Sweep Test - " & "Variation - " & swpCount.ToString
         End If
 
-        ' Save the test result of the board in the test list of summary
-        Dim x As New variations
-        x.name = m.name
-        x.result = m.testStatus
-        's = New summary
-        's.tests = New List(Of variations)
-        s.tests.Add(x)
-
         '   Assign lot number and serial number
         Dim lotSummaryPath As String = rootFilePath
         ' if root directory does not exist then create it
@@ -1551,6 +1557,7 @@ Public Class HomeScreen
         End If
         m.filePath = System.IO.Path.Combine(lotSummaryPath, m.serialNum.ToString & ".txt")
 
+        decideTestStatus()
     End Sub
 
     '
@@ -1728,7 +1735,7 @@ Public Class HomeScreen
         gtxTest.dtei = 2
         gtxTest.stei = 3
 
-        gtxTest.txpowermode = 2
+        gtxTest.txpowermode = spiTXTestSettings.eTxPwrMode.HIGH_TX_POWER_MODE
 
         gtxTest.descLen = spiTXTestSettings.HYBRII_CELLBUF_SIZE
 
@@ -1738,7 +1745,7 @@ Public Class HomeScreen
         gtxTest.frmType = spiTXTestSettings.eFrmType.HPGP_HW_FRMTYPE_MSDU
 
         gtxTest.lenTestMode = spiTXTestSettings.eLenTestMode.FIXED_LEN
-        gtxTest.mcstMode = &H1
+        gtxTest.mcstMode = spiTXTestSettings.eFrmMcstMode.HPGP_MCST
 
         '   Can be used for sweep test
         gtxTest.frmLen = 100
@@ -1757,7 +1764,7 @@ Public Class HomeScreen
         '   change other params
         For Each item As spiTXTestSettings._sPlcSimTxTestParams In sweepParamList
             item.frmType = spiTXTestSettings.eFrmType.HPGP_HW_FRMTYPE_MSDU
-            item.plid = 0
+            item.plid = spiTXTestSettings.eHpgpPlidValue.HPGP_PLID0
             item.secTestMode = spiTXTestSettings.eSecTestMode.ENCRYPTED
             item.eks = 0
             item.delay = 4
@@ -1779,7 +1786,7 @@ Public Class HomeScreen
         For Each l As UInteger In FrmLenArr
             temp_gtxtest.frmLen = l
             If setPowerMode = False Then
-                temp_gtxtest.txpowermode = 0
+                temp_gtxtest.txpowermode = spiTXTestSettings.eTxPwrMode.AUTOMOTIVE_TX_POWER_MODE
             End If
             sweepParamList.Enqueue(temp_gtxtest)
         Next

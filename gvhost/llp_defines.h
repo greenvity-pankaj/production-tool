@@ -81,5 +81,8 @@ u8 gv_test_case ;
 #define CHANGE_GRP				(6)
 #endif
 
+extern volatile sig_atomic_t GV_ETH_THREAD_CONTINUE;
+extern volatile sig_atomic_t GVSPI_THREAD_CONTINUE;
+
 #endif /* __LLP_DEFINES_H*/
 

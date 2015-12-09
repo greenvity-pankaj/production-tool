@@ -51,25 +51,24 @@ extern int gvspi_raw_txsocket;
 
 void send_EventorResponse(u8 *rxBuffer, int readLength){
 
-	u8 *buffer;
-
-	buffer = gvMalloc(readLength + 1); // for "\r"
-	memcpy(buffer, rxBuffer, readLength);
-	strncpy((char*)&buffer[readLength + 1], "\r", 1);
-
-	eth_socketSend(buffer,readLength + 1);
-	gvFree(buffer);
+	u8 *buffer = gvMalloc(readLength + 1); // for "\r"
+	if(buffer){
+		memcpy(buffer, rxBuffer, readLength);
+		strncpy((char*)&buffer[readLength + 1], "\r", 1);
+		eth_socketSend(buffer,readLength + 1);
+		gvFree(buffer);
+	}
 }
 
 void send_Request(u8 *rxBuffer, int readLength){
 
-	u8 *buffer;
-
-	buffer = gvMalloc(sizeof(struct ethhdr) + readLength);
-	memcpy((buffer + sizeof(struct ethhdr)), rxBuffer, readLength);
-	gvspi_tx((u8 *)gv_controller_mac_addr.addr_8bit,buffer,
-		sizeof(struct ethhdr) + readLength, TRUE);
-	gvFree(buffer);
+	u8 *buffer = gvMalloc(sizeof(struct ethhdr) + readLength);
+	if(buffer){
+		memcpy((buffer + sizeof(struct ethhdr)), rxBuffer, readLength);
+		gvspi_tx((u8 *)gv_controller_mac_addr.addr_8bit,buffer,
+			sizeof(struct ethhdr) + readLength, TRUE);
+		gvFree(buffer);
+	}
 }
 
 
@@ -90,6 +89,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 			case headerEvent:
 				switch (cmdState){
 					case EVENT_DEVICE_UP:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending EVENT_DEVICE_UP to Tool");
 						send_EventorResponse(rxBuffer,readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -97,6 +97,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 						
 					case EVENT_TEST_DONE:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending EVENT_TEST_DONE to Tool");
 						send_EventorResponse(rxBuffer,readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -113,6 +114,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 
 				switch (cmdState){
 					case TOOL_CMD_PREPARE_DUT:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_PREPARE_DUT to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -120,6 +122,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_PREPARE_REFERENCE:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_PREPARE_REFERENCE to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -127,6 +130,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_START_TEST:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_START_TEST to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -134,6 +138,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_STOP_TEST:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_STOP_TEST to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -141,6 +146,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_GET_RESULT:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_GET_RESULT to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -148,6 +154,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_DEVICE_SEARCH:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_DEVICE_SEARCH to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -155,6 +162,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 						
 					case TOOL_CMD_DEVICE_RESET:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_DEVICE_RESET to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -173,6 +181,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 				switch (cmdState){
 
 					case TOOL_CMD_PREPARE_DUT_CNF:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_PREPARE_DUT_CNF to Tool");
 						send_EventorResponse(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -180,6 +189,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_PREPARE_REFERENCE_CNF:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_PREPARE_REFERENCE_CNF to Tool");
 						send_EventorResponse(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -187,6 +197,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;						
 
 					case TOOL_CMD_START_TEST_CNF:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_START_TEST_CNF to Tool");
 						send_EventorResponse(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -194,6 +205,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_STOP_TEST_CNF:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_STOP_TEST_CNF to Tool");
 						send_EventorResponse(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -201,6 +213,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_GET_RESULT_CNF:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_GET_RESULT_CNF to Tool");
 						send_EventorResponse(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
@@ -208,6 +221,7 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_DEVICE_RESET_CNF:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_DEVICE_RESET_CNF to Tool");
 						send_EventorResponse(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;

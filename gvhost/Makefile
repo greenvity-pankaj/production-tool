@@ -36,7 +36,8 @@ endif
 ifeq "$(TARGET)" "imx233"
   #Compiler to be used arm-2011.09-70-arm-none-linux-gnueabi.bin
   #CC=~/CodeSourcery/Sourcery_CodeBench_Lite_for_ARM_GNU_Linux/bin/arm-none-linux-gnueabi-gcc
-  CC=/opt/freescale/usr/local/gcc-4.1.2-glibc-2.5-nptl-3/arm-none-linux-gnueabi/bin/arm-none-linux-gnueabi-gcc
+  #CC=/opt/freescale/usr/local/gcc-4.1.2-glibc-2.5-nptl-3/arm-none-linux-gnueabi/bin/arm-none-linux-gnueabi-gcc
+  CC=/usr/bin/arm-linux-gnueabi-gcc
 #  CFLAGS= -static -g
    CFLAGS= -Wall -g -fPIC \
 	-I$(enclosing_dir)\
@@ -81,8 +82,8 @@ all: $(CFILES)
 	$(TXTRESET)
 	$(CC) $(CFILES) $(CFLAGS) -o $(EXE_NAME) $(LIBS)
 	@echo "----------------------------------------------------------"
-	sudo rm /opt/greenvity/server/*.out
-	sudo cp $(shell pwd)/*.out /opt/greenvity/server
-	sudo cp $(shell pwd)/msglog_runtime_config.txt  /opt/greenvity/server	
+	#sudo rm /opt/greenvity/server/*.out
+	#sudo cp $(shell pwd)/*.out /opt/greenvity/server
+	#sudo cp $(shell pwd)/msglog_runtime_config.txt  /opt/greenvity/server	
 clean:
 	rm $(shell pwd)/*.out

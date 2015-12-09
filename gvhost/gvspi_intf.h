@@ -16,11 +16,17 @@
 
 #define MAX_PKT_BUFFSIZE							250
 
+// Externs
+extern char gv_ip_addr_raw[16];
+extern char gv_interface_raw[IFNAMSIZ];
+
 
 int gvspi_rawsock_init (void);
 void gvspi_rx (void) ;
 int gvspi_tx(u8 *dest_mac, u8 *data_buff, 
 		   u8 data_len, bool mgmt_frm); 
+void *gvspi_sock_server (void *sock);
+
 
 #endif // SOCKET_INTF_H
 

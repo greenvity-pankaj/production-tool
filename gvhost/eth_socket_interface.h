@@ -19,6 +19,17 @@
 #define MAX_FW_VER_LEN	16
 
 /*--- Enum Declaration ---*/
+
+// Status messages
+typedef enum {
+
+	NULL_STATE			= 0,
+	RET_MSG_ERROR		= 1,
+	RET_MSG_SUCCESS 	= 2,
+
+} STATUS_MESSAGES;
+
+
 // Test Id
 enum
 {
@@ -83,11 +94,19 @@ typedef struct _response{
 	
 }PACKED response;
 
-/*--- Function declarations ---*/
-void eth_socket_init(void);
-void *eth_socket_comm(void* sock);
-bool eth_socketSend(void* buffer, u16 len);
-void connect_w_to(void) ;
+/*--- Externarations ---*/
+char gv_interface_eth[IFNAMSIZ];
+char gv_ip_addr_eth[16];
 
+
+/*--- Function declarations ---*/
+STATUS_MESSAGES eth_socket_init(void);
+void *eth_socket_comm(void* sock);
+void eth_socketSend(void* buffer, u16 len);
+void close_eth_socket(void);
+
+int set_MACAddr(void);
+char *getIP(void);
+int set_ip(char *iface_name, char *ip_addr);
 
 #endif /*_GV_SOCKET_INTF_*/

@@ -53,15 +53,17 @@ extern pthread_mutex_t mutex;
 int gvspi_raw_txsocket = -1;
 int gvspi_raw_rxsocket = -1;
 
+u16 g_cmd_line_llp_protocol = 0x88e2;
+
+char gv_interface_raw[IFNAMSIZ]="";
+char gv_ip_addr_raw[16]="";
+
 struct sockaddr_ll  sock_address;
 
 char macaddr_raw[18]="";
 mac_addr_t gv_controller_mac_addr;
 u8 gv_brdcst_mac_addr[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-
-extern char gv_ip_addr_raw[16];
-extern char gv_interface_raw[IFNAMSIZ];
-extern uint16_t g_cmd_line_llp_protocol;
+ 
 
 
 int gvspi_rawsock_init (void) 
@@ -121,34 +123,31 @@ int gvspi_rawsock_init (void)
 }
 
 
-void *gvspi_sock_server ( void *sock ) 
-{	
-	MSGLOG(GVSPI,LOG_INFO,"Socket Thread started");
-	while (1) {
-		gvspi_rx ();
-		usleep( 10000 );
-	}
-}
+void *gvspi_sock_server(void *sock){
+	
+	int length = 0;
+	u8 data_buff[MAX_PKT_BUFFSIZE]; 
 
-void gvspi_rx (void) 
-{
-	int length;
-	u8 data_buff[MAX_PKT_BUFFSIZE];	
-
-	while (1) 
-	{
+	MSGLOG(GVSPI,LOG_INFO,"GVSPI Socket Thread started ...");
+	while(GVSPI_THREAD_CONTINUE){
+		
+		memset(&data_buff[0], 0, MAX_PKT_BUFFSIZE);
+		
 		length = recvfrom(gvspi_raw_rxsocket, data_buff, MAX_PKT_BUFFSIZE, 0, NULL, NULL);
-		if (length == -1) 
-		{ 
+		if (length == -1){
+			
 			MSGLOG(GVSPI,LOG_ERR,"RAW Socket RX error");
+			if(GVSPI_THREAD_CONTINUE) delay_ms(10);
 			continue;
+			
 		} else {
+		
 			header * frmHead = (header *)data_buff;
 			if(frmHead->protocolID == PROD_TOOL_PROTOCOL){
-
+		
 				// acquire mutex
 				pthread_mutex_lock(&mutex);
-
+		
 				// frame parsing here
 				run_through_state_machine(data_buff,length);
 		
@@ -157,10 +156,14 @@ void gvspi_rx (void)
 			}
 		}
 
-
-		// clear buffer before receiving
-		memset(&data_buff[0], 0, MAX_PKT_BUFFSIZE);
+		sched_yield();
+		if(GVSPI_THREAD_CONTINUE) delay_ms(10);
 	}
+
+	MSGLOG(GVSPI, LOG_INFO, "Terminating GVSPI receive thread of Production Tool Client Application");
+	pthread_exit(NULL);
+	return NULL;
+
 }
 
 int gvspi_tx(u8 *dest_mac, u8 *data_buff, u8 data_len, bool mgmt_frm) 

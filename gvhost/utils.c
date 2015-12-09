@@ -37,12 +37,14 @@
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "llp_defines.h"
 #include "msglog.h"
 #include "eth_socket_interface.h"
 
 u32 numMemAlloc = 0;
+int err_num = 0;
 
 //wrapper functions for malloc and free
 void *gvMalloc(u32 size){
@@ -53,9 +55,45 @@ void *gvMalloc(u32 size){
 }
 
 void gvFree(void *ptr){
-	free(ptr);
-	numMemAlloc--;
+	if(ptr){
+		free(ptr);
+		numMemAlloc--;
+	}
 }
+
+/*_______________________________________________*/
+
+/*--- Delay functions ---*/
+
+int delay_sec(int sec){
+
+	int ret = 0;
+	ret = sleep(sec);
+	err_num = errno;
+	return ret;
+
+}
+
+int delay_ms(int ms){
+
+#define MS_BASE		1000
+
+	int ret = 0;
+	ret = usleep(ms * MS_BASE);
+	err_num = errno;
+	return ret;
+
+}
+
+int delay_us(int us){
+
+	int ret = 0;
+	ret = usleep(us);
+	err_num = errno;
+	return ret;
+
+}
+/*_______________________________________________*/
 
 void *memcpy_rev( u8 *p_dst, const u8 *p_src, unsigned int count )
 { 
@@ -160,4 +198,119 @@ unsigned char get_mac_addr(char * if_name, char * macaddress) {
 		return 0;
 	}
 }
+
+#if 0
+// Connect to server with timeout
+void connect_w_to(void) { 
+  int res; 
+  struct sockaddr_in addr; 
+  long arg; 
+  fd_set myset; 
+  struct timeval tv; 
+  int valopt; 
+  socklen_t lon; 
+
+  MSGLOG(SERVER,LOG_DEBUG,"Initializing gv eth socket...");
+
+  // Create socket 
+  eth_sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+  if (eth_sockfd < 0) { 
+     fprintf(stderr, "Error creating socket (%d %s)\n", errno, strerror(errno)); 
+     exit(0); 
+  } 
+
+  addr.sin_family = AF_INET; 
+  addr.sin_port = htons(gv_port_eth); 
+  addr.sin_addr.s_addr = inet_addr(server_ip_addr_eth); 
+
+  // Set non-blocking 
+  if( (arg = fcntl(eth_sockfd, F_GETFL, NULL)) < 0) { 
+     fprintf(stderr, "Error fcntl(..., F_GETFL) (%s)\n", strerror(errno)); 
+     exit(0); 
+  } 
+  arg |= O_NONBLOCK; 
+  if( fcntl(eth_sockfd, F_SETFL, arg) < 0) { 
+     fprintf(stderr, "Error fcntl(..., F_SETFL) (%s)\n", strerror(errno)); 
+     exit(0); 
+  } 
+  // Trying to connect with timeout 
+  res = connect(eth_sockfd, (struct sockaddr *)&addr, sizeof(addr)); 
+  if (res < 0) { 
+     if (errno == EINPROGRESS) { 
+        fprintf(stderr, "EINPROGRESS in connect() - selecting\n"); 
+        do { 
+           tv.tv_sec = 15; 
+           tv.tv_usec = 0; 
+           FD_ZERO(&myset); 
+           FD_SET(eth_sockfd, &myset); 
+           res = select(eth_sockfd+1, NULL, &myset, NULL, &tv); 
+           if (res < 0 && errno != EINTR) { 
+              fprintf(stderr, "Error connecting %d - %s\n", errno, strerror(errno)); 
+              exit(0); 
+           } 
+           else if (res > 0) { 
+              // Socket selected for write 
+              lon = sizeof(int); 
+              if (getsockopt(eth_sockfd, SOL_SOCKET, SO_ERROR, (void*)(&valopt), &lon) < 0) { 
+                 fprintf(stderr, "Error in getsockopt() %d - %s\n", errno, strerror(errno)); 
+                 exit(0); 
+              } 
+              // Check the value returned... 
+              if (valopt) { 
+                 fprintf(stderr, "Error in delayed connection() %d - %s\n", valopt, strerror(valopt)); 
+                 exit(0); 
+              } 
+              break; 
+           } 
+           else { 
+              fprintf(stderr, "Timeout in select() - Cancelling!\n"); 
+              exit(0); 
+           } 
+        } while (1); 
+     } 
+     else { 
+        fprintf(stderr, "Error connecting %d - %s\n", errno, strerror(errno)); 
+        exit(0); 
+     } 
+  } 
+  // Set to blocking mode again... 
+  if( (arg = fcntl(eth_sockfd, F_GETFL, NULL)) < 0) { 
+     fprintf(stderr, "Error fcntl(..., F_GETFL) (%s)\n", strerror(errno)); 
+     exit(0); 
+  } 
+  arg &= (~O_NONBLOCK); 
+  if( fcntl(eth_sockfd, F_SETFL, arg) < 0) { 
+     fprintf(stderr, "Error fcntl(..., F_SETFL) (%s)\n", strerror(errno)); 
+     exit(0); 
+  } 
+  // I hope that is all 
+  	MSGLOG(SERVER,LOG_DEBUG,"IPv4 TCP Clinet Connected...");
+}
+
+
+// Read HW MAC address
+char * read_MACAddr (void){
+
+  int fd, length;
+  struct stat file_info;
+  char* buffer;
+
+  fd = open ("/sys/class/net/eth0/address", O_RDONLY);
+
+  fstat (fd, &file_info);
+  length = file_info.st_size;
+  /* Make sure the file is an ordinary file.  */
+  if (!S_ISREG (file_info.st_mode)) {
+    close (fd);
+  }
+
+  buffer = (char*) malloc (length);
+  read (fd, buffer, length);
+
+  close (fd);
+  return buffer;
+  
+}
+
+#endif
 

@@ -489,7 +489,7 @@ Partial Class HomeScreen
         Me.Margin = New System.Windows.Forms.Padding(3, 4, 3, 4)
         Me.MaximizeBox = False
         Me.Name = "HomeScreen"
-        Me.Text = "Greenvity Production Tool version 2.0"
+        Me.Text = "Greenvity Production Tool version 2.1"
         Me.GroupBox1.ResumeLayout(False)
         Me.grpbxTests.ResumeLayout(False)
         Me.grpbxTests.PerformLayout()

@@ -5,6 +5,7 @@ Public Class ConnectedClient
     Const BYTES_TO_READ As Integer = 512
     Public mClient As System.Net.Sockets.TcpClient
     Public mDevType As UInteger
+    Private RunThread = New Boolean
     Private readThread As System.Threading.Thread
     Private Const MESSAGE_DELIMITER As Char = ControlChars.Cr
 
@@ -17,6 +18,7 @@ Public Class ConnectedClient
     Sub New(ByVal client As System.Net.Sockets.TcpClient)
 
         mClient = client
+        RunThread = True
 
         readThread = New System.Threading.Thread(AddressOf doRead)
         readThread.IsBackground = True
@@ -29,7 +31,8 @@ Public Class ConnectedClient
         mClient.GetStream.Flush()
         mClient.GetStream.Close()
         mClient.Close()
-        readThread.Abort()
+        'readThread.Abort()     'Thread abort throws expection, better to do it using a control boolean variable
+        RunThread = False
     End Sub
     '
     '   Read data
@@ -44,12 +47,11 @@ Public Class ConnectedClient
                 If mClient.Connected Then
                     If mClient.GetStream.CanRead Then
                         bytesRead = mClient.GetStream.Read(readBuffer, 0, BYTES_TO_READ)
-                        If (bytesRead > 0) Then
 
+                        If (bytesRead > 0) Then
                             SyncLock lockObj
                                 RaiseEvent dataReceived(Me, readBuffer)
                             End SyncLock
-
                             mClient.GetStream.Flush()
                         End If
 
@@ -74,11 +76,14 @@ Public Class ConnectedClient
                 End If
 
             End Try
+
             Threading.Thread.Sleep(5)
-        Loop
+        Loop While RunThread
 
     End Sub
-
+    '
+    '   Send data to the client
+    '
     Public Sub SendMessage(ByVal msg As Byte())
 
         Try

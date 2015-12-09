@@ -106,12 +106,12 @@ Public Class HomeScreen
 #Region "Required Variables"
 
     '   Boolean Variables
-    Public DUT_UP As Boolean = False
-    Public REF_UP As Boolean = False
-    Public lineSent As Boolean = False
-    Public devicesUP As Boolean = False
-    Public testRunning As Boolean = False
-    Public setPowerMode As Boolean = False
+    Private DUT_UP As New Boolean
+    Private REF_UP As New Boolean
+    Private lineSent As New Boolean
+    Private devicesUP As New Boolean
+    Private testRunning As New Boolean
+    Private setPowerMode As New Boolean
     Public userPLCTXPramasSet As New Boolean
     Public userPLCRXPramasSet As New Boolean
     Private sweepTestRunning As New Boolean
@@ -122,7 +122,7 @@ Public Class HomeScreen
     Private Delegate Sub _AddClient(ByVal client As Socket, ByVal type As RunTest.ClientType)
 
     '   Directory
-    Public clDirectory = New Dictionary(Of String, ConnectedClient)
+    Private clDirectory = New Dictionary(Of String, ConnectedClient)
 
     '   Enum Variables
     Public testParamsFor As tests
@@ -133,8 +133,8 @@ Public Class HomeScreen
     Private elapsed_time As TimeSpan = Nothing
 
     '   Integers Variables
-    Dim minVal As Decimal = 0
-    Dim maxVal As Decimal = 130
+    Private minVal As Decimal = 0
+    Private maxVal As Decimal = 130
     Private port As Integer = 54321
     Private swpCount As New UInteger
     Private rfswpCount As New UInteger
@@ -145,23 +145,18 @@ Public Class HomeScreen
     Private RF_FRM_NUM As Integer = 200
 
     '   Lists
-    Public sockets As List(Of Socket)
-    Public clients As New List(Of ConnectedClient)
-    Public qExecStatus As New List(Of tests)
-    Public defTestQ As New List(Of tests)
-    'Private FrmLenArr As New List(Of UInteger)(New UInteger() {100, 250, 500, 800, 1000})
-    'Private FrmLenArr As New List(Of UInteger)(New UInteger() {100, 500, 1000})
+    Private sockets As List(Of Socket)
+    Private clients As New List(Of ConnectedClient)
+    Private qExecStatus As New List(Of tests)
+    Private defTestQ As New List(Of tests)
     Private FrmLenArr As New List(Of UInteger)(New UInteger() {100, 500})
     Private RFChannelList As New List(Of Byte)(New Byte() {&HF, &H14, &H1A})
-    'Private RFChannelList As New List(Of Byte)(New Byte() {&HB, &HC, &HD, &HE, &HF, &H10, &H11, &H12, &H13, &H14, &H15, &H16, &H17, &H18, &H19, &H1A})
 
     '   Queue
     Private sweepParamList As New Queue(Of spiTXTestSettings._sPlcSimTxTestParams)
     Private RFChannelParamList As New Queue(Of spiTXTestSettings.sRfTxTestParams)
 
     '   Sockets
-    Public serverSocket As Socket
-    Public clientSocket As Socket
     Private serverStream As NetworkStream
     Private listener As System.Net.Sockets.TcpListener
 
@@ -385,6 +380,7 @@ Public Class HomeScreen
             AddHandler connClient.dataReceived, AddressOf Me.messageReceived
             clients.Add(connClient)
             lvClients.Items.Add(incomingClient.Client.RemoteEndPoint.ToString.Split(":"c).First)
+            Threading.Thread.Sleep(5)
         Loop
 
     End Sub
@@ -3279,7 +3275,8 @@ Public Class HomeScreen
                 bar.PerformStep()
 
                 If bar.Value >= bar.Maximum Then
-                    System.Threading.Thread.Sleep(30)
+                    bar.Value = bar.Maximum
+                    System.Threading.Thread.Sleep(50)
                     bar.Value = bar.Minimum
                 End If
             End SyncLock
@@ -3291,6 +3288,7 @@ Public Class HomeScreen
     Private Sub clearBar()
         Try
             SyncLock objForUI
+                bar.Value = bar.Maximum
                 System.Threading.Thread.Sleep(30)
                 bar.Value = bar.Minimum
             End SyncLock

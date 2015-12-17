@@ -149,7 +149,7 @@ void register_segmentation_fault_handler(void){
 **	Revision 1.1 : Two threaded application for connection between Windows Tool and 
 **				GVSPI net driver.
 **	Revision 1.2 : Linux signal handlers, Windows Tool connection retry, thread control 
-**				using global boolean variable, version control, segmentation fault handler.
+**				using global boolean variables, version control, segmentation fault handler.
 **
 */
 
@@ -196,8 +196,9 @@ int main (void){
 	
 	mslog_init();
 	app_version_control();
-	
-	set_MACAddr();	
+
+	// set random MAC address and IP address
+	set_MACAddr();
 	set_ip("eth0", getIP());
 
 	// Find the ethernet interface

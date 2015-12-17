@@ -25,5 +25,7 @@ if [ ! -f /opt/greenvity/ghdd/ghdd_config.txt ]; then
 	mv ghdd_config.txt /opt/greenvity/ghdd/ghdd_config.txt
 fi
 
+"/root/turn_on_wifi.sh"
+sleep 1
 #insmod /opt/greenvity/ghdd/ghdd.ko
 "/opt/greenvity/prodTool/gv_server.out"

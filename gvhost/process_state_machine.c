@@ -51,10 +51,10 @@ extern int gvspi_raw_txsocket;
 
 void send_EventorResponse(u8 *rxBuffer, int readLength){
 
-	u8 *buffer = gvMalloc(readLength + 1); // for "\r"
+	u8 *buffer = gvMalloc(readLength + 1); // for '\r'
 	if(buffer){
 		memcpy(buffer, rxBuffer, readLength);
-		strncpy((char*)&buffer[readLength + 1], "\r", 1);
+		buffer[readLength] = '\r';
 		eth_socketSend(buffer,readLength + 1);
 		gvFree(buffer);
 	}

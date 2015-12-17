@@ -2,7 +2,7 @@
 Imports System.Text, System.IO, System.Threading
 Imports System.Collections, System.Collections.Generic, System.ComponentModel, System.Management
 Imports System.Runtime.InteropServices
-Imports Excel = Microsoft.Office.Interop.Excel
+'Imports Excel = Microsoft.Office.Interop.Excel
 
 Public Class shpgpStats
 
@@ -10,9 +10,8 @@ Public Class shpgpStats
     Public filePath As String = String.Empty
     Public lotSummaryFilePath As String = String.Empty
     Public serialtoMACFilePath As String = String.Empty
+    Private o = New Object
 
-    '   Row Offset
-    Private ROWOFFSET As Integer = 5
     '
     '   RF Calibration Methods
     '
@@ -141,20 +140,6 @@ Public Class shpgpStats
 #End Region
 
     '
-    '   load
-    '
-    Sub New()
-        'Try
-        '    filePath = System.IO.Path.Combine(My.Computer.FileSystem.SpecialDirectories.MyDocuments, "Test Results.txt")
-        '    If Not System.IO.File.Exists(filePath) Then
-        '        System.IO.File.Create(filePath).Dispose()
-        '    End If
-        'Catch fileException As Exception
-        '    MessageBox.Show(fileException.ToString)
-        'End Try
-    End Sub
-
-    '
     '   Log PLC Test Results
     '
     Private Sub logPLCResults(ByRef m As HomeScreen.metadata, ByRef sw As StreamWriter)
@@ -163,15 +148,24 @@ Public Class shpgpStats
         sw.WriteLine("Parameters - ")
         sw.Write(vbNewLine)
 
-        If m.testPramas.txpowermode = 2 Then
-            sw.WriteLine("High Power Mode")
-        ElseIf m.testPramas.txpowermode = 0 Then
-            sw.WriteLine("Low Power Mode")
+        Dim ermode As String = String.Empty
+        If m.testPramas.ermode = TestSettings.erModestate.erModeOFF Then
+            ermode = "erMode OFF"
+        ElseIf m.testPramas.ermode = TestSettings.erModestate.erModeON Then
+            ermode = "erMode ON"
         End If
 
-        If m.testPramas.mcstMode = 1 Then
+        If m.testPramas.txpowermode = TestSettings.eTxPwrMode.HIGH_TX_POWER_MODE Then
+            sw.WriteLine("High Power Mode" & "   " & ermode)
+        ElseIf m.testPramas.txpowermode = TestSettings.eTxPwrMode.NORMAL_TX_POWER_MODE Then
+            sw.WriteLine("Normal Power Mode" & "   " & ermode)
+        ElseIf m.testPramas.txpowermode = TestSettings.eTxPwrMode.AUTOMOTIVE_TX_POWER_MODE Then
+            sw.WriteLine("Auto Power Mode" & "   " & ermode)
+        End If
+
+        If m.testPramas.mcstMode = TestSettings.eFrmMcstMode.HPGP_MCST Then
             sw.WriteLine("Mode = Multicast")
-        Else
+        ElseIf m.testPramas.mcstMode = TestSettings.eFrmMcstMode.HPGP_UCST Then
             sw.WriteLine("Mode = Unicast")
         End If
 
@@ -180,20 +174,20 @@ Public Class shpgpStats
 
         If m.testPramas.eks.ToString = "15" Then
             sw.WriteLine("Key Index = 0x0F " & "   " & "Encryption = " & _
-                     CType([Enum].Parse(GetType(spiTXTestSettings.eSecTestMode), _
-                                        m.testPramas.secTestMode), spiTXTestSettings.eSecTestMode).ToString)
+                     CType([Enum].Parse(GetType(TestSettings.eSecTestMode), _
+                                        m.testPramas.secTestMode), TestSettings.eSecTestMode).ToString)
         Else
             sw.WriteLine("Key Index = " & m.testPramas.eks.ToString & "   " & "Encryption = " & _
-                     CType([Enum].Parse(GetType(spiTXTestSettings.eSecTestMode), _
-                                        m.testPramas.secTestMode), spiTXTestSettings.eSecTestMode).ToString)
+                     CType([Enum].Parse(GetType(TestSettings.eSecTestMode), _
+                                        m.testPramas.secTestMode), TestSettings.eSecTestMode).ToString)
         End If
 
         sw.WriteLine("Frame Type = " & _
-                     CType([Enum].Parse(GetType(spiTXTestSettings.eFrmType), m.testPramas.frmType),  _
-                         spiTXTestSettings.eFrmType).ToString _
+                     CType([Enum].Parse(GetType(TestSettings.eFrmType), m.testPramas.frmType),  _
+                         TestSettings.eFrmType).ToString _
                      & "   " & "Length Test Mode = " & _
-                     CType([Enum].Parse(GetType(spiTXTestSettings.eLenTestMode), _
-                                        m.testPramas.lenTestMode), spiTXTestSettings.eLenTestMode).ToString)
+                     CType([Enum].Parse(GetType(TestSettings.eLenTestMode), _
+                                        m.testPramas.lenTestMode), TestSettings.eLenTestMode).ToString)
         sw.Write(vbNewLine)
 
         '   Append PLC Result
@@ -286,194 +280,77 @@ Public Class shpgpStats
     End Sub
 
     '
-    '   Create Lot summary file   
-    '
-    Public Sub createSummaryLog(ByVal s As HomeScreen.summary)
-
-        ' If lot summary file does not exist then create the file
-        Dim path As String = System.IO.Path.Combine(s.filepath, "Lot Summary.xls")
-
-        If Not My.Computer.FileSystem.FileExists(path) Then
-
-            Dim xlApp As Excel.Application = New Microsoft.Office.Interop.Excel.Application()
-
-            If xlApp Is Nothing Then
-                MessageBox.Show("Excel is not properly installed!!")
-                Return
-            End If
-
-            Dim xlWorkBook As Excel.Workbook = Nothing
-            Dim xlWorkSheet As Excel.Worksheet = Nothing
-            Dim misValue As Object = System.Reflection.Missing.Value
-
-            xlWorkBook = xlApp.Workbooks.Add(misValue)
-            xlWorkSheet = xlWorkBook.Sheets("sheet1")
-
-            ' Heading
-            Dim chartRange As Excel.Range
-            chartRange = xlWorkSheet.Range("a1", "d1")
-            chartRange.Merge()
-            chartRange = xlWorkSheet.Range("a2", "d2")
-            chartRange.Merge()
-
-            chartRange = xlWorkSheet.Range("a1", "d1")
-            chartRange.FormulaR1C1 = "Lot 1 Summary"
-            chartRange.HorizontalAlignment = 3
-            chartRange.VerticalAlignment = 3
-            chartRange.Font.Size = 18
-
-            xlWorkSheet.Cells(3, 1) = "Serial Number"
-            xlWorkSheet.Cells(3, 2) = "MAC Address"
-            xlWorkSheet.Cells(3, 3) = "Final Result"
-            xlWorkSheet.Cells(3, 4) = "Pass Tests Stats"
-            xlWorkSheet.Range("3:4").EntireColumn.AutoFit()
-
-            ' make it bold
-            Dim formatRange As Excel.Range
-            formatRange = xlWorkSheet.Range("a1")
-            formatRange.EntireRow.Font.Bold = True
-            formatRange = xlWorkSheet.Range("a3")
-            formatRange.EntireRow.Font.Bold = True
-
-            ' Fix first row
-            xlWorkSheet.Activate()
-            xlWorkSheet.Application.ActiveWindow.SplitRow = 4
-            xlWorkSheet.Application.ActiveWindow.FreezePanes = True
-
-            xlWorkBook.SaveAs(path, Excel.XlFileFormat.xlWorkbookNormal, misValue, misValue, misValue, misValue, _
-             Excel.XlSaveAsAccessMode.xlExclusive, misValue, misValue, misValue, misValue, misValue)
-            xlWorkBook.Close(True, misValue, misValue)
-            xlApp.Quit()
-
-            releaseObject(xlWorkSheet)
-            releaseObject(xlWorkBook)
-            releaseObject(xlApp)
-
-            MessageBox.Show("Excel file created , you can find the file " & path)
-        End If
-
-    End Sub
-
-    '
-    '   Write Summary in Excel file
+    '   Write Summary in tabbed text file
     '
     Public Sub logSumary(ByVal s As HomeScreen.summary)
         Try
-            Dim path As String = System.IO.Path.Combine(s.filepath, "Lot Summary.xls")
+            Dim path As String = System.IO.Path.Combine(s.filepath, "Lot Summary.txt")
+            If My.Computer.FileSystem.FileExists(path) Then
 
-            Dim xlApp As Excel.Application = New Microsoft.Office.Interop.Excel.Application()
-            If xlApp Is Nothing Then
-                MessageBox.Show("Excel is not properly installed!!")
-                Return
+                Dim sw = New StreamWriter(path, True)
+
+                ' Calculate how many tests are passed
+                Dim pass As Integer = 0
+                For Each t As HomeScreen.variations In s.tests
+                    If t.result = True Then
+                        pass += 1
+                    End If
+                Next
+                Dim passStr As String = "0 " & pass.ToString & "/" & s.tests.Count.ToString
+                Using sw
+                    sw.WriteLine(s.serialNum & vbTab & s.MAC & vbTab & s.finalResult & vbTab & passStr)
+                End Using
+
+            Else    ' if the log file does not exist then create and write first entry
+
+                Dim sw = New StreamWriter(path, True)
+
+                ' Calculate how many tests are passed
+                Dim pass As Integer = 0
+                For Each t As HomeScreen.variations In s.tests
+                    If t.result = True Then
+                        pass += 1
+                    End If
+                Next
+                Dim passStr As String = "0 " & pass.ToString & "/" & s.tests.Count.ToString
+                Using sw
+                    sw.WriteLine("Serial Number" & vbTab & "MAC Address" & vbTab & "Final Result" & vbTab & "Pass Tests Stats")
+                    sw.WriteLine(s.serialNum & vbTab & s.MAC & vbTab & s.finalResult & vbTab & passStr)
+                End Using
+
             End If
-
-            Dim xlWorkBook As New Excel.Workbook
-            xlWorkBook = xlApp.Workbooks.Open(path)
-
-            Dim xlWorkSheet As Excel.Worksheet
-            xlWorkSheet = xlWorkBook.Sheets("sheet1")
-
-            '   Fill values
-            xlWorkSheet.Cells(ROWOFFSET, 1) = s.serialNum
-            xlWorkSheet.Cells(ROWOFFSET, 2) = s.MAC
-            xlWorkSheet.Cells(ROWOFFSET, 3) = s.finalResult
-
-            Dim pass As Integer = 0
-            For Each t As HomeScreen.variations In s.tests
-                If t.result = True Then
-                    pass += 1
-                End If
-            Next
-            xlWorkSheet.Cells(ROWOFFSET, 4) = pass.ToString & "/" & s.tests.Count.ToString
-
-            ' ready ROWOFFSET for next iteration
-            ROWOFFSET += 1
-
-            xlWorkBook.SaveAs(path)
-            xlWorkBook.Close(True)
-            xlApp.Quit()
-
-            releaseObject(xlWorkSheet)
-            releaseObject(xlWorkBook)
-            releaseObject(xlApp)
+            
         Catch ex As Exception
             MessageBox.Show(ex.ToString)
         End Try
     End Sub
 
     '
-    '
-    '
-    Private Sub create_serialToMAC_file(ByRef s As HomeScreen.summary)
-        ' If lot summary file does not exist then create the file
-        s.xlfilepath = System.IO.Path.Combine(s.filepath, "Serial to MAC mapping.xls")
-
-        If Not My.Computer.FileSystem.FileExists(s.xlfilepath) Then
-
-            Dim xlApp As Excel.Application = New Microsoft.Office.Interop.Excel.Application()
-
-            If xlApp Is Nothing Then
-                MessageBox.Show("Excel is not properly installed!!")
-                Return
-            End If
-
-            Dim xlWorkBook As Excel.Workbook = Nothing
-            Dim xlWorkSheet As Excel.Worksheet = Nothing
-            Dim misValue As Object = System.Reflection.Missing.Value
-
-            xlWorkBook = xlApp.Workbooks.Add(misValue)
-            xlWorkSheet = xlWorkBook.Sheets("sheet1")
-
-            xlWorkSheet.Cells(1, 1) = "Serial Number"
-            xlWorkSheet.Cells(1, 2) = "MAC Address"
-
-            xlWorkBook.SaveAs(s.xlfilepath, Excel.XlFileFormat.xlWorkbookNormal, misValue, misValue, misValue, misValue, _
-             Excel.XlSaveAsAccessMode.xlExclusive, misValue, misValue, misValue, misValue, misValue)
-            xlWorkBook.Close(True, misValue, misValue)
-            xlApp.Quit()
-
-            releaseObject(xlWorkSheet)
-            releaseObject(xlWorkBook)
-            releaseObject(xlApp)
-
-            MessageBox.Show("Excel file created , you can find the file " & s.xlfilepath)
-        End If
-    End Sub
-
-    '
     '   Serial number to MAC address mapping
     '
-    Dim macRowOffset As Integer = 3
     Public Sub serialToMAC_map(ByVal s As HomeScreen.summary)
-        create_serialToMAC_file(s)
 
         Try
-            Dim xlApp As Excel.Application = New Microsoft.Office.Interop.Excel.Application()
-            If xlApp Is Nothing Then
-                MessageBox.Show("Excel is not properly installed!!")
-                Return
+            ' If lot summary file does not exist then create the file
+            s.xlfilepath = System.IO.Path.Combine(s.filepath, "Serial to MAC mapping.txt")
+
+            If My.Computer.FileSystem.FileExists(s.xlfilepath) Then
+
+                Dim sw = New StreamWriter(s.xlfilepath, True)
+                Using sw
+                    sw.WriteLine(s.serialNum & vbTab & s.MAC)
+                End Using
+
+            Else    ' if the log file does not exist then create and write first entry
+
+                Dim sw = New StreamWriter(s.xlfilepath, True)
+                Using sw
+                    sw.WriteLine("Serial Number" & vbTab & "MAC Address")
+                    sw.WriteLine(s.serialNum & vbTab & s.MAC)
+                End Using
+
             End If
 
-            Dim xlWorkBook As New Excel.Workbook
-            xlWorkBook = xlApp.Workbooks.Open(s.xlfilepath)
-
-            Dim xlWorkSheet As Excel.Worksheet
-            xlWorkSheet = xlWorkBook.Sheets("sheet1")
-
-            '   Fill values
-            xlWorkSheet.Cells(macRowOffset, 1) = s.serialNum
-            xlWorkSheet.Cells(macRowOffset, 2) = s.MAC
-
-            ' ready ROWOFFSET for next iteration
-            macRowOffset += 1
-
-            xlWorkBook.SaveAs(s.xlfilepath)
-            xlWorkBook.Close(True)
-            xlApp.Quit()
-
-            releaseObject(xlWorkSheet)
-            releaseObject(xlWorkBook)
-            releaseObject(xlApp)
         Catch ex As Exception
             MessageBox.Show(ex.ToString)
         End Try
@@ -494,7 +371,6 @@ Public Class shpgpStats
         End Try
     End Sub
 
-    Private o = New Object
     Public Sub dumpinFile(ByVal arr As Byte())
         Try
             SyncLock o

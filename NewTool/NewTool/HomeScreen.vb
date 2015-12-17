@@ -72,9 +72,9 @@ Public Class HomeScreen
         Public filePath As String
         Public serialNum As String
         Public lotnumber As String
-        Public testPramas As spiTXTestSettings._sPlcSimTxTestParams
+        Public testPramas As TestSettings._sPlcSimTxTestParams
         Public rsp As shpgpStats._plcTxTestResults_t
-        Public rftestPramas As spiTXTestSettings.sRfTxTestParams
+        Public rftestPramas As TestSettings.sRfTxTestParams
         Public rf_rsp As shpgpStats._sRfStats
         Public intf As RunTest.TestInterface
     End Structure
@@ -118,6 +118,7 @@ Public Class HomeScreen
 
     '   Delegates
     Private Delegate Sub _initUIDelegate()
+    Private Delegate Sub _addtoLVClient(s As String)
     Private Delegate Function getSelectedLVIItemDelegate()
     Private Delegate Sub _AddClient(ByVal client As Socket, ByVal type As RunTest.ClientType)
 
@@ -126,6 +127,8 @@ Public Class HomeScreen
 
     '   Enum Variables
     Public testParamsFor As tests
+    Private DUTCapbility As New capability
+    Private REFCapbility As New capability
 
     '   Duration Calculations
     Private stop_time As DateTime = Nothing
@@ -133,16 +136,18 @@ Public Class HomeScreen
     Private elapsed_time As TimeSpan = Nothing
 
     '   Integers Variables
+    Public plcTestThreshold As Decimal = 10
+    Public rfTestThreshold As Decimal = 10
     Private minVal As Decimal = 0
     Private maxVal As Decimal = 130
     Private port As Integer = 54321
     Private swpCount As New UInteger
-    Private rfswpCount As New UInteger
     Private runCount As New UInteger
-    Public threshold As UInteger = 10
     Private serverThreadCount As Integer = 0
     Private pendingConnections As Integer = 5
     Private RF_FRM_NUM As Integer = 200
+    Public RF_CHANNEL As Byte = &HF
+    Public gMACcounter = New ULong
 
     '   Lists
     Private sockets As List(Of Socket)
@@ -152,12 +157,14 @@ Public Class HomeScreen
     Private FrmLenArr As New List(Of UInteger)(New UInteger() {100, 500})
     Private RFChannelList As New List(Of Byte)(New Byte() {&HF, &H14, &H1A})
 
-    '   Queue
-    Private sweepParamList As New Queue(Of spiTXTestSettings._sPlcSimTxTestParams)
-    Private RFChannelParamList As New Queue(Of spiTXTestSettings.sRfTxTestParams)
+    ' Objects   >> used for UI object control
+    Private objForUI = New Object()
 
-    '   Sockets
-    Private serverStream As NetworkStream
+    '   Queue
+    Private sweepParamList As New Queue(Of TestSettings._sPlcSimTxTestParams)
+    Private RFChannelParamList As New Queue(Of TestSettings.sRfTxTestParams)
+
+    '   Listener
     Private listener As System.Net.Sockets.TcpListener
 
     '   String Variables
@@ -169,14 +176,12 @@ Public Class HomeScreen
     Public m As metadata
     Public s As New summary
     Public status As New execState
-    Public plcRXparams As New spiTXTestSettings._sPlcSimTxTestParams
-    Public plcTXparams As New spiTXTestSettings._sPlcSimTxTestParams
-    Public gtxTest As New spiTXTestSettings._sPlcSimTxTestParams  'global variable to carry PLC test parameter
-    Public rfgtxTest As New spiTXTestSettings.sRfTxTestParams  'global variable to carry RF test parameter
+    Public plcRXparams As New TestSettings._sPlcSimTxTestParams
+    Public plcTXparams As New TestSettings._sPlcSimTxTestParams
+    Public gtxTest As New TestSettings._sPlcSimTxTestParams  'global variable to carry PLC test parameter
+    Public rfgtxTest As New TestSettings.sRfTxTestParams  'global variable to carry RF test parameter
 
     '   Threads
-    Private mainThread As Thread
-    Private threadList As New List(Of Thread)
     Private listenThread As System.Threading.Thread
 
 #End Region
@@ -256,15 +261,7 @@ Public Class HomeScreen
     '   Terminates all socket connections and disposes TCP Client
     '
     Private Sub HomeScreen_Disposed(sender As Object, e As EventArgs) Handles Me.Disposed
-        Try
-            If Me.serverStream IsNot Nothing Then
-                Me.serverStream.Close()
-                Me.serverStream.Dispose()
-            End If
-            Me.mainThread.Abort()
-        Catch ex As Exception
-            MessageBox.Show(ex.ToString)
-        End Try
+
     End Sub
 
     '
@@ -272,44 +269,18 @@ Public Class HomeScreen
     '
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
+        ' To allow cross thread access without delegates, however in future developments, 
+        ' this shoud be set to true and delegates should be used 
         Control.CheckForIllegalCrossThreadCalls = False
-        System.Net.ServicePointManager.Expect100Continue = False
 
-        'Dim s As New readConfig
-        's.readXML()
+        ' To read the xml settings file for the tool
+        Dim s As New readConfig
+        s.readXML()
 
-        mainThread = New Thread(AddressOf begin)
-        mainThread.IsBackground = True
-        mainThread.Priority = ThreadPriority.Normal
-        mainThread.Start()
-
-    End Sub
-
-    '
-    '   Run multiple threads
-    '
-    Private Sub begin()
-
-        serverThreadCount = 1
         initUI()
         startServer()
 
     End Sub
-    '
-    '   Init all server threads
-    '
-    Public Function RunThreads(count As Integer, start As ThreadStart) As List(Of Thread)
-
-        Dim list As New List(Of Thread)
-        For i = 0 To count - 1
-            Dim thread = New Thread(start)
-            thread.Name = String.Format("Thread{0}", i + 1)
-            thread.Start()
-            list.Add(thread)
-        Next
-        Return list
-
-    End Function
 
     '
     '   initialize main UI screen (Invoke by delegate)
@@ -325,20 +296,20 @@ Public Class HomeScreen
 
             'PLC RX
             chkbxPLCRX.Enabled = False
-            btnSettingsPLCRX.Enabled = False
+            btnPLCRXSettings.Enabled = False
             'PLC TX
             chkbxPLCTX.Enabled = False
-            btnSettingsPLCTX.Enabled = False
+            btnPLCTXSettings.Enabled = False
             'RF TX
-            chkbx_RFTX.Enabled = False
-            btnSettingRFTX.Enabled = False
-            chkbxRFTXSweep.Enabled = False
-            btnSettingRFTXsweep.Enabled = False
+            chkbxRFTX.Enabled = False
+            btnRFTXSetting.Enabled = False
+            chkbx_RFTXSweep.Enabled = False
+            btn_RFTXSweepSetting.Enabled = False
             'RF RX
-            chkbx_RFRX.Enabled = False
-            btnSettingRFRX.Enabled = False
-            chkbxRFRXSweep.Enabled = False
-            btnSettingRFRXsweep.Enabled = False
+            chkbxRFRX.Enabled = False
+            btnRFRXSetting.Enabled = False
+            chkbx_RFRXSweep.Enabled = False
+            btn_RFRXSweepSetting.Enabled = False
 
             '   Set bar thresholds
             bar.Maximum = maxVal
@@ -368,6 +339,12 @@ Public Class HomeScreen
     End Sub
 
     '
+    '   Delegate for adding item to lvClient
+    '
+    Private Sub addtoLVClient(ByVal s As String)
+        lvClients.Items.Add(s)
+    End Sub
+    '
     '   Listen to incoming connections
     '
     Private Sub doListen()
@@ -379,7 +356,12 @@ Public Class HomeScreen
             '   Event for data received
             AddHandler connClient.dataReceived, AddressOf Me.messageReceived
             clients.Add(connClient)
-            lvClients.Items.Add(incomingClient.Client.RemoteEndPoint.ToString.Split(":"c).First)
+            If lvClients.InvokeRequired Then
+                Dim d As New _addtoLVClient(AddressOf addtoLVClient)
+                Me.Invoke(d, New Object() {incomingClient.Client.RemoteEndPoint.ToString.Split(":"c).First})
+            Else
+                addtoLVClient(incomingClient.Client.RemoteEndPoint.ToString.Split(":"c).First)
+            End If
             Threading.Thread.Sleep(5)
         Loop
 
@@ -407,6 +389,7 @@ Public Class HomeScreen
 
     '
     '   Remove client
+    '   Unused
     '
     Private Sub removeClient(ByVal client As ConnectedClient)
 
@@ -425,7 +408,9 @@ Public Class HomeScreen
             If clients.Count > 0 Then
 
                 btnRunTest.Enabled = False
-                txtbxDummy.Clear()
+                SyncLock objForUI
+                    txtbxDummy.Clear()
+                End SyncLock
                 DUT_UP = False
                 REF_UP = False
                 devicesUP = False
@@ -475,20 +460,33 @@ Public Class HomeScreen
         If deviceUPEvent.deviceType = RunTest.ClientType.REF Then
             sender.mDevType = deviceUPEvent.deviceType
             clDirectory(sender.mClient.Client.RemoteEndPoint.ToString.Split(":"c).First) = sender
-            AddClient(sender.mClient.Client, RunTest.ClientType.REF)
+            If lvClients.InvokeRequired Then
+                Dim d As New _AddClient(AddressOf AddClient)
+                Me.Invoke(d, New Object() {sender.mClient.Client, RunTest.ClientType.REF})
+            Else
+                AddClient(sender.mClient.Client, RunTest.ClientType.REF)
+            End If
             REF_UP = True
+            REFCapbility = deviceUPEvent.capabilityInfo
         End If
 
         If deviceUPEvent.deviceType = RunTest.ClientType.DUT Then
             sender.mDevType = deviceUPEvent.deviceType
             clDirectory(sender.mClient.Client.RemoteEndPoint.ToString.Split(":"c).First) = sender
-            AddClient(sender.mClient.Client, RunTest.ClientType.DUT)
+            If lvClients.InvokeRequired Then
+                Dim d As New _AddClient(AddressOf AddClient)
+                Me.Invoke(d, New Object() {sender.mClient.Client, RunTest.ClientType.DUT})
+            Else
+                AddClient(sender.mClient.Client, RunTest.ClientType.DUT)
+            End If
             DUT_UP = True
+            DUTCapbility = deviceUPEvent.capabilityInfo
         End If
 
         If DUT_UP = True And REF_UP = True Then
             devicesUP = True
-            enableTests2(deviceUPEvent.capabilityInfo)
+            enableTests2(DUTCapbility)          ' Enable tests on DUT capability
+            txtbxDummy.Clear()
             dumpMsg("Tests are configured ! ")
             dumpMsg("You can start the tests ! ")
             dumpMsg(vbNewLine)
@@ -537,18 +535,18 @@ Public Class HomeScreen
                 setDefaultPLCPramas()
                 ' enable PLC TX & RX
                 chkbxPLCTX.Enabled = True
-                btnSettingsPLCTX.Enabled = True
+                btnPLCTXSettings.Enabled = True
                 chkbxPLCRX.Enabled = True
-                btnSettingsPLCRX.Enabled = True
+                btnPLCRXSettings.Enabled = True
 
                 ' PLC TX Sweep
-                chkbx_txSweep.Enabled = True
-                chkbx_txSweep.Checked = True
-                btn_txSweepSettings.Enabled = True
+                chkbx_PLCTXSweep.Enabled = True
+                chkbx_PLCTXSweep.Checked = True
+                btn_PLCTXSweepSettings.Enabled = True
                 ' PLC RX Sweep
-                chkbx_rxSweep.Enabled = True
-                chkbx_rxSweep.Checked = True
-                btn_rxSweepSettings.Enabled = True
+                chkbx_PLCRXSweep.Enabled = True
+                chkbx_PLCRXSweep.Checked = True
+                btn_PLCRXSweepSettings.Enabled = True
                 ' Enable run tests button
                 btnRunTest.Enabled = True
                 Exit Select
@@ -558,33 +556,33 @@ Public Class HomeScreen
                 setDefaultPLCPramas()
                 ' enable PLC TX & RX
                 chkbxPLCTX.Enabled = True
-                btnSettingsPLCTX.Enabled = True
+                btnPLCTXSettings.Enabled = True
                 chkbxPLCRX.Enabled = True
-                btnSettingsPLCRX.Enabled = True
+                btnPLCRXSettings.Enabled = True
 
                 ' PLC TX Sweep
-                chkbx_txSweep.Enabled = True
-                chkbx_txSweep.Checked = True
-                btn_txSweepSettings.Enabled = True
+                chkbx_PLCTXSweep.Enabled = True
+                chkbx_PLCTXSweep.Checked = True
+                btn_PLCTXSweepSettings.Enabled = True
                 ' PLC RX Sweep
-                chkbx_rxSweep.Enabled = True
-                chkbx_rxSweep.Checked = True
-                btn_rxSweepSettings.Enabled = True
+                chkbx_PLCRXSweep.Enabled = True
+                chkbx_PLCRXSweep.Checked = True
+                btn_PLCRXSweepSettings.Enabled = True
 
                 ' RF tests
                 setDefaultRFPramas()
                 ' enable RF TX & RX
-                chkbx_RFTX.Enabled = True
-                btnSettingRFTX.Enabled = True
-                chkbx_RFRX.Enabled = True
-                btnSettingRFRX.Enabled = True
+                chkbxRFTX.Enabled = True
+                btnRFTXSetting.Enabled = True
+                chkbxRFRX.Enabled = True
+                btnRFRXSetting.Enabled = True
 
                 ' RF TX Sweep Test
-                chkbxRFTXSweep.Enabled = True
-                chkbxRFTXSweep.Checked = True
+                chkbx_RFTXSweep.Enabled = True
+                chkbx_RFTXSweep.Checked = True
                 ' RF RX Sweep Test
-                chkbxRFRXSweep.Enabled = True
-                chkbxRFRXSweep.Checked = True
+                chkbx_RFRXSweep.Enabled = True
+                chkbx_RFRXSweep.Checked = True
 
                 ' Enable run tests button
                 btnRunTest.Enabled = True
@@ -594,17 +592,17 @@ Public Class HomeScreen
                 ' RF tests
                 setDefaultRFPramas()
                 ' enable RF TX & RX
-                chkbx_RFTX.Enabled = True
-                btnSettingRFTX.Enabled = True
-                chkbx_RFRX.Enabled = True
-                btnSettingRFRX.Enabled = True
+                chkbxRFTX.Enabled = True
+                btnRFTXSetting.Enabled = True
+                chkbxRFRX.Enabled = True
+                btnRFRXSetting.Enabled = True
 
                 ' RF TX Sweep Test
-                chkbxRFTXSweep.Enabled = True
-                chkbxRFTXSweep.Checked = True
+                chkbx_RFTXSweep.Enabled = True
+                chkbx_RFTXSweep.Checked = True
                 ' RF RX Sweep Test
-                chkbxRFRXSweep.Enabled = True
-                chkbxRFRXSweep.Checked = True
+                chkbx_RFRXSweep.Enabled = True
+                chkbx_RFRXSweep.Checked = True
 
                 ' Enable run tests button
                 btnRunTest.Enabled = True
@@ -642,13 +640,13 @@ Public Class HomeScreen
                         setDefaultPLCPramas()
 
                         ' PLC TX Sweep
-                        chkbx_txSweep.Enabled = True
-                        chkbx_txSweep.Checked = True
-                        btn_txSweepSettings.Enabled = True
+                        chkbx_PLCTXSweep.Enabled = True
+                        chkbx_PLCTXSweep.Checked = True
+                        btn_PLCTXSweepSettings.Enabled = True
                         ' PLC RX Sweep
-                        chkbx_rxSweep.Enabled = True
-                        chkbx_rxSweep.Checked = True
-                        btn_rxSweepSettings.Enabled = True
+                        chkbx_PLCRXSweep.Enabled = True
+                        chkbx_PLCRXSweep.Checked = True
+                        btn_PLCRXSweepSettings.Enabled = True
                         ' Enable run tests button
                         btnRunTest.Enabled = True
                         Exit Select
@@ -657,11 +655,11 @@ Public Class HomeScreen
 
                         setDefaultRFPramas()
 
-                        chkbx_RFTX.Enabled = True
-                        chkbx_txSweep.Checked = True
-                        chkbx_rxSweep.Checked = True
-                        btn_rxSweepSettings.Enabled = True
-                        btn_txSweepSettings.Enabled = True
+                        chkbxRFTX.Enabled = True
+                        chkbx_PLCTXSweep.Checked = True
+                        chkbx_PLCRXSweep.Checked = True
+                        btn_PLCRXSweepSettings.Enabled = True
+                        btn_PLCTXSweepSettings.Enabled = True
                         ' Enable run tests button
                         btnRunTest.Enabled = True
                         Exit Select
@@ -714,6 +712,50 @@ Public Class HomeScreen
         status.state = RunTest.states.STATE_NONE
     End Sub
 
+    '
+    '   If incorrect device up event is received
+    '
+    Private Sub incorrectDevUpEvent()
+        MsgBox("Device Up Event received while tests were running !", MsgBoxStyle.Critical)
+        lblSessionName.Text = "Resetting ..."
+
+        dumpMsg("Device Up Event received while tests were running !")
+        dumpMsg("Resetting ...")
+
+        setStatusvarNull()
+        swpCount = 0
+        runCount = 0
+
+        start_time = Nothing
+        stop_time = Nothing
+        elapsed_time = Nothing
+        testRunning = False
+        sweepTestRunning = False
+
+        ' clear test parameter queues
+        qExecStatus.Clear()
+        sweepParamList.Clear()
+        RFChannelParamList.Clear()
+
+        enableUI()
+        clearBar()
+
+        chkbx_PLCRXSweep.Checked = False
+        chkbx_PLCTXSweep.Checked = False
+        chkbx_RFRXSweep.Checked = False
+        chkbx_RFTXSweep.Checked = False
+        chkbxPLCRX.Checked = False
+        chkbxPLCTX.Checked = False
+        chkbxRFRX.Checked = False
+        chkbxRFTX.Checked = False
+
+        btn_ShowResults.Enabled = False
+        btnRunTest.Enabled = False
+
+        Threading.Thread.Sleep(1000)
+        lblSessionName.Text = String.Empty
+    End Sub
+
     '   <summary>
     '       State machine to handle the received message
     '   </summary>
@@ -752,6 +794,13 @@ Public Class HomeScreen
                             '
                             '   Device UP Event
                             '
+                            ' if the device up event is received while the test is running
+                            ' then ignore all the other states and reset everything
+                            If testRunning Or sweepTestRunning Then
+                                incorrectDevUpEvent()
+                                Exit Sub
+                            End If
+
                             Dim upEventArray As New List(Of Byte)
                             For Each b As Byte In packet.ToList.GetRange(Marshal.SizeOf(GetType(RunTest.frmHeader)), _
                                                                          Marshal.SizeOf(GetType(RunTest.sDevUpEvent)))
@@ -821,20 +870,21 @@ Public Class HomeScreen
 
                             resp = CType(ByteToStruct(respArray, GetType(RunTest.sResponse)), RunTest.sResponse)
 
-
-                            'For Each x As Byte In packet
-                            '    dumpMsg(x)
-                            'Next
-
                             '   calib status
                             Dim c As New RunTest.sProdPrepRfStatusCnf
                             Dim r(Marshal.SizeOf(GetType(RunTest.sProdPrepRfStatusCnf))) As Byte
 
-                            Array.Copy(packet, (Marshal.SizeOf(GetType(RunTest.frmHeader)) + Marshal.SizeOf(GetType(RunTest.sResponse))), r, 0, Marshal.SizeOf(GetType(RunTest.sProdPrepRfStatusCnf)))
+                            Array.Copy(packet, (Marshal.SizeOf(GetType(RunTest.frmHeader)) + Marshal.SizeOf(GetType(RunTest.sResponse))), _
+                                       r, 0, Marshal.SizeOf(GetType(RunTest.sProdPrepRfStatusCnf)))
 
                             c = CType(ByteToStruct(r, GetType(RunTest.sProdPrepRfStatusCnf)), RunTest.sProdPrepRfStatusCnf)
 
                             If resp.rsp = response.SUCCESS Then
+
+                                If qExecStatus.Count = 0 Then
+                                    setStatusvarNull()
+                                    Exit Select
+                                End If
 
                                 updateBar()
                                 If qExecStatus.First = tests.TEST_ID_PLC_TX Or qExecStatus.First = tests.TEST_ID_PLC_TX_SWEEP Then
@@ -896,20 +946,21 @@ Public Class HomeScreen
 
                             resp = CType(ByteToStruct(respArray, GetType(RunTest.sResponse)), RunTest.sResponse)
 
-
-                            'For Each x As Byte In packet
-                            '    dumpMsg(x)
-                            'Next
-
                             '   calib status
                             Dim c As New RunTest.sProdPrepRfStatusCnf
                             Dim r(Marshal.SizeOf(GetType(RunTest.sProdPrepRfStatusCnf))) As Byte
 
-                            Array.Copy(packet, (Marshal.SizeOf(GetType(RunTest.frmHeader)) + Marshal.SizeOf(GetType(RunTest.sResponse))), r, 0, Marshal.SizeOf(GetType(RunTest.sProdPrepRfStatusCnf)))
+                            Array.Copy(packet, (Marshal.SizeOf(GetType(RunTest.frmHeader)) + Marshal.SizeOf(GetType(RunTest.sResponse))), _
+                                       r, 0, Marshal.SizeOf(GetType(RunTest.sProdPrepRfStatusCnf)))
 
                             c = CType(ByteToStruct(r, GetType(RunTest.sProdPrepRfStatusCnf)), RunTest.sProdPrepRfStatusCnf)
 
                             If resp.rsp = response.SUCCESS Then
+
+                                If qExecStatus.Count = 0 Then
+                                    setStatusvarNull()
+                                    Exit Select
+                                End If
 
                                 updateBar()
                                 If qExecStatus.First = tests.TEST_ID_PLC_TX Or qExecStatus.First = tests.TEST_ID_PLC_TX_SWEEP Then
@@ -969,6 +1020,11 @@ Public Class HomeScreen
 
                             If resp.rsp = response.SUCCESS Then
 
+                                If qExecStatus.Count = 0 Then
+                                    setStatusvarNull()
+                                    Exit Select
+                                End If
+
                                 updateBar()
                                 If qExecStatus.First = tests.TEST_ID_PLC_TX Or qExecStatus.First = tests.TEST_ID_PLC_TX_SWEEP Then
 
@@ -1015,6 +1071,11 @@ Public Class HomeScreen
                             resp = CType(ByteToStruct(respArray, GetType(RunTest.sResponse)), RunTest.sResponse)
 
                             If resp.rsp = response.SUCCESS Then
+
+                                If qExecStatus.Count = 0 Then
+                                    setStatusvarNull()
+                                    Exit Select
+                                End If
 
                                 updateBar()
                                 If qExecStatus.First = tests.TEST_ID_PLC_TX Or qExecStatus.First = tests.TEST_ID_PLC_TX_SWEEP Then
@@ -1083,29 +1144,12 @@ Public Class HomeScreen
                                 m.rf_rsp = resp
                             End If
 
-                            'decideTestStatus()
                             updatemetadata()
 
                             Dim result = New shpgpStats
                             result.logResultinTextFile(m)
 
                             updateBar()
-
-                            ''   If any test fails
-                            'If m.testStatus = False Then
-                            '    qExecStatus.Clear()
-                            '    sweepParamList.Clear()
-
-                            '    status = Nothing
-                            '    start_time = Nothing
-                            '    stop_time = Nothing
-                            '    elapsed_time = Nothing
-
-                            '    testRunning = False
-                            '    lineSent = False
-                            '    enableUI()
-                            '    Exit Sub
-                            'End If
 
                             If qExecStatus.First = tests.TEST_ID_PLC_TX Then
                                 qExecStatus.RemoveAt(0)
@@ -1408,14 +1452,23 @@ Public Class HomeScreen
         Dim p = New Decimal
         Dim f = New Double
 
-        Dim od As Boolean = False   ' This variable will check if received frames are more than transmitted in case of RF
+        Dim od As Boolean = False   ' This variable will check if received frames are more than transmitted 
 
+        '   As per the test interface, calculate the percentage of frames
         If m.intf = RunTest.TestInterface.TEST_PLC_ID Then
 
-            If m.rsp.TotalRxGoodFrmCnt > m.testPramas.numFrames Then
-                od = True
-            Else
-                f = (((m.testPramas.numFrames - m.rsp.TotalRxGoodFrmCnt) / m.testPramas.numFrames) * 100)
+            If m.testPramas.frmType = TestSettings.eFrmType.HPGP_HW_FRMTYPE_MSDU Then
+                If m.rsp.RxGoodDataCnt > m.testPramas.numFrames Then
+                    od = True
+                Else
+                    f = (((m.testPramas.numFrames - m.rsp.RxGoodDataCnt) / m.testPramas.numFrames) * 100)
+                End If
+            ElseIf m.testPramas.frmType = TestSettings.eFrmType.HPGP_HW_FRMTYPE_MGMT Then
+                If m.rsp.RxGoodMgmtCnt > m.testPramas.numFrames Then
+                    od = True
+                Else
+                    f = (((m.testPramas.numFrames - m.rsp.RxGoodMgmtCnt) / m.testPramas.numFrames) * 100)
+                End If
             End If
             dumpMsg(m.name & vbNewLine & "Frame Length - " & m.testPramas.frmLen)
 
@@ -1430,16 +1483,30 @@ Public Class HomeScreen
 
         End If
 
+        '   Round off the percentage
         If Math.Round(f, 1, MidpointRounding.AwayFromZero) > Math.Round(f, 1, MidpointRounding.ToEven) Then
             p = Math.Round(f) + 1
         Else
             p = Math.Round(f)
         End If
 
-        If p <= threshold Then
-            m.testStatus = True
-        Else
-            m.testStatus = False
+        '   Compare the threshold as per interface
+        If m.intf = RunTest.TestInterface.TEST_PLC_ID Then
+
+            If p <= plcTestThreshold Then
+                m.testStatus = True
+            Else
+                m.testStatus = False
+            End If
+
+        ElseIf m.intf = RunTest.TestInterface.TEST_802_15_5_ID Then
+
+            If p <= rfTestThreshold Then
+                m.testStatus = True
+            Else
+                m.testStatus = False
+            End If
+
         End If
 
         ' This is a temp fix
@@ -1460,8 +1527,6 @@ Public Class HomeScreen
         Dim x As New variations
         x.name = m.name
         x.result = m.testStatus
-        's = New summary
-        's.tests = New List(Of variations)
         s.tests.Add(x)
     End Sub
 
@@ -1490,12 +1555,13 @@ Public Class HomeScreen
         m.duration = elapsed_time.ToString
 
         m.runCount = runCount
-        m.threshold = threshold
 
         If m.intf = RunTest.TestInterface.TEST_PLC_ID Then
             m.testPramas = gtxTest
+            m.threshold = plcTestThreshold
         ElseIf m.intf = RunTest.TestInterface.TEST_802_15_5_ID Then
             m.rftestPramas = rfgtxTest
+            m.threshold = rfTestThreshold
         End If
 
         If lineSent = False Then
@@ -1559,7 +1625,6 @@ Public Class HomeScreen
     '
     '   Update summary of the test
     '
-    Public gMACcounter = New ULong
     Private Sub updatesummary()
 
         '   Assign lot number and serial number
@@ -1576,9 +1641,6 @@ Public Class HomeScreen
                 If (Not System.IO.Directory.Exists(s.filepath)) Then
                     System.IO.Directory.CreateDirectory(s.filepath)
                 End If
-
-                'Dim r = New shpgpStats
-                'r.createSummaryLog(s)
 
             End If
 
@@ -1601,24 +1663,24 @@ Public Class HomeScreen
                 lblResult.Text = "BOARD PASS"
 
                 ' convert MAC address to string
-                'Dim t As String = Hex(gMACcounter)
-                'Dim i As Integer = 2
-                'Dim sb As StringBuilder = New StringBuilder(t)
-                'While True
-                '    sb.Insert(i, ":")
-                '    i += 3
-                '    If i >= sb.Length Then
-                '        Exit While
-                '    End If
-                'End While
-                's.MAC = sb.ToString
+                Dim t As String = Hex(gMACcounter)
+                Dim i As Integer = 2
+                Dim sb As StringBuilder = New StringBuilder(t)
+                While True
+                    sb.Insert(i, ":")
+                    i += 3
+                    If i >= sb.Length Then
+                        Exit While
+                    End If
+                End While
+                s.MAC = sb.ToString
 
-                ' increment MAC counter
+                ' increment golbal MAC address counter
                 gMACcounter += 1
 
-            Else
+            Else    ' If any test is failed, do not assign any MAC address
                 s.finalResult = "FAIL"
-                s.MAC = String.Empty
+                s.MAC = "N/A"
                 lblResult.Text = "BOARD FAIL"
             End If
 
@@ -1633,12 +1695,11 @@ Public Class HomeScreen
     '
     Private Sub tests_done_update_summary(result As shpgpStats)
         ''   if all tests are done then log device summary
-        'dumpMsg("calling >>> updateSummary")
         updatesummary()
-        'result.logSumary(s)
-        'If s.finalResult = "PASS" Then
-        '    result.serialToMAC_map(s)
-        'End If
+        result.logSumary(s)
+        If s.finalResult = "PASS" Then
+            result.serialToMAC_map(s)
+        End If
     End Sub
 
     '
@@ -1657,25 +1718,25 @@ Public Class HomeScreen
         btn_ShowResults.Enabled = False
         btn_SetIP.Enabled = False
 
-        chkbx_rxSweep.Enabled = False
-        btn_rxSweepSettings.Enabled = False
-        chkbx_txSweep.Enabled = False
-        btn_txSweepSettings.Enabled = False
+        chkbx_PLCRXSweep.Enabled = False
+        btn_PLCRXSweepSettings.Enabled = False
+        chkbx_PLCTXSweep.Enabled = False
+        btn_PLCTXSweepSettings.Enabled = False
 
         chkbxPLCRX.Enabled = False
-        btnSettingsPLCRX.Enabled = False
+        btnPLCRXSettings.Enabled = False
         chkbxPLCTX.Enabled = False
-        btnSettingsPLCTX.Enabled = False
+        btnPLCTXSettings.Enabled = False
 
-        chkbx_RFTX.Enabled = False
-        btnSettingRFTX.Enabled = False
-        chkbx_RFRX.Enabled = False
-        btnSettingRFRX.Enabled = False
+        chkbxRFTX.Enabled = False
+        btnRFTXSetting.Enabled = False
+        chkbxRFRX.Enabled = False
+        btnRFRXSetting.Enabled = False
 
-        chkbxRFTXSweep.Enabled = False
-        btnSettingRFTXsweep.Enabled = False
-        chkbxRFRXSweep.Enabled = False
-        btnSettingRFRXsweep.Enabled = False
+        chkbx_RFTXSweep.Enabled = False
+        btn_RFTXSweepSetting.Enabled = False
+        chkbx_RFRXSweep.Enabled = False
+        btn_RFRXSweepSetting.Enabled = False
 
     End Sub
 
@@ -1695,25 +1756,25 @@ Public Class HomeScreen
         btn_ShowResults.Enabled = True
         btn_SetIP.Enabled = True
 
-        chkbx_rxSweep.Enabled = True
-        btn_rxSweepSettings.Enabled = True
-        chkbx_txSweep.Enabled = True
-        btn_txSweepSettings.Enabled = True
+        chkbx_PLCRXSweep.Enabled = True
+        btn_PLCRXSweepSettings.Enabled = True
+        chkbx_PLCTXSweep.Enabled = True
+        btn_PLCTXSweepSettings.Enabled = True
 
         chkbxPLCRX.Enabled = True
-        btnSettingsPLCRX.Enabled = True
+        btnPLCRXSettings.Enabled = True
         chkbxPLCTX.Enabled = True
-        btnSettingsPLCTX.Enabled = True
+        btnPLCTXSettings.Enabled = True
 
-        chkbx_RFTX.Enabled = True
-        btnSettingRFTX.Enabled = True
-        chkbx_RFRX.Enabled = True
-        btnSettingRFRX.Enabled = True
+        chkbxRFTX.Enabled = True
+        btnRFTXSetting.Enabled = True
+        chkbxRFRX.Enabled = True
+        btnRFRXSetting.Enabled = True
 
-        chkbxRFTXSweep.Enabled = True
-        btnSettingRFTXsweep.Enabled = True
-        chkbxRFRXSweep.Enabled = True
-        btnSettingRFRXsweep.Enabled = True
+        chkbx_RFTXSweep.Enabled = True
+        btn_RFTXSweepSetting.Enabled = True
+        chkbx_RFRXSweep.Enabled = True
+        btn_RFRXSweepSetting.Enabled = True
 
     End Sub
 
@@ -1731,17 +1792,18 @@ Public Class HomeScreen
         gtxTest.dtei = 2
         gtxTest.stei = 3
 
-        gtxTest.txpowermode = spiTXTestSettings.eTxPwrMode.HIGH_TX_POWER_MODE
+        gtxTest.ermode = TestSettings.erModestate.erModeON
+        gtxTest.txpowermode = TestSettings.eTxPwrMode.AUTOMOTIVE_TX_POWER_MODE
 
-        gtxTest.descLen = spiTXTestSettings.HYBRII_CELLBUF_SIZE
+        gtxTest.descLen = TestSettings.HYBRII_CELLBUF_SIZE
 
-        gtxTest.secTestMode = spiTXTestSettings.eSecTestMode.UNENCRYPTED
-        gtxTest.eks = 15
+        gtxTest.secTestMode = TestSettings.eSecTestMode.ENCRYPTED
+        gtxTest.eks = 0
 
-        gtxTest.frmType = spiTXTestSettings.eFrmType.HPGP_HW_FRMTYPE_MSDU
+        gtxTest.frmType = TestSettings.eFrmType.HPGP_HW_FRMTYPE_MSDU
 
-        gtxTest.lenTestMode = spiTXTestSettings.eLenTestMode.FIXED_LEN
-        gtxTest.mcstMode = spiTXTestSettings.eFrmMcstMode.HPGP_MCST
+        gtxTest.lenTestMode = TestSettings.eLenTestMode.FIXED_LEN
+        gtxTest.mcstMode = TestSettings.eFrmMcstMode.HPGP_MCST
 
         '   Can be used for sweep test
         gtxTest.frmLen = 100
@@ -1754,19 +1816,34 @@ Public Class HomeScreen
     '   Configure PLC sweep parameters
     '
     Private Sub sweepTest()
-        varyFrmLen()
+
         swpCount = 1
 
-        '   change other params
-        For Each item As spiTXTestSettings._sPlcSimTxTestParams In sweepParamList
-            item.frmType = spiTXTestSettings.eFrmType.HPGP_HW_FRMTYPE_MSDU
-            item.plid = spiTXTestSettings.eHpgpPlidValue.HPGP_PLID0
-            item.secTestMode = spiTXTestSettings.eSecTestMode.ENCRYPTED
-            item.eks = 0
-            item.delay = 4
-            If item.frmLen = 100 Then
-                item.ermode = 1
+        For Each len As UInteger In FrmLenArr
+
+            Dim temp_gtxtest As New TestSettings._sPlcSimTxTestParams
+            temp_gtxtest = gtxTest
+
+            If len <= 100 Then
+                temp_gtxtest.ermode = TestSettings.erModestate.erModeON
+            Else
+                temp_gtxtest.ermode = TestSettings.erModestate.erModeOFF
             End If
+
+            temp_gtxtest.frmLen = len
+
+            If setPowerMode = False Then
+                temp_gtxtest.txpowermode = TestSettings.eTxPwrMode.AUTOMOTIVE_TX_POWER_MODE
+            End If
+
+            temp_gtxtest.frmType = TestSettings.eFrmType.HPGP_HW_FRMTYPE_MSDU
+            temp_gtxtest.plid = TestSettings.eHpgpPlidValue.HPGP_PLID0
+            temp_gtxtest.secTestMode = TestSettings.eSecTestMode.ENCRYPTED
+            temp_gtxtest.eks = 0
+            temp_gtxtest.delay = 4
+
+            sweepParamList.Enqueue(temp_gtxtest)
+
         Next
 
     End Sub
@@ -1776,14 +1853,24 @@ Public Class HomeScreen
     '
     Private Sub varyFrmLen()
 
-        Dim temp_gtxtest As New spiTXTestSettings._sPlcSimTxTestParams
+        Dim temp_gtxtest As New TestSettings._sPlcSimTxTestParams
         temp_gtxtest = gtxTest
 
         For Each l As UInteger In FrmLenArr
+            If l <= 100 Then
+                temp_gtxtest.ermode = TestSettings.erModestate.erModeON
+            Else
+                temp_gtxtest.ermode = TestSettings.erModestate.erModeOFF
+            End If
             temp_gtxtest.frmLen = l
             If setPowerMode = False Then
-                temp_gtxtest.txpowermode = spiTXTestSettings.eTxPwrMode.AUTOMOTIVE_TX_POWER_MODE
+                temp_gtxtest.txpowermode = TestSettings.eTxPwrMode.AUTOMOTIVE_TX_POWER_MODE
             End If
+            temp_gtxtest.frmType = TestSettings.eFrmType.HPGP_HW_FRMTYPE_MSDU
+            temp_gtxtest.plid = TestSettings.eHpgpPlidValue.HPGP_PLID0
+            temp_gtxtest.secTestMode = TestSettings.eSecTestMode.ENCRYPTED
+            temp_gtxtest.eks = 0
+            temp_gtxtest.delay = 4
             sweepParamList.Enqueue(temp_gtxtest)
         Next
 
@@ -1795,7 +1882,6 @@ Public Class HomeScreen
     Private Sub RFChannelSweep()
 
         varyRFChannel()
-        rfswpCount = 1
         swpCount = 1
 
     End Sub
@@ -1805,7 +1891,7 @@ Public Class HomeScreen
     '
     Private Sub varyRFChannel()
 
-        Dim temp As New spiTXTestSettings.sRfTxTestParams
+        Dim temp As New TestSettings.sRfTxTestParams
         temp = rfgtxTest
 
         For Each b As Byte In RFChannelList
@@ -1883,7 +1969,7 @@ Public Class HomeScreen
                 Exit Select
 
             Case tests.TEST_ID_PLC_RX_SWEEP
-                lblSessionName.Text = chkbx_rxSweep.Text
+                lblSessionName.Text = chkbx_PLCRXSweep.Text
                 Exit Select
 
             Case tests.TEST_ID_PLC_TX
@@ -1891,23 +1977,23 @@ Public Class HomeScreen
                 Exit Select
 
             Case tests.TEST_ID_PLC_TX_SWEEP
-                lblSessionName.Text = chkbx_txSweep.Text
+                lblSessionName.Text = chkbx_PLCTXSweep.Text
                 Exit Select
 
             Case tests.TEST_ID_RF_RX
-                lblSessionName.Text = chkbx_RFRX.Text
+                lblSessionName.Text = chkbxRFRX.Text
                 Exit Select
 
             Case tests.TEST_ID_RF_TX
-                lblSessionName.Text = chkbx_RFTX.Text
+                lblSessionName.Text = chkbxRFTX.Text
                 Exit Select
 
             Case tests.TEST_ID_RF_RX_SWEEP
-                lblSessionName.Text = chkbxRFRXSweep.Text
+                lblSessionName.Text = chkbx_RFRXSweep.Text
                 Exit Select
 
             Case tests.TEST_ID_RF_TX_SWEEP
-                lblSessionName.Text = chkbxRFTXSweep.Text
+                lblSessionName.Text = chkbx_RFTXSweep.Text
                 Exit Select
 
         End Select
@@ -1921,7 +2007,12 @@ Public Class HomeScreen
         s = New summary
         s.tests = New List(Of variations)
 
-        txtbxDummy.Clear()
+        SyncLock objForUI
+            txtbxDummy.Clear()
+            lblResult.Text = String.Empty
+        End SyncLock
+
+        setStatusvarNull()
 
         If getSelectedClientList().Count <= 1 Then
             MessageBox.Show("Select more than one devices and Restart the test !!")
@@ -2072,7 +2163,7 @@ Public Class HomeScreen
                     If cl.mDevType = RunTest.ClientType.DUT Then
                         If sweepTestRunning = False Then
                             'if this is not rf sweep test then assign only one set of params
-                            rfgtxTest.ch = &HF
+                            rfgtxTest.ch = RF_CHANNEL
                         End If
                         swap_dest_short_address()
                         RunTest.rftestParams = Me.rfgtxTest
@@ -2090,7 +2181,7 @@ Public Class HomeScreen
                     If cl.mDevType = RunTest.ClientType.REF Then
                         If sweepTestRunning = False Then
                             'if this is not rf sweep test then assign only one set of params
-                            rfgtxTest.ch = &HF
+                            rfgtxTest.ch = RF_CHANNEL
                         End If
                         RunTest.rftestParams = Me.rfgtxTest
                         RunTest.beginSend(RunTest.states.STATE_PREPARE_REFERENCE, cl, t)
@@ -2186,26 +2277,22 @@ Public Class HomeScreen
                     executeTests(status)
 
                 Else
-
-                    'chkbxPLCTX.Checked = False
-                    'chkbxPLCRX.Checked = False
-
-                    '' To keep sweep tests running continuously
-                    'chkbx_txSweep.Checked = False
-                    'chkbx_txSweep.Checked = True
-                    'chkbx_rxSweep.Checked = False
-                    'chkbx_rxSweep.Checked = True
-
-                    '' RF
-                    'chkbx_RFTX.Checked = False
-                    'chkbx_RFTX.Checked = True
-                    'chkbx_RFRX.Checked = False
-                    'chkbx_RFRX.Checked = True
-
-                    enableRFTXSweep()
-                    enableRFRXSweep()
-                    enablePLCTXSweep()
-                    enablePLCRXSweep()
+                    ' If all tests are done then based DUT capability 
+                    ' enable the tests to simulate cyclic manner
+                    Select Case DUTCapbility
+                        Case capability.PLC
+                            enablePLCTXSweep()
+                            enablePLCRXSweep()
+                        Case capability.RF
+                            enableRFTXSweep()
+                            enableRFRXSweep()
+                        Case capability.RF_PLC
+                            enableRFTXSweep()
+                            enableRFRXSweep()
+                            enablePLCTXSweep()
+                            enablePLCRXSweep()
+                        Case Else
+                    End Select
 
                 End If
                 Exit Select
@@ -2235,7 +2322,7 @@ Public Class HomeScreen
                     If cl.mDevType = RunTest.ClientType.DUT Then
                         If sweepTestRunning = False Then
                             'if this is not rf sweep test then assign only one set of params
-                            rfgtxTest.ch = &HF
+                            rfgtxTest.ch = RF_CHANNEL
                         End If
                         RunTest.rftestParams = Me.rfgtxTest
                         RunTest.beginSend(RunTest.states.STATE_PREPARE_DUT, cl, t)
@@ -2252,7 +2339,7 @@ Public Class HomeScreen
                     If cl.mDevType = RunTest.ClientType.REF Then
                         If sweepTestRunning = False Then
                             'if this is not rf sweep test then assign only one set of params
-                            rfgtxTest.ch = &HF
+                            rfgtxTest.ch = RF_CHANNEL
                         End If
                         swap_dest_short_address()
                         RunTest.rftestParams = Me.rfgtxTest
@@ -2350,26 +2437,22 @@ Public Class HomeScreen
                     executeTests(status)
 
                 Else
-
-                    'chkbxPLCTX.Checked = False
-                    'chkbxPLCRX.Checked = False
-
-                    '' To keep sweep tests running continuously
-                    'chkbx_txSweep.Checked = False
-                    'chkbx_txSweep.Checked = True
-                    'chkbx_rxSweep.Checked = False
-                    'chkbx_rxSweep.Checked = True
-
-                    '' RF
-                    'chkbx_RFTX.Checked = False
-                    'chkbx_RFTX.Checked = True
-                    'chkbx_RFRX.Checked = False
-                    'chkbx_RFRX.Checked = True
-
-                    enableRFTXSweep()
-                    enableRFRXSweep()
-                    enablePLCTXSweep()
-                    enablePLCRXSweep()
+                    ' If all tests are done then based DUT capability 
+                    ' enable the tests to simulate cyclic manner
+                    Select Case DUTCapbility
+                        Case capability.PLC
+                            enablePLCTXSweep()
+                            enablePLCRXSweep()
+                        Case capability.RF
+                            enableRFTXSweep()
+                            enableRFRXSweep()
+                        Case capability.RF_PLC
+                            enableRFTXSweep()
+                            enableRFRXSweep()
+                            enablePLCTXSweep()
+                            enablePLCRXSweep()
+                        Case Else
+                    End Select
 
                 End If
                 Exit Select
@@ -2550,26 +2633,22 @@ Public Class HomeScreen
                     executeTests(status)
 
                 Else
-
-                    'chkbxPLCTX.Checked = False
-                    'chkbxPLCRX.Checked = False
-
-                    '' To keep sweep tests running continuously
-                    'chkbx_txSweep.Checked = False
-                    'chkbx_txSweep.Checked = True
-                    'chkbx_rxSweep.Checked = False
-                    'chkbx_rxSweep.Checked = True
-
-                    '' RF
-                    'chkbx_RFTX.Checked = False
-                    'chkbx_RFTX.Checked = True
-                    'chkbx_RFRX.Checked = False
-                    'chkbx_RFRX.Checked = True
-
-                    enableRFTXSweep()
-                    enableRFRXSweep()
-                    enablePLCTXSweep()
-                    enablePLCRXSweep()
+                    ' If all tests are done then based DUT capability 
+                    ' enable the tests to simulate cyclic manner
+                    Select Case DUTCapbility
+                        Case capability.PLC
+                            enablePLCTXSweep()
+                            enablePLCRXSweep()
+                        Case capability.RF
+                            enableRFTXSweep()
+                            enableRFRXSweep()
+                        Case capability.RF_PLC
+                            enableRFTXSweep()
+                            enableRFRXSweep()
+                            enablePLCTXSweep()
+                            enablePLCRXSweep()
+                        Case Else
+                    End Select
 
                 End If
                 Exit Select
@@ -2711,26 +2790,22 @@ Public Class HomeScreen
                     executeTests(status)
 
                 Else
-
-                    'chkbxPLCTX.Checked = False
-                    'chkbxPLCRX.Checked = False
-
-                    '' To keep sweep tests running continuously
-                    'chkbx_txSweep.Checked = False
-                    'chkbx_txSweep.Checked = True
-                    'chkbx_rxSweep.Checked = False
-                    'chkbx_rxSweep.Checked = True
-
-                    '' RF
-                    'chkbx_RFTX.Checked = False
-                    'chkbx_RFTX.Checked = True
-                    'chkbx_RFRX.Checked = False
-                    'chkbx_RFRX.Checked = True
-
-                    enableRFTXSweep()
-                    enableRFRXSweep()
-                    enablePLCTXSweep()
-                    enablePLCRXSweep()
+                    ' If all tests are done then based DUT capability 
+                    ' enable the tests to simulate cyclic manner
+                    Select Case DUTCapbility
+                        Case capability.PLC
+                            enablePLCTXSweep()
+                            enablePLCRXSweep()
+                        Case capability.RF
+                            enableRFTXSweep()
+                            enableRFRXSweep()
+                        Case capability.RF_PLC
+                            enableRFTXSweep()
+                            enableRFRXSweep()
+                            enablePLCTXSweep()
+                            enablePLCRXSweep()
+                        Case Else
+                    End Select
 
                 End If
 
@@ -2750,19 +2825,27 @@ Public Class HomeScreen
 
         sweepTest()
 
-        gtxTest = sweepParamList.First
-        sweepTestRunning = True
-
-        If setPowerMode = True Then
-            dumpMsg("High Power Mode")
-            dumpMsg("-------------------------")    '25 Dashes
-        Else
-            dumpMsg("Low Power Mode")
-            dumpMsg("-------------------------")    '25 Dashes
-        End If
+        Select Case gtxTest.txpowermode
+            Case TestSettings.eTxPwrMode.AUTOMOTIVE_TX_POWER_MODE
+                dumpMsg("Auto Power Mode")
+                dumpMsg("-------------------------")    '25 Dashes
+            Case TestSettings.eTxPwrMode.DEFAULT_TX_POWER_MODE
+                dumpMsg("Default Power Mode")
+                dumpMsg("-------------------------")    '25 Dashes
+            Case TestSettings.eTxPwrMode.HIGH_TX_POWER_MODE
+                dumpMsg("High Power Mode")
+                dumpMsg("-------------------------")    '25 Dashes
+            Case TestSettings.eTxPwrMode.NORMAL_TX_POWER_MODE
+                dumpMsg("Normal Power Mode")
+                dumpMsg("-------------------------")    '25 Dashes
+            Case Else
+        End Select
 
         status.test = tests.TEST_ID_PLC_TX
         status.state = RunTest.states.STATE_PREPARE_REFERENCE
+
+        gtxTest = sweepParamList.First
+        sweepTestRunning = True
 
         _test_plcTX(status)
 
@@ -2775,19 +2858,27 @@ Public Class HomeScreen
 
         sweepTest()
 
+        Select Case gtxTest.txpowermode
+            Case TestSettings.eTxPwrMode.AUTOMOTIVE_TX_POWER_MODE
+                dumpMsg("Auto Power Mode")
+                dumpMsg("-------------------------")    '25 Dashes
+            Case TestSettings.eTxPwrMode.DEFAULT_TX_POWER_MODE
+                dumpMsg("Default Power Mode")
+                dumpMsg("-------------------------")    '25 Dashes
+            Case TestSettings.eTxPwrMode.HIGH_TX_POWER_MODE
+                dumpMsg("High Power Mode")
+                dumpMsg("-------------------------")    '25 Dashes
+            Case TestSettings.eTxPwrMode.NORMAL_TX_POWER_MODE
+                dumpMsg("Normal Power Mode")
+                dumpMsg("-------------------------")    '25 Dashes
+            Case Else
+        End Select
+
         status.test = tests.TEST_ID_PLC_RX
         status.state = RunTest.states.STATE_PREPARE_DUT
 
         gtxTest = sweepParamList.First
         sweepTestRunning = True
-
-        If setPowerMode = True Then
-            dumpMsg("High Power Mode")
-            dumpMsg("-------------------------")    '25 Dashesh
-        Else
-            dumpMsg("Low Power Mode")
-            dumpMsg("-------------------------")    '25 Dashesh
-        End If
 
         _test_plcRX(status)
 
@@ -2797,6 +2888,7 @@ Public Class HomeScreen
 
     '   <summary>
     '           Checkbox and settings button events
+    '           Revisit this logic to simplify things
     '   </summary>
 #Region "Wrapper for button events"
 
@@ -2805,32 +2897,36 @@ Public Class HomeScreen
     '   Enable RF TX
     '
     Private Sub enableRFTX()
-        chkbx_RFTX.Checked = False
-        chkbx_RFTX.Checked = True
+        chkbxRFTX.Checked = False
+        chkbxRFTX.Checked = True
+        btnRFTXSetting.Enabled = True
     End Sub
 
     '
     '   Enable RF TX SWEEP
     '
     Private Sub enableRFTXSweep()
-        chkbxRFTXSweep.Checked = False
-        chkbxRFTXSweep.Checked = True
+        chkbx_RFTXSweep.Checked = False
+        chkbx_RFTXSweep.Checked = True
+        btn_RFTXSweepSetting.Enabled = True
     End Sub
 
     '
     '   Enable RF RX
     '
     Private Sub enableRFRX()
-        chkbx_RFRX.Checked = False
-        chkbx_RFRX.Checked = True
+        chkbxRFRX.Checked = False
+        chkbxRFRX.Checked = True
+        btnRFRXSetting.Enabled = True
     End Sub
 
     '
     '   Enable RF RX SWEEP
     '
     Private Sub enableRFRXSweep()
-        chkbxRFRXSweep.Checked = False
-        chkbxRFRXSweep.Checked = True
+        chkbx_RFRXSweep.Checked = False
+        chkbx_RFRXSweep.Checked = True
+        btn_RFRXSweepSetting.Enabled = True
     End Sub
 
     '
@@ -2839,14 +2935,16 @@ Public Class HomeScreen
     Private Sub enablePLCTX()
         chkbxPLCTX.Checked = False
         chkbxPLCTX.Checked = True
+        btnPLCTXSettings.Enabled = True
     End Sub
 
     '
     '   Enable PLC TX SWEEP
     '
     Private Sub enablePLCTXSweep()
-        chkbx_txSweep.Checked = False
-        chkbx_txSweep.Checked = True
+        chkbx_PLCTXSweep.Checked = False
+        chkbx_PLCTXSweep.Checked = True
+        btn_PLCTXSweepSettings.Enabled = True
     End Sub
 
     '
@@ -2855,14 +2953,16 @@ Public Class HomeScreen
     Private Sub enablePLCRX()
         chkbxPLCRX.Checked = False
         chkbxPLCRX.Checked = True
+        btnPLCRXSettings.Enabled = True
     End Sub
 
     '
     '   Enable PLC TX SWEEP
     '
     Private Sub enablePLCRXSweep()
-        chkbx_rxSweep.Checked = False
-        chkbx_rxSweep.Checked = True
+        chkbx_PLCRXSweep.Checked = False
+        chkbx_PLCRXSweep.Checked = True
+        btn_PLCRXSweepSettings.Enabled = True
     End Sub
 
 #End Region
@@ -2872,72 +2972,80 @@ Public Class HomeScreen
     '   Disable RF TX
     '
     Private Sub disableRFTX()
-
+        chkbxRFTX.Checked = False
+        btnRFTXSetting.Enabled = False
     End Sub
 
     '
     '   Disable RF TX SWEEP
     '
     Private Sub disableRFTXSweep()
-
+        chkbx_RFTXSweep.Checked = False
+        btn_RFTXSweepSetting.Enabled = False
     End Sub
 
     '
     '   Disable RF RX
     '
     Private Sub disableRFRX()
-
+        chkbxRFRX.Checked = False
+        btnRFRXSetting.Enabled = False
     End Sub
 
     '
     '   Disable RF RX SWEEP
     '
     Private Sub disableRFRXSweep()
-
+        chkbx_RFRXSweep.Checked = False
+        btn_RFRXSweepSetting.Enabled = False
     End Sub
 
     '
     '   Disable PLC TX
     '
     Private Sub disablePLCTX()
-
+        chkbxPLCTX.Checked = False
+        btnPLCTXSettings.Enabled = False
     End Sub
 
     '
     '   Disable PLC TX SWEEP
     '
     Private Sub disablePLCTXSweep()
-
+        chkbx_PLCTXSweep.Checked = False
+        btn_PLCTXSweepSettings.Enabled = False
     End Sub
 
     '
     '   Disable PLC RX
     '
     Private Sub disablePLCRX()
-
+        chkbxPLCRX.Checked = False
+        btnPLCRXSettings.Enabled = False
     End Sub
 
     '
     '   Disable PLC TX SWEEP
     '
     Private Sub disablePLCRXSweep()
-
+        chkbx_PLCRXSweep.Checked = False
+        btn_PLCRXSweepSettings.Enabled = False
     End Sub
 
 #End Region
-    
+
 #End Region
 
     '   <summary>
-    '           Checkbox and settings button events
+    '       Checkbox and settings button events
     '   </summary>
 #Region "Checkbox and Settings Button Events"
     '
     '   PLC TX Sweep Test checkbox
     '
-    Private Sub chkbx_txSweep_CheckedChanged(sender As Object, e As EventArgs) Handles chkbx_txSweep.CheckedChanged
+    Private Sub chkbx_txSweep_CheckedChanged(sender As Object, e As EventArgs) Handles chkbx_PLCTXSweep.CheckedChanged
 
-        If chkbx_txSweep.Checked = True Then
+        If chkbx_PLCTXSweep.Checked = True Then
             If qExecStatus.Contains(tests.TEST_ID_PLC_TX_SWEEP) Then
                 ' do nothing cause the test is already enqued
             Else
@@ -2945,10 +3053,10 @@ Public Class HomeScreen
                 If qExecStatus.Contains(tests.TEST_ID_PLC_TX) Then
                     qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_PLC_TX))
                     chkbxPLCTX.Checked = False
-                    btn_txSweepSettings.Enabled = False
+                    btn_PLCTXSweepSettings.Enabled = False
                 End If
             End If
-            btn_txSweepSettings.Enabled = True
+            btn_PLCTXSweepSettings.Enabled = True
         Else
             If qExecStatus.Contains(tests.TEST_ID_PLC_TX_SWEEP) Then
                 qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_PLC_TX_SWEEP))
@@ -2958,9 +3066,9 @@ Public Class HomeScreen
     '
     '   PLC RX Sweep Test checkbox
     '
-    Private Sub chkbx_rxSweep_CheckedChanged(sender As Object, e As EventArgs) Handles chkbx_rxSweep.CheckedChanged
+    Private Sub chkbx_rxSweep_CheckedChanged(sender As Object, e As EventArgs) Handles chkbx_PLCRXSweep.CheckedChanged
 
-        If chkbx_rxSweep.Checked = True Then
+        If chkbx_PLCRXSweep.Checked = True Then
             If qExecStatus.Contains(tests.TEST_ID_PLC_RX_SWEEP) Then
                 ' do nothing cause the test is already enqued
             Else
@@ -2968,10 +3076,10 @@ Public Class HomeScreen
                 If qExecStatus.Contains(tests.TEST_ID_PLC_RX) Then
                     qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_PLC_RX))
                     chkbxPLCRX.Checked = False
-                    btn_rxSweepSettings.Enabled = False
+                    btn_PLCRXSweepSettings.Enabled = False
                 End If
             End If
-            btn_rxSweepSettings.Enabled = True
+            btn_PLCRXSweepSettings.Enabled = True
         Else
             If qExecStatus.Contains(tests.TEST_ID_PLC_RX_SWEEP) Then
                 qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_PLC_RX_SWEEP))
@@ -2989,7 +3097,7 @@ Public Class HomeScreen
             Else
                 qExecStatus.Add(tests.TEST_ID_PLC_TX)
             End If
-            btnSettingsPLCTX.Enabled = True
+            btnPLCTXSettings.Enabled = True
         Else
             If qExecStatus.Contains(tests.TEST_ID_PLC_TX) Then
                 qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_PLC_TX))
@@ -3008,7 +3116,7 @@ Public Class HomeScreen
             Else
                 qExecStatus.Add(tests.TEST_ID_PLC_RX)
             End If
-            btnSettingsPLCRX.Enabled = True
+            btnPLCRXSettings.Enabled = True
         Else
             If qExecStatus.Contains(tests.TEST_ID_PLC_RX) Then
                 qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_PLC_RX))
@@ -3019,15 +3127,15 @@ Public Class HomeScreen
     '
     '   RF TX Test enque
     '
-    Private Sub chkbx_RFTX_CheckedChanged(sender As Object, e As EventArgs) Handles chkbx_RFTX.CheckedChanged
+    Private Sub chkbx_RFTX_CheckedChanged(sender As Object, e As EventArgs) Handles chkbxRFTX.CheckedChanged
         '   Set status test
-        If chkbx_RFTX.Checked = True Then
+        If chkbxRFTX.Checked = True Then
             If qExecStatus.Contains(tests.TEST_ID_RF_TX) Or qExecStatus.Contains(tests.TEST_ID_RF_TX_SWEEP) Then
                 ' do nothing cause the test is already enqued
             Else
                 qExecStatus.Add(tests.TEST_ID_RF_TX)
             End If
-            btnSettingRFTX.Enabled = True
+            btnRFTXSetting.Enabled = True
         Else
             If qExecStatus.Contains(tests.TEST_ID_RF_TX) Then
                 qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_RF_TX))
@@ -3038,15 +3146,15 @@ Public Class HomeScreen
     '
     '   RF RX Test enque
     '
-    Private Sub chkbx_RFRX_CheckedChanged(sender As Object, e As EventArgs) Handles chkbx_RFRX.CheckedChanged
+    Private Sub chkbx_RFRX_CheckedChanged(sender As Object, e As EventArgs) Handles chkbxRFRX.CheckedChanged
         '   Set status test
-        If chkbx_RFRX.Checked = True Then
+        If chkbxRFRX.Checked = True Then
             If qExecStatus.Contains(tests.TEST_ID_RF_RX) Or qExecStatus.Contains(tests.TEST_ID_RF_RX_SWEEP) Then
                 ' do nothing cause the test is already enqued
             Else
                 qExecStatus.Add(tests.TEST_ID_RF_RX)
             End If
-            btnSettingRFRX.Enabled = True
+            btnRFRXSetting.Enabled = True
         Else
             If qExecStatus.Contains(tests.TEST_ID_RF_RX) Then
                 qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_RF_RX))
@@ -3058,20 +3166,20 @@ Public Class HomeScreen
     '
     '   RF TX Sweep enque
     '
-    Private Sub chkbxRFTXSweep_CheckedChanged(sender As Object, e As EventArgs) Handles chkbxRFTXSweep.CheckedChanged
+    Private Sub chkbxRFTXSweep_CheckedChanged(sender As Object, e As EventArgs) Handles chkbx_RFTXSweep.CheckedChanged
 
-        If chkbxRFTXSweep.Checked = True Then
+        If chkbx_RFTXSweep.Checked = True Then
             If qExecStatus.Contains(tests.TEST_ID_RF_TX_SWEEP) Then
                 ' do nothing cause the test is already enqued
             Else
                 qExecStatus.Add(tests.TEST_ID_RF_TX_SWEEP)
                 If qExecStatus.Contains(tests.TEST_ID_RF_TX) Then
                     qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_RF_TX))
-                    chkbx_RFTX.Checked = False
-                    btnSettingRFTX.Enabled = False
+                    chkbxRFTX.Checked = False
+                    btnRFTXSetting.Enabled = False
                 End If
             End If
-            btnSettingRFTXsweep.Enabled = True
+            btn_RFTXSweepSetting.Enabled = True
         Else
             If qExecStatus.Contains(tests.TEST_ID_RF_TX_SWEEP) Then
                 qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_RF_TX_SWEEP))
@@ -3083,20 +3191,20 @@ Public Class HomeScreen
     '
     '   RF RX Sweep enque
     '
-    Private Sub chkbxRFRXSweep_CheckedChanged(sender As Object, e As EventArgs) Handles chkbxRFRXSweep.CheckedChanged
+    Private Sub chkbxRFRXSweep_CheckedChanged(sender As Object, e As EventArgs) Handles chkbx_RFRXSweep.CheckedChanged
 
-        If chkbxRFRXSweep.Checked = True Then
+        If chkbx_RFRXSweep.Checked = True Then
             If qExecStatus.Contains(tests.TEST_ID_RF_RX_SWEEP) Then
                 ' do nothing cause the test is already enqued
             Else
                 qExecStatus.Add(tests.TEST_ID_RF_RX_SWEEP)
                 If qExecStatus.Contains(tests.TEST_ID_RF_RX) Then
                     qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_RF_RX))
-                    chkbx_RFRX.Checked = False
-                    btnSettingRFRX.Enabled = False
+                    chkbxRFRX.Checked = False
+                    btnRFRXSetting.Enabled = False
                 End If
             End If
-            btnSettingRFRXsweep.Enabled = True
+            btn_RFRXSweepSetting.Enabled = True
         Else
             If qExecStatus.Contains(tests.TEST_ID_RF_RX_SWEEP) Then
                 qExecStatus.RemoveAt(qExecStatus.IndexOf(tests.TEST_ID_RF_RX_SWEEP))
@@ -3108,30 +3216,30 @@ Public Class HomeScreen
     '
     '   View Transmit Test settings
     '
-    Private Sub btnSettingsSPITX_Click(sender As Object, e As EventArgs) Handles btnSettingsPLCTX.Click
+    Private Sub btnSettingsSPITX_Click(sender As Object, e As EventArgs) Handles btnPLCTXSettings.Click
         testParamsFor = tests.TEST_ID_PLC_TX
-        spiTXTestSettings.Show()
+        TestSettings.Show()
     End Sub
 
-    Private Sub btnSettingsSPIRX_Click(sender As Object, e As EventArgs) Handles btnSettingsPLCRX.Click
+    Private Sub btnSettingsSPIRX_Click(sender As Object, e As EventArgs) Handles btnPLCRXSettings.Click
         testParamsFor = tests.TEST_ID_PLC_RX
-        spiTXTestSettings.Show()
+        TestSettings.Show()
     End Sub
 
-    Private Sub btn_txSweepSettings_Click(sender As Object, e As EventArgs) Handles btn_txSweepSettings.Click
-        testParamsFor = tests.TEST_ID_PLC_TX_SWEEP
-        spiTXTestSettings.Show()
+    Private Sub btn_txSweepSettings_Click(sender As Object, e As EventArgs) Handles btn_PLCTXSweepSettings.Click
+        testParamsFor = tests.TEST_ID_PLC_TX
+        TestSettings.Show()
     End Sub
 
-    Private Sub btn_rxSweepSettings_Click(sender As Object, e As EventArgs) Handles btn_rxSweepSettings.Click
-        testParamsFor = tests.TEST_ID_PLC_RX_SWEEP
-        spiTXTestSettings.Show()
+    Private Sub btn_rxSweepSettings_Click(sender As Object, e As EventArgs) Handles btn_PLCRXSweepSettings.Click
+        testParamsFor = tests.TEST_ID_PLC_RX
+        TestSettings.Show()
     End Sub
 
 #End Region
 
     '   <summary>
-    '           Result log browsing
+    '       Result log browsing
     '   </summary>
 #Region "Result log location browsing"
 
@@ -3175,9 +3283,9 @@ Public Class HomeScreen
 
 #End Region
 
-    '
-    '   Reset Devices
-    '
+    '   <summary>
+    '       Reset Devices | Unused
+    '   </summary>
     Private Sub btn_ResetDevices_Click(sender As Object, e As EventArgs) Handles btn_ResetDevices.Click
         For Each cl As ConnectedClient In clients
             RunTest.beginSend(RunTest.states.STATE_DEVICE_RESET, cl, Nothing)
@@ -3185,7 +3293,7 @@ Public Class HomeScreen
     End Sub
 
     '   <summary>
-    '           Changing local machine IPv4 addres
+    '       Changing local machine IPv4 addres
     '   </summary>
 #Region "Configure Local Machine IPv4 Address"
 
@@ -3259,12 +3367,12 @@ Public Class HomeScreen
 #End Region
 
     '   <summary>
-    '           These are utility functions used in tool
+    '       These are utility functions used in tool
     '   </summary>
 #Region "Utility Functions"
 
     '   <summary>
-    '           Utility functions for progress bar
+    '       Utility functions for progress bar
     '   </summary>
 #Region "Progress Bar"
 
@@ -3299,9 +3407,8 @@ Public Class HomeScreen
 
 #End Region
 
-
     '   <summary>
-    '           Convert byte array to structure
+    '       Endieness converters | unused
     '   </summary>
 #Region "Endieness Converters"
 
@@ -3318,7 +3425,7 @@ Public Class HomeScreen
 #End Region
 
     '   <summary>
-    '           Convert byte array to structure
+    '       Convert byte array to structure
     '   </summary>
     Public Function ByteToStruct(ByVal btData As Byte(), ByVal StructureType As Type) As Object
         Dim iStructSize As Integer = Marshal.SizeOf(StructureType)
@@ -3336,10 +3443,9 @@ Public Class HomeScreen
         Return retobj
     End Function
 
-    '
-    '   Dump messages on dummy text box
-    '
-    Private objForUI = New Object()
+    '   <summary>
+    '       Dump messages on dummy text box
+    '   </summary>
     Public Sub dumpMsg(ByVal msg As String)
         Try
             SyncLock objForUI

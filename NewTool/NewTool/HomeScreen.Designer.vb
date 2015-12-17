@@ -28,20 +28,20 @@ Partial Class HomeScreen
         Me.grpbxTests = New System.Windows.Forms.GroupBox()
         Me.Button3 = New System.Windows.Forms.Button()
         Me.CheckBox3 = New System.Windows.Forms.CheckBox()
-        Me.chkbxRFRXSweep = New System.Windows.Forms.CheckBox()
-        Me.chkbxRFTXSweep = New System.Windows.Forms.CheckBox()
-        Me.btnSettingRFRXsweep = New System.Windows.Forms.Button()
-        Me.btnSettingRFTXsweep = New System.Windows.Forms.Button()
-        Me.btnSettingRFTX = New System.Windows.Forms.Button()
-        Me.btnSettingRFRX = New System.Windows.Forms.Button()
-        Me.chkbx_RFRX = New System.Windows.Forms.CheckBox()
-        Me.btn_rxSweepSettings = New System.Windows.Forms.Button()
-        Me.chkbx_rxSweep = New System.Windows.Forms.CheckBox()
-        Me.btn_txSweepSettings = New System.Windows.Forms.Button()
-        Me.chkbx_txSweep = New System.Windows.Forms.CheckBox()
-        Me.btnSettingsPLCTX = New System.Windows.Forms.Button()
-        Me.btnSettingsPLCRX = New System.Windows.Forms.Button()
-        Me.chkbx_RFTX = New System.Windows.Forms.CheckBox()
+        Me.chkbx_RFRXSweep = New System.Windows.Forms.CheckBox()
+        Me.chkbx_RFTXSweep = New System.Windows.Forms.CheckBox()
+        Me.btn_RFRXSweepSetting = New System.Windows.Forms.Button()
+        Me.btn_RFTXSweepSetting = New System.Windows.Forms.Button()
+        Me.btnRFTXSetting = New System.Windows.Forms.Button()
+        Me.btnRFRXSetting = New System.Windows.Forms.Button()
+        Me.chkbxRFRX = New System.Windows.Forms.CheckBox()
+        Me.btn_PLCRXSweepSettings = New System.Windows.Forms.Button()
+        Me.chkbx_PLCRXSweep = New System.Windows.Forms.CheckBox()
+        Me.btn_PLCTXSweepSettings = New System.Windows.Forms.Button()
+        Me.chkbx_PLCTXSweep = New System.Windows.Forms.CheckBox()
+        Me.btnPLCTXSettings = New System.Windows.Forms.Button()
+        Me.btnPLCRXSettings = New System.Windows.Forms.Button()
+        Me.chkbxRFTX = New System.Windows.Forms.CheckBox()
         Me.chkbxPLCRX = New System.Windows.Forms.CheckBox()
         Me.chkbxPLCTX = New System.Windows.Forms.CheckBox()
         Me.btnRunTest = New System.Windows.Forms.Button()
@@ -92,20 +92,20 @@ Partial Class HomeScreen
         '
         Me.grpbxTests.Controls.Add(Me.Button3)
         Me.grpbxTests.Controls.Add(Me.CheckBox3)
-        Me.grpbxTests.Controls.Add(Me.chkbxRFRXSweep)
-        Me.grpbxTests.Controls.Add(Me.chkbxRFTXSweep)
-        Me.grpbxTests.Controls.Add(Me.btnSettingRFRXsweep)
-        Me.grpbxTests.Controls.Add(Me.btnSettingRFTXsweep)
-        Me.grpbxTests.Controls.Add(Me.btnSettingRFTX)
-        Me.grpbxTests.Controls.Add(Me.btnSettingRFRX)
-        Me.grpbxTests.Controls.Add(Me.chkbx_RFRX)
-        Me.grpbxTests.Controls.Add(Me.btn_rxSweepSettings)
-        Me.grpbxTests.Controls.Add(Me.chkbx_rxSweep)
-        Me.grpbxTests.Controls.Add(Me.btn_txSweepSettings)
-        Me.grpbxTests.Controls.Add(Me.chkbx_txSweep)
-        Me.grpbxTests.Controls.Add(Me.btnSettingsPLCTX)
-        Me.grpbxTests.Controls.Add(Me.btnSettingsPLCRX)
-        Me.grpbxTests.Controls.Add(Me.chkbx_RFTX)
+        Me.grpbxTests.Controls.Add(Me.chkbx_RFRXSweep)
+        Me.grpbxTests.Controls.Add(Me.chkbx_RFTXSweep)
+        Me.grpbxTests.Controls.Add(Me.btn_RFRXSweepSetting)
+        Me.grpbxTests.Controls.Add(Me.btn_RFTXSweepSetting)
+        Me.grpbxTests.Controls.Add(Me.btnRFTXSetting)
+        Me.grpbxTests.Controls.Add(Me.btnRFRXSetting)
+        Me.grpbxTests.Controls.Add(Me.chkbxRFRX)
+        Me.grpbxTests.Controls.Add(Me.btn_PLCRXSweepSettings)
+        Me.grpbxTests.Controls.Add(Me.chkbx_PLCRXSweep)
+        Me.grpbxTests.Controls.Add(Me.btn_PLCTXSweepSettings)
+        Me.grpbxTests.Controls.Add(Me.chkbx_PLCTXSweep)
+        Me.grpbxTests.Controls.Add(Me.btnPLCTXSettings)
+        Me.grpbxTests.Controls.Add(Me.btnPLCRXSettings)
+        Me.grpbxTests.Controls.Add(Me.chkbxRFTX)
         Me.grpbxTests.Controls.Add(Me.chkbxPLCRX)
         Me.grpbxTests.Controls.Add(Me.chkbxPLCTX)
         Me.grpbxTests.Location = New System.Drawing.Point(22, 249)
@@ -139,154 +139,154 @@ Partial Class HomeScreen
         Me.CheckBox3.Text = "New Test"
         Me.CheckBox3.UseVisualStyleBackColor = True
         '
-        'chkbxRFRXSweep
+        'chkbx_RFRXSweep
         '
-        Me.chkbxRFRXSweep.AutoSize = True
-        Me.chkbxRFRXSweep.Location = New System.Drawing.Point(278, 136)
-        Me.chkbxRFRXSweep.Name = "chkbxRFRXSweep"
-        Me.chkbxRFRXSweep.Size = New System.Drawing.Size(118, 19)
-        Me.chkbxRFRXSweep.TabIndex = 28
-        Me.chkbxRFRXSweep.Text = "RF RX Sweep Test"
-        Me.chkbxRFRXSweep.UseVisualStyleBackColor = True
+        Me.chkbx_RFRXSweep.AutoSize = True
+        Me.chkbx_RFRXSweep.Location = New System.Drawing.Point(278, 136)
+        Me.chkbx_RFRXSweep.Name = "chkbx_RFRXSweep"
+        Me.chkbx_RFRXSweep.Size = New System.Drawing.Size(118, 19)
+        Me.chkbx_RFRXSweep.TabIndex = 28
+        Me.chkbx_RFRXSweep.Text = "RF RX Sweep Test"
+        Me.chkbx_RFRXSweep.UseVisualStyleBackColor = True
         '
-        'chkbxRFTXSweep
+        'chkbx_RFTXSweep
         '
-        Me.chkbxRFTXSweep.AutoSize = True
-        Me.chkbxRFTXSweep.Location = New System.Drawing.Point(20, 137)
-        Me.chkbxRFTXSweep.Name = "chkbxRFTXSweep"
-        Me.chkbxRFTXSweep.Size = New System.Drawing.Size(118, 19)
-        Me.chkbxRFTXSweep.TabIndex = 27
-        Me.chkbxRFTXSweep.Text = "RF TX Sweep Test"
-        Me.chkbxRFTXSweep.UseVisualStyleBackColor = True
+        Me.chkbx_RFTXSweep.AutoSize = True
+        Me.chkbx_RFTXSweep.Location = New System.Drawing.Point(17, 138)
+        Me.chkbx_RFTXSweep.Name = "chkbx_RFTXSweep"
+        Me.chkbx_RFTXSweep.Size = New System.Drawing.Size(118, 19)
+        Me.chkbx_RFTXSweep.TabIndex = 27
+        Me.chkbx_RFTXSweep.Text = "RF TX Sweep Test"
+        Me.chkbx_RFTXSweep.UseVisualStyleBackColor = True
         '
-        'btnSettingRFRXsweep
+        'btn_RFRXSweepSetting
         '
-        Me.btnSettingRFRXsweep.BackgroundImage = CType(resources.GetObject("btnSettingRFRXsweep.BackgroundImage"), System.Drawing.Image)
-        Me.btnSettingRFRXsweep.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
-        Me.btnSettingRFRXsweep.Enabled = False
-        Me.btnSettingRFRXsweep.Location = New System.Drawing.Point(457, 130)
-        Me.btnSettingRFRXsweep.Name = "btnSettingRFRXsweep"
-        Me.btnSettingRFRXsweep.Size = New System.Drawing.Size(27, 24)
-        Me.btnSettingRFRXsweep.TabIndex = 26
-        Me.btnSettingRFRXsweep.UseVisualStyleBackColor = True
+        Me.btn_RFRXSweepSetting.BackgroundImage = CType(resources.GetObject("btn_RFRXSweepSetting.BackgroundImage"), System.Drawing.Image)
+        Me.btn_RFRXSweepSetting.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
+        Me.btn_RFRXSweepSetting.Enabled = False
+        Me.btn_RFRXSweepSetting.Location = New System.Drawing.Point(457, 130)
+        Me.btn_RFRXSweepSetting.Name = "btn_RFRXSweepSetting"
+        Me.btn_RFRXSweepSetting.Size = New System.Drawing.Size(27, 24)
+        Me.btn_RFRXSweepSetting.TabIndex = 26
+        Me.btn_RFRXSweepSetting.UseVisualStyleBackColor = True
         '
-        'btnSettingRFTXsweep
+        'btn_RFTXSweepSetting
         '
-        Me.btnSettingRFTXsweep.BackgroundImage = CType(resources.GetObject("btnSettingRFTXsweep.BackgroundImage"), System.Drawing.Image)
-        Me.btnSettingRFTXsweep.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
-        Me.btnSettingRFTXsweep.Enabled = False
-        Me.btnSettingRFTXsweep.Location = New System.Drawing.Point(151, 131)
-        Me.btnSettingRFTXsweep.Name = "btnSettingRFTXsweep"
-        Me.btnSettingRFTXsweep.Size = New System.Drawing.Size(27, 24)
-        Me.btnSettingRFTXsweep.TabIndex = 24
-        Me.btnSettingRFTXsweep.UseVisualStyleBackColor = True
+        Me.btn_RFTXSweepSetting.BackgroundImage = CType(resources.GetObject("btn_RFTXSweepSetting.BackgroundImage"), System.Drawing.Image)
+        Me.btn_RFTXSweepSetting.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
+        Me.btn_RFTXSweepSetting.Enabled = False
+        Me.btn_RFTXSweepSetting.Location = New System.Drawing.Point(151, 131)
+        Me.btn_RFTXSweepSetting.Name = "btn_RFTXSweepSetting"
+        Me.btn_RFTXSweepSetting.Size = New System.Drawing.Size(27, 24)
+        Me.btn_RFTXSweepSetting.TabIndex = 24
+        Me.btn_RFTXSweepSetting.UseVisualStyleBackColor = True
         '
-        'btnSettingRFTX
+        'btnRFTXSetting
         '
-        Me.btnSettingRFTX.BackgroundImage = CType(resources.GetObject("btnSettingRFTX.BackgroundImage"), System.Drawing.Image)
-        Me.btnSettingRFTX.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
-        Me.btnSettingRFTX.Enabled = False
-        Me.btnSettingRFTX.Location = New System.Drawing.Point(737, 29)
-        Me.btnSettingRFTX.Name = "btnSettingRFTX"
-        Me.btnSettingRFTX.Size = New System.Drawing.Size(27, 24)
-        Me.btnSettingRFTX.TabIndex = 22
-        Me.btnSettingRFTX.UseVisualStyleBackColor = True
+        Me.btnRFTXSetting.BackgroundImage = CType(resources.GetObject("btnRFTXSetting.BackgroundImage"), System.Drawing.Image)
+        Me.btnRFTXSetting.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
+        Me.btnRFTXSetting.Enabled = False
+        Me.btnRFTXSetting.Location = New System.Drawing.Point(737, 29)
+        Me.btnRFTXSetting.Name = "btnRFTXSetting"
+        Me.btnRFTXSetting.Size = New System.Drawing.Size(27, 24)
+        Me.btnRFTXSetting.TabIndex = 22
+        Me.btnRFTXSetting.UseVisualStyleBackColor = True
         '
-        'btnSettingRFRX
+        'btnRFRXSetting
         '
-        Me.btnSettingRFRX.BackgroundImage = CType(resources.GetObject("btnSettingRFRX.BackgroundImage"), System.Drawing.Image)
-        Me.btnSettingRFRX.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
-        Me.btnSettingRFRX.Enabled = False
-        Me.btnSettingRFRX.Location = New System.Drawing.Point(737, 82)
-        Me.btnSettingRFRX.Name = "btnSettingRFRX"
-        Me.btnSettingRFRX.Size = New System.Drawing.Size(27, 24)
-        Me.btnSettingRFRX.TabIndex = 21
-        Me.btnSettingRFRX.UseVisualStyleBackColor = True
+        Me.btnRFRXSetting.BackgroundImage = CType(resources.GetObject("btnRFRXSetting.BackgroundImage"), System.Drawing.Image)
+        Me.btnRFRXSetting.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
+        Me.btnRFRXSetting.Enabled = False
+        Me.btnRFRXSetting.Location = New System.Drawing.Point(737, 82)
+        Me.btnRFRXSetting.Name = "btnRFRXSetting"
+        Me.btnRFRXSetting.Size = New System.Drawing.Size(27, 24)
+        Me.btnRFRXSetting.TabIndex = 21
+        Me.btnRFRXSetting.UseVisualStyleBackColor = True
         '
-        'chkbx_RFRX
+        'chkbxRFRX
         '
-        Me.chkbx_RFRX.AutoSize = True
-        Me.chkbx_RFRX.Enabled = False
-        Me.chkbx_RFRX.Location = New System.Drawing.Point(571, 86)
-        Me.chkbx_RFRX.Name = "chkbx_RFRX"
-        Me.chkbx_RFRX.Size = New System.Drawing.Size(107, 19)
-        Me.chkbx_RFRX.TabIndex = 20
-        Me.chkbx_RFRX.Text = "RF Receive Test"
-        Me.chkbx_RFRX.UseVisualStyleBackColor = True
+        Me.chkbxRFRX.AutoSize = True
+        Me.chkbxRFRX.Enabled = False
+        Me.chkbxRFRX.Location = New System.Drawing.Point(571, 86)
+        Me.chkbxRFRX.Name = "chkbxRFRX"
+        Me.chkbxRFRX.Size = New System.Drawing.Size(107, 19)
+        Me.chkbxRFRX.TabIndex = 20
+        Me.chkbxRFRX.Text = "RF Receive Test"
+        Me.chkbxRFRX.UseVisualStyleBackColor = True
         '
-        'btn_rxSweepSettings
+        'btn_PLCRXSweepSettings
         '
-        Me.btn_rxSweepSettings.BackgroundImage = CType(resources.GetObject("btn_rxSweepSettings.BackgroundImage"), System.Drawing.Image)
-        Me.btn_rxSweepSettings.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
-        Me.btn_rxSweepSettings.Enabled = False
-        Me.btn_rxSweepSettings.Location = New System.Drawing.Point(457, 80)
-        Me.btn_rxSweepSettings.Name = "btn_rxSweepSettings"
-        Me.btn_rxSweepSettings.Size = New System.Drawing.Size(27, 24)
-        Me.btn_rxSweepSettings.TabIndex = 19
-        Me.btn_rxSweepSettings.UseVisualStyleBackColor = True
+        Me.btn_PLCRXSweepSettings.BackgroundImage = CType(resources.GetObject("btn_PLCRXSweepSettings.BackgroundImage"), System.Drawing.Image)
+        Me.btn_PLCRXSweepSettings.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
+        Me.btn_PLCRXSweepSettings.Enabled = False
+        Me.btn_PLCRXSweepSettings.Location = New System.Drawing.Point(457, 80)
+        Me.btn_PLCRXSweepSettings.Name = "btn_PLCRXSweepSettings"
+        Me.btn_PLCRXSweepSettings.Size = New System.Drawing.Size(27, 24)
+        Me.btn_PLCRXSweepSettings.TabIndex = 19
+        Me.btn_PLCRXSweepSettings.UseVisualStyleBackColor = True
         '
-        'chkbx_rxSweep
+        'chkbx_PLCRXSweep
         '
-        Me.chkbx_rxSweep.AutoSize = True
-        Me.chkbx_rxSweep.Enabled = False
-        Me.chkbx_rxSweep.Location = New System.Drawing.Point(278, 86)
-        Me.chkbx_rxSweep.Name = "chkbx_rxSweep"
-        Me.chkbx_rxSweep.Size = New System.Drawing.Size(126, 19)
-        Me.chkbx_rxSweep.TabIndex = 18
-        Me.chkbx_rxSweep.Text = "PLC RX Sweep Test"
-        Me.chkbx_rxSweep.UseVisualStyleBackColor = True
+        Me.chkbx_PLCRXSweep.AutoSize = True
+        Me.chkbx_PLCRXSweep.Enabled = False
+        Me.chkbx_PLCRXSweep.Location = New System.Drawing.Point(278, 86)
+        Me.chkbx_PLCRXSweep.Name = "chkbx_PLCRXSweep"
+        Me.chkbx_PLCRXSweep.Size = New System.Drawing.Size(126, 19)
+        Me.chkbx_PLCRXSweep.TabIndex = 18
+        Me.chkbx_PLCRXSweep.Text = "PLC RX Sweep Test"
+        Me.chkbx_PLCRXSweep.UseVisualStyleBackColor = True
         '
-        'btn_txSweepSettings
+        'btn_PLCTXSweepSettings
         '
-        Me.btn_txSweepSettings.BackgroundImage = CType(resources.GetObject("btn_txSweepSettings.BackgroundImage"), System.Drawing.Image)
-        Me.btn_txSweepSettings.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
-        Me.btn_txSweepSettings.Enabled = False
-        Me.btn_txSweepSettings.Location = New System.Drawing.Point(151, 80)
-        Me.btn_txSweepSettings.Name = "btn_txSweepSettings"
-        Me.btn_txSweepSettings.Size = New System.Drawing.Size(27, 24)
-        Me.btn_txSweepSettings.TabIndex = 17
-        Me.btn_txSweepSettings.UseVisualStyleBackColor = True
+        Me.btn_PLCTXSweepSettings.BackgroundImage = CType(resources.GetObject("btn_PLCTXSweepSettings.BackgroundImage"), System.Drawing.Image)
+        Me.btn_PLCTXSweepSettings.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
+        Me.btn_PLCTXSweepSettings.Enabled = False
+        Me.btn_PLCTXSweepSettings.Location = New System.Drawing.Point(151, 80)
+        Me.btn_PLCTXSweepSettings.Name = "btn_PLCTXSweepSettings"
+        Me.btn_PLCTXSweepSettings.Size = New System.Drawing.Size(27, 24)
+        Me.btn_PLCTXSweepSettings.TabIndex = 17
+        Me.btn_PLCTXSweepSettings.UseVisualStyleBackColor = True
         '
-        'chkbx_txSweep
+        'chkbx_PLCTXSweep
         '
-        Me.chkbx_txSweep.AutoSize = True
-        Me.chkbx_txSweep.Enabled = False
-        Me.chkbx_txSweep.Location = New System.Drawing.Point(17, 85)
-        Me.chkbx_txSweep.Name = "chkbx_txSweep"
-        Me.chkbx_txSweep.Size = New System.Drawing.Size(126, 19)
-        Me.chkbx_txSweep.TabIndex = 16
-        Me.chkbx_txSweep.Text = "PLC TX Sweep Test"
-        Me.chkbx_txSweep.UseVisualStyleBackColor = True
+        Me.chkbx_PLCTXSweep.AutoSize = True
+        Me.chkbx_PLCTXSweep.Enabled = False
+        Me.chkbx_PLCTXSweep.Location = New System.Drawing.Point(17, 85)
+        Me.chkbx_PLCTXSweep.Name = "chkbx_PLCTXSweep"
+        Me.chkbx_PLCTXSweep.Size = New System.Drawing.Size(126, 19)
+        Me.chkbx_PLCTXSweep.TabIndex = 16
+        Me.chkbx_PLCTXSweep.Text = "PLC TX Sweep Test"
+        Me.chkbx_PLCTXSweep.UseVisualStyleBackColor = True
         '
-        'btnSettingsPLCTX
+        'btnPLCTXSettings
         '
-        Me.btnSettingsPLCTX.BackgroundImage = CType(resources.GetObject("btnSettingsPLCTX.BackgroundImage"), System.Drawing.Image)
-        Me.btnSettingsPLCTX.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
-        Me.btnSettingsPLCTX.Location = New System.Drawing.Point(151, 29)
-        Me.btnSettingsPLCTX.Name = "btnSettingsPLCTX"
-        Me.btnSettingsPLCTX.Size = New System.Drawing.Size(27, 24)
-        Me.btnSettingsPLCTX.TabIndex = 15
-        Me.btnSettingsPLCTX.UseVisualStyleBackColor = True
+        Me.btnPLCTXSettings.BackgroundImage = CType(resources.GetObject("btnPLCTXSettings.BackgroundImage"), System.Drawing.Image)
+        Me.btnPLCTXSettings.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
+        Me.btnPLCTXSettings.Location = New System.Drawing.Point(151, 29)
+        Me.btnPLCTXSettings.Name = "btnPLCTXSettings"
+        Me.btnPLCTXSettings.Size = New System.Drawing.Size(27, 24)
+        Me.btnPLCTXSettings.TabIndex = 15
+        Me.btnPLCTXSettings.UseVisualStyleBackColor = True
         '
-        'btnSettingsPLCRX
+        'btnPLCRXSettings
         '
-        Me.btnSettingsPLCRX.BackgroundImage = CType(resources.GetObject("btnSettingsPLCRX.BackgroundImage"), System.Drawing.Image)
-        Me.btnSettingsPLCRX.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
-        Me.btnSettingsPLCRX.Location = New System.Drawing.Point(457, 28)
-        Me.btnSettingsPLCRX.Name = "btnSettingsPLCRX"
-        Me.btnSettingsPLCRX.Size = New System.Drawing.Size(27, 24)
-        Me.btnSettingsPLCRX.TabIndex = 14
-        Me.btnSettingsPLCRX.UseVisualStyleBackColor = True
+        Me.btnPLCRXSettings.BackgroundImage = CType(resources.GetObject("btnPLCRXSettings.BackgroundImage"), System.Drawing.Image)
+        Me.btnPLCRXSettings.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center
+        Me.btnPLCRXSettings.Location = New System.Drawing.Point(457, 28)
+        Me.btnPLCRXSettings.Name = "btnPLCRXSettings"
+        Me.btnPLCRXSettings.Size = New System.Drawing.Size(27, 24)
+        Me.btnPLCRXSettings.TabIndex = 14
+        Me.btnPLCRXSettings.UseVisualStyleBackColor = True
         '
-        'chkbx_RFTX
+        'chkbxRFTX
         '
-        Me.chkbx_RFTX.AutoSize = True
-        Me.chkbx_RFTX.Location = New System.Drawing.Point(571, 34)
-        Me.chkbx_RFTX.Name = "chkbx_RFTX"
-        Me.chkbx_RFTX.Size = New System.Drawing.Size(114, 19)
-        Me.chkbx_RFTX.TabIndex = 2
-        Me.chkbx_RFTX.Text = "RF Transmit Test"
-        Me.chkbx_RFTX.UseVisualStyleBackColor = True
+        Me.chkbxRFTX.AutoSize = True
+        Me.chkbxRFTX.Location = New System.Drawing.Point(571, 34)
+        Me.chkbxRFTX.Name = "chkbxRFTX"
+        Me.chkbxRFTX.Size = New System.Drawing.Size(114, 19)
+        Me.chkbxRFTX.TabIndex = 2
+        Me.chkbxRFTX.Text = "RF Transmit Test"
+        Me.chkbxRFTX.UseVisualStyleBackColor = True
         '
         'chkbxPLCRX
         '
@@ -489,7 +489,7 @@ Partial Class HomeScreen
         Me.Margin = New System.Windows.Forms.Padding(3, 4, 3, 4)
         Me.MaximizeBox = False
         Me.Name = "HomeScreen"
-        Me.Text = "Greenvity Production Tool version 2.1"
+        Me.Text = "Greenvity Production Tool v2.2"
         Me.GroupBox1.ResumeLayout(False)
         Me.grpbxTests.ResumeLayout(False)
         Me.grpbxTests.PerformLayout()
@@ -505,24 +505,24 @@ Partial Class HomeScreen
     Friend WithEvents PictureBox1 As System.Windows.Forms.PictureBox
     Friend WithEvents Label2 As System.Windows.Forms.Label
     Friend WithEvents lblSessionLocation As System.Windows.Forms.Label
-    Friend WithEvents chkbx_RFTX As System.Windows.Forms.CheckBox
+    Friend WithEvents chkbxRFTX As System.Windows.Forms.CheckBox
     Friend WithEvents chkbxPLCRX As System.Windows.Forms.CheckBox
     Friend WithEvents chkbxPLCTX As System.Windows.Forms.CheckBox
-    Friend WithEvents btnSettingsPLCTX As System.Windows.Forms.Button
-    Friend WithEvents btnSettingsPLCRX As System.Windows.Forms.Button
-    Friend WithEvents btnSettingRFRX As System.Windows.Forms.Button
-    Friend WithEvents chkbx_RFRX As System.Windows.Forms.CheckBox
-    Friend WithEvents btn_rxSweepSettings As System.Windows.Forms.Button
-    Friend WithEvents chkbx_rxSweep As System.Windows.Forms.CheckBox
-    Friend WithEvents btn_txSweepSettings As System.Windows.Forms.Button
-    Friend WithEvents chkbx_txSweep As System.Windows.Forms.CheckBox
+    Friend WithEvents btnPLCTXSettings As System.Windows.Forms.Button
+    Friend WithEvents btnPLCRXSettings As System.Windows.Forms.Button
+    Friend WithEvents btnRFRXSetting As System.Windows.Forms.Button
+    Friend WithEvents chkbxRFRX As System.Windows.Forms.CheckBox
+    Friend WithEvents btn_PLCRXSweepSettings As System.Windows.Forms.Button
+    Friend WithEvents chkbx_PLCRXSweep As System.Windows.Forms.CheckBox
+    Friend WithEvents btn_PLCTXSweepSettings As System.Windows.Forms.Button
+    Friend WithEvents chkbx_PLCTXSweep As System.Windows.Forms.CheckBox
     Friend WithEvents btn_SetIP As System.Windows.Forms.Button
     Friend WithEvents btn_ScanDevices As System.Windows.Forms.Button
     Friend WithEvents btn_ResetDevices As System.Windows.Forms.Button
     Friend WithEvents txtbxDummy As System.Windows.Forms.TextBox
     Friend WithEvents lvClients As System.Windows.Forms.ListBox
     Friend WithEvents bar As System.Windows.Forms.ProgressBar
-    Friend WithEvents btnSettingRFTX As System.Windows.Forms.Button
+    Friend WithEvents btnRFTXSetting As System.Windows.Forms.Button
     Friend WithEvents btn_ShowResults As System.Windows.Forms.Button
     Friend WithEvents txtbxLotNum As System.Windows.Forms.TextBox
     Friend WithEvents txtbxSerialNum As System.Windows.Forms.TextBox
@@ -530,10 +530,10 @@ Partial Class HomeScreen
     Friend WithEvents lblSerialNum As System.Windows.Forms.Label
     Friend WithEvents Button3 As System.Windows.Forms.Button
     Friend WithEvents CheckBox3 As System.Windows.Forms.CheckBox
-    Friend WithEvents chkbxRFRXSweep As System.Windows.Forms.CheckBox
-    Friend WithEvents chkbxRFTXSweep As System.Windows.Forms.CheckBox
-    Friend WithEvents btnSettingRFRXsweep As System.Windows.Forms.Button
-    Friend WithEvents btnSettingRFTXsweep As System.Windows.Forms.Button
+    Friend WithEvents chkbx_RFRXSweep As System.Windows.Forms.CheckBox
+    Friend WithEvents chkbx_RFTXSweep As System.Windows.Forms.CheckBox
+    Friend WithEvents btn_RFRXSweepSetting As System.Windows.Forms.Button
+    Friend WithEvents btn_RFTXSweepSetting As System.Windows.Forms.Button
     Friend WithEvents btnStopTest As System.Windows.Forms.Button
     Friend WithEvents lblResult As System.Windows.Forms.Label
 

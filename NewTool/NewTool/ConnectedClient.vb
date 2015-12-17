@@ -2,7 +2,7 @@
 
 Public Class ConnectedClient
 
-    Const BYTES_TO_READ As Integer = 512
+    Const BYTES_TO_READ As Integer = 2048
     Public mClient As System.Net.Sockets.TcpClient
     Public mDevType As UInteger
     Private RunThread = New Boolean
@@ -46,7 +46,20 @@ Public Class ConnectedClient
             Try
                 If mClient.Connected Then
                     If mClient.GetStream.CanRead Then
-                        bytesRead = mClient.GetStream.Read(readBuffer, 0, BYTES_TO_READ)
+
+                        ' read till data is available
+                        Const buffSize As Integer = 512
+                        Dim buffer As Byte() = New Byte(buffSize) {}
+                        Dim ret As New UInteger
+                        Do
+                            ret = mClient.GetStream.Read(buffer, 0, buffSize)
+                            Array.Copy(buffer, 0, readBuffer, bytesRead, ret)
+                            bytesRead += ret
+                            ret = Nothing
+                            Array.Clear(buffer, 0, buffSize)
+                        Loop While mClient.GetStream.DataAvailable
+
+                        'bytesRead = mClient.GetStream.Read(readBuffer, 0, BYTES_TO_READ)
 
                         If (bytesRead > 0) Then
                             SyncLock lockObj
@@ -96,4 +109,5 @@ Public Class ConnectedClient
             MessageBox.Show(ex.ToString)
         End Try
     End Sub
+
 End Class

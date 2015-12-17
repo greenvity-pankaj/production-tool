@@ -1,12 +1,20 @@
-﻿Imports System.Runtime.Serialization.Formatters.Binary
+﻿'Imports System.Runtime.Serialization.Formatters.Binary
 Imports System.Net, System.Net.Sockets, System.Text, System.Threading
 Imports System.Runtime.InteropServices
 
-Public Class spiTXTestSettings
+Public Class TestSettings
     '   <summary>
     '       Enum declarations
     '   </summary>
 #Region "Enum Declaration"
+
+    '
+    '   erMode status
+    '
+    Enum erModestate As Byte
+        erModeOFF
+        erModeON
+    End Enum
 
     '
     '   TXPowerMode
@@ -89,22 +97,27 @@ Public Class spiTXTestSettings
     '   </summary>
 #Region "Structure Declerations"
 
+    Const MAC_ADD_LEN As Integer = 8
+
+    '
+    '   PLC Parameters
+    '
     <StructLayout(LayoutKind.Sequential, Size:=37, pack:=1)> _
     Public Structure _sPlcSimTxTestParams
         '   Security
         Public eks As Byte
-        Public secTestMode As Byte
+        Public secTestMode As eSecTestMode
 
         'frame type
-        Public frmType As Byte
+        Public frmType As eFrmType
         Public altFrmTypeTest As Byte           'overrides frmType
 
         'ucst/mcst/bcst
-        Public mcstMode As Byte
+        Public mcstMode As eFrmMcstMode
         Public altMcstTest As Byte
 
         'plid
-        Public plid As Byte
+        Public plid As eHpgpPlidValue
         Public altPlidTest As Byte              'overrides plid
 
         'offset descLen
@@ -114,8 +127,8 @@ Public Class spiTXTestSettings
 
         'robo mode/ lengths
         Public stdModeSel As Byte               'for frm lens b/w Mini Robo Max & STD/2PB HS Max
-        Public lenTestMode As Byte
-        Public roboTestMode As Byte             'for single robo inc len test
+        Public lenTestMode As eLenTestMode
+        Public roboTestMode As eRoboTestMode             'for single robo inc len test
 
         Public contMode As Byte
         Public frmLen As UShort
@@ -133,11 +146,9 @@ Public Class spiTXTestSettings
         Public dtei As Byte
         Public stei As Byte
 
-        Public txpowermode As Byte
-        Public ermode As Byte
+        Public txpowermode As eTxPwrMode
+        Public ermode As erModestate
     End Structure
-
-    Const MAC_ADD_LEN As Integer = 8
 
     '
     '   RF Parameters
@@ -216,9 +227,9 @@ Public Class spiTXTestSettings
     '
     Private Sub chkbx_BCastMode_CheckedChanged(sender As Object, e As EventArgs) Handles chkbx_BCastMode.CheckedChanged
         If chkbx_BCastMode.Checked Then
-            txTest.mcstMode = &H1
+            txTest.mcstMode = eFrmMcstMode.HPGP_MCST
         Else
-            txTest.mcstMode = &H0
+            txTest.mcstMode = eFrmMcstMode.HPGP_UCST
         End If
     End Sub
     ''
@@ -262,6 +273,11 @@ Public Class spiTXTestSettings
         txTest.delay = txtbx_InterFrmDelay.Text
         txTest.numFrames = txtbx_NumOfFrms.Text
 
+        ' erMode on for payload equal to 100 or less
+        If txTest.frmLen <= 100 Then
+            txTest.ermode = erModestate.erModeON
+        End If
+        txTest.txpowermode = eTxPwrMode.AUTOMOTIVE_TX_POWER_MODE
 
         '   Default and not open to user
         txTest.snid = 1
@@ -282,14 +298,7 @@ Public Class spiTXTestSettings
         txTest = Nothing
         Me.Dispose()
     End Sub
-    '
-    '   Form dispose
-    '
-    Private Sub btn_Cancle_Click(sender As Object, e As EventArgs) Handles btn_Cancle.Click
-        txTest = Nothing
-        Threading.Thread.Sleep(10)
-        Me.Dispose()
-    End Sub
+    
     '
     '   Main Form Init
     '
@@ -303,13 +312,13 @@ Public Class spiTXTestSettings
         cmbbx_Eks.Enabled = False
         chkbx_ContMode.Enabled = False
 
-        If HomeScreen.chkbx_txSweep.Checked = True Then
+        If HomeScreen.chkbx_PLCTXSweep.Checked = True Then
 
             txtbx_FrmLen.AppendText("100")
             txtbx_InterFrmDelay.AppendText("4")
             txtbx_NumOfFrms.AppendText("1000")
 
-            chkbx_BCastMode.Enabled = False
+            'chkbx_BCastMode.Enabled = False
 
             cmbbx_Eks.SelectedIndex = 0
             cmbbxLenTestMode.SelectedIndex = 3
@@ -327,13 +336,13 @@ Public Class spiTXTestSettings
             btn_Save.Enabled = False
             btn_Cancle.Text = "OK"
 
-        ElseIf HomeScreen.chkbx_rxSweep.Checked = True Then
+        ElseIf HomeScreen.chkbx_PLCRXSweep.Checked = True Then
 
             txtbx_FrmLen.AppendText("100")
             txtbx_InterFrmDelay.AppendText("4")
             txtbx_NumOfFrms.AppendText("1000")
 
-            chkbx_BCastMode.Enabled = False
+            'chkbx_BCastMode.Enabled = False
 
             cmbbx_Eks.SelectedIndex = 0
             cmbbxLenTestMode.SelectedIndex = 3
@@ -352,6 +361,15 @@ Public Class spiTXTestSettings
             btn_Cancle.Text = "OK"
 
         End If
+    End Sub
+
+    '
+    '   Form dispose
+    '
+    Private Sub btn_Cancle_Click(sender As Object, e As EventArgs) Handles btn_Cancle.Click
+        txTest = Nothing
+        Threading.Thread.Sleep(10)
+        Me.Dispose()
     End Sub
 
 End Class

@@ -10,13 +10,13 @@ Public Class RunTest
     Private headerFrmType As Byte
     Private payloadLength As UShort
     Private headerFrmID As Byte
-    Public gtxTest As New spiTXTestSettings._sPlcSimTxTestParams 'global variable to carry PLC params
-    Public rftestParams As New spiTXTestSettings.sRfTxTestParams    'global variable to carry rf params
+    Public gtxTest As New TestSettings._sPlcSimTxTestParams 'global variable to carry PLC params
+    Public rftestParams As New TestSettings.sRfTxTestParams 'global variable to carry rf params
     Public Const ProductionToolProtocol As Byte = &H8F
     Public Const MAX_FW_VER_LEN As Integer = 16
 
 #End Region
-    
+
 
     '   <summary>
     '       Enums
@@ -34,8 +34,6 @@ Public Class RunTest
         STATE_START_TEST_DUT
         STATE_START_TEST_REF
         STATE_START_TEST_CNF
-        STATE_START_TEST_CNF_DUT
-        STATE_START_TEST_CNF_REF
         STATE_STOP_TEST
         STATE_STOP_TEST_CNF
         STATE_DEVICE_RESET
@@ -68,7 +66,7 @@ Public Class RunTest
     '       Structures
     '   </summary>
 #Region "Structure Declerations"
-    
+
     '
     '   Header strucutre
     '
@@ -116,7 +114,7 @@ Public Class RunTest
     '
     '   Swap stei and dtei
     '
-    Private Function swapNWIDsforREF(ByVal x As spiTXTestSettings._sPlcSimTxTestParams) As spiTXTestSettings._sPlcSimTxTestParams
+    Private Function swapNWIDsforREF(ByVal x As TestSettings._sPlcSimTxTestParams) As TestSettings._sPlcSimTxTestParams
         Dim tmpSTEI As UInteger = 0
         Dim tmpDTEI As UInteger = 0
 
@@ -221,7 +219,7 @@ Public Class RunTest
 
             Case states.STATE_PREPARE_REFERENCE
 
-                Dim gtxTest_forREF As spiTXTestSettings._sPlcSimTxTestParams = Nothing
+                Dim gtxTest_forREF As TestSettings._sPlcSimTxTestParams = Nothing
 
                 If get_interface(test) = TestInterface.TEST_PLC_ID Then
                     gtxTest_forREF = swapNWIDsforREF(gtxTest)
@@ -335,15 +333,15 @@ Public Class RunTest
     '   <summary>
     '       Async send 
     '   </summary>
-#Region "Send Thread"
+#Region "Send To client"
     '
-    '   start send thread
+    '   send data to client
     '
     Public Sub beginSend(ByVal state As states, mClient As ConnectedClient, ByVal t As HomeScreen.tests)
 
         Dim txMsg() = New Byte() {}
         txMsg = getPayload(state, t)
-        
+
         If txMsg IsNot Nothing Then
             mClient.SendMessage(txMsg)
         End If
@@ -414,34 +412,11 @@ Public Class RunTest
 #End Region
 
     '
-    '   check if multiple tests are selected
-    '
-    Private Function isMultipleTestSelected(ByVal SelectedTests As Byte()) As Boolean
-        Dim count As Integer = 0
-        If HomeScreen.chkbxPLCTX.Checked Then
-            count += 1
-            Add(SelectedTests, HomeScreen.tests.TEST_ID_PLC_TX)
-        End If
-        If HomeScreen.chkbx_RFTX.Checked Then
-            count += 1
-            Add(SelectedTests, HomeScreen.tests.TEST_ID_PLC_RX)
-        End If
-        If HomeScreen.chkbxPLCRX.Checked Then
-            count += 1
-            Add(SelectedTests, HomeScreen.tests.TEST_ID_RF_TX)
-        End If
-
-        If count > 1 Then
-            Return True
-        Else
-            Return False
-        End If
-        Return Nothing
-    End Function
-    '
     '   Dispose form
     '
     Private Sub Button6_Click(sender As Object, e As EventArgs) Handles Button6.Click
+        Threading.Thread.Sleep(10)
         Me.Dispose()
     End Sub
+
 End Class

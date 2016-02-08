@@ -168,7 +168,14 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						state = 0xff;
 						frameParsed = FALSE;
 						break;
-						
+
+					case TOOL_CMD_DEVICE_FLASH_PARAM:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_DEVICE_FLASH_PARAM to FW");
+						send_Request(rxBuffer, readLength);
+						cmdState = 0xff;
+						state = 0xff;
+						frameParsed = FALSE;
+						break;
 					default:
 
 						break;
@@ -222,6 +229,13 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 
 					case TOOL_CMD_DEVICE_RESET_CNF:
 						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_DEVICE_RESET_CNF to Tool");
+						send_EventorResponse(rxBuffer, readLength);
+						cmdState = 0xff;
+						state = 0xff;
+						frameParsed = FALSE;
+						break;
+					case TOOL_CMD_DEVICE_FLASH_PARAM_CNF:
+						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_DEVICE_FLASH_PARAM_CNF to Tool");
 						send_EventorResponse(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;

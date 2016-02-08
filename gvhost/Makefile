@@ -33,11 +33,12 @@ endif
 #---------------------------------------------------------------------TEXT FORMATTING END
 #---------------------------------------------------------------------TARGETS TYPES START
 
-ifeq "$(TARGET)" "imx233"
+ifeq "$(TARGET)" "imx287"
   #Compiler to be used arm-2011.09-70-arm-none-linux-gnueabi.bin
   #CC=~/CodeSourcery/Sourcery_CodeBench_Lite_for_ARM_GNU_Linux/bin/arm-none-linux-gnueabi-gcc
   #CC=/opt/freescale/usr/local/gcc-4.1.2-glibc-2.5-nptl-3/arm-none-linux-gnueabi/bin/arm-none-linux-gnueabi-gcc
-  CC=/usr/bin/arm-linux-gnueabi-gcc
+  #CC=/usr/bin/arm-linux-gnueabi-gcc
+  CC=/opt/freescale/usr/local/gcc-4.4.4-glibc-2.11.1-multilib-1.0/arm-fsl-linux-gnueabi/bin/arm-none-linux-gnueabi-gcc
 #  CFLAGS= -static -g
    CFLAGS= -Wall -g -fPIC \
 	-I$(enclosing_dir)\
@@ -77,7 +78,7 @@ all: $(CFILES)
 	@echo "----------------------------------------------------------"
 	$(TXTYELLOW)
 	@echo "Building Greenvity Production Tool Host Daemon..."
-	@echo "TARGET option selected as $(TARGET) out of (x86 | imx233 | imx25)"
+	@echo "TARGET option selected as $(TARGET) out of (x86 | imx287)"
 	@echo $(enclosing_dir)
 	$(TXTRESET)
 	$(CC) $(CFILES) $(CFLAGS) -o $(EXE_NAME) $(LIBS)

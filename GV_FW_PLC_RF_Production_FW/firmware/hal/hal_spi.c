@@ -803,7 +803,7 @@ bool hal_spi_tx_dma (uint8_t XDATA *tx_data_p, uint16_t tx_req_bytes)
             }                        
         }
         spi_tx_flag = 1;
-
+#ifdef PROD_TEST
 		if((STM_TIME_TICK_MAX - STM_GetTick()) <= (MAX_SPI_TX_TIMEOUT + 1))
 		{
 			spi_tx_time = 0;
@@ -812,7 +812,7 @@ bool hal_spi_tx_dma (uint8_t XDATA *tx_data_p, uint16_t tx_req_bytes)
 		{
 			spi_tx_time = STM_GetTick();
 		}
-
+#endif
         hal_spi_payload_rx_rdy();
         
         hal_spi_stats.tx_bytes += (tx_req_bytes + 2);

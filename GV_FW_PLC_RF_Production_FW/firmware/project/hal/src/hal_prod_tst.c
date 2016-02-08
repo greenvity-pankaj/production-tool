@@ -26,6 +26,7 @@ txTestResults preTest_plcTxTestStats;
 sRfTxTestHostParams gRfTxTestHostParams;
 sRfRxTestHostParams gRfRxTestHostParams;
 extern tTimerId prod_test_rf_timer;
+#define TXLO_CAL_TRY_MAX	20
 
 u8 testCmd = 0;
 
@@ -151,7 +152,8 @@ void prodTest_init(u8 resetFlag)
 	if(resetFlag == 1)
 	{
 		gProdFlashProfile.rfProfile.testActionPreparePending = 0;
-		gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+		gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile.testIntf, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)\
+			-sizeof(gProdFlashProfile.signature)));
 		FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
 		Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
 	}
@@ -168,12 +170,12 @@ void prodTest_init(u8 resetFlag)
 			rf_test_prepare_reconfig();
 		}
 		else if((gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && \
-		(gProdFlashProfile.rfProfile.rfCalAttemptCount >= 10) && (gProdFlashProfile.rfProfile.testActionPreparePending == 1))
+		(gProdFlashProfile.rfProfile.rfCalAttemptCount >= TXLO_CAL_TRY_MAX) && (gProdFlashProfile.rfProfile.testActionPreparePending == 1))
 		{
 			sProdPrepRfStatusCnf rfPrepStatus;
 			
 			gProdFlashProfile.rfProfile.testActionPreparePending = 0;
-			gProdFlashProfile.crc =	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+			gProdFlashProfile.crc =	chksum_crc32 ((u8*)&gProdFlashProfile.testIntf, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)-sizeof(gProdFlashProfile.signature)));
 			FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
 			Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
 
@@ -280,6 +282,8 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 	txTestResults *plxTxTestStats = (txTestResults *)(upH + 1);
 	sRfStats      *pRfTxStat = (txTestResults *)(upH + 1);
 	sPlcSimTxTestParams *pTestParams;
+	sFlashMACParams *pFlashMACParams;
+	
 	memset(&spiTxBuf[0], 0x00, sizeof(upHeader) + sizeof(txTestResults) + EXTRA_PAYLOAD_SIZE);
 
 	//printf("pprodTestCmd->cmdId = %bu \n", pprodTestCmd->cmdId);
@@ -380,7 +384,7 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 					}
 					if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED || \
 						gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && \
-						gProdFlashProfile.rfProfile.rfCalAttemptCount < 10)
+						gProdFlashProfile.rfProfile.rfCalAttemptCount < TXLO_CAL_TRY_MAX)
 					{
 						memcpy((u8*)&gProdFlashProfile.rfProfile.txTestParams,prepProdCmd.parms,sizeof(sRfTxTestHostParams));
 						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
@@ -393,14 +397,15 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 						gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
 						gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
 						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
-						gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+						gProdFlashProfile.crc=	chksum_crc32 ((u8*)&(gProdFlashProfile.testIntf), (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)\
+							-sizeof(gProdFlashProfile.signature)));
 						FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
 						Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
 						GV701x_Chip_Reset();
 						while(1);// Prevents code execution if reset circuit is not present
 					}
 					else if(gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED &&  \
-							gProdFlashProfile.rfProfile.rfCalAttemptCount >= 10)
+							gProdFlashProfile.rfProfile.rfCalAttemptCount >= TXLO_CAL_TRY_MAX)
 					{
 						sProdPrepRfStatusCnf rfPrepStatus;
 						rfPrepStatus.calStatus = gProdFlashProfile.rfProfile.rfCalStatus;
@@ -440,7 +445,7 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 					}
 					if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED || \
 						gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && \
-						gProdFlashProfile.rfProfile.rfCalAttemptCount < 10)
+						gProdFlashProfile.rfProfile.rfCalAttemptCount < TXLO_CAL_TRY_MAX)
 					{
 						memcpy((u8*)&gProdFlashProfile.rfProfile.rxTestParams,prepProdCmd.parms,sizeof(sRfRxTestHostParams));
 						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
@@ -453,14 +458,15 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 						gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
 						gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
 						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
-						gProdFlashProfile.crc =	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+						gProdFlashProfile.crc =	chksum_crc32 ((u8*)&(gProdFlashProfile.testIntf), (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)\
+							-sizeof(gProdFlashProfile.signature)));
 						FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
 						Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
 						GV701x_Chip_Reset();
 						while(1);
 					}
 					else if(gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED && \
-							gProdFlashProfile.rfProfile.rfCalAttemptCount >= 10)
+							gProdFlashProfile.rfProfile.rfCalAttemptCount >= TXLO_CAL_TRY_MAX)
 					{
 						sProdPrepRfStatusCnf rfPrepStatus;
 						rfPrepStatus.calStatus = RF_CALIBRATION_FAILED;
@@ -580,7 +586,7 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 					
 					if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED || \
 						gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && \
-						gProdFlashProfile.rfProfile.rfCalAttemptCount < 10)
+						gProdFlashProfile.rfProfile.rfCalAttemptCount < TXLO_CAL_TRY_MAX)
 					{
 						memcpy((u8*)&gProdFlashProfile.rfProfile.rxTestParams,prepProdCmd.parms,sizeof(sRfRxTestHostParams));
 						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
@@ -593,14 +599,15 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 						gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
 						gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
 						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
-						gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+						gProdFlashProfile.crc=	chksum_crc32 ((u8*)&(gProdFlashProfile.testIntf), (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)\
+							-sizeof(gProdFlashProfile.signature)));
 						FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
 						Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
 						GV701x_Chip_Reset();
 						while(1);
 					}
 					else if(gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED && \
-							gProdFlashProfile.rfProfile.rfCalAttemptCount >= 10)
+							gProdFlashProfile.rfProfile.rfCalAttemptCount >= TXLO_CAL_TRY_MAX)
 					{
 						sProdPrepRfStatusCnf rfPrepStatus;
 						rfPrepStatus.calStatus = RF_CALIBRATION_FAILED;
@@ -641,7 +648,7 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 					}
 					if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED || \
 						gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && \
-						gProdFlashProfile.rfProfile.rfCalAttemptCount < 10)
+						gProdFlashProfile.rfProfile.rfCalAttemptCount < TXLO_CAL_TRY_MAX)
 					{
 						memcpy((u8*)&gProdFlashProfile.rfProfile.txTestParams,prepProdCmd.parms,sizeof(sRfTxTestHostParams));
 						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
@@ -654,14 +661,15 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 						gProdFlashProfile.rfProfile.calRegister.reg23 = 0xff;
 						gProdFlashProfile.rfProfile.calRegister.reg24 = 0xff;
 						gProdFlashProfile.rfProfile.testActionPreparePending = 1;
-						gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+						gProdFlashProfile.crc=	chksum_crc32 ((u8*)&(gProdFlashProfile.testIntf), (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)\
+							-sizeof(gProdFlashProfile.signature)));
 						FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
 						Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
 						GV701x_Chip_Reset();
 						while(1);
 					}
 					else if(gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED &&  \
-							gProdFlashProfile.rfProfile.rfCalAttemptCount >= 10)
+							gProdFlashProfile.rfProfile.rfCalAttemptCount >= TXLO_CAL_TRY_MAX)
 					{
 						sProdPrepRfStatusCnf rfPrepStatus;
 						rfPrepStatus.calStatus = gProdFlashProfile.rfProfile.rfCalStatus;
@@ -900,6 +908,7 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 			else
 			if (prodTestDev.devType == DEV_DUT)
 			{
+
 				printf("\nDUT: TOOL_CMD_STOP_TEST received !\n");
 				gHpgpHalCB.prodTestIsPLCTxTestActive  = 0;
 				//printf("gHpgpHalCB.prodTestIsPLCTxTestActive  = 0 \n");
@@ -980,7 +989,42 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 			//prodTest_init();
 			//GV701x_Chip_Reset();
 		break;
-			
+
+		case TOOL_CMD_DEVICE_FLASH_PARAM:
+		{
+			if(pprodTestCmd->testIntf == TEST_PLC_ID)
+			{	
+				sMacSerInfoProfile macSerInfoProfile;
+				u8 i=0;
+				u16 sector_address = 0;
+
+				memset(&macSerInfoProfile,0,sizeof(sMacSerInfoProfile));
+				
+				pFlashMACParams = (sFlashMACParams*)(pprodTestCmd->parms);
+				printf("\r\nRx: TOOL_CMD_DEVICE_FLASH_PARAM\r\n");
+				sector_address = le16_to_cpu(pFlashMACParams->sectorAddress);
+					
+				FM_Printf(FM_USER,"\nSector %u\n",sector_address);
+				FM_HexDump(FM_USER,"MAC Address",pFlashMACParams->macAddress,MAC_ADDR_LEN);
+				FM_HexDump(FM_USER,"Sr No.",pFlashMACParams->serialNo,SR_NO_LEN);
+
+				macSerInfoProfile.signature = MAC_SER_VALID_SIGNATURE;
+				
+				for(i=0;i<MAC_ADDR_LEN;i++)
+				{
+					macSerInfoProfile.macAddress[i] = pFlashMACParams->macAddress[MAC_ADDR_LEN-i-1];
+				}
+				memcpy(&macSerInfoProfile.serialNo[0],&pFlashMACParams->serialNo,SR_NO_LEN);
+				macSerInfoProfile.crc=	chksum_crc32 ((u8*)&macSerInfoProfile.macAddress[0], \
+										(sizeof(sMacSerInfoProfile) - sizeof(macSerInfoProfile.crc)-sizeof(macSerInfoProfile.signature)));
+				Gv701x_FlashWriteMemProfile(sector_address,sizeof(sMacSerInfoProfile),(void *)&macSerInfoProfile);
+				
+				prodTestSendRespOrEvent(headerResponse, TOOL_CMD_DEVICE_FLASH_PARAM_CNF, 
+				PRODTEST_STAT_SUCCESS);
+			}
+		}
+		break;
+		
 		default:
 			// not a Prod Test command
 			return;
@@ -991,10 +1035,11 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 void copy_plcTxTestStats (txTestResults *stats){
 
 	u32 AddrFilterErrCnt,FrameCtrlErrCnt,ICVErrCnt;
-
+	//gHpgpHalCB.halStats.TotalRxGoodFrmCnt -= gHpgpHalCB.halStats.DuplicateRxCnt; 
 	stats->TotalRxGoodFrmCnt = cpu_to_le32(gHpgpHalCB.halStats.TotalRxGoodFrmCnt);
+
 	stats->TotalRxBytesCnt   = cpu_to_le32(gHpgpHalCB.halStats.TotalRxBytesCnt);
-	stats->RxGoodDataCnt     = cpu_to_le32(gHpgpHalCB.halStats.RxGoodDataCnt);
+	stats->RxGoodDataCnt     = cpu_to_le32(gHpgpHalCB.halStats.RxGoodDataCnt - gHpgpHalCB.halStats.DuplicateRxCnt);
 	stats->RxGoodMgmtCnt     = cpu_to_le32(gHpgpHalCB.halStats.RxGoodMgmtCnt);
 	stats->DuplicateRxCnt    = cpu_to_le32(gHpgpHalCB.halStats.DuplicateRxCnt);
 
@@ -1025,19 +1070,19 @@ void config_plc_test_parameters(u8 *parms)
 	
 	//Assign txpowermode
 	// 0 - Automotive or Low powermode
-	if (0 == pTestParams->txpowermode){
+	if (AUTOMOTIVE_TX_POWER_MODE == pTestParams->txpowermode){
 		mac_utils_spi_write(0x34,0x08);
 		mac_utils_spi_write(0x35,0x30);
 	}
 	
 	// 1 - Normal powermode
-	if (1 == pTestParams->txpowermode){
+	if (NORMAL_TX_POWER_MODE == pTestParams->txpowermode){
 		mac_utils_spi_write(0x34,0x00);
 		mac_utils_spi_write(0x35,0x00);
 	}
 	
 	// 2 - High powermode			
-	if (2 == pTestParams->txpowermode){
+	if (HIGH_TX_POWER_MODE == pTestParams->txpowermode){
 		mac_utils_spi_write(0x34,0x00);
 		mac_utils_spi_write(0x35,0x0f);
 	}

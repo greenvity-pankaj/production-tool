@@ -934,7 +934,9 @@ __CRIT_SECTION_END__ //kiran
                     }
 					else
 					{
+#ifndef RELEASE
                         FM_Printf(FM_ERROR,"HAL: Rx PLC data frame\n");
+#endif
 					}
 #endif
                     break;

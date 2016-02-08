@@ -26,8 +26,6 @@
 
 #endif
 
-
-
 #include <REG51.H>                /* special function register declarations   */
                                   /* for the intended 8051 derivative         */
 #include <stdio.h>
@@ -48,13 +46,7 @@
 #include "ism.h"
 #include "utils_fw.h"
 #include "sys_common.h"
-//#include "hpgpctrl.h"
-//#include "hpgpdef.h"
-//#include "nma.h"
 
-
-//#include "htm.h"
-//#include "green.h"
 #ifdef UART_HOST_INTF 
 #include "gv701x_uartdriver_fw.h"
 #endif
@@ -80,6 +72,10 @@
 #include "crc32.h"
 #endif
 
+#ifdef Flash_Config
+#include "Gv701x_flash_fw.h"
+#endif
+
 #define HYBRII_FW_VER_MAJOR     1
 
 #define HYBRII_FW_VER_MINOR     10
@@ -96,6 +92,7 @@ extern u32 PLC_DC_LINE_CYCLE_FREQENCY;
 
 #ifdef PROD_TEST
 	sProdConfigProfile gProdFlashProfile;
+	sMacSerInfoProfile gMacSerInfoProfile;
 #endif
 
 static char xdata CmdBuf[128];
@@ -771,17 +768,17 @@ void CmdRun()
 
 eStatus LHTM_Init()
 {
-#ifndef PROD_TEST  
+#ifdef PROD_TEST  
     os_create_task(HYBRII_TASK_ID_UI);
 #endif
     return STATUS_SUCCESS;
 }
 
-#ifndef PROD_TEST
+#ifdef PROD_TEST
 void LHTM_Task (void) _task_ HYBRII_TASK_ID_UI
 {
     while (1) {
-    CmdRun();
+    	CmdRun();
 		os_switch_task();
     }
 }
@@ -800,15 +797,14 @@ void Read_FlashProfile()
    
 }
 #endif
-//extern void STM_Proc();
-//extern void HTM_CmdRun();
-
+#ifdef PROD_TEST
 extern u8  spi_tx_flag;
 extern void hal_spi_set_rx_cmd_len_rdy (void);
 
 extern void hal_spi_prepare_rx_cmd_engine (void);
 
 extern u32 spi_tx_time;
+#endif
 #ifdef RTX51_TINY_OS
 void green_main (void) _task_ HYBRII_TASK_ID_INIT
 #else
@@ -867,17 +863,19 @@ void main()
 			gProdFlashProfile.rfProfile.testActionPreparePending = 0;
 			//gProdFlashProfile.checksum =  Gv701x_CalcCheckSum16((u8*)&gProdFlashProfile,
 				//(sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.checksum)));
-			gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+			gProdFlashProfile.crc=	chksum_crc32 ((u8*)&(gProdFlashProfile.testIntf), (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)\
+			-sizeof(gProdFlashProfile.signature)));
 			FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
 			Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
 		}
 		else
 		{
-			if(chksum_crc32 ((u8*)&gProdFlashProfile, sizeof(sProdConfigProfile)-sizeof(gProdFlashProfile.crc))\
+			if(chksum_crc32 ((u8*)&(gProdFlashProfile.testIntf), sizeof(sProdConfigProfile)-sizeof(gProdFlashProfile.crc)-sizeof(gProdFlashProfile.signature))\
 				!= gProdFlashProfile.crc)
 				
 			{
-				printf("Prod Crc failed %lx,%lx\n",gProdFlashProfile.crc,chksum_crc32 ((u8*)&gProdFlashProfile, sizeof(sProdConfigProfile)));
+				printf("Prod Crc failed %lx,%lx\n",gProdFlashProfile.crc,chksum_crc32 ((u8*)&(gProdFlashProfile.testIntf), \
+										sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)-sizeof(gProdFlashProfile.signature)));
 				memset(&gProdFlashProfile,0x00,sizeof(sProdConfigProfile));
 				gProdFlashProfile.signature = PROD_VALID_SIGNATURE;
 				gProdFlashProfile.rfProfile.rfCalStatus = RF_NOT_CALIBRATED;
@@ -888,7 +886,8 @@ void main()
 				gProdFlashProfile.rfProfile.testActionPreparePending = 0;
 				//gProdFlashProfile.checksum =  Gv701x_CalcCheckSum16((u8*)&gProdFlashProfile,
 				//	(sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.checksum)));
-				gProdFlashProfile.crc=	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+				gProdFlashProfile.crc=	chksum_crc32 ((u8*)&(gProdFlashProfile.testIntf), (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)-\
+										sizeof(gProdFlashProfile.signature)));
 				FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
 				Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
 				
@@ -900,20 +899,40 @@ void main()
 			}
 
 		}
+
+		Gv701x_FlashReadMemProfile(MFG_PARAM_SECTOR,sizeof(sMacSerInfoProfile),(void *)&gMacSerInfoProfile);
+		if(gMacSerInfoProfile.signature == MAC_SER_VALID_SIGNATURE)
+		{
+			if(chksum_crc32 ((u8*)&(gMacSerInfoProfile.macAddress[0]), sizeof(sMacSerInfoProfile)-sizeof(gMacSerInfoProfile.crc)-sizeof(gMacSerInfoProfile.signature))\
+				!= gMacSerInfoProfile.crc)
+			{
+				printf("\n MAC Serial CRC Failed\n");
+			}
+			else
+			{
+				FM_HexDump(FM_USER,"MAC Address",gMacSerInfoProfile.macAddress,MAC_ADDR_LEN);
+				FM_HexDump(FM_USER,"Sr No.",gMacSerInfoProfile.serialNo,SR_NO_LEN);
+			}
+			
+		}
+		else
+		{
+			printf("\nMAC Ser signature not found\n");
+		}
 	}
 #endif
 #ifdef TIMER_POLL
 
 	timer0Poll();
 #endif
-
+#if 1
 #ifdef HYBRII_802154
     mac_init();
 #ifdef ZBMAC_DIAG
     mac_diag_init();
 #endif
 #endif
-
+#endif
 #ifdef UART_HOST_INTF 
 	UART_Init16550();
 #endif
@@ -933,6 +952,7 @@ void main()
 	while (1)
 	{ 
 #ifdef PROD_TEST	
+#ifdef HYBRII_SPI
 		if(spi_tx_flag == 1) 
 		{
 			if((STM_GetTick() - spi_tx_time) > MAX_SPI_TX_TIMEOUT)
@@ -950,6 +970,7 @@ void main()
 				//FM_Printf(FM_USER,"spi tx tm1\n");
 			}
 		}
+#endif
 #endif		
 #ifdef RTX51_TINY_OS
 
@@ -964,15 +985,8 @@ void main()
 #endif
 
 #ifdef PROD_TEST
-        CmdRun();
+        //CmdRun();
         //HTM_CmdRun();
-//#ifdef PROD_TEST
-		//os_switch_task();
-
-		//STM_Proc();
-		
-//#endif
-
 #endif
 		//os_set_ready(HYBRII_TASK_ID_FRAME);
 		os_switch_task();

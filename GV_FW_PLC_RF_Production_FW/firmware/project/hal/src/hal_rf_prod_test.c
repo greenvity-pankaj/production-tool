@@ -162,10 +162,37 @@ eStatus Gv701x_CheckSum16Valid(u8 *dataPtr, u16 length)
 	}
 }
 
+eStatus Gv701x_FlashWriteMemProfile(u32 sectorNo,u16 length,void *profile)
+{
+	u16 counter;// used to count flash memory write address
+	u32 address = (sectorNo * FLASH_SECTOR_SIZE);// Calculates base memory address of given sector
+
+	spiflash_eraseSector(sectorNo);
+	
+	for(counter=0;counter<length;counter++)
+	{
+		spiflash_WriteByte(address + counter,((u8 *)profile)[counter]);
+	}
+	spiflash_wrsr_unlock(0);
+	return STATUS_SUCCESS;
+}
+
+eStatus Gv701x_FlashReadMemProfile(u32 sectorNo,u16 length, void *profile)
+{
+	u16 counter;// used to count flash memory read address
+	u32 address = (sectorNo * FLASH_SECTOR_SIZE);// Calculates base memory address of given sector
+
+	for(counter = 0;counter < length;counter++)
+	{
+		((u8 *)profile)[counter] = spiflash_ReadByte(address + counter);	
+	}
+	return STATUS_SUCCESS;
+}
+
 eStatus Gv701x_FlashWriteProdProfile(u32 sectorNo, sProdConfigProfile *profile)
 {
 	u16 counter;// used to count flash memory write address
-	u32 address = (sectorNo * FLASH_SECTOR_SIZE);
+	u32 address = (sectorNo * FLASH_SECTOR_SIZE);// Calculates base memory address of given sector
 	spiflash_eraseSector(sectorNo);
 	
 	FM_HexDump(FM_USER,"Write profile",(u8*)profile,sizeof(sProdConfigProfile));
@@ -180,7 +207,7 @@ eStatus Gv701x_FlashWriteProdProfile(u32 sectorNo, sProdConfigProfile *profile)
 eStatus Gv701x_FlashReadProdProfile(u32 sectorNo, sProdConfigProfile *profile)
 {
 	u16 counter;// used to count flash memory read address
-	u32 address = (sectorNo * FLASH_SECTOR_SIZE);
+	u32 address = (sectorNo * FLASH_SECTOR_SIZE);// Calculates base memory address of given sector
 
 	for(counter = 0;counter < sizeof(sProdConfigProfile);counter++)
 	{

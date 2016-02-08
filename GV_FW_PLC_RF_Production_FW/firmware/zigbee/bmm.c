@@ -96,11 +96,11 @@ buffer_t *bmm_buffer_alloc (uint8_t size)
 	if(buffer_p)
 	{
 		buffCount++;
-		FM_Printf(FM_APP, "\nba1.2 %bu", buffCount);			
+	//	FM_Printf(FM_APP, "\nba1.2 %bu", buffCount);			
 	}
 	else
 	{
-		FM_Printf(FM_APP, "\nba1.3 %bu", buffCount);
+//		FM_Printf(FM_APP, "\nba1.3 %bu", buffCount);
 	}
     return buffer_p;
 }
@@ -124,7 +124,7 @@ void bmm_buffer_free (buffer_t *buffer_p)
 
     /* Append the buffer into free large buffer queue */
 	buffCount--;
-	FM_Printf(FM_APP, "\nba1.4:%bu", buffCount);
+//	FM_Printf(FM_APP, "\nba1.4:%bu", buffCount);
     qmm_queue_append(&free_buffer_q, buffer_p);
 }
 #endif //HYBRII_802154

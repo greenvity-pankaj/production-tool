@@ -10,6 +10,29 @@
 
 extern void prod_rf_test_timer_cb(void *cookie);
 
+
+#define MAX_RETRY 3
+
+#define RF_CALIBRATION_FAILED		0x00
+#define RF_CALIBRATED 				0x01
+#define RF_NOT_CALIBRATED 			0xFF
+
+#define RF_MAX_PAYLOAD 102
+
+#define PROD_VALID_SIGNATURE 			0x47565052  // GVPR is the signature in hex
+#define MAC_SER_VALID_SIGNATURE         0x47564D53  // GVMS is the signature in hex
+
+#define FLASH_ENTIRE_SECTOR 			(0)
+#define FLASH_SECTOR_SIZE 				(4096)
+#define FLASH_DEFAULT_MEM_VALUE 		(0xFF)
+#define PROD_CONFIG_SECTOR 				(300)
+#define PROD_SECTOR_ADDRESS 			(PROD_CONFIG_SECTOR * FLASH_SECTOR_SIZE)
+
+#define MFG_PARAM_SECTOR 				(PROD_CONFIG_SECTOR + 1)
+#define MFG_PARAM_MEMORY_ADDRESS 		(PROD_CONFIG_SECTOR * FLASH_SECTOR_SIZE)
+#define SR_NO_LEN 18
+
+
 enum {
 
 	LRWPAN_INIT = 0,
@@ -24,7 +47,7 @@ enum{
 	MSG_TIMER_EVENT,
 }; // used in LrwpanHandler
 
-#define MAX_RETRY 3
+
 
 typedef enum {	
 	LRWPAN_IDLE = 0x00,	
@@ -71,7 +94,7 @@ typedef struct _sRfTxTimerCookie
 	security_info_t 	*sec_p;
 }__PACKED__ sRfTxTimerCookie; // This structure is passed during timer allocation
 
-#define RF_MAX_PAYLOAD 102
+
 
 typedef enum
 {
@@ -134,15 +157,11 @@ typedef struct _sRfStats
 
 //List of APIs
 
-#define RF_CALIBRATION_FAILED		0x00
-#define RF_CALIBRATED 				0x01
-#define RF_NOT_CALIBRATED 			0xFF
-
-#define PROD_VALID_SIGNATURE 			0x47565052  // GVPR is the signature in hex
 
 typedef struct _sProdConfigProfile
 {
 	u32 signature;
+	u32 crc;
 	u8  testIntf;
 	struct
 	{
@@ -163,19 +182,30 @@ typedef struct _sProdConfigProfile
 		sRfTxTestHostParams txTestParams;
 	} rfProfile;
 	
-	u32 crc;
+	
 }__PACKED__  sProdConfigProfile;
+
+typedef struct _sMacSerInfoProfile
+{
+	u32 signature;
+	u32 crc;
+
+	u8 macAddress[MAC_ADDR_LEN];
+	u8 serialNo[SR_NO_LEN];	
+}__PACKED__ sMacSerInfoProfile;
 
 typedef struct _sProdPrepRfStatusCnf
 {
 	u8 calStatus;
 }sProdPrepRfStatusCnf;
 
-#define FLASH_ENTIRE_SECTOR 0
-#define FLASH_SECTOR_SIZE 4096
-#define FLASH_DEFAULT_MEM_VALUE 0xFF
-#define PROD_CONFIG_SECTOR 257
-#define PROD_SECTOR_ADDRESS (PROD_CONFIG_SECTOR * FLASH_SECTOR_SIZE)
+
+typedef struct _sFlashMACParams
+{
+	u16 sectorAddress;
+	u8  macAddress[MAC_ADDR_LEN];
+	u8  serialNo[SR_NO_LEN];
+} __PACKED__ sFlashMACParams;
 
 
 
@@ -185,14 +215,8 @@ eStatus Gv701x_CheckSum16Valid(u8 *dataPtr, u16 length);
 eStatus Gv701x_FlashWriteProdProfile(u32 sectorNo, sProdConfigProfile *profile);
 eStatus Gv701x_FlashReadProdProfile(u32 sectorNo, sProdConfigProfile *profile);
 
-
-
-
-
-
-
-
-
+eStatus Gv701x_FlashWriteMemProfile(u32 sectorNo,u16 length,void *profile);
+eStatus Gv701x_FlashReadMemProfile(u32 sectorNo,u16 length, void *profile);
 
 #endif
 

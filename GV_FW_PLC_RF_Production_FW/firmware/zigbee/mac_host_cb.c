@@ -235,7 +235,7 @@ void mlme_send_to_host(buffer_t *buf_p)
 		break;
 	}
 
-	FM_Printf(FM_APP, "\nrfcr %bu", cmd_code);
+	//FM_Printf(FM_APP, "\nrfcr %bu", cmd_code);
 	if(cmd_type == EVENT_FRM_ID)
 	{
 		Host_SendIndication(cmd_code, IEEE802_15_4_MAC_ID,

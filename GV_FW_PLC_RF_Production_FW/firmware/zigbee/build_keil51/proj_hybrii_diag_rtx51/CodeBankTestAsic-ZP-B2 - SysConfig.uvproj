@@ -253,8 +253,8 @@
               </Ocm3>
               <Ocr1>
                 <Type>0</Type>
-                <StartAddress>0x2000</StartAddress>
-                <Size>0xe000</Size>
+                <StartAddress>0x2100</StartAddress>
+                <Size>0xd000</Size>
               </Ocr1>
               <Ocr2>
                 <Type>0</Type>
@@ -790,7 +790,7 @@
             <CSection></CSection>
             <UserSection></UserSection>
             <CodeBaseAddress>0X2100-0X9FFF</CodeBaseAddress>
-            <XDataBaseAddress>0X2000-0XFFFF</XDataBaseAddress>
+            <XDataBaseAddress>0X2100-0XF0FF</XDataBaseAddress>
             <PDataBaseAddress></PDataBaseAddress>
             <BitBaseAddress></BitBaseAddress>
             <DataBaseAddress></DataBaseAddress>
@@ -3271,6 +3271,31 @@
                   </C51>
                 </File51>
               </FileOption>
+            </File>
+            <File>
+              <FileName>gv701x_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\common\gv701x_flash.c</FilePath>
+            </File>
+            <File>
+              <FileName>crc32.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\hpgp\src\crypto\crc32.c</FilePath>
+            </File>
+            <File>
+              <FileName>hal_prod_tst.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\project\hal\src\hal_prod_tst.c</FilePath>
+            </File>
+            <File>
+              <FileName>hal_rf_prod_test.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\project\hal\src\hal_rf_prod_test.c</FilePath>
+            </File>
+            <File>
+              <FileName>prod_test_correct_endieness.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\project\hal\src\prod_test_correct_endieness.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -1,5 +1,5 @@
 /*
-* $Id: gv701x_cfg.c,v 1.21 2015/01/06 23:53:04 son Exp $
+* $Id: gv701x_cfg.c,v 1.25 2015/09/29 22:52:52 son Exp $
 *
 * $Source: /home/cvsrepo/Hybrii_B_OSFW_Dev/firmware/common/gv701x_cfg.c,v $
 *
@@ -41,6 +41,11 @@ extern sysProfile_t gSysProfile;
 extern	sProdConfigProfile gProdFlashProfile;
 
 #endif
+
+
+#define CAL_BB_RESET	// Define if base band reset is preffered during calibration
+						// Un-define if chip reset is preffered
+
 #ifdef HYBRII_802154
 #ifdef HYBRII_B
 /* From Rachel 05/19/2014 @ 10 dB Gain for RX */
@@ -152,11 +157,11 @@ uint16_t gv701x_zb_read_bb_fft (void)
     
     mac_utils_delay_ms(1);	
     WriteU8Reg(0x442, 1);
-	//WriteU8Reg(0x442, 3);
+    //WriteU8Reg(0x442, 3);
     //WriteU8Reg(0x442, 5); /* HW is doing average */
     mac_utils_delay_ms(1);
     WriteU8Reg(0x442, 0);
-	//WriteU8Reg(0x442, 2);
+    //WriteU8Reg(0x442, 2);
     WriteU8Reg(0x4fa, 1);  /* Select Bank 3 */
     //printf("\n452 = %bx, 453 = %bx", ReadU8Reg(PHY_FFT_LSB),
     //       ReadU8Reg(PHY_FFT_MSB));
@@ -170,6 +175,7 @@ uint16_t gv701x_zb_read_bb_fft (void)
     return (bb_fft);
 }
 /*==============================================================rz*/
+#if 0 //ndef CAL_BB_RESET
 uint16_t gv701x_zb_read_bb_pos (void)
 {
     uint16_t bb_pos;
@@ -200,11 +206,11 @@ uint16_t gv701x_zb_read_bb_neg (void)
     
     mac_utils_delay_ms(1);	
     WriteU8Reg(0x442, 1);
-	//WriteU8Reg(0x442, 3);
+    //WriteU8Reg(0x442, 3);
     //WriteU8Reg(0x442, 5); /* HW is doing average */
     mac_utils_delay_ms(1);
     WriteU8Reg(0x442, 0);
-	//WriteU8Reg(0x442, 2);
+    //WriteU8Reg(0x442, 2);
     WriteU8Reg(0x4fa, 1);  /* Select Bank 3 */
     //printf("\n452 = %bx, 453 = %bx", ReadU8Reg(PHY_FFT_LSB),
     //       ReadU8Reg(PHY_FFT_MSB));
@@ -217,6 +223,7 @@ uint16_t gv701x_zb_read_bb_neg (void)
 
     return (bb_neg);
 }
+#endif
 /*==============================================================rz*/
 #ifndef B2
 void gv701x_zb_lock_channel (uint8_t channel)
@@ -230,8 +237,8 @@ void gv701x_zb_lock_channel (uint8_t channel)
      * cal_val = read_flash_lock_channel_value(channel);
      */
 #ifdef Flash_Config
-	cal_val = sysConfig.VCOCal[channel];
-	printf("lock channel %bx VCO cal value = %bx\n", channel+ MIN_CHANNEL, cal_val);
+    cal_val = sysConfig.VCOCal[channel];
+    printf("lock channel %bx VCO cal value = %bx\n", channel+ MIN_CHANNEL, cal_val);
 
     mac_utils_spi_write(AFE_CAL_CNTRL, 
                         0x70 | AFE_CAL_CNTRL_RESET);  /* 04 = 0x72 */
@@ -258,7 +265,7 @@ void gv701x_zb_set_afe_channel (uint8_t channel, bool afe_rx_cal)
                afe_channel_to_vco_tx_freq[channel - MIN_CHANNEL] & 0xFF);
     WriteU8Reg(0x42a, 
                afe_channel_to_vco_tx_freq[channel - MIN_CHANNEL] >> 8);
-	WriteU8Reg(0x408,  
+    WriteU8Reg(0x408,  
                afe_channel_to_vco_tx_freq[channel - MIN_CHANNEL] & 0xFF);
     WriteU8Reg(0x409, 
                afe_channel_to_vco_tx_freq[channel - MIN_CHANNEL] >> 8);
@@ -302,7 +309,8 @@ void gv701x_zb_lo_leakage_calibration_init (void)
 
     mac_utils_spi_write(AFE_ZIG_GC_TX_FLTR_GAIN, 0x0f); /* Set PA power to max. */
 
-	mac_utils_spi_write(AFE_ZIG_GC_TX_PA_CNTRL, 0x20);	/*rz 6dB lower than max gain*/
+    //mac_utils_spi_write(AFE_ZIG_GC_TX_PA_CNTRL, 0x20);	/*rz 6dB lower than max gain*/
+    //printf("\npa -6db");//rz
     /* 
      * RX DC offset calibration after enable peek detector
      * according to spec
@@ -311,7 +319,7 @@ void gv701x_zb_lo_leakage_calibration_init (void)
     mac_utils_spi_write(AFE_ZIG_PEEK_DETECT_TX, 0x04); /* Enable Power Detector */
 
     gv701x_cfg_zb_dc_offset_calibration();
-    mac_utils_spi_write(AFE_MODE_CNTRL_1,
+    mac_utils_spi_write(AFE_MODE_CNTRL_1, 
                         AFE_SPI_MODE_EN  |
                         AFE_SPI_WL_RX_EN |
                         AFE_SPI_WL_TX_EN |
@@ -321,28 +329,29 @@ void gv701x_zb_lo_leakage_calibration_init (void)
     WriteU8Reg(PHY_DECI_SEL_GARF_CFG, 0x40);  /* Set DAC clock to 12 Mhz */
     WriteU8Reg(PHY_DAC_TEST_CONTROL, 0x25);   /* Enable 1 Mhz tone from DAC */
     //WriteU8Reg(PHY_ECO_CFG, 0x0f);            /* Turn of phy rx */
-	
+
 	sd_sync_temp = ReadU8Reg(0x417);//rz
-	printf("\nsd_sync_temp:%bx", sd_sync_temp);//rz
+	//printf("\nsd_sync_temp:%bx", sd_sync_temp);//rz
 	sd_sync_temp = sd_sync_temp|0x10;
 	WriteU8Reg(0x417, sd_sync_temp);
 	sd_sync_temp = ReadU8Reg(0x417);
-	printf("\nenable: sd_sync_temp:%bx", sd_sync_temp);//rz
+	//printf("\nenable: sd_sync_temp:%bx", sd_sync_temp);//rz
 
 	sd_sync_pw = ReadU8Reg(0x410);
-	printf("\nsd_sync_pw:%bx", sd_sync_pw);//rz
+	//printf("\nsd_sync_pw:%bx", sd_sync_pw);//rz
 	//sd_sync_pw = 0x10;
 	sd_sync_pw = 0x80;
 	WriteU8Reg(0x410, sd_sync_pw);
 	sd_sync_pw = ReadU8Reg(0x410);
-	printf("\nenable: sd_sync_pw:%bx", sd_sync_pw);//rz
+	//printf("\nenable: sd_sync_pw:%bx", sd_sync_pw);//rz
 
 	WriteU8Reg(PHY_ECO_CFG, 0x0f);            /* Turn on phy rx */
 }
 
 #define NUM_READ    8
 #define MIN_DIF     64
-#define MAX_NUM_MIN 4
+#define MAX_NUM_MIN 2
+#define TXLO_CAL_TRY_MAX	20
 
 uint32_t  min_bb_fft = 0xffffffff;
 
@@ -364,8 +373,8 @@ void gv701x_zb_lo_leakage_calibration_start ()
 	uint32_t  num_min;//rz
 	//uint8_t  read_afe_i;//rz
 	//uint8_t  read_afe_q;//rz
-	uint32_t  one_bb_pos;//rz
-	uint32_t  one_bb_neg;//rz
+	//uint32_t  one_bb_pos;//rz
+	//uint32_t  one_bb_neg;//rz
 #ifdef PROD_TEST	
 	u8		  prod_dco_cal_failed = 0;
 #endif
@@ -384,6 +393,15 @@ void gv701x_zb_lo_leakage_calibration_start ()
 		FM_Printf(FM_USER,"\n%bx/%bx", min_afe_i, min_afe_q);
 		return;
 	}
+	else if(gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED)
+	{
+		prod_dco_cal_failed = 0xff;
+	}
+	else if(gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED)
+	{
+		prod_dco_cal_failed = gProdFlashProfile.rfProfile.rfCalAttemptCount;
+	}
+	printf("\nprod_dco_cal_failed = %bu\n",prod_dco_cal_failed);
 #endif
 	
 #if 0 
@@ -412,6 +430,44 @@ void gv701x_zb_lo_leakage_calibration_start ()
 //#endif
 #else
 zb_txlo_cal://rz
+    //if ((sysConfig.dco_cal_failed >= TXLO_CAL_TRY_MAX/2)&&
+    //  (sysConfig.dco_cal_failed < TXLO_CAL_TRY_MAX))
+	//printf("\nfailed=%ld", sysConfig.dco_cal_failed);
+#ifndef PROD_TEST	
+    if ((sysConfig.dco_cal_failed != 0xff) &&
+	    (sysConfig.dco_cal_failed+1) > TXLO_CAL_TRY_MAX-4)
+#else
+	if ((prod_dco_cal_failed != 0xff) &&
+	    (prod_dco_cal_failed+1) > TXLO_CAL_TRY_MAX-4)
+#endif		
+	{
+        mac_utils_spi_write(AFE_ZIG_GC_TX_PA_CNTRL, 0x40);	/*rz 12dB lower than max gain*/
+        //printf("\npa -12db");//rz
+	}
+    else
+	{
+#ifndef PROD_TEST	
+	    if ((sysConfig.dco_cal_failed == 0xff) ||
+	        (sysConfig.dco_cal_failed%2 == 0))
+#else
+		if ((prod_dco_cal_failed == 0xff) ||
+	        (prod_dco_cal_failed %2 == 0))
+			
+#endif			
+        {
+            mac_utils_spi_write(AFE_ZIG_GC_TX_PA_CNTRL, 0x00);	/*rz max gain*/
+		    //printf("\npa max");//rz
+        }
+        else
+        {
+            mac_utils_spi_write(AFE_ZIG_GC_TX_PA_CNTRL, 0x20);	/*rz 6dB lower than max gain*/
+            //printf("\npa -6db");//rz
+        }
+	}
+	
+    min_bb_fft = 0xffffffff;
+    min_afe_i = 0xf0;
+    min_afe_q = 0xf0;// rz
     afe_i = 0xf0;
     change_dir_i = FALSE;
     /*
@@ -424,24 +480,46 @@ zb_txlo_cal://rz
         afe_q = 0xf0;
         change_dir_q = FALSE;
         for (j = 0; j < 15; j++){
+            /////////////////////////////////////////////////////////
+            //WriteU8Reg(PHY_DAC_TEST_CONTROL, 0x25);   /* Enable 1 Mhz tone from DAC */
+            //WriteU8Reg(PHY_ECO_CFG, 0x0f);            /* Turn of phy rx */
+            /*
+            //sd_sync_temp = ReadU8Reg(0x417);//rz
+            //printf("\nsd_sync_temp:%bx", sd_sync_temp);//rz
+            //sd_sync_temp = sd_sync_temp|0x10;
+            //WriteU8Reg(0x417, sd_sync_temp);
+            //sd_sync_temp = ReadU8Reg(0x417);
+            //printf("\nenable: sd_sync_temp:%bx", sd_sync_temp);//rz
+
+            //sd_sync_pw = ReadU8Reg(0x410);
+            //printf("\nsd_sync_pw:%bx", sd_sync_pw);//rz
+            //sd_sync_pw = 0x10;
+            //sd_sync_pw = 0x80;
+            //WriteU8Reg(0x410, sd_sync_pw);
+            //sd_sync_pw = ReadU8Reg(0x410);
+            //printf("\nenable: sd_sync_pw:%bx", sd_sync_pw);//rz
+            */
+
+//WriteU8Reg(PHY_ECO_CFG, 0x0f);            /* Turn on phy rx */
+/////////////////////////////////////////////////////
             mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, afe_q);
             //read_afe_i = mac_utils_spi_read(AFE_ZIG_TX_OC_I_MSB);//rz
             //read_afe_q = mac_utils_spi_read(AFE_ZIG_TX_OC_Q_MSB);//rz
             //printf("\nread back:%bx/%bx", read_afe_i, read_afe_q);//rz
             num_read = NUM_READ;
             cur_bb_fft = 0;
-			
-			//one_bb_pos = gv701x_zb_read_bb_pos();
-			//one_bb_neg = gv701x_zb_read_bb_neg();
+
+            //one_bb_pos = gv701x_zb_read_bb_pos();
+            //one_bb_neg = gv701x_zb_read_bb_neg();
             while (num_read--){
                 one_bb_fft = gv701x_zb_read_bb_fft();
-				//one_bb_pos = gv701x_zb_read_bb_pos();
-				//one_bb_neg = gv701x_zb_read_bb_neg();
+                //one_bb_pos = gv701x_zb_read_bb_pos();
+                //one_bb_neg = gv701x_zb_read_bb_neg();
                 cur_bb_fft += one_bb_fft;
                 //rz cur_bb_fft += gv701x_zb_read_bb_fft();
                 //printf("\neach time: %bx/%bx %lx", afe_i, afe_q, one_bb_fft);
             }
-			
+
             cur_bb_fft /= NUM_READ;
             avg_bb_fft += cur_bb_fft; //rz
 
@@ -466,7 +544,11 @@ zb_txlo_cal://rz
             } else {
                 afe_q -= 0x10;
             }
-        }
+            /////////////////////////////////////
+            //WriteU8Reg(PHY_ECO_CFG, 0x03);           /* 0x417 = 0x03 */
+            //WriteU8Reg(PHY_DAC_TEST_CONTROL, 0x00);  /* 0x40a = 0x00 -> Turn off 1 Mhz tone from DAC */
+            //////////////////////////////
+}
         if (afe_i == 0x80) {
             afe_i = 0;
             change_dir_i = TRUE;
@@ -477,10 +559,10 @@ zb_txlo_cal://rz
             afe_i -= 0x10;
         }
     }
-	avg_bb_fft = (avg_bb_fft - min_bb_fft) / 224; //15*15-1 rz
-	dif_bb_fft = avg_bb_fft - min_bb_fft;
+    avg_bb_fft = (avg_bb_fft - min_bb_fft) / 224; //15*15-1 rz
+    dif_bb_fft = avg_bb_fft - min_bb_fft;
     //printf("\nMin FFT %bx/%bx %lx", min_afe_i, min_afe_q, min_bb_fft);
-	printf("\nMin FFT %bx/%bx min=%lx avg=%lx dif=%lu num_min=%lu", 
+    printf("\nMin FFT %bx/%bx min=%lx avg=%lx dif=%lu num_min=%lu", 
            min_afe_i, min_afe_q, min_bb_fft, avg_bb_fft, dif_bb_fft, num_min); //rz
     if ((dif_bb_fft < MIN_DIF) || (num_min > MAX_NUM_MIN)) {
         printf("\nnote: reading not valid");
@@ -493,46 +575,44 @@ zb_txlo_cal://rz
         } else {
             sysConfig.dco_cal_failed++;
         }
-        //flashWrite_config((u8 *)&sysConfig,FLASH_SYS_CONFIG_OFFSET,
-						   //sizeof(sysConfig_t));
+        flashWrite_config((u8 *)&sysConfig,FLASH_SYS_CONFIG_OFFSET,
+                                     sizeof(sysConfig_t));
 				   
-        if (sysConfig.dco_cal_failed < 10) {
+        if (sysConfig.dco_cal_failed < TXLO_CAL_TRY_MAX) {
             //printf("\nChip Reset (%bu)", sysConfig.dco_cal_failed);
             //GV701x_Chip_Reset();//rz
-			mac_utils_spi_write(0x37, 0x03);
-			mac_utils_spi_write(0x37, 0x02);
-			printf("\nreset rf");
+            printf("\nrest baseband (%bu)", sysConfig.dco_cal_failed);
+            WriteU8Reg(0x41f, 0x03);//rz garx_sft_rst & gatx_sft_rst);
+            WriteU8Reg(0x41f, 0x00);
+            //mac_utils_spi_write(0x37, 0x03);
+            //mac_utils_delay_ms(5);
+            //mac_utils_spi_write(0x37, 0x02);
+            //mac_utils_delay_ms(5);
+            //printf("\nreset rf");
+            //printf("\nrest baseband (%bu)", sysConfig.dco_cal_failed);
 			goto zb_txlo_cal;
         } else {
             printf("\nPlease perform DCO calibration manually");
         }
 #else
 #ifdef PROD_TEST
-	//prod_dco_cal_failed++;
-	if (gProdFlashProfile.rfProfile.rfCalAttemptCount < 10) 
+	prod_dco_cal_failed++;
+	if (prod_dco_cal_failed < TXLO_CAL_TRY_MAX) 
 	{
-            printf("\nChip Reset (%bu)",gProdFlashProfile.rfProfile.rfCalAttemptCount);
+            //printf("\nChip Reset (%bu)",gProdFlashProfile.rfProfile.rfCalAttemptCount);
             //GV701x_Chip_Reset();//rz
-			mac_utils_spi_write(0x37, 0x03);//Kiran - Unable to resolve chip reset requirement
-			mac_utils_spi_write(0x37, 0x02);
-			printf("\nreset rf");
-			//goto zb_txlo_cal;
+			//mac_utils_spi_write(0x37, 0x03);//Kiran - Unable to resolve chip reset requirement
+		//	mac_utils_spi_write(0x37, 0x02);
+		 	printf("\nReset baseband (%bu)", prod_dco_cal_failed);
+            WriteU8Reg(0x41f, 0x03);//rz garx_sft_rst & gatx_sft_rst);
+            WriteU8Reg(0x41f, 0x00);
+			//printf("\nreset rf");
+			gProdFlashProfile.rfProfile.rfCalAttemptCount = prod_dco_cal_failed;
+			goto zb_txlo_cal;
     } else {
             printf("\nPlease perform DCO calibration manually");
+			gProdFlashProfile.rfProfile.rfCalAttemptCount = prod_dco_cal_failed;
     }
-#if 0
-	if(gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATED)
-	{
-		min_afe_i = gProdFlashProfile.rfProfile.calRegister.reg23 ;
-		min_afe_q = gProdFlashProfile.rfProfile.calRegister.reg24 ;
-	
-		mac_utils_spi_write(AFE_ZIG_TX_OC_I_MSB, min_afe_i);
-    	mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, min_afe_q);
-	
-		FM_Printf(FM_WARN,"\n%bx/%bx", min_afe_i, min_afe_q);
-		return;
-	}
-#endif	
 #endif
 
 #endif
@@ -540,6 +620,11 @@ zb_txlo_cal://rz
         GV701x_Chip_Reset();
 #endif
     }
+	else
+	{
+		calibration_good = TRUE;
+		printf("\nCal Success\n");		
+	}
     mac_utils_spi_write(AFE_ZIG_TX_OC_I_MSB, min_afe_i);
     mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, min_afe_q);
 
@@ -601,6 +686,7 @@ void gv701x_zb_lo_leakage_calibration_done (void)
     mac_utils_spi_write(AFE_VGA1_CNTRL, 0x00);
     mac_utils_spi_write(AFE_VGA2_CNTRL, 0x00);
     mac_utils_spi_write(AFE_ZIG_PEEK_DETECT_TX, 0x00);
+    mac_utils_spi_write(AFE_ZIG_GC_TX_PA_CNTRL, 0x00);// PA 12dB
     WriteU8Reg(PHY_DECI_SEL_GARF_CFG, 0x41); /* 0x412 = 0x41 */    
     WriteU8Reg(PHY_ECO_CFG, 0x03);           /* 0x417 = 0x03 */
     WriteU8Reg(PHY_DAC_TEST_CONTROL, 0x00);  /* 0x40a = 0x00 -> Turn off 1 Mhz tone from DAC */
@@ -642,12 +728,12 @@ void gv701x_zb_lo_leakage_calibration (uint8_t channel)
 
     //gv701x_zb_lo_leakage_calibration_init();
     //mac_utils_spi_write(AFE_ZIG_TX_OC_Q_MSB, 0);
-	//printf("\ncal_time=%bx", cal_time);
+    //printf("\ncal_time=%bx", cal_time);
     while (cal_time --) {
         gv701x_zb_lo_leakage_calibration_init();
         gv701x_zb_lo_leakage_calibration_start();
         gv701x_zb_lo_leakage_calibration_done();
-		//printf("\ncal_time=%bx", cal_time);
+        //printf("\ncal_time=%bx", cal_time);
 #ifdef CAL_MULTIPLE        
         num_read = NUM_READ;
         while (num_read--){
@@ -689,7 +775,7 @@ if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED) || \
 	else if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED) && (!calibration_good))
 	{
 		gProdFlashProfile.rfProfile.rfCalStatus = RF_CALIBRATION_FAILED;
-		gProdFlashProfile.rfProfile.rfCalAttemptCount++;
+		//gProdFlashProfile.rfProfile.rfCalAttemptCount++;// already updated 
 		gProdFlashProfile.rfProfile.autoCalibrated = RF_CAL_MANUAL;
 		printf("Calibration Fail count %bu\n",gProdFlashProfile.rfProfile.rfCalAttemptCount);
 	}
@@ -709,14 +795,15 @@ if((gProdFlashProfile.rfProfile.rfCalStatus == RF_NOT_CALIBRATED) || \
 		printf("Calibration Fail count %bu\n",gProdFlashProfile.rfProfile.rfCalAttemptCount);
 	}
 	
-	gProdFlashProfile.crc =	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+	gProdFlashProfile.crc =	chksum_crc32 ((u8*)&(gProdFlashProfile.testIntf), (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)-sizeof(gProdFlashProfile.signature)));
 	FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
 	Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
 	if((gProdFlashProfile.rfProfile.rfCalStatus == RF_CALIBRATION_FAILED) && \
-		(gProdFlashProfile.rfProfile.rfCalAttemptCount < 10) && (gProdFlashProfile.rfProfile.testActionPreparePending == 1))
+		(gProdFlashProfile.rfProfile.rfCalAttemptCount < TXLO_CAL_TRY_MAX) && (gProdFlashProfile.rfProfile.testActionPreparePending == 1))
 	{
-		GV701x_Chip_Reset();
-		while(1);
+		//GV701x_Chip_Reset();
+		//while(1);
+		printf("Logic pending");
 	}
 }
 #endif

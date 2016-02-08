@@ -1715,6 +1715,7 @@ void mac_diag_zb_cmd (char* cmd_buf_p)
 #ifndef PROD_TEST		
         spiflash_eraseConfigMem();
 #else        
+		spiflash_eraseConfigMem();
         spiflash_eraseSector(PROD_CONFIG_SECTOR);
 		spiflash_wrsr_unlock((u8)0);
 #endif		
@@ -1790,7 +1791,8 @@ void mac_diag_zb_cmd (char* cmd_buf_p)
 			gProdFlashProfile.rfProfile.autoCalibrated = RF_CAL_MANUAL;
 			//gProdFlashProfile.checksum =  Gv701x_CalcCheckSum16((u8*)&gProdFlashProfile,
 				//(sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.checksum)));
-			gProdFlashProfile.crc =	chksum_crc32 ((u8*)&gProdFlashProfile, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)));
+			gProdFlashProfile.crc =	chksum_crc32 ((u8*)&gProdFlashProfile.testIntf, (sizeof(sProdConfigProfile) - sizeof(gProdFlashProfile.crc)\
+				-sizeof(gProdFlashProfile.signature)));
 			FM_HexDump(FM_USER,"Flash Profile",(u8 *)&gProdFlashProfile,(sizeof(sProdConfigProfile)));
 			Gv701x_FlashWriteProdProfile(PROD_CONFIG_SECTOR,&gProdFlashProfile);
 		}

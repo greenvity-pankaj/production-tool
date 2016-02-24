@@ -75,8 +75,9 @@ Public Class readConfig
                         If reader.Name = "startMacAddr" Then
                             If reader.Read Then
                                 Dim str As String = String.Join("", reader.Value.ToString.Split(":"))
-                                HomeScreen.gMACcounter = ULong.Parse(str, NumberStyles.HexNumber, CultureInfo.CurrentCulture.NumberFormat)
-                                HomeScreen.txtbx_MACAddr.Text = reader.Value.ToString
+                                'HomeScreen.gMACcounter = ULong.Parse(str, NumberStyles.HexNumber, CultureInfo.CurrentCulture.NumberFormat)
+                                HomeScreen.txtbx_MACAddr.Text = "xx:xx:xx:xx:xx:xx" 'reader.Value.ToString
+                                'MsgBox("HomeScreen.gMACcounter" & " " & str)
                                 'Dim t As String = Hex(HomeScreen.gMACcounter)
                                 'Dim i As Integer = 2
                                 'Dim s As StringBuilder = New StringBuilder(t)

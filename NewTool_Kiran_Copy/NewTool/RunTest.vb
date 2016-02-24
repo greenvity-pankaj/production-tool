@@ -342,6 +342,7 @@ Public Class RunTest
                     'flashMacSerialInfo.macAddress = System.Text.Encoding.ASCII.GetBytes(HomeScreen.gMACcounter)
                     'flashMacSerialInfo.serialNo = 
                     flashMacSerialInfo.macAddress = BitConverter.GetBytes(CULng(HomeScreen.gMACAddress)) 'after successful test it increments by 1 for next iteration
+
                     'Array.Reverse(tempArray)
                     'Array.Copy(tempArray, 0, flashMacSerialInfo.macAddress, 0, 6)
                     'HomeScreen.txtbxDummy.AppendText(vbCrLf)
@@ -351,7 +352,7 @@ Public Class RunTest
                     'Array.Reverse(flashMacSerialInfo.macAddress)
                     Dim answer As MsgBoxResult
                     If HomeScreen.txtbxSerialNum.TextLength <> SR_NO_SIZE Then
-                        answer = MsgBox("Serial No length not correct. Click Ok to flash without Sr.No.")
+                        answer = MsgBox("Serial No length not correct. Click Ok to flash without Sr.No. " & HomeScreen.txtbxSerialNum.TextLength)
                     End If
 
                     If answer = MsgBoxResult.Ok Then

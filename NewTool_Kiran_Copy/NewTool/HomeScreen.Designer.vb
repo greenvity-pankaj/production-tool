@@ -67,6 +67,8 @@ Partial Class HomeScreen
         Me.btn_flashParams = New System.Windows.Forms.Button()
         Me.pbox_test_status = New System.Windows.Forms.PictureBox()
         Me.PictureBox1 = New System.Windows.Forms.PictureBox()
+        Me.MenuStrip1 = New System.Windows.Forms.MenuStrip()
+        Me.lbl_flashDone = New System.Windows.Forms.Label()
         Me.GroupBox1.SuspendLayout()
         Me.grpbxTests.SuspendLayout()
         CType(Me.pbox_test_status, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -76,7 +78,7 @@ Partial Class HomeScreen
         'GroupBox1
         '
         Me.GroupBox1.Controls.Add(Me.lvClients)
-        Me.GroupBox1.Location = New System.Drawing.Point(22, 87)
+        Me.GroupBox1.Location = New System.Drawing.Point(22, 105)
         Me.GroupBox1.Margin = New System.Windows.Forms.Padding(3, 4, 3, 4)
         Me.GroupBox1.Name = "GroupBox1"
         Me.GroupBox1.Padding = New System.Windows.Forms.Padding(3, 4, 3, 4)
@@ -318,7 +320,7 @@ Partial Class HomeScreen
         '
         'btnRunTest
         '
-        Me.btnRunTest.Location = New System.Drawing.Point(328, 99)
+        Me.btnRunTest.Location = New System.Drawing.Point(310, 116)
         Me.btnRunTest.Margin = New System.Windows.Forms.Padding(3, 4, 3, 4)
         Me.btnRunTest.Name = "btnRunTest"
         Me.btnRunTest.Size = New System.Drawing.Size(136, 47)
@@ -354,7 +356,7 @@ Partial Class HomeScreen
         '
         'btn_SetIP
         '
-        Me.btn_SetIP.Location = New System.Drawing.Point(668, 99)
+        Me.btn_SetIP.Location = New System.Drawing.Point(650, 116)
         Me.btn_SetIP.Name = "btn_SetIP"
         Me.btn_SetIP.Size = New System.Drawing.Size(132, 47)
         Me.btn_SetIP.TabIndex = 17
@@ -363,7 +365,7 @@ Partial Class HomeScreen
         '
         'btn_ScanDevices
         '
-        Me.btn_ScanDevices.Location = New System.Drawing.Point(499, 99)
+        Me.btn_ScanDevices.Location = New System.Drawing.Point(481, 116)
         Me.btn_ScanDevices.Margin = New System.Windows.Forms.Padding(3, 4, 3, 4)
         Me.btn_ScanDevices.Name = "btn_ScanDevices"
         Me.btn_ScanDevices.Size = New System.Drawing.Size(132, 47)
@@ -373,7 +375,7 @@ Partial Class HomeScreen
         '
         'btn_ResetDevices
         '
-        Me.btn_ResetDevices.Location = New System.Drawing.Point(499, 167)
+        Me.btn_ResetDevices.Location = New System.Drawing.Point(481, 184)
         Me.btn_ResetDevices.Margin = New System.Windows.Forms.Padding(3, 4, 3, 4)
         Me.btn_ResetDevices.Name = "btn_ResetDevices"
         Me.btn_ResetDevices.Size = New System.Drawing.Size(132, 47)
@@ -400,7 +402,7 @@ Partial Class HomeScreen
         '
         'btn_ShowResults
         '
-        Me.btn_ShowResults.Location = New System.Drawing.Point(328, 167)
+        Me.btn_ShowResults.Location = New System.Drawing.Point(310, 184)
         Me.btn_ShowResults.Name = "btn_ShowResults"
         Me.btn_ShowResults.Size = New System.Drawing.Size(136, 47)
         Me.btn_ShowResults.TabIndex = 22
@@ -409,7 +411,7 @@ Partial Class HomeScreen
         '
         'txtbxLotNum
         '
-        Me.txtbxLotNum.Location = New System.Drawing.Point(964, 17)
+        Me.txtbxLotNum.Location = New System.Drawing.Point(964, 27)
         Me.txtbxLotNum.Name = "txtbxLotNum"
         Me.txtbxLotNum.Size = New System.Drawing.Size(136, 23)
         Me.txtbxLotNum.TabIndex = 23
@@ -418,7 +420,7 @@ Partial Class HomeScreen
         '
         'txtbxSerialNum
         '
-        Me.txtbxSerialNum.Location = New System.Drawing.Point(964, 46)
+        Me.txtbxSerialNum.Location = New System.Drawing.Point(964, 56)
         Me.txtbxSerialNum.MaxLength = 18
         Me.txtbxSerialNum.Name = "txtbxSerialNum"
         Me.txtbxSerialNum.Size = New System.Drawing.Size(136, 23)
@@ -429,7 +431,7 @@ Partial Class HomeScreen
         'lblLotNum
         '
         Me.lblLotNum.AutoSize = True
-        Me.lblLotNum.Location = New System.Drawing.Point(831, 20)
+        Me.lblLotNum.Location = New System.Drawing.Point(831, 30)
         Me.lblLotNum.Name = "lblLotNum"
         Me.lblLotNum.Size = New System.Drawing.Size(77, 15)
         Me.lblLotNum.TabIndex = 25
@@ -438,7 +440,7 @@ Partial Class HomeScreen
         'lblSerialNum
         '
         Me.lblSerialNum.AutoSize = True
-        Me.lblSerialNum.Location = New System.Drawing.Point(831, 49)
+        Me.lblSerialNum.Location = New System.Drawing.Point(831, 59)
         Me.lblSerialNum.Name = "lblSerialNum"
         Me.lblSerialNum.Size = New System.Drawing.Size(122, 15)
         Me.lblSerialNum.TabIndex = 25
@@ -446,7 +448,7 @@ Partial Class HomeScreen
         '
         'btnStopTest
         '
-        Me.btnStopTest.Location = New System.Drawing.Point(668, 167)
+        Me.btnStopTest.Location = New System.Drawing.Point(650, 184)
         Me.btnStopTest.Margin = New System.Windows.Forms.Padding(3, 4, 3, 4)
         Me.btnStopTest.Name = "btnStopTest"
         Me.btnStopTest.Size = New System.Drawing.Size(132, 47)
@@ -459,7 +461,7 @@ Partial Class HomeScreen
         Me.lblResult.AutoSize = True
         Me.lblResult.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.lblResult.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft
-        Me.lblResult.Location = New System.Drawing.Point(854, 198)
+        Me.lblResult.Location = New System.Drawing.Point(854, 208)
         Me.lblResult.Name = "lblResult"
         Me.lblResult.Size = New System.Drawing.Size(46, 17)
         Me.lblResult.TabIndex = 27
@@ -469,7 +471,7 @@ Partial Class HomeScreen
         'lblMacAddress
         '
         Me.lblMacAddress.AutoSize = True
-        Me.lblMacAddress.Location = New System.Drawing.Point(831, 78)
+        Me.lblMacAddress.Location = New System.Drawing.Point(831, 88)
         Me.lblMacAddress.Name = "lblMacAddress"
         Me.lblMacAddress.Size = New System.Drawing.Size(85, 15)
         Me.lblMacAddress.TabIndex = 28
@@ -479,7 +481,7 @@ Partial Class HomeScreen
         '
         Me.txtbx_MACAddr.Enabled = False
         Me.txtbx_MACAddr.Font = New System.Drawing.Font("Segoe UI Semibold", 11.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.txtbx_MACAddr.Location = New System.Drawing.Point(964, 75)
+        Me.txtbx_MACAddr.Location = New System.Drawing.Point(964, 85)
         Me.txtbx_MACAddr.Name = "txtbx_MACAddr"
         Me.txtbx_MACAddr.Size = New System.Drawing.Size(136, 27)
         Me.txtbx_MACAddr.TabIndex = 29
@@ -491,7 +493,8 @@ Partial Class HomeScreen
         Me.chkbx_configMACAddr.AutoSize = True
         Me.chkbx_configMACAddr.Checked = True
         Me.chkbx_configMACAddr.CheckState = System.Windows.Forms.CheckState.Checked
-        Me.chkbx_configMACAddr.Location = New System.Drawing.Point(964, 114)
+        Me.chkbx_configMACAddr.Enabled = False
+        Me.chkbx_configMACAddr.Location = New System.Drawing.Point(964, 124)
         Me.chkbx_configMACAddr.Name = "chkbx_configMACAddr"
         Me.chkbx_configMACAddr.Size = New System.Drawing.Size(121, 19)
         Me.chkbx_configMACAddr.TabIndex = 30
@@ -501,7 +504,8 @@ Partial Class HomeScreen
         'chkbx_configSysPatam
         '
         Me.chkbx_configSysPatam.AutoSize = True
-        Me.chkbx_configSysPatam.Location = New System.Drawing.Point(964, 139)
+        Me.chkbx_configSysPatam.Enabled = False
+        Me.chkbx_configSysPatam.Location = New System.Drawing.Point(964, 149)
         Me.chkbx_configSysPatam.Name = "chkbx_configSysPatam"
         Me.chkbx_configSysPatam.Size = New System.Drawing.Size(140, 19)
         Me.chkbx_configSysPatam.TabIndex = 31
@@ -510,7 +514,7 @@ Partial Class HomeScreen
         '
         'btn_flashParams
         '
-        Me.btn_flashParams.Location = New System.Drawing.Point(964, 164)
+        Me.btn_flashParams.Location = New System.Drawing.Point(964, 174)
         Me.btn_flashParams.Name = "btn_flashParams"
         Me.btn_flashParams.Size = New System.Drawing.Size(132, 47)
         Me.btn_flashParams.TabIndex = 32
@@ -519,7 +523,7 @@ Partial Class HomeScreen
         '
         'pbox_test_status
         '
-        Me.pbox_test_status.Location = New System.Drawing.Point(854, 123)
+        Me.pbox_test_status.Location = New System.Drawing.Point(854, 133)
         Me.pbox_test_status.Name = "pbox_test_status"
         Me.pbox_test_status.Size = New System.Drawing.Size(72, 72)
         Me.pbox_test_status.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage
@@ -529,17 +533,39 @@ Partial Class HomeScreen
         'PictureBox1
         '
         Me.PictureBox1.Image = CType(resources.GetObject("PictureBox1.Image"), System.Drawing.Image)
-        Me.PictureBox1.Location = New System.Drawing.Point(12, 12)
+        Me.PictureBox1.Location = New System.Drawing.Point(12, 34)
         Me.PictureBox1.Name = "PictureBox1"
         Me.PictureBox1.Size = New System.Drawing.Size(279, 60)
         Me.PictureBox1.TabIndex = 9
         Me.PictureBox1.TabStop = False
+        '
+        'MenuStrip1
+        '
+        Me.MenuStrip1.BackColor = System.Drawing.Color.LimeGreen
+        Me.MenuStrip1.Location = New System.Drawing.Point(0, 0)
+        Me.MenuStrip1.Name = "MenuStrip1"
+        Me.MenuStrip1.Size = New System.Drawing.Size(1144, 24)
+        Me.MenuStrip1.TabIndex = 34
+        Me.MenuStrip1.Text = "MenuStrip1"
+        '
+        'lbl_flashDone
+        '
+        Me.lbl_flashDone.AutoSize = True
+        Me.lbl_flashDone.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.lbl_flashDone.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft
+        Me.lbl_flashDone.Location = New System.Drawing.Point(978, 224)
+        Me.lbl_flashDone.Name = "lbl_flashDone"
+        Me.lbl_flashDone.Size = New System.Drawing.Size(95, 17)
+        Me.lbl_flashDone.TabIndex = 35
+        Me.lbl_flashDone.Text = "Flash Pending"
+        Me.lbl_flashDone.TextAlign = System.Drawing.ContentAlignment.TopCenter
         '
         'HomeScreen
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(7.0!, 15.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(1144, 507)
+        Me.Controls.Add(Me.lbl_flashDone)
         Me.Controls.Add(Me.pbox_test_status)
         Me.Controls.Add(Me.btn_flashParams)
         Me.Controls.Add(Me.chkbx_configSysPatam)
@@ -565,8 +591,10 @@ Partial Class HomeScreen
         Me.Controls.Add(Me.btnRunTest)
         Me.Controls.Add(Me.grpbxTests)
         Me.Controls.Add(Me.GroupBox1)
+        Me.Controls.Add(Me.MenuStrip1)
         Me.DoubleBuffered = True
         Me.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.MainMenuStrip = Me.MenuStrip1
         Me.Margin = New System.Windows.Forms.Padding(3, 4, 3, 4)
         Me.MaximizeBox = False
         Me.Name = "HomeScreen"
@@ -624,4 +652,6 @@ Partial Class HomeScreen
     Friend WithEvents chkbx_configSysPatam As CheckBox
     Friend WithEvents btn_flashParams As Button
     Friend WithEvents pbox_test_status As PictureBox
+    Friend WithEvents MenuStrip1 As MenuStrip
+    Friend WithEvents lbl_flashDone As Label
 End Class

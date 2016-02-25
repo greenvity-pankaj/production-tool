@@ -292,6 +292,8 @@ Public Class HomeScreen
         Dim s As New readConfig
 
         Me.Text = "Greenvity Production Tool v" & Me.ProductVersion
+        lblSessionLocation.Text = System.IO.Path.Combine(My.Computer.FileSystem.SpecialDirectories.MyDocuments, "Production Tool Logs")
+
         s.readXML()
         'gMACAddress = gMACcounter
         initUI()
@@ -1672,8 +1674,15 @@ Public Class HomeScreen
         End If
 
         If Not txtbxSerialNum.Text.Length = 0 Then
-            s.serialNum = txtbxSerialNum.Text
-
+            Dim serialNum As String = ""
+            serialNum = txtbxSerialNum.Text
+            serialNum = serialNum.Replace("-", "")
+            s.serialNum = serialNum
+            If serialNum.Length <> RunTest.SR_NO_SIZE Then
+                MsgBox("Please correct Serial No. and rerun test. Eg. xx-xxxxxx-0-xxxxxxxxx")
+                txtbxSerialNum.Focus()
+                Exit Sub
+            End If
             ' Final test result for the board
             Dim finalResult As Boolean = True
             For Each t As variations In s.tests
@@ -1692,80 +1701,89 @@ Public Class HomeScreen
                 pbox_test_status.Image = My.Resources.test_result_success
                 ' Dim gMACAddress1 As ULong = 0
                 ' convert MAC address to string
-                If txtbxSerialNum.TextLength = RunTest.SR_NO_SIZE Then
+                If Not txtbxSerialNum.Text = "" Then
                     Dim macAddressLastBytes(3) As Byte
                     Dim tempString As String = ""
 
                     Array.Clear(macAddressLastBytes, 0, 3)
-
+                    'serialNum = txtbxSerialNum.Text
+                    'serialNum = serialNum.Replace("-", "")
                     ' Sr No. PN-YYMYLY-XXXXXXXXXX
                     ' 1st X = Encoded OUI
                     ' 84:86:f3 encoded as 0 in Serial Number
-                    If txtbxSerialNum.Text.Chars(8) = "0" Then
-                        txtbx_MACAddr.Text = ""
-                        txtbx_MACAddr.Text = "84:86:F3"
-                    Else
-                        MsgBox("Invalid Sr. No or OUI Not Supported")
+                    ' If serialNum.Length = RunTest.SR_NO_SIZE Then
+                    If serialNum.Chars(8) = "0" Then
+                            txtbx_MACAddr.Text = ""
+                            txtbx_MACAddr.Text = "84:86:F3"
+                        Else
+                        MsgBox("Invalid Sr. No or OUI Not Supported. Eg. xx-xxxxxx-0-xxxxxxxxx")
+                        Exit Sub
+                    End If
+                    Try
+                        tempString = Mid(serialNum, 10, 3)
+                        macAddressLastBytes(0) = CByte(tempString)
+                        txtbx_MACAddr.AppendText(":" & macAddressLastBytes(0).ToString("X02"))
+
+                        tempString = Mid(serialNum, 13, 3)
+                        macAddressLastBytes(1) = CByte(tempString)
+                        txtbx_MACAddr.AppendText(":" & macAddressLastBytes(1).ToString("X02"))
+
+                        tempString = Mid(serialNum, 16, 3)
+                        macAddressLastBytes(2) = CByte(tempString)
+                        txtbx_MACAddr.AppendText(":" & macAddressLastBytes(2).ToString("X02"))
+
+                        Dim str1 As String = txtbx_MACAddr.Text.Replace(":", "")
+
+                        gMACcounter = ULong.Parse(str1, NumberStyles.HexNumber, CultureInfo.CurrentCulture.NumberFormat)
+                    Catch e As Exception
+                        MsgBox("Invalid Sr. No: Hex Conversion failed. Eg. xx-xxxxxx-0-valid numbers")
+                        Exit Sub
+                    End Try
+                    lbl_flashDone.Text = "Flash Pending"
+                        lbl_flashDone.ForeColor = Color.DarkRed
+                        'Dim t As String = Hex(gMACAddress1)
+                        'Dim i As Integer = 2
+                        '    Dim sb As StringBuilder = New StringBuilder(t)
+                        '    While True
+                        '        sb.Insert(i, ":")
+                        '        i += 3
+                        '        If i >= sb.Length Then
+                        '            Exit While
+                        '        End If
+                        '    End While
+                        's.MAC = sb.ToString
+                        'txtbx_MACAddr.Text = s.MAC
+                        s.MAC = txtbx_MACAddr.Text
+                        ' increment golbal MAC address counter
+                        gMACAddress = gMACcounter
+                        'Dim Path = IO.Path.Combine(rootFilePath, "MAC_Addr_Log.xml")
+                        ' Dim xmlWrite As New readConfig
+                        ' xmlWrite.create_LogMACAddr_XML_file(Path, txtbx_MACAddr.Text)
+                        'gMACcounter += 1
+                        '#Region "FLASH_MAC_ADDRESS"
+                        'Dim t As HomeScreen.tests
+                        't = status.test
+
+                        'For Each cl As ConnectedClient In getSelectedClientList()
+
+                        '    If cl.mDevType = RunTest.ClientType.DUT Then
+
+                        '        If txtbxSerialNum.TextLength = RunTest.SR_NO_SIZE Then
+                        '            RunTest.rftestParams = Me.rfgtxTest
+                        '            RunTest.beginSend(RunTest.states.STATE_DEVICE_FLASH_PARAMS, cl, t)
+                        '        Else
+                        '            MsgBox("Invalid Serial No.")
+                        '        End If
+                        '    End If
+
+                        'Next
+                        '#End Region
+                        'Else
+                        '   MsgBox("Invalid Sr. No.")
+                        'End If
                     End If
 
-                    tempString = Mid(txtbxSerialNum.Text, 10, 3)
-                    macAddressLastBytes(0) = CByte(tempString)
-                    txtbx_MACAddr.AppendText(":" & macAddressLastBytes(0).ToString("X02"))
-
-                    tempString = Mid(txtbxSerialNum.Text, 13, 3)
-                    macAddressLastBytes(1) = CByte(tempString)
-                    txtbx_MACAddr.AppendText(":" & macAddressLastBytes(1).ToString("X02"))
-
-                    tempString = Mid(txtbxSerialNum.Text, 16, 3)
-                    macAddressLastBytes(2) = CByte(tempString)
-                    txtbx_MACAddr.AppendText(":" & macAddressLastBytes(2).ToString("X02"))
-
-                    Dim str1 As String = txtbx_MACAddr.Text.Replace(":", "")
-
-                    gMACcounter = ULong.Parse(str1, NumberStyles.HexNumber, CultureInfo.CurrentCulture.NumberFormat)
-                    lbl_flashDone.Text = "Flash Pending"
-                    lbl_flashDone.ForeColor = Color.DarkRed
-                    'Dim t As String = Hex(gMACAddress1)
-                    'Dim i As Integer = 2
-                    '    Dim sb As StringBuilder = New StringBuilder(t)
-                    '    While True
-                    '        sb.Insert(i, ":")
-                    '        i += 3
-                    '        If i >= sb.Length Then
-                    '            Exit While
-                    '        End If
-                    '    End While
-                    's.MAC = sb.ToString
-                    'txtbx_MACAddr.Text = s.MAC
-                    s.MAC = txtbx_MACAddr.Text
-                    ' increment golbal MAC address counter
-                    gMACAddress = gMACcounter
-                    'Dim Path = IO.Path.Combine(rootFilePath, "MAC_Addr_Log.xml")
-                    ' Dim xmlWrite As New readConfig
-                    ' xmlWrite.create_LogMACAddr_XML_file(Path, txtbx_MACAddr.Text)
-                    'gMACcounter += 1
-                    '#Region "FLASH_MAC_ADDRESS"
-                    'Dim t As HomeScreen.tests
-                    't = status.test
-
-                    'For Each cl As ConnectedClient In getSelectedClientList()
-
-                    '    If cl.mDevType = RunTest.ClientType.DUT Then
-
-                    '        If txtbxSerialNum.TextLength = RunTest.SR_NO_SIZE Then
-                    '            RunTest.rftestParams = Me.rfgtxTest
-                    '            RunTest.beginSend(RunTest.states.STATE_DEVICE_FLASH_PARAMS, cl, t)
-                    '        Else
-                    '            MsgBox("Invalid Serial No.")
-                    '        End If
-                    '    End If
-
-                    'Next
-                    '#End Region
-
-                End If
-
-                Else    ' If any test is failed, do not assign any MAC address
+            Else    ' If any test is failed, do not assign any MAC address
                 s.finalResult = "FAIL"
                 s.MAC = "N/A"
                 lblResult.ForeColor = Color.DarkRed
@@ -2094,6 +2112,17 @@ Public Class HomeScreen
     '   Run the test
     '
     Private Sub btnRunTest_Click(sender As Object, e As EventArgs) Handles btnRunTest.Click
+
+        Dim serialNum As String = ""
+        txtbx_MACAddr.Text = "xx:xx:xx:xx:xx:xx"
+        serialNum = txtbxSerialNum.Text
+        serialNum = serialNum.Replace("-", "")
+        s.serialNum = serialNum
+        If serialNum.Length <> RunTest.SR_NO_SIZE Then
+            MsgBox("Please correct Serial No. & rerun test. Eg. xx-xxxxxx-0-xxxxxxxxx")
+            txtbxSerialNum.Focus()
+            Exit Sub
+        End If
 
         s = New summary
         s.tests = New List(Of variations)
@@ -3554,28 +3583,53 @@ Public Class HomeScreen
     End Sub
 
     Private Sub btn_flashParams_Click(sender As Object, e As EventArgs) Handles btn_flashParams.Click
-        Dim t As HomeScreen.tests
-        t = status.test
 
-        For Each cl As ConnectedClient In getSelectedClientList()
-
-            If cl.mDevType = RunTest.ClientType.DUT Then
-                'If sweepTestRunning = False Then
-                'if this is not rf sweep test then assign only one set of params
-                'rfgtxTest.ch = RF_CHANNEL
-                'End If
-                'swap_dest_short_address()
-                If txtbxSerialNum.TextLength = 18 Then
-                    RunTest.rftestParams = Me.rfgtxTest
-                    lbl_flashDone.Text = "Flash write in process"
-                    lbl_flashDone.ForeColor = Color.DarkRed
-                    RunTest.beginSend(RunTest.states.STATE_DEVICE_FLASH_PARAMS, cl, t)
-                Else
-                    MsgBox("Invalid Serial No.")
+        Dim finalResult As Boolean = True
+        If Not IsNothing(s.tests) Then
+            For Each test As variations In s.tests
+                If test.result = False Then
+                    finalResult = False
+                    Exit For
                 End If
-            End If
+            Next
+        Else
+            MsgBox("Tests are not ready/performed or boards are not available")
+            Exit Sub
+        End If
+        If finalResult = True Then
+            Dim t As HomeScreen.tests
+            t = status.test
+            For Each cl As ConnectedClient In getSelectedClientList()
 
-        Next
+                If cl.mDevType = RunTest.ClientType.DUT Then
+                    'If sweepTestRunning = False Then
+                    'if this is not rf sweep test then assign only one set of params
+                    'rfgtxTest.ch = RF_CHANNEL
+                    'End If
+                    'swap_dest_short_address()
+                    If Not txtbxSerialNum.Text = "" Then
+                        Dim serialNum As String = ""
+                        serialNum = txtbxSerialNum.Text
+                        serialNum = serialNum.Replace("-", "")
+
+                        If serialNum.Length = RunTest.SR_NO_SIZE Then
+                            RunTest.rftestParams = Me.rfgtxTest
+                            lbl_flashDone.Text = "Flash write in process"
+                            lbl_flashDone.ForeColor = Color.DarkRed
+                            RunTest.beginSend(RunTest.states.STATE_DEVICE_FLASH_PARAMS, cl, t)
+                        Else
+                            MsgBox("Invalid Serial No. Eg. xx-xxxxxx-0-xxxxxxxxx")
+                        End If
+                    Else
+                        MsgBox("Invalid Serial No. Eg. xx-xxxxxx-0-xxxxxxxxx")
+                    End If
+                End If
+
+            Next
+        Else
+            MsgBox("Cannot flash as test not performed or failed")
+        End If
+
     End Sub
 
 #End Region

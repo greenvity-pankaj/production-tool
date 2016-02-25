@@ -76,6 +76,9 @@
   <PropertyGroup>
     <ApplicationManifest>My Project\app.manifest</ApplicationManifest>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>greenvity_ico_nobgc.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
@@ -238,6 +241,7 @@
     <None Include="Resources\test_result_success.png" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="greenvity_ico_nobgc.ico" />
     <Content Include="Resources\test_result_error.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />

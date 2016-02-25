@@ -351,8 +351,13 @@ Public Class RunTest
                     ' Next
                     'Array.Reverse(flashMacSerialInfo.macAddress)
                     Dim answer As MsgBoxResult
-                    If HomeScreen.txtbxSerialNum.TextLength <> SR_NO_SIZE Then
-                        answer = MsgBox("Serial No length not correct. Click Ok to flash without Sr.No. " & HomeScreen.txtbxSerialNum.TextLength)
+                    Dim serialNum As String = ""
+                    serialNum = HomeScreen.txtbxSerialNum.Text
+                    serialNum = serialNum.Replace("-", "")
+
+                    If serialNum.Length <> RunTest.SR_NO_SIZE Then
+                        'If HomeScreen.txtbxSerialNum.TextLength <> SR_NO_SIZE Then
+                        answer = MsgBox("Serial No length not correct. Click Ok to flash without Sr.No. " & serialNum.Length)
                     End If
 
                     If answer = MsgBoxResult.Ok Then
@@ -389,7 +394,7 @@ Public Class RunTest
 
                         Exit Select
                     End If
-                    flashMacSerialInfo.serialNo = System.Text.Encoding.UTF8.GetBytes(HomeScreen.txtbxSerialNum.Text)
+                    flashMacSerialInfo.serialNo = System.Text.Encoding.UTF8.GetBytes(serialNum)
                     structByte = StructToByte(flashMacSerialInfo)
 
                     payloadLen = structByte.Length
@@ -400,7 +405,7 @@ Public Class RunTest
                     'fill header 
                     fill_header(header, payloadLen, HomeScreen.commandIDs.TOOL_CMD_DEVICE_FLASH_PARAM)
 
-                    headerbyte = StructToByte(header)
+                    headerByte = StructToByte(header)
                     '   fill payload
                     Array.Resize(txMsg, headerByte.Length)
                     Array.Copy(headerByte, 0, txMsg, 0, headerByte.Length)

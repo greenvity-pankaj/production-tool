@@ -421,7 +421,7 @@ Partial Class HomeScreen
         'txtbxSerialNum
         '
         Me.txtbxSerialNum.Location = New System.Drawing.Point(964, 56)
-        Me.txtbxSerialNum.MaxLength = 18
+        Me.txtbxSerialNum.MaxLength = 30
         Me.txtbxSerialNum.Name = "txtbxSerialNum"
         Me.txtbxSerialNum.Size = New System.Drawing.Size(136, 23)
         Me.txtbxSerialNum.TabIndex = 24
@@ -594,6 +594,7 @@ Partial Class HomeScreen
         Me.Controls.Add(Me.MenuStrip1)
         Me.DoubleBuffered = True
         Me.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Icon = CType(resources.GetObject("$this.Icon"), System.Drawing.Icon)
         Me.MainMenuStrip = Me.MenuStrip1
         Me.Margin = New System.Windows.Forms.Padding(3, 4, 3, 4)
         Me.MaximizeBox = False

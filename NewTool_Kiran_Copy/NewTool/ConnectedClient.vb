@@ -47,7 +47,7 @@ Public Class ConnectedClient
                 If mClient.Connected Then
                     If mClient.GetStream.CanRead Then
 
-                        ' read till data is available
+
                         Const buffSize As Integer = 512
                         Dim buffer As Byte() = New Byte(buffSize) {}
                         Dim ret As New UInteger

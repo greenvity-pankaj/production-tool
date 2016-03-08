@@ -52,25 +52,30 @@ Public Class ConnectedClient
                         Dim buffer As Byte() = New Byte(buffSize) {}
                         Dim ret As New UInteger
                         Do
-                            ret = mClient.GetStream.Read(buffer, 0, buffSize)
+                            Try
+                                ret = mClient.GetStream.Read(buffer, 0, buffSize)
+                            Catch e As Exception
+                                MsgBox("Reset boards and tool")
+                            End Try
+
                             'If mClient.Connected Then
-                                'Try
-                                '    With mClient.GetStream
-                                '        ret = .Read(buffer, 0, buffSize)
-                                '    End With
-                               ' Catch ex As SocketException
-                               '     If ex.NativeErrorCode.Equals(10053) Then
-                               '         clearConnection()
-                                '        Array.Clear(readBuffer, 0, BYTES_TO_READ)
-                                 '       bytesRead = 0
-                                 '       MsgBox("10053")
-                                 '       Exit Do
-                                 '   Else
-                                 '       MsgBox(ex.ToString)
-                                 '       Exit Do
-                                '    End If
-                             '   End Try
-                          '  End If
+                            'Try
+                            '    With mClient.GetStream
+                            '        ret = .Read(buffer, 0, buffSize)
+                            '    End With
+                            ' Catch ex As SocketException
+                            '     If ex.NativeErrorCode.Equals(10053) Then
+                            '         clearConnection()
+                            '        Array.Clear(readBuffer, 0, BYTES_TO_READ)
+                            '       bytesRead = 0
+                            '       MsgBox("10053")
+                            '       Exit Do
+                            '   Else
+                            '       MsgBox(ex.ToString)
+                            '       Exit Do
+                            '    End If
+                            '   End Try
+                            '  End If
                             Array.Copy(buffer, 0, readBuffer, bytesRead, ret)
                             bytesRead += ret
                             ret = Nothing

@@ -1,6 +1,7 @@
 ﻿Imports System.Net, System.Net.Sockets, System.Text, System.Threading
 Imports System.Runtime.Serialization.Formatters.Binary
 Imports System.Runtime.InteropServices
+Imports System.Globalization
 
 Public Class RunTest
 
@@ -17,6 +18,7 @@ Public Class RunTest
     Public Const ProductionToolProtocol As Byte = &H8F
     Public Const MAX_FW_VER_LEN As Integer = 16
     Public Const SR_NO_SIZE As Integer = 18
+    Public Const SR_NO_TRIM_LEN As Integer = 2
 
 #End Region
 
@@ -340,9 +342,12 @@ Public Class RunTest
                     flashHeaderArray = StructToByte(flashHeader)
 
                     'flashMacSerialInfo.macAddress = System.Text.Encoding.ASCII.GetBytes(HomeScreen.gMACcounter)
-                    'flashMacSerialInfo.serialNo = 
-                    flashMacSerialInfo.macAddress = BitConverter.GetBytes(CULng(HomeScreen.gMACAddress)) 'after successful test it increments by 1 for next iteration
-
+                    'Dim str1 As String = HomeScreen.txtbx_MACAddr.Text.Replace(":", "")
+                    'Dim macAddress As ULong
+                    'macAddress = ULong.Parse(str1, NumberStyles.HexNumber, CultureInfo.CurrentCulture.NumberFormat)
+                    SyncLock HomeScreen.objForMac
+                        flashMacSerialInfo.macAddress = BitConverter.GetBytes(CULng(HomeScreen.gMACAddress)) 'after successful test it increments by 1 for next iteration
+                    End SyncLock
                     'Array.Reverse(tempArray)
                     'Array.Copy(tempArray, 0, flashMacSerialInfo.macAddress, 0, 6)
                     'HomeScreen.txtbxDummy.AppendText(vbCrLf)
@@ -352,10 +357,11 @@ Public Class RunTest
                     'Array.Reverse(flashMacSerialInfo.macAddress)
                     Dim answer As MsgBoxResult
                     Dim serialNum As String = ""
-                    serialNum = HomeScreen.txtbxSerialNum.Text
-                    serialNum = serialNum.Replace("-", "")
-
-                    If serialNum.Length <> RunTest.SR_NO_SIZE Then
+                    'serialNum = HomeScreen.txtbxSerialNum.Text
+                    'MsgBox(HomeScreen.gMACAddress & " " & HomeScreen.gMACAddress)
+                    ' serialNum = serialNum.Replace("-", "")
+                    serialNum = HomeScreen.s.serialNum
+                    If serialNum.Length <> (RunTest.SR_NO_SIZE - RunTest.SR_NO_TRIM_LEN) Then
                         'If HomeScreen.txtbxSerialNum.TextLength <> SR_NO_SIZE Then
                         answer = MsgBox("Serial No length not correct. Click Ok to flash without Sr.No. " & serialNum.Length)
                     End If
@@ -394,7 +400,32 @@ Public Class RunTest
 
                         Exit Select
                     End If
-                    flashMacSerialInfo.serialNo = System.Text.Encoding.UTF8.GetBytes(serialNum)
+
+                    Dim tempString As String = ""
+
+                    Dim pn As Byte = 0
+                    Dim pn1 As Byte = 0
+                    Dim tempSrNo As Byte()
+                    Dim byteOffset As Integer
+                    tempString = Mid(serialNum, 1, 2) ' Extract first 2 characters as PN from SR No String
+                    ' MsgBox(tempString)
+                    pn = Byte.Parse(tempString, NumberStyles.HexNumber, CultureInfo.CurrentCulture.NumberFormat) ' Treat 4 chars as hex number
+                    'MsgBox(pn)
+                    Array.Resize(flashMacSerialInfo.serialNo, 18)
+                    flashMacSerialInfo.serialNo(0) = pn
+
+                    tempString = Mid(serialNum, 3, 2) ' Extract next 2 characters as PN from SR No String
+                    pn1 = Byte.Parse(tempString, NumberStyles.HexNumber, CultureInfo.CurrentCulture.NumberFormat) ' Treat 4 chars as hex number
+                    flashMacSerialInfo.serialNo(1) = pn1
+
+                    tempSrNo = System.Text.Encoding.UTF8.GetBytes(serialNum)
+
+                    For byteOffset = 4 To 15
+                        flashMacSerialInfo.serialNo(byteOffset - 2) = tempSrNo(byteOffset)
+                    Next
+                    flashMacSerialInfo.serialNo(16) = 0
+                    flashMacSerialInfo.serialNo(17) = 0
+
                     structByte = StructToByte(flashMacSerialInfo)
 
                     payloadLen = structByte.Length

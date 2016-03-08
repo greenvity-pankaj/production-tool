@@ -7,6 +7,7 @@ Imports System.Resources
 Imports System.Globalization
 
 Public Class HomeScreen
+
     '
     '   Bitmap for tests
     '
@@ -48,7 +49,7 @@ Public Class HomeScreen
     '
     '   Structure Declaration
     '
-#Region "Structure Declaratio"
+#Region "Structure Declaration"
     '
     '   To maintain the execution status
     '
@@ -149,8 +150,9 @@ Public Class HomeScreen
     Private pendingConnections As Integer = 5
     Private RF_FRM_NUM As Integer = 200
     Public RF_CHANNEL As Byte = &HF
-    Public gMACcounter = New ULong
-    Public gMACAddress = New ULong
+    Public Shared gMACcounter = New ULong
+    Public Shared gMACAddress = New ULong
+    Public Shared serialNumber As String = ""
     '   Lists
     Private sockets As List(Of Socket)
     Private clients As New List(Of ConnectedClient)
@@ -161,7 +163,7 @@ Public Class HomeScreen
     Private RFChannelList As New List(Of Byte)(New Byte() {&H1A}) ' List of channels in Sweep Test Queue
     ' Objects   >> used for UI object control
     Private objForUI = New Object()
-
+    Public objForMac = New Object
     '   Queue
     Private sweepParamList As New Queue(Of TestSettings._sPlcSimTxTestParams)
     Private RFChannelParamList As New Queue(Of TestSettings.sRfTxTestParams)
@@ -176,7 +178,7 @@ Public Class HomeScreen
 
     '   Structure Variables
     Public m As metadata
-    Public s As New summary
+    Public Shared s As New summary
     Public status As New execState
     Public plcRXparams As New TestSettings._sPlcSimTxTestParams
     Public plcTXparams As New TestSettings._sPlcSimTxTestParams
@@ -577,6 +579,9 @@ Public Class HomeScreen
                 setDefaultPLCPramas()
                 ' enable PLC TX & RX
                 chkbxPLCTX.Enabled = True
+
+
+
                 btnPLCTXSettings.Enabled = True
                 chkbxPLCRX.Enabled = True
                 btnPLCRXSettings.Enabled = True
@@ -823,7 +828,7 @@ Public Class HomeScreen
                             End If
 
                             Dim upEventArray As New List(Of Byte)
-                            For Each b As Byte In packet.ToList.GetRange(Marshal.SizeOf(GetType(RunTest.frmHeader)), _
+                            For Each b As Byte In packet.ToList.GetRange(Marshal.SizeOf(GetType(RunTest.frmHeader)),
                                                                          Marshal.SizeOf(GetType(RunTest.sDevUpEvent)))
                                 upEventArray.Add(b)
                                 If upEventArray.Count = Marshal.SizeOf(GetType(RunTest.sDevUpEvent)) Then
@@ -832,7 +837,7 @@ Public Class HomeScreen
                             Next
 
                             Dim deviceUPEvent As New RunTest.sDevUpEvent
-                            deviceUPEvent = CType(ByteToStruct(upEventArray.ToArray, _
+                            deviceUPEvent = CType(ByteToStruct(upEventArray.ToArray,
                                                                GetType(RunTest.sDevUpEvent)), RunTest.sDevUpEvent)
                             SyncLock objForUI
                                 isDeviceUP(sender, deviceUPEvent)
@@ -845,7 +850,7 @@ Public Class HomeScreen
                             '   sort the response
                             '
                             Dim resp As New RunTest.sResponse
-                            Array.Copy(packet, Marshal.SizeOf(GetType(RunTest.frmHeader)), respArray, _
+                            Array.Copy(packet, Marshal.SizeOf(GetType(RunTest.frmHeader)), respArray,
                                        0, Marshal.SizeOf(GetType(RunTest.sResponse)))
 
                             resp = CType(ByteToStruct(respArray, GetType(RunTest.sResponse)), RunTest.sResponse)
@@ -886,7 +891,7 @@ Public Class HomeScreen
                             End If
                             '   sort the response
                             Dim resp As New RunTest.sResponse
-                            Array.Copy(packet, Marshal.SizeOf(GetType(RunTest.frmHeader)), respArray, _
+                            Array.Copy(packet, Marshal.SizeOf(GetType(RunTest.frmHeader)), respArray,
                                        0, Marshal.SizeOf(GetType(RunTest.sResponse)))
 
                             resp = CType(ByteToStruct(respArray, GetType(RunTest.sResponse)), RunTest.sResponse)
@@ -895,7 +900,7 @@ Public Class HomeScreen
                             Dim c As New RunTest.sProdPrepRfStatusCnf
                             Dim r(Marshal.SizeOf(GetType(RunTest.sProdPrepRfStatusCnf))) As Byte
 
-                            Array.Copy(packet, (Marshal.SizeOf(GetType(RunTest.frmHeader)) + Marshal.SizeOf(GetType(RunTest.sResponse))), _
+                            Array.Copy(packet, (Marshal.SizeOf(GetType(RunTest.frmHeader)) + Marshal.SizeOf(GetType(RunTest.sResponse))),
                                        r, 0, Marshal.SizeOf(GetType(RunTest.sProdPrepRfStatusCnf)))
 
                             c = CType(ByteToStruct(r, GetType(RunTest.sProdPrepRfStatusCnf)), RunTest.sProdPrepRfStatusCnf)
@@ -962,7 +967,7 @@ Public Class HomeScreen
 
                             '   sort the response
                             Dim resp As New RunTest.sResponse
-                            Array.Copy(packet, Marshal.SizeOf(GetType(RunTest.frmHeader)), respArray, _
+                            Array.Copy(packet, Marshal.SizeOf(GetType(RunTest.frmHeader)), respArray,
                                        0, Marshal.SizeOf(GetType(RunTest.sResponse)))
 
                             resp = CType(ByteToStruct(respArray, GetType(RunTest.sResponse)), RunTest.sResponse)
@@ -971,7 +976,7 @@ Public Class HomeScreen
                             Dim c As New RunTest.sProdPrepRfStatusCnf
                             Dim r(Marshal.SizeOf(GetType(RunTest.sProdPrepRfStatusCnf))) As Byte
 
-                            Array.Copy(packet, (Marshal.SizeOf(GetType(RunTest.frmHeader)) + Marshal.SizeOf(GetType(RunTest.sResponse))), _
+                            Array.Copy(packet, (Marshal.SizeOf(GetType(RunTest.frmHeader)) + Marshal.SizeOf(GetType(RunTest.sResponse))),
                                        r, 0, Marshal.SizeOf(GetType(RunTest.sProdPrepRfStatusCnf)))
 
                             c = CType(ByteToStruct(r, GetType(RunTest.sProdPrepRfStatusCnf)), RunTest.sProdPrepRfStatusCnf)
@@ -1034,7 +1039,7 @@ Public Class HomeScreen
                         Case commandIDs.TOOL_CMD_START_TEST_CNF
                             '   sort the response
                             Dim resp As New RunTest.sResponse
-                            Array.Copy(packet, Marshal.SizeOf(GetType(RunTest.frmHeader)), respArray, _
+                            Array.Copy(packet, Marshal.SizeOf(GetType(RunTest.frmHeader)), respArray,
                                        0, Marshal.SizeOf(GetType(RunTest.sResponse)))
 
                             resp = CType(ByteToStruct(respArray, GetType(RunTest.sResponse)), RunTest.sResponse)
@@ -1086,7 +1091,7 @@ Public Class HomeScreen
                         Case commandIDs.TOOL_CMD_STOP_TEST_CNF
                             '   sort the response
                             Dim resp As New RunTest.sResponse
-                            Array.Copy(packet, Marshal.SizeOf(GetType(RunTest.frmHeader)), respArray, _
+                            Array.Copy(packet, Marshal.SizeOf(GetType(RunTest.frmHeader)), respArray,
                                        0, Marshal.SizeOf(GetType(RunTest.sResponse)))
 
                             resp = CType(ByteToStruct(respArray, GetType(RunTest.sResponse)), RunTest.sResponse)
@@ -1132,7 +1137,7 @@ Public Class HomeScreen
 
                             '   Result of PLC interface test
                             If intf = RunTest.TestInterface.TEST_PLC_ID Then
-                                For Each b As Byte In packet.ToList.GetRange(Marshal.SizeOf(GetType(RunTest.frmHeader)), _
+                                For Each b As Byte In packet.ToList.GetRange(Marshal.SizeOf(GetType(RunTest.frmHeader)),
                                                                              Marshal.SizeOf(GetType(shpgpStats._plcTxTestResults_t)))
                                     statsArray.Add(b)
                                     If statsArray.Count = Marshal.SizeOf(GetType(shpgpStats._plcTxTestResults_t)) Then
@@ -1141,7 +1146,7 @@ Public Class HomeScreen
                                 Next
 
                                 Dim resp As New shpgpStats._plcTxTestResults_t
-                                resp = CType(ByteToStruct(statsArray.ToArray, _
+                                resp = CType(ByteToStruct(statsArray.ToArray,
                                                                    GetType(shpgpStats._plcTxTestResults_t)), shpgpStats._plcTxTestResults_t)
 
                                 '   set metadata
@@ -1150,7 +1155,7 @@ Public Class HomeScreen
 
                             '   Result of RF interface test
                             If intf = RunTest.TestInterface.TEST_802_15_5_ID Then
-                                For Each b As Byte In packet.ToList.GetRange(Marshal.SizeOf(GetType(RunTest.frmHeader)), _
+                                For Each b As Byte In packet.ToList.GetRange(Marshal.SizeOf(GetType(RunTest.frmHeader)),
                                                                              Marshal.SizeOf(GetType(shpgpStats._sRfStats)))
                                     statsArray.Add(b)
                                     If statsArray.Count = Marshal.SizeOf(GetType(shpgpStats._sRfStats)) Then
@@ -1678,8 +1683,8 @@ Public Class HomeScreen
             serialNum = txtbxSerialNum.Text
             serialNum = serialNum.Replace("-", "")
             s.serialNum = serialNum
-            If serialNum.Length <> RunTest.SR_NO_SIZE Then
-                MsgBox("Please correct Serial No. and rerun test. Eg. xx-xxxxxx-0-xxxxxxxxx")
+            If serialNum.Length <> (RunTest.SR_NO_SIZE - RunTest.SR_NO_TRIM_LEN) Then
+                MsgBox("Please correct Serial No. and rerun test. Eg. xxxx-xxx-0-xxxxxxxx")
                 txtbxSerialNum.Focus()
                 Exit Sub
             End If
@@ -1699,89 +1704,76 @@ Public Class HomeScreen
                 'SetSysColors(3, COLOR_WINDOWFRAME, RGB(0, 255, 0))
                 pbox_test_status.SizeMode = PictureBoxSizeMode.StretchImage
                 pbox_test_status.Image = My.Resources.test_result_success
-                ' Dim gMACAddress1 As ULong = 0
+
                 ' convert MAC address to string
                 If Not txtbxSerialNum.Text = "" Then
-                    Dim macAddressLastBytes(3) As Byte
+                    ' Dim macAddressLastBytes(3) As Byte
                     Dim tempString As String = ""
-
-                    Array.Clear(macAddressLastBytes, 0, 3)
+                    Const OUI_INDEX As Byte = 7
+                    'Array.Clear(macAddressLastBytes, 0, 3)
                     'serialNum = txtbxSerialNum.Text
                     'serialNum = serialNum.Replace("-", "")
-                    ' Sr No. PN-YYMYLY-XXXXXXXXXX
+                    ' Sr No. PNDS-MYY-0-XXXXXXXXX - Product Number,Device Type, Sub Device Type ()
                     ' 1st X = Encoded OUI
-                    ' 84:86:f3 encoded as 0 in Serial Number
-                    ' If serialNum.Length = RunTest.SR_NO_SIZE Then
-                    If serialNum.Chars(8) = "0" Then
-                            txtbx_MACAddr.Text = ""
-                            txtbx_MACAddr.Text = "84:86:F3"
-                        Else
-                        MsgBox("Invalid Sr. No or OUI Not Supported. Eg. xx-xxxxxx-0-xxxxxxxxx")
+                    ' 84:86:f3 encoded as 0 in Serial Number. OUI Field is indexed at location 7
+
+                    If serialNum.Chars(OUI_INDEX) = "0" Then
+                        txtbx_MACAddr.Text = ""
+                        txtbx_MACAddr.Text = "84:86:F3"
+                    Else
+                        MsgBox("Invalid Sr. No or OUI Not Supported. Eg. xxxx-xxx-0-xxxxxxxx")
                         Exit Sub
                     End If
+
                     Try
-                        tempString = Mid(serialNum, 10, 3)
-                        macAddressLastBytes(0) = CByte(tempString)
-                        txtbx_MACAddr.AppendText(":" & macAddressLastBytes(0).ToString("X02"))
+                        tempString = Mid(serialNum, 8, 9) ' For Mid function index starts from 1. Not from 8 like others
 
-                        tempString = Mid(serialNum, 13, 3)
-                        macAddressLastBytes(1) = CByte(tempString)
-                        txtbx_MACAddr.AppendText(":" & macAddressLastBytes(1).ToString("X02"))
+                        Dim macaddressPart As String = CLng(tempString).ToString("X06") ' represents last 3 bytes of mac address in hex characters
+                        Dim colonOffset As Integer = 2
+                        Dim sbString As StringBuilder = New StringBuilder(macaddressPart)
 
-                        tempString = Mid(serialNum, 16, 3)
-                        macAddressLastBytes(2) = CByte(tempString)
-                        txtbx_MACAddr.AppendText(":" & macAddressLastBytes(2).ToString("X02"))
+                        While True
+                            sbString.Insert(colonOffset, ":")
+                            colonOffset += 3
+                            If colonOffset >= sbString.Length Then
+                                Exit While
+                            End If
+                        End While
+                        txtbx_MACAddr.AppendText(":" & sbString.ToString())
+                        'tempString = Mid(serialNum, 9, 3)
+                        'macAddressLastBytes(0) = CByte(tempString)
+                        'txtbx_MACAddr.AppendText(":" & macAddressLastBytes(0).ToString("X02"))
+
+                        'tempString = Mid(serialNum, 12, 3)
+                        'macAddressLastBytes(1) = CByte(tempString)
+                        'txtbx_MACAddr.AppendText(":" & macAddressLastBytes(1).ToString("X02"))
+
+                        'tempString = Mid(serialNum, 15, 3)
+                        'macAddressLastBytes(2) = CByte(tempString)
+                        'txtbx_MACAddr.AppendText(":" & macAddressLastBytes(2).ToString("X02"))
 
                         Dim str1 As String = txtbx_MACAddr.Text.Replace(":", "")
-
-                        gMACcounter = ULong.Parse(str1, NumberStyles.HexNumber, CultureInfo.CurrentCulture.NumberFormat)
+                        SyncLock objForMac
+                            gMACAddress = ULong.Parse(str1, NumberStyles.HexNumber, CultureInfo.CurrentCulture.NumberFormat)
+                        End SyncLock
                     Catch e As Exception
-                        MsgBox("Invalid Sr. No: Hex Conversion failed. Eg. xx-xxxxxx-0-valid numbers")
+                        MsgBox("Invalid Sr. No: Hex Conversion failed. Eg. xxxx-xxx-0-valid numbers")
                         Exit Sub
                     End Try
                     lbl_flashDone.Text = "Flash Pending"
-                        lbl_flashDone.ForeColor = Color.DarkRed
-                        'Dim t As String = Hex(gMACAddress1)
-                        'Dim i As Integer = 2
-                        '    Dim sb As StringBuilder = New StringBuilder(t)
-                        '    While True
-                        '        sb.Insert(i, ":")
-                        '        i += 3
-                        '        If i >= sb.Length Then
-                        '            Exit While
-                        '        End If
-                        '    End While
-                        's.MAC = sb.ToString
-                        'txtbx_MACAddr.Text = s.MAC
+                    lbl_flashDone.ForeColor = Color.DarkRed
+                    SyncLock objForMac
                         s.MAC = txtbx_MACAddr.Text
-                        ' increment golbal MAC address counter
-                        gMACAddress = gMACcounter
-                        'Dim Path = IO.Path.Combine(rootFilePath, "MAC_Addr_Log.xml")
-                        ' Dim xmlWrite As New readConfig
-                        ' xmlWrite.create_LogMACAddr_XML_file(Path, txtbx_MACAddr.Text)
-                        'gMACcounter += 1
-                        '#Region "FLASH_MAC_ADDRESS"
-                        'Dim t As HomeScreen.tests
-                        't = status.test
+                        gMACcounter = gMACAddress
 
-                        'For Each cl As ConnectedClient In getSelectedClientList()
+                    End SyncLock
 
-                        '    If cl.mDevType = RunTest.ClientType.DUT Then
+                    flashParams()
+                    'Dim Path = IO.Path.Combine(rootFilePath, "MAC_Addr_Log.xml")
+                    ' Dim xmlWrite As New readConfig
+                    ' xmlWrite.create_LogMACAddr_XML_file(Path, txtbx_MACAddr.Text)
 
-                        '        If txtbxSerialNum.TextLength = RunTest.SR_NO_SIZE Then
-                        '            RunTest.rftestParams = Me.rfgtxTest
-                        '            RunTest.beginSend(RunTest.states.STATE_DEVICE_FLASH_PARAMS, cl, t)
-                        '        Else
-                        '            MsgBox("Invalid Serial No.")
-                        '        End If
-                        '    End If
-
-                        'Next
-                        '#End Region
-                        'Else
-                        '   MsgBox("Invalid Sr. No.")
-                        'End If
-                    End If
+                End If
 
             Else    ' If any test is failed, do not assign any MAC address
                 s.finalResult = "FAIL"
@@ -1799,6 +1791,55 @@ Public Class HomeScreen
 
     End Sub
 
+    Private Sub flashParams()
+
+        Dim finalResult As Boolean = True
+        If Not IsNothing(s.tests) Then
+            For Each test As variations In s.tests
+                If test.result = False Then
+                    finalResult = False
+                    Exit For
+                End If
+            Next
+        Else
+            MsgBox("Tests are not ready/performed or boards are not available")
+            Exit Sub
+        End If
+        If finalResult = True Then
+            Dim t As HomeScreen.tests
+            t = status.test
+            For Each cl As ConnectedClient In getSelectedClientList()
+
+                If cl.mDevType = RunTest.ClientType.DUT Then
+                    'If sweepTestRunning = False Then
+                    'if this is not rf sweep test then assign only one set of params
+                    'rfgtxTest.ch = RF_CHANNEL
+                    'End If
+                    'swap_dest_short_address()
+                    If Not txtbxSerialNum.Text = "" Then
+                        Dim serialNum As String = ""
+                        serialNum = txtbxSerialNum.Text
+                        serialNum = serialNum.Replace("-", "")
+
+                        If serialNum.Length = (RunTest.SR_NO_SIZE - RunTest.SR_NO_TRIM_LEN) Then
+                            RunTest.rftestParams = Me.rfgtxTest
+                            lbl_flashDone.Text = "Flash write in process"
+                            lbl_flashDone.ForeColor = Color.DarkRed
+                            RunTest.beginSend(RunTest.states.STATE_DEVICE_FLASH_PARAMS, cl, t)
+                        Else
+                            MsgBox("Invalid Serial No. Eg. xx-xxxxxx-0-xxxxxxxxx")
+                        End If
+                    Else
+                        MsgBox("Invalid Serial No. Eg. xx-xxxxxx-0-xxxxxxxxx")
+                    End If
+                End If
+
+            Next
+        Else
+            MsgBox("Cannot flash as test not performed or failed")
+        End If
+
+    End Sub
     '
     '   All tests are done and now update the summary 
     '
@@ -1885,6 +1926,12 @@ Public Class HomeScreen
         chkbx_RFRXSweep.Enabled = True
         btn_RFRXSweepSetting.Enabled = True
         btn_flashParams.Enabled = True
+
+        chkbxRFTX.Checked = False
+        chkbxRFRX.Checked = False
+
+        chkbxPLCTX.Checked = False
+        chkbxPLCRX.Checked = False
     End Sub
 
     '   <summary>
@@ -2114,16 +2161,22 @@ Public Class HomeScreen
     Private Sub btnRunTest_Click(sender As Object, e As EventArgs) Handles btnRunTest.Click
 
         Dim serialNum As String = ""
+        Dim stringValid As String = ""
         txtbx_MACAddr.Text = "xx:xx:xx:xx:xx:xx"
         serialNum = txtbxSerialNum.Text
         serialNum = serialNum.Replace("-", "")
         s.serialNum = serialNum
-        If serialNum.Length <> RunTest.SR_NO_SIZE Then
-            MsgBox("Please correct Serial No. & rerun test. Eg. xx-xxxxxx-0-xxxxxxxxx")
+        If serialNum.Length <> (RunTest.SR_NO_SIZE - RunTest.SR_NO_TRIM_LEN) Then
+            MsgBox("Please correct Serial No. & rerun test. Eg. xxxx-xxx-0-xxxxxxxx or xxxx-xxx-0xxxxxxxx")
             txtbxSerialNum.Focus()
             Exit Sub
         End If
-
+        stringValid = Mid(serialNum, 9, 8)
+        If Not System.Text.RegularExpressions.Regex.IsMatch(stringValid, "^[0-9]+$") Then
+            MsgBox("Please correct Serial No. & rerun test. Eg. xxxx-xxx-0-0numbers or xxxx-xxx-0numbers")
+            txtbxSerialNum.Focus()
+            Exit Sub
+        End If
         s = New summary
         s.tests = New List(Of variations)
 
@@ -3425,7 +3478,7 @@ Public Class HomeScreen
     Function GetIP() As String
 
         Return (
-            From networkInterface In networkInterface.GetAllNetworkInterfaces()
+            From networkInterface In NetworkInterface.GetAllNetworkInterfaces()
             Where networkInterface.NetworkInterfaceType = NetworkInterfaceType.Ethernet
             From address In networkInterface.GetIPProperties().UnicastAddresses
             Where address.Address.AddressFamily = Net.Sockets.AddressFamily.InterNetwork
@@ -3581,7 +3634,7 @@ Public Class HomeScreen
             MessageBox.Show(ex.ToString)
         End Try
     End Sub
-
+#End Region
     Private Sub btn_flashParams_Click(sender As Object, e As EventArgs) Handles btn_flashParams.Click
 
         Dim finalResult As Boolean = True
@@ -3612,7 +3665,7 @@ Public Class HomeScreen
                         serialNum = txtbxSerialNum.Text
                         serialNum = serialNum.Replace("-", "")
 
-                        If serialNum.Length = RunTest.SR_NO_SIZE Then
+                        If serialNum.Length = (RunTest.SR_NO_SIZE - RunTest.SR_NO_TRIM_LEN) Then
                             RunTest.rftestParams = Me.rfgtxTest
                             lbl_flashDone.Text = "Flash write in process"
                             lbl_flashDone.ForeColor = Color.DarkRed
@@ -3631,8 +3684,5 @@ Public Class HomeScreen
         End If
 
     End Sub
-
-#End Region
-
 
 End Class

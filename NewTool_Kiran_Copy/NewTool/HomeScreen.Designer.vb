@@ -69,6 +69,8 @@ Partial Class HomeScreen
         Me.PictureBox1 = New System.Windows.Forms.PictureBox()
         Me.MenuStrip1 = New System.Windows.Forms.MenuStrip()
         Me.lbl_flashDone = New System.Windows.Forms.Label()
+        Me.Label1 = New System.Windows.Forms.Label()
+        Me.lbl_rf_ch_no = New System.Windows.Forms.Label()
         Me.GroupBox1.SuspendLayout()
         Me.grpbxTests.SuspendLayout()
         CType(Me.pbox_test_status, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -559,11 +561,33 @@ Partial Class HomeScreen
         Me.lbl_flashDone.Text = "Flash Pending"
         Me.lbl_flashDone.TextAlign = System.Drawing.ContentAlignment.TopCenter
         '
+        'Label1
+        '
+        Me.Label1.AutoSize = True
+        Me.Label1.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label1.Location = New System.Drawing.Point(325, 79)
+        Me.Label1.Name = "Label1"
+        Me.Label1.Size = New System.Drawing.Size(49, 17)
+        Me.Label1.TabIndex = 36
+        Me.Label1.Text = "RF CH:"
+        '
+        'lbl_rf_ch_no
+        '
+        Me.lbl_rf_ch_no.AutoSize = True
+        Me.lbl_rf_ch_no.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.lbl_rf_ch_no.Location = New System.Drawing.Point(375, 79)
+        Me.lbl_rf_ch_no.Name = "lbl_rf_ch_no"
+        Me.lbl_rf_ch_no.Size = New System.Drawing.Size(15, 17)
+        Me.lbl_rf_ch_no.TabIndex = 37
+        Me.lbl_rf_ch_no.Text = "0"
+        '
         'HomeScreen
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(7.0!, 15.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(1144, 507)
+        Me.Controls.Add(Me.lbl_rf_ch_no)
+        Me.Controls.Add(Me.Label1)
         Me.Controls.Add(Me.lbl_flashDone)
         Me.Controls.Add(Me.pbox_test_status)
         Me.Controls.Add(Me.btn_flashParams)
@@ -654,4 +678,6 @@ Partial Class HomeScreen
     Friend WithEvents pbox_test_status As PictureBox
     Friend WithEvents MenuStrip1 As MenuStrip
     Friend WithEvents lbl_flashDone As Label
+    Friend WithEvents Label1 As Label
+    Friend WithEvents lbl_rf_ch_no As Label
 End Class

@@ -28,9 +28,13 @@ Public Class ConnectedClient
     '   Clear connection and terminate thread
     '
     Private Sub clearConnection()
-        mClient.GetStream.Flush()
-        mClient.GetStream.Close()
-        mClient.Close()
+        Try
+            mClient.GetStream.Flush()
+            mClient.GetStream.Close()
+            mClient.Close()
+        Catch e As Exception
+            MsgBox("Unable to close connection. Please restart boards & Windows Tool")
+        End Try
         'readThread.Abort()     'Thread abort throws expection, better to do it using a control boolean variable
         RunThread = False
     End Sub
@@ -51,37 +55,39 @@ Public Class ConnectedClient
                         Const buffSize As Integer = 512
                         Dim buffer As Byte() = New Byte(buffSize) {}
                         Dim ret As New UInteger
-                        Do
-                            Try
+                        Try
+                            Do
+
                                 ret = mClient.GetStream.Read(buffer, 0, buffSize)
-                            Catch e As Exception
-                                MsgBox("Reset boards and tool")
-                            End Try
 
-                            'If mClient.Connected Then
-                            'Try
-                            '    With mClient.GetStream
-                            '        ret = .Read(buffer, 0, buffSize)
-                            '    End With
-                            ' Catch ex As SocketException
-                            '     If ex.NativeErrorCode.Equals(10053) Then
-                            '         clearConnection()
-                            '        Array.Clear(readBuffer, 0, BYTES_TO_READ)
-                            '       bytesRead = 0
-                            '       MsgBox("10053")
-                            '       Exit Do
-                            '   Else
-                            '       MsgBox(ex.ToString)
-                            '       Exit Do
-                            '    End If
-                            '   End Try
-                            '  End If
-                            Array.Copy(buffer, 0, readBuffer, bytesRead, ret)
-                            bytesRead += ret
-                            ret = Nothing
-                            Array.Clear(buffer, 0, buffSize)
-                        Loop While mClient.GetStream.DataAvailable
 
+                                'If mClient.Connected Then
+                                'Try
+                                '    With mClient.GetStream
+                                '        ret = .Read(buffer, 0, buffSize)
+                                '    End With
+                                ' Catch ex As SocketException
+                                '     If ex.NativeErrorCode.Equals(10053) Then
+                                '         clearConnection()
+                                '        Array.Clear(readBuffer, 0, BYTES_TO_READ)
+                                '       bytesRead = 0
+                                '       MsgBox("10053")
+                                '       Exit Do
+                                '   Else
+                                '       MsgBox(ex.ToString)
+                                '       Exit Do
+                                '    End If
+                                '   End Try
+                                '  End If
+                                Array.Copy(buffer, 0, readBuffer, bytesRead, ret)
+                                bytesRead += ret
+                                ret = Nothing
+                                Array.Clear(buffer, 0, buffSize)
+                            Loop While mClient.GetStream.DataAvailable
+                        Catch e As Exception
+                            bytesRead = 0
+                            MsgBox("Communication interrupted. Please restart boards and Windows tool")
+                        End Try
                         'bytesRead = mClient.GetStream.Read(readBuffer, 0, BYTES_TO_READ)
 
                         If (bytesRead > 0) Then

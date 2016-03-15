@@ -11,10 +11,10 @@ Public Class RunTest
     Private headerFrmType As Byte
     Private payloadLength As UShort
     Private headerFrmID As Byte
-    Public gtxTest As New TestSettings._sPlcSimTxTestParams 'global variable to carry PLC params
-    Public rftestParams As New TestSettings.sRfTxTestParams 'global variable to carry rf params
-    Public flashHeader As New TestSettings.sFlashHeader
-    Public flashMacSerialInfo As New TestSettings.sFlashMacSerial
+    Public Shared gtxTest As New TestSettings._sPlcSimTxTestParams 'global variable to carry PLC params
+    Public Shared rftestParams As New TestSettings.sRfTxTestParams 'global variable to carry rf params
+    Public Shared flashHeader As New TestSettings.sFlashHeader
+    Public Shared flashMacSerialInfo As New TestSettings.sFlashMacSerial
     Public Const ProductionToolProtocol As Byte = &H8F
     Public Const MAX_FW_VER_LEN As Integer = 16
     Public Const SR_NO_SIZE As Integer = 18

@@ -115,8 +115,8 @@ Public Class HomeScreen
     Private devicesUP As New Boolean
     Private testRunning As New Boolean
     Private setPowerMode As New Boolean
-    Public userPLCTXPramasSet As New Boolean
-    Public userPLCRXPramasSet As New Boolean
+    Public Shared userPLCTXPramasSet As New Boolean
+    Public Shared userPLCRXPramasSet As New Boolean
     Private sweepTestRunning As New Boolean
 
     '   Delegates
@@ -160,7 +160,16 @@ Public Class HomeScreen
     Private defTestQ As New List(Of tests)
     Private FrmLenArr As New List(Of UInteger)(New UInteger() {100, 500})
     'Private RFChannelList As New List(Of Byte)(New Byte() {&HF, &H14, &H1A})
-    Private RFChannelList As New List(Of Byte)(New Byte() {&H1A}) ' List of channels in Sweep Test Queue
+#If TEST_CHANNEL = "15" Then
+    Private RFChannelList As New List(Of Byte)(New Byte() {15}) ' List of channels in Sweep Test Queue
+#ElseIf TEST_CHANNEL = "16" Then
+    Private RFChannelList As New List(Of Byte)(New Byte() {16}) ' List of channels in Sweep Test Queue
+#ElseIf TEST_CHANNEL = "25" Then
+    Private RFChannelList As New List(Of Byte)(New Byte() {25}) ' List of channels in Sweep Test Queue
+#ElseIf TEST_CHANNEL = "26" Then
+    Private RFChannelList As New List(Of Byte)(New Byte() {26}) ' List of channels in Sweep Test Queue
+#End If
+
     ' Objects   >> used for UI object control
     Private objForUI = New Object()
     Public objForMac = New Object
@@ -295,6 +304,16 @@ Public Class HomeScreen
 
         Me.Text = "Greenvity Production Tool v" & Me.ProductVersion
         lblSessionLocation.Text = System.IO.Path.Combine(My.Computer.FileSystem.SpecialDirectories.MyDocuments, "Production Tool Logs")
+
+#If TEST_CHANNEL = "15" Then
+        lbl_rf_ch_no.Text = 15
+#ElseIf TEST_CHANNEL = "16" Then
+    lbl_rf_ch_no.Text = 16
+#ElseIf TEST_CHANNEL = "25" Then
+    lbl_rf_ch_no.Text = 25
+#ElseIf TEST_CHANNEL = "26" Then
+    lbl_rf_ch_no.Text = 26
+#End If
 
         s.readXML()
         'gMACAddress = gMACcounter

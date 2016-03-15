@@ -1,6 +1,5 @@
----- SIOCGIFINDEX Matches (5 in 1 files) ----
-Gvspi_intf.c:	if (ioctl(gvspi_raw_txsocket, SIOCGIFINDEX, &ifr) == -1) {
-Gvspi_intf.c:		perror("SIOCGIFINDEX");
-Gvspi_intf.c:		perror("SIOCGIFINDEX");
-Gvspi_intf.c:	if (ioctl(gvspi_raw_txsocket, SIOCGIFINDEX, &ifr) == -1) 
-Gvspi_intf.c:		perror("SIOCGIFINDEX");
+---- set_MACAddr Matches (4 in 3 files) ----
+Eth_socket_interface.c:int set_MACAddr(u8* address){
+Eth_socket_interface.h:int set_MACAddr(void);
+Main.c:	set_MACAddr(&mac);
+Main.c:	//set_MACAddr();

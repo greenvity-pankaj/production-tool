@@ -99,6 +99,7 @@ typedef struct _response{
 /*--- Externarations ---*/
 char gv_interface_eth[IFNAMSIZ];
 char gv_ip_addr_eth[16];
+unsigned char device_mac_address[20];// = "84:86:f3:00:00:00";
 
 
 /*--- Function declarations ---*/

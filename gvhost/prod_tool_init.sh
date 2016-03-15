@@ -1,9 +1,10 @@
-rmmod gv701x_spi_intf
+#rmmod gv701x_spi_intf
 insmod /opt/greenvity/ghdd/gv701x_spi_intf.ko
 insmod /opt/greenvity/ghdd/gv701x_spi_net.ko
 sleep 1
 ifconfig gvspi hw ether 10:22:33:44:55:66
-ifconfig eth0  up
+ifconfig eth0 hw ether 84:86:f3:90:00:00
+ifconfig eth0 192.168.1.10 up
 sleep 1
 ifconfig gvspi 10.0.1.1 up
 sleep 1

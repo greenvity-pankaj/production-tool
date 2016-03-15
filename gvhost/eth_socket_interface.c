@@ -53,9 +53,10 @@
 char gv_interface_eth[IFNAMSIZ]="";
 char gv_ip_addr_eth[16]="";
 
-int gv_port_eth = 54321;
+int gv_port_eth = 8080;//54321;
 int eth_sockfd = -1;
 char server_ip_addr_eth[16] = "192.168.1.101";
+
 extern pthread_mutex_t mutex;
 
 char ethIPStream[15] = "192.168.1.";

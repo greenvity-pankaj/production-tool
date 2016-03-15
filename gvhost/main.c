@@ -50,6 +50,8 @@
 #include "eth_socket_interface.h"
 #include "gvspi_intf.h"
 
+#include "dictionary.h"
+#include "iniparser.h"
 
 static pthread_t gv_eth_thread;
 static pthread_t gvspi_thread;
@@ -58,6 +60,7 @@ pthread_mutex_t mutex;
 volatile sig_atomic_t GV_ETH_THREAD_CONTINUE = TRUE;
 volatile sig_atomic_t GVSPI_THREAD_CONTINUE = TRUE;
 
+extern char ethIPStream;
 #define CALL_STACK_TRACE_DEPTH 		10
 
 void SIGhandler(int sig){
@@ -183,6 +186,94 @@ void init_threads(void){
 	pthread_join (gvspi_thread, NULL);	
 	pthread_join(gv_eth_thread, NULL);
 }
+#define CONFIG_FILE_PATH "/opt/greenvity/prodTool/config_file.txt"
+
+void hex_to_int(unsigned char *MacAddr, int len)
+{
+	int j;
+	for(j=0; j<len; j++)
+	{
+		if(MacAddr[j] >= '0' && MacAddr[j] <= '9')
+		{
+			MacAddr[j] = MacAddr[j] - 48;
+		}
+		else if( MacAddr[j] == 'A' || MacAddr[j] == 'a')
+		{
+			MacAddr[j] = 10;
+		}
+		else if(MacAddr[j] == 'B'|| MacAddr[j] == 'b')
+		{
+			MacAddr[j] = 11;
+		}
+		else if(MacAddr[j] == 'C'|| MacAddr[j] == 'c')	
+		{
+			MacAddr[j] = 12;
+		}
+		else if(MacAddr[j] == 'D' || MacAddr[j] == 'd')
+		{
+			MacAddr[j] = 13;
+		}
+		else if(MacAddr[j] == 'E'|| MacAddr[j] == 'e')
+		{
+			MacAddr[j] = 14;
+		}
+		else if(MacAddr[j] == 'F'|| MacAddr[j] == 'f')
+		{
+			MacAddr[j] = 15;
+		}
+	}
+}
+#if 0
+void read_config(){
+	u8 mac[6];
+	//u8 macstr[20];
+	u8 i;
+	unsigned char *prt_mac = (unsigned char *)&device_mac_address;
+	char *ptr_ip = (char *)&ethIPStream;
+	dictionary * read_config_dic = iniparser_load(CONFIG_FILE_PATH);
+	if (read_config_dic == NULL) {
+		printf ("\n Could not open file [%s] \n", CONFIG_FILE_PATH);
+		return;
+	}
+
+	//MSGLOG_VAR_TARGET_SERVER= iniparser_getint(read_config_dic, 	"MSGLOG_RUNTIME_CONFIG:MSGLOG_TARGET_SERVER", 0);
+	//MSGLOG_VAR_TARGET_SERVER = iniparser_getint(read_config_dic,	"MSGLOG_RUNTIME_CONFIG:MSGLOG_LOGMASK_SERVER", 0);
+	prt_mac = (unsigned char *)iniparser_getstring(read_config_dic, "MAC_ADDRESS", NULL);
+	ptr_ip = iniparser_getstring(read_config_dic, "IP_ADDRESS", NULL);
+
+	if(NULL == prt_mac)
+	{
+		return;
+	}
+	printf("IP Address %s\n",&ethIPStream);
+	if(device_mac_address[2] != ':' || device_mac_address[5] != ':' || 
+		device_mac_address[8] != ':' || device_mac_address[11] != ':' || device_mac_address[14] != ':') 
+	{
+		//	FM_Printf(FM_USER, "ERROR: Invalid MAC address\n");
+			//FM_Printf(FM_USER, "format: AA:22:CC:44:FE:34\n");
+			//return STATUS_FAILURE;
+			printf("\nInvalid MAC Address\n");
+		return;
+	}
+	hex_to_int((unsigned char *)&device_mac_address,(int)strlen((const char)device_mac_address));
+	i = 0;
+	mac[0] =	(device_mac_address[i] * 16) + device_mac_address[i+1];
+	i += 3;
+	mac[1] =	(device_mac_address[i] * 16) + device_mac_address[i+1];
+	i += 3;
+	mac[2] =	(device_mac_address[i] * 16) + device_mac_address[i+1];
+	i += 3;
+	mac[3] =	(device_mac_address[i] * 16) + device_mac_address[i+1];
+	i += 3;
+	mac[4] =	(device_mac_address[i] * 16) + device_mac_address[i+1];
+	i += 3;
+	mac[5] =	(device_mac_address[i] * 16) + device_mac_address[i+1];
+
+	set_MACAddr((u8 *)&mac);
+	set_ip("eth0", &ethIPStream);
+	iniparser_freedict(read_config_dic);
+}
+#endif
 
 int main (void){
 	
@@ -200,6 +291,8 @@ int main (void){
 	// set random MAC address and IP address
 	set_MACAddr();
 	set_ip("eth0", getIP());
+	//read_config();
+	
 
 	// Find the ethernet interface
 	if(find_interface(gv_ip_addr_eth,gv_interface_eth, "eth") == 1) {

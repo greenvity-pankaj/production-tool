@@ -151,7 +151,7 @@ Public Class HomeScreen
     Private runCount As New UInteger
     Private serverThreadCount As Integer = 0
     Private pendingConnections As Integer = 5
-    Private RF_FRM_NUM As Integer = 200
+    Private RF_FRM_NUM As Integer = 100
     Public Shared RF_CHANNEL As Byte = &HF
     Public Shared gMACcounter = New ULong
     Public Shared gMACAddress = New ULong
@@ -1851,7 +1851,7 @@ Public Class HomeScreen
                         serialNum = serialNum.Replace("-", "")
 
                         If serialNum.Length = (RunTest.SR_NO_SIZE - RunTest.SR_NO_TRIM_LEN) Then
-                            RunTest.rftestParams = Me.rfgtxTest
+                            RunTest.rftestParams = rfgtxTest
                             lbl_flashDone.Text = "Flash write in process"
                             lbl_flashDone.ForeColor = Color.DarkRed
                             RunTest.beginSend(RunTest.states.STATE_DEVICE_FLASH_PARAMS, cl, t)
@@ -2110,7 +2110,7 @@ Public Class HomeScreen
         rfgtxTest.panId = &H2222
         rfgtxTest.frameLength = 102
         rfgtxTest.frameCount = RF_FRM_NUM
-        rfgtxTest.interFrameDelay = 50
+        rfgtxTest.interFrameDelay = 20
 
     End Sub
 
@@ -2209,7 +2209,7 @@ Public Class HomeScreen
         s = New summary
         s.tests = New List(Of variations)
 
-        If serialNum.Chars(0) = BOARD_TYPE_GV7011_LED Then 'Enable only PLC TX RX with 100 bytes & no sweep test
+        If serialNum.Chars(0) <> BOARD_TYPE_GV7011_MOD Then 'Enable only PLC TX RX with 100 bytes & no sweep test
             Select Case DUTCapbility
                 Case capability.RF_PLC
 
@@ -2403,7 +2403,7 @@ Public Class HomeScreen
                             rfgtxTest.ch = RF_CHANNEL
                         End If
                         swap_dest_short_address()
-                        RunTest.rftestParams = Me.rfgtxTest
+                        RunTest.rftestParams = rfgtxTest
                         RunTest.beginSend(RunTest.states.STATE_PREPARE_DUT, cl, t)
                     End If
 
@@ -2420,7 +2420,7 @@ Public Class HomeScreen
                             'if this is not rf sweep test then assign only one set of params
                             rfgtxTest.ch = RF_CHANNEL
                         End If
-                        RunTest.rftestParams = Me.rfgtxTest
+                        RunTest.rftestParams = rfgtxTest
                         RunTest.beginSend(RunTest.states.STATE_PREPARE_REFERENCE, cl, t)
                     End If
 
@@ -2578,7 +2578,7 @@ Public Class HomeScreen
                             'if this is not rf sweep test then assign only one set of params
                             rfgtxTest.ch = RF_CHANNEL
                         End If
-                        RunTest.rftestParams = Me.rfgtxTest
+                        RunTest.rftestParams = rfgtxTest
                         RunTest.beginSend(RunTest.states.STATE_PREPARE_DUT, cl, t)
                     End If
 
@@ -2596,7 +2596,7 @@ Public Class HomeScreen
                             rfgtxTest.ch = RF_CHANNEL
                         End If
                         swap_dest_short_address()
-                        RunTest.rftestParams = Me.rfgtxTest
+                        RunTest.rftestParams = rfgtxTest
                         RunTest.beginSend(RunTest.states.STATE_PREPARE_REFERENCE, cl, t)
                     End If
 
@@ -2789,7 +2789,7 @@ Public Class HomeScreen
                         If sweepTestRunning = False And userPLCTXPramasSet = True Then
                             gtxTest = plcTXparams
                         End If
-                        RunTest.gtxTest = Me.gtxTest
+                        RunTest.gtxTest = gtxTest
                         RunTest.beginSend(RunTest.states.STATE_PREPARE_DUT, cl, t)
                     End If
 
@@ -2805,7 +2805,7 @@ Public Class HomeScreen
                         If sweepTestRunning = False And userPLCTXPramasSet = True Then
                             gtxTest = plcTXparams
                         End If
-                        RunTest.gtxTest = Me.gtxTest
+                        RunTest.gtxTest = gtxTest
                         RunTest.beginSend(RunTest.states.STATE_PREPARE_REFERENCE, cl, t)
                     End If
 
@@ -3782,7 +3782,7 @@ Public Class HomeScreen
                         serialNum = serialNum.Replace("-", "")
 
                         If serialNum.Length = (RunTest.SR_NO_SIZE - RunTest.SR_NO_TRIM_LEN) Then
-                            RunTest.rftestParams = Me.rfgtxTest
+                            RunTest.rftestParams = rfgtxTest
                             lbl_flashDone.Text = "Flash write in process"
                             lbl_flashDone.ForeColor = Color.DarkRed
                             RunTest.beginSend(RunTest.states.STATE_DEVICE_FLASH_PARAMS, cl, t)

@@ -31,20 +31,12 @@ enum hpLayer
 #define HYBRII_TASK_ID_ISM_POLL 10
 #endif
 #if defined(HYBRII_HPGP) && defined(HYBRII_802154)
-#if defined(HAL_802154_TASK)
-#ifndef PROD_TEST 
+#ifdef HAL_802154_TASK 
  #define HPGP_TASK_ID_CTRL  	1
  #define HYBRII_TASK_ID_FRAME   2
  #define MAC_802154_TASK_ID 	3
  #define HAL_802154_TASK_ID 	4
- #define HYBRII_TASK_ID_UI      5 
-#else
-#define HYBRII_TASK_ID_FRAME   1
- #define MAC_802154_TASK_ID    2
- #define HAL_802154_TASK_ID 	3
- #define HYBRII_TASK_ID_UI      4
-
-#endif
+ //#define HYBRII_TASK_ID_UI      5 
 #else
 #ifdef PROD_TEST
  #define HPGP_TASK_ID_CTRL  	1

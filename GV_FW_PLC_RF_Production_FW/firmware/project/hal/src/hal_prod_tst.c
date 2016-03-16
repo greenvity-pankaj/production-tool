@@ -995,6 +995,8 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 			if(pprodTestCmd->testIntf == TEST_PLC_ID)
 			{	
 				sMacSerInfoProfile macSerInfoProfile;
+				sPn *productNumber;
+				led_nv_t ioCfg;
 				u8 i=0;
 				u16 sector_address = 0;
 
@@ -1018,7 +1020,23 @@ void prodTestExecCmd(sprodTstCmd *pprodTestCmd)
 				macSerInfoProfile.crc=	chksum_crc32 ((u8*)&macSerInfoProfile.macAddress[0], \
 										(sizeof(sMacSerInfoProfile) - sizeof(macSerInfoProfile.crc)-sizeof(macSerInfoProfile.signature)));
 				Gv701x_FlashWriteMemProfile(sector_address,sizeof(sMacSerInfoProfile),(void *)&macSerInfoProfile);
+
+				productNumber = (sPn*)&macSerInfoProfile.serialNo;
+				printf("Pn0 %bu, Pn1 %bu\n",productNumber->productNumber[0],productNumber->productNumber[1]);
+				ioCfg.dev_subtype = productNumber->sFields.subDeviceType;
 				
+				ioCfg.io_cfg.io[0] = productNumber->sFields.ch0;
+				ioCfg.io_cfg.io[1] = productNumber->sFields.ch1;
+				ioCfg.io_cfg.io[2] = productNumber->sFields.ch2;
+				ioCfg.io_cfg.io[3] = productNumber->sFields.ch3;
+				ioCfg.io_cfg.io[4] = 0;
+				ioCfg.io_cfg.io[5] = 0;
+				printf("SDT %bu,io0 %bu,io1 %bu,io2 %bu,io3 %bu,io4 %bu,io5 %bu\n",
+					ioCfg.dev_subtype, ioCfg.io_cfg.io[0],
+					ioCfg.io_cfg.io[1],ioCfg.io_cfg.io[2],
+					ioCfg.io_cfg.io[3],ioCfg.io_cfg.io[4],ioCfg.io_cfg.io[5]);
+				//GV701x_FlashWrite(LED_CFG_SECTOR, (u8*)&ioCfg, sizeof(ioCfg));
+				Gv701x_FlashWriteMemProfile(LED_CFG_SECTOR,sizeof(ioCfg),(void *)&ioCfg);
 				prodTestSendRespOrEvent(headerResponse, TOOL_CMD_DEVICE_FLASH_PARAM_CNF, 
 				PRODTEST_STAT_SUCCESS);
 			}

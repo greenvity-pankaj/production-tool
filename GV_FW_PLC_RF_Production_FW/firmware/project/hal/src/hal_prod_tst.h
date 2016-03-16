@@ -133,6 +133,35 @@ typedef struct plcTxTestResults
 
 }__PACKED__ txTestResults;
 
+typedef union _sPn
+{
+	struct
+	{
+		u8 subDeviceType:4;
+		u8 productNumber:4;
+		
+		u8 ch0:2;
+		u8 ch1:2;
+		u8 ch2:2;
+		u8 ch3:2;
+	}sFields;
+	u8 productNumber[2];
+}__PACKED__ sPn;
+
+#define LED_MAX_IO          			(6)
+
+typedef struct
+{
+    u8 io[LED_MAX_IO];
+}led_iocfg_t;
+
+/* LED light information */
+typedef struct  
+{
+	u8 dev_subtype;
+	led_iocfg_t io_cfg;
+}led_nv_t;
+
 void prodTest_init(u8 resetFlag);
 bool isProdTstCmd(u8 *pCpAddr, u8 cpLen, sprodTstCmd *pprodCmdTst);
 void prodTestExecCmd(sprodTstCmd *pprodTestCmd);

@@ -30,6 +30,12 @@ extern void prod_rf_test_timer_cb(void *cookie);
 
 #define MFG_PARAM_SECTOR 				(PROD_CONFIG_SECTOR + 1)
 #define MFG_PARAM_MEMORY_ADDRESS 		(PROD_CONFIG_SECTOR * FLASH_SECTOR_SIZE)
+
+#ifdef PROD_TEST
+#define GVTY_CONFIG_APP_SECTOR 			(257)
+#endif
+
+#define LED_CFG_SECTOR					(GVTY_CONFIG_APP_SECTOR + 11)
 #define SR_NO_LEN 18
 
 

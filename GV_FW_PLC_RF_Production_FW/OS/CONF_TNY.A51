@@ -54,7 +54,7 @@ LONG_USR_INTR	EQU	1	; 0 user interrupts execute fast.
 ;  The following macro defines the code executed on a hardware timer interrupt.
 ;
 ;  Define instructions executed on a hardware timer interrupt.
-UART_HOST_INTF EQU 1 ; 0 for generic firmware & 1 in case of UART-PLC bridge or SDK (UART as peripheral)
+UART_HOST_INTF EQU 0 ; 0 for generic firmware & 1 in case of UART-PLC bridge or SDK (UART as peripheral)
 IF(UART_HOST_INTF)
 ELSE
 EXTRN   CODE (timer_handler)

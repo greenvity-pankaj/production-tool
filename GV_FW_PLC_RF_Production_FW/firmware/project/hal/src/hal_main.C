@@ -768,13 +768,13 @@ void CmdRun()
 
 eStatus LHTM_Init()
 {
-#ifdef PROD_TEST  
+#ifndef PROD_TEST  
     os_create_task(HYBRII_TASK_ID_UI);
 #endif
     return STATUS_SUCCESS;
 }
 
-#ifdef PROD_TEST
+#ifndef PROD_TEST
 void LHTM_Task (void) _task_ HYBRII_TASK_ID_UI
 {
     while (1) {
@@ -819,7 +819,7 @@ void main()
 #ifdef HYBRII_802154
     STM_Init();
 #endif
-#ifdef PROD_TEST
+#ifndef PROD_TEST
 	LHTM_Init();
 #endif
 	frame_task_init();
@@ -985,7 +985,7 @@ void main()
 #endif
 
 #ifdef PROD_TEST
-        //CmdRun();
+        CmdRun();
         //HTM_CmdRun();
 #endif
 		//os_set_ready(HYBRII_TASK_ID_FRAME);

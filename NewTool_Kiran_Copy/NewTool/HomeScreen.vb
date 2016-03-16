@@ -44,6 +44,9 @@ Public Class HomeScreen
         RF_PLC = 3
     End Enum
 
+    Private Const BOARD_TYPE_GV7011_MOD = "3"
+    Private Const BOARD_TYPE_GV7011_LED = "6"
+
 #End Region
 
     '
@@ -129,7 +132,7 @@ Public Class HomeScreen
     Private clDirectory = New Dictionary(Of String, ConnectedClient)
 
     '   Enum Variables
-    Public testParamsFor As tests
+    Public Shared testParamsFor As tests
     Private DUTCapbility As New capability
     Private REFCapbility As New capability
 
@@ -139,8 +142,8 @@ Public Class HomeScreen
     Private elapsed_time As TimeSpan = Nothing
 
     '   Integers Variables
-    Public plcTestThreshold As Decimal = 10
-    Public rfTestThreshold As Decimal = 10
+    Public Shared plcTestThreshold As Decimal = 10
+    Public Shared rfTestThreshold As Decimal = 10
     Private minVal As Decimal = 0
     Private maxVal As Decimal = 130
     Private port As Integer = 8080 '54321
@@ -149,7 +152,7 @@ Public Class HomeScreen
     Private serverThreadCount As Integer = 0
     Private pendingConnections As Integer = 5
     Private RF_FRM_NUM As Integer = 200
-    Public RF_CHANNEL As Byte = &HF
+    Public Shared RF_CHANNEL As Byte = &HF
     Public Shared gMACcounter = New ULong
     Public Shared gMACAddress = New ULong
     Public Shared serialNumber As String = ""
@@ -183,16 +186,16 @@ Public Class HomeScreen
     '   String Variables
     Private st As String
     Private filereader As String
-    Public rootFilePath = System.IO.Path.Combine(My.Computer.FileSystem.SpecialDirectories.MyDocuments, "Production Tool Logs")
+    Public Shared rootFilePath = System.IO.Path.Combine(My.Computer.FileSystem.SpecialDirectories.MyDocuments, "Production Tool Logs")
 
     '   Structure Variables
-    Public m As metadata
+    Public Shared m As metadata
     Public Shared s As New summary
-    Public status As New execState
-    Public plcRXparams As New TestSettings._sPlcSimTxTestParams
-    Public plcTXparams As New TestSettings._sPlcSimTxTestParams
-    Public gtxTest As New TestSettings._sPlcSimTxTestParams  'global variable to carry PLC test parameter
-    Public rfgtxTest As New TestSettings.sRfTxTestParams  'global variable to carry RF test parameter
+    Public Shared status As New execState
+    Public Shared plcRXparams As New TestSettings._sPlcSimTxTestParams
+    Public Shared plcTXparams As New TestSettings._sPlcSimTxTestParams
+    Public Shared gtxTest As New TestSettings._sPlcSimTxTestParams  'global variable to carry PLC test parameter
+    Public Shared rfgtxTest As New TestSettings.sRfTxTestParams  'global variable to carry RF test parameter
 
     '   Threads
     Private listenThread As System.Threading.Thread
@@ -598,22 +601,29 @@ Public Class HomeScreen
                 setDefaultPLCPramas()
                 ' enable PLC TX & RX
                 chkbxPLCTX.Enabled = True
-
-
-
                 btnPLCTXSettings.Enabled = True
                 chkbxPLCRX.Enabled = True
                 btnPLCRXSettings.Enabled = True
+#If LED_BOARD_TEST = "YES" Then
+                chkbxPLCTX.Checked = True
+                chkbxPLCRX.Checked = True
+#Else
 
+#End If
                 ' PLC TX Sweep
                 chkbx_PLCTXSweep.Enabled = True
-                chkbx_PLCTXSweep.Checked = True
                 btn_PLCTXSweepSettings.Enabled = True
                 ' PLC RX Sweep
                 chkbx_PLCRXSweep.Enabled = True
-                chkbx_PLCRXSweep.Checked = True
                 btn_PLCRXSweepSettings.Enabled = True
+#If LED_BOARD_TEST = "YES" Then
 
+#ElseIf LED_BOARD_TEST = "NO" Then
+                chkbx_PLCTXSweep.Checked = True
+                chkbx_PLCRXSweep.Checked = True
+#Else
+
+#End If
                 ' RF tests
                 setDefaultRFPramas()
                 ' enable RF TX & RX
@@ -2199,6 +2209,38 @@ Public Class HomeScreen
         s = New summary
         s.tests = New List(Of variations)
 
+        If serialNum.Chars(0) = BOARD_TYPE_GV7011_LED Then 'Enable only PLC TX RX with 100 bytes & no sweep test
+            Select Case DUTCapbility
+                Case capability.RF_PLC
+
+                    enablePLCRX()
+                    enablePLCTX()
+                    'If chkbx_PLCRXSweep.Checked = False Then
+                    disablePLCRXSweep()
+                    'End If
+                    ' If chkbx_PLCTXSweep.Checked = False Then
+                    disablePLCTXSweep()
+                    ' End If
+
+                Case Else
+            End Select
+        Else ' Do PLC Sweep test
+            Select Case DUTCapbility
+                Case capability.RF_PLC
+
+                    enablePLCRXSweep()
+                    enablePLCTXSweep()
+                    ' If chkbxPLCRX.Checked = False Then
+                    disablePLCRX()
+                    ' End If
+                    '  If chkbxPLCTX.Checked = False Then
+                    disablePLCTX()
+                    '  End If
+
+                Case Else
+            End Select
+        End If
+
         SyncLock objForUI
             txtbxDummy.Clear()
             lblResult.Text = String.Empty
@@ -2212,6 +2254,7 @@ Public Class HomeScreen
             scan()
             Exit Sub
         End If
+
 
         If qExecStatus.Count = 0 Then
             MessageBox.Show("Select atleast one test !!")
@@ -2483,8 +2526,25 @@ Public Class HomeScreen
                         Case capability.RF_PLC
                             enableRFTXSweep()
                             enableRFRXSweep()
+
+                            'enablePLCTXSweep()
+                            'enablePLCRXSweep()
+                            'disablePLCRXSweep()
+                            'disablePLCTXSweep()
+#If LED_BOARD_TEST = "YES" Then
+                            enablePLCRX()
+                            enablePLCTX()
+                            disablePLCRXSweep()
+                            disablePLCTXSweep()
+
+#ElseIf LED_BOARD_TEST = "NO" Then
                             enablePLCTXSweep()
                             enablePLCRXSweep()
+                            disablePLCRX()
+                            disablePLCTX()
+#Else
+
+#End If
                         Case Else
                     End Select
 
@@ -2643,8 +2703,20 @@ Public Class HomeScreen
                         Case capability.RF_PLC
                             enableRFTXSweep()
                             enableRFRXSweep()
+#If LED_BOARD_TEST = "YES" Then
+                            enablePLCRX()
+                            enablePLCTX()
+                            disablePLCRXSweep()
+                            disablePLCTXSweep()
+#ElseIf LED_BOARD_TEST = "NO" Then
                             enablePLCTXSweep()
                             enablePLCRXSweep()
+                            disablePLCRX()
+                            disablePLCTX()
+#Else
+#End If
+                            'disablePLCRXSweep()
+                            'disablePLCTXSweep()
                         Case Else
                     End Select
 
@@ -2839,8 +2911,20 @@ Public Class HomeScreen
                         Case capability.RF_PLC
                             enableRFTXSweep()
                             enableRFRXSweep()
+                            'enablePLCTXSweep()
+                            'enablePLCRXSweep()
+#If LED_BOARD_TEST = "YES" Then
+                            enablePLCRX()
+                            enablePLCTX()
+                            disablePLCRXSweep()
+                            disablePLCTXSweep()
+#ElseIf LED_BOARD_TEST = "NO" Then
                             enablePLCTXSweep()
                             enablePLCRXSweep()
+                            disablePLCRX()
+                            disablePLCTX()
+#Else
+#End If
                         Case Else
                     End Select
 
@@ -2996,8 +3080,21 @@ Public Class HomeScreen
                         Case capability.RF_PLC
                             enableRFTXSweep()
                             enableRFRXSweep()
+                            'enablePLCTXSweep()
+                            'enablePLCRXSweep()
+#If LED_BOARD_TEST = "YES" Then
+                            enablePLCRX()
+                            enablePLCTX()
+                            disablePLCRXSweep()
+                            disablePLCTXSweep()
+
+#ElseIf LED_BOARD_TEST = "NO" Then
                             enablePLCTXSweep()
                             enablePLCRXSweep()
+                            disablePLCRX()
+                            disablePLCTX()
+#Else
+#End If
                         Case Else
                     End Select
 

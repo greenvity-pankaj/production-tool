@@ -48,6 +48,7 @@ Public Class RunTest
         STATE_DEVICE_SEARCH
         STATE_DEVICE_UP
         STATE_DEVICE_FLASH_PARAMS
+        STATE_DEVICE_SPI_DISCONNECT
         STATE_NONE
     End Enum
 
@@ -453,6 +454,18 @@ Public Class RunTest
                         Add(txMsg, b)
                     Next
                 End If
+                Exit Select
+
+            Case states.STATE_DEVICE_SPI_DISCONNECT
+                payloadLen = 1
+                '   fill header 
+                fill_header(header, payloadLen, HomeScreen.commandIDs.TOOL_CMD_DEVICE_SPI_DISCONNECT)
+
+                Dim headerByte As Byte() = StructToByte(header)
+                Array.Resize(txMsg, headerByte.Length)
+                Array.Copy(headerByte, 0, txMsg, 0, headerByte.Length)
+                '   Add interface
+                Add(txMsg, CType([Enum].Parse(GetType(TestInterface), get_interface(test)), TestInterface))
                 Exit Select
         End Select
         '   Return transmit payload

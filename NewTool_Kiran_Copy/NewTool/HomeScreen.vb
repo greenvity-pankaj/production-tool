@@ -225,6 +225,7 @@ Public Class HomeScreen
         TOOL_CMD_DEVICE_SEARCH = &H6
         TOOL_CMD_DEVICE_FLASH_PARAM = &H7
         TOOL_CMD_DEVICE_FLASH_PARAM_CNF = &H87
+        TOOL_CMD_DEVICE_SPI_DISCONNECT = &H8
     End Enum
     '
     '   List of Events
@@ -301,6 +302,7 @@ Public Class HomeScreen
         ' To allow cross thread access without delegates, however in future developments, 
         ' this shoud be set to true and delegates should be used 
         Control.CheckForIllegalCrossThreadCalls = False
+        panel_disconnect_info.Visible = False
         lblResult.Text = ""
         ' To read the xml settings file for the tool
         Dim s As New readConfig
@@ -323,8 +325,8 @@ Public Class HomeScreen
         initUI()
         startServer()
 
-        lbl_flashDone.Text = "Do Not Flash"
-        lbl_flashDone.ForeColor = Color.DarkRed
+        lbl_flashDone.Text = ""
+        'lbl_flashDone.ForeColor = Color.DarkRed
     End Sub
 
     '
@@ -1483,6 +1485,17 @@ Public Class HomeScreen
                             'MsgBox("Flash Done", MsgBoxStyle.Information)
                             lbl_flashDone.Text = "Flash Done"
                             lbl_flashDone.ForeColor = Color.ForestGreen
+                            If txtbxSerialNum.TextLength >= RunTest.SR_NO_SIZE Then
+                                Dim temp_txtbx_string As String = txtbxSerialNum.Text
+                                txtbxSerialNum.Text = temp_txtbx_string.Trim().Remove(temp_txtbx_string.Length - 4)
+                            End If
+                            board_disconnect_cmd()
+                            panel_disconnect_info.Visible = True
+                            'btn_panel_ready.Visible = True
+                            'Dim diagResult As MsgBoxResult = MsgBox("Boards Disconnected. Replace DUT", MessageBoxButtons.OK)
+                            'If (diagResult = MsgBoxResult.Ok) Then
+
+                            'End If
                             Exit Select
                     End Select
                     '   Response Switch Ends
@@ -1812,6 +1825,12 @@ Public Class HomeScreen
                 lblResult.Text = "BOARD FAIL"
                 pbox_test_status.SizeMode = PictureBoxSizeMode.StretchImage
                 pbox_test_status.Image = My.Resources.test_result_error
+                panel_disconnect_info.Visible = True
+                If txtbxSerialNum.TextLength >= RunTest.SR_NO_SIZE Then
+                    Dim temp_txtbx_string As String = txtbxSerialNum.Text
+                    txtbxSerialNum.Text = temp_txtbx_string.Trim().Remove(temp_txtbx_string.Length - 4)
+                End If
+
             End If
 
             ' send MAC address to device
@@ -2245,8 +2264,8 @@ Public Class HomeScreen
             txtbxDummy.Clear()
             lblResult.Text = String.Empty
         End SyncLock
-        lbl_flashDone.Text = "Do Not Flash"
-        lbl_flashDone.ForeColor = Color.DarkRed
+        'lbl_flashDone.Text = "Do Not Flash"
+        'lbl_flashDone.ForeColor = Color.DarkRed
         setStatusvarNull()
 
         If getSelectedClientList().Count <= 1 Then
@@ -3800,5 +3819,22 @@ Public Class HomeScreen
         End If
 
     End Sub
+    Private Sub board_disconnect_cmd()
+        Dim t As HomeScreen.tests
+        t = status.test
+        For Each cl As ConnectedClient In getSelectedClientList()
+            If cl.mDevType = RunTest.ClientType.DUT Then
+                RunTest.beginSend(RunTest.states.STATE_DEVICE_SPI_DISCONNECT, cl, t)
+            End If
+        Next
+    End Sub
+    Private Sub btn_board_disconnect_Click(sender As Object, e As EventArgs)
+        board_disconnect_cmd()
+    End Sub
 
+    Private Sub btn_panel_ready_Click(sender As Object, e As EventArgs) Handles btn_panel_ready.Click
+        panel_disconnect_info.Visible = False
+
+        'btn_panel_ready.Visible = False
+    End Sub
 End Class

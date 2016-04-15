@@ -71,17 +71,13 @@ Partial Class HomeScreen
         Me.lbl_flashDone = New System.Windows.Forms.Label()
         Me.Label1 = New System.Windows.Forms.Label()
         Me.lbl_rf_ch_no = New System.Windows.Forms.Label()
-        Me.panel_disconnect_info = New System.Windows.Forms.Panel()
-        Me.btn_panel_ready = New System.Windows.Forms.Button()
-        Me.Label3 = New System.Windows.Forms.Label()
-        Me.Label4 = New System.Windows.Forms.Label()
-        Me.Label5 = New System.Windows.Forms.Label()
-        Me.Label6 = New System.Windows.Forms.Label()
+        Me.pbox_test_result_visual = New System.Windows.Forms.PictureBox()
+        Me.lbl_test_result = New System.Windows.Forms.Label()
         Me.GroupBox1.SuspendLayout()
         Me.grpbxTests.SuspendLayout()
         CType(Me.pbox_test_status, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.PictureBox1, System.ComponentModel.ISupportInitialize).BeginInit()
-        Me.panel_disconnect_info.SuspendLayout()
+        CType(Me.pbox_test_result_visual, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.SuspendLayout()
         '
         'GroupBox1
@@ -589,77 +585,31 @@ Partial Class HomeScreen
         Me.lbl_rf_ch_no.TabIndex = 37
         Me.lbl_rf_ch_no.Text = "0"
         '
-        'panel_disconnect_info
+        'pbox_test_result_visual
         '
-        Me.panel_disconnect_info.Controls.Add(Me.Label6)
-        Me.panel_disconnect_info.Controls.Add(Me.Label5)
-        Me.panel_disconnect_info.Controls.Add(Me.Label4)
-        Me.panel_disconnect_info.Controls.Add(Me.Label3)
-        Me.panel_disconnect_info.Controls.Add(Me.btn_panel_ready)
-        Me.panel_disconnect_info.Location = New System.Drawing.Point(310, 116)
-        Me.panel_disconnect_info.Name = "panel_disconnect_info"
-        Me.panel_disconnect_info.Size = New System.Drawing.Size(472, 115)
-        Me.panel_disconnect_info.TabIndex = 39
+        Me.pbox_test_result_visual.Location = New System.Drawing.Point(964, 228)
+        Me.pbox_test_result_visual.Name = "pbox_test_result_visual"
+        Me.pbox_test_result_visual.Size = New System.Drawing.Size(132, 25)
+        Me.pbox_test_result_visual.TabIndex = 38
+        Me.pbox_test_result_visual.TabStop = False
         '
-        'btn_panel_ready
+        'lbl_test_result
         '
-        Me.btn_panel_ready.Location = New System.Drawing.Point(382, 17)
-        Me.btn_panel_ready.Name = "btn_panel_ready"
-        Me.btn_panel_ready.Size = New System.Drawing.Size(75, 70)
-        Me.btn_panel_ready.TabIndex = 39
-        Me.btn_panel_ready.Text = "Ready"
-        Me.btn_panel_ready.UseVisualStyleBackColor = True
-        '
-        'Label3
-        '
-        Me.Label3.AutoSize = True
-        Me.Label3.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label3.ForeColor = System.Drawing.Color.DarkRed
-        Me.Label3.Location = New System.Drawing.Point(24, 35)
-        Me.Label3.Name = "Label3"
-        Me.Label3.Size = New System.Drawing.Size(172, 17)
-        Me.Label3.TabIndex = 40
-        Me.Label3.Text = "Board/s are disconnected. "
-        '
-        'Label4
-        '
-        Me.Label4.AutoSize = True
-        Me.Label4.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label4.ForeColor = System.Drawing.Color.DarkRed
-        Me.Label4.Location = New System.Drawing.Point(24, 62)
-        Me.Label4.Name = "Label4"
-        Me.Label4.Size = New System.Drawing.Size(217, 17)
-        Me.Label4.TabIndex = 41
-        Me.Label4.Text = "Please replace DUT with new DUT"
-        '
-        'Label5
-        '
-        Me.Label5.AutoSize = True
-        Me.Label5.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label5.ForeColor = System.Drawing.Color.DarkRed
-        Me.Label5.Location = New System.Drawing.Point(24, 89)
-        Me.Label5.Name = "Label5"
-        Me.Label5.Size = New System.Drawing.Size(329, 17)
-        Me.Label5.TabIndex = 42
-        Me.Label5.Text = "Once you are ready click on Ready and Scan Devices"
-        '
-        'Label6
-        '
-        Me.Label6.AutoSize = True
-        Me.Label6.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label6.ForeColor = System.Drawing.Color.DarkRed
-        Me.Label6.Location = New System.Drawing.Point(24, 10)
-        Me.Label6.Name = "Label6"
-        Me.Label6.Size = New System.Drawing.Size(76, 17)
-        Me.Label6.TabIndex = 43
-        Me.Label6.Text = "Tests Done"
+        Me.lbl_test_result.AutoSize = True
+        Me.lbl_test_result.Font = New System.Drawing.Font("Segoe UI", 12.0!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.lbl_test_result.Location = New System.Drawing.Point(972, 190)
+        Me.lbl_test_result.Name = "lbl_test_result"
+        Me.lbl_test_result.Size = New System.Drawing.Size(91, 21)
+        Me.lbl_test_result.TabIndex = 39
+        Me.lbl_test_result.Text = "Test Result"
         '
         'HomeScreen
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(7.0!, 15.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(1144, 507)
-        Me.Controls.Add(Me.panel_disconnect_info)
+        Me.Controls.Add(Me.lbl_test_result)
+        Me.Controls.Add(Me.pbox_test_result_visual)
         Me.Controls.Add(Me.lbl_rf_ch_no)
         Me.Controls.Add(Me.Label1)
         Me.Controls.Add(Me.lbl_flashDone)
@@ -702,8 +652,7 @@ Partial Class HomeScreen
         Me.grpbxTests.PerformLayout()
         CType(Me.pbox_test_status, System.ComponentModel.ISupportInitialize).EndInit()
         CType(Me.PictureBox1, System.ComponentModel.ISupportInitialize).EndInit()
-        Me.panel_disconnect_info.ResumeLayout(False)
-        Me.panel_disconnect_info.PerformLayout()
+        CType(Me.pbox_test_result_visual, System.ComponentModel.ISupportInitialize).EndInit()
         Me.ResumeLayout(False)
         Me.PerformLayout()
 
@@ -756,10 +705,6 @@ Partial Class HomeScreen
     Friend WithEvents lbl_flashDone As Label
     Friend WithEvents Label1 As Label
     Friend WithEvents lbl_rf_ch_no As Label
-    Friend WithEvents panel_disconnect_info As Panel
-    Friend WithEvents Label5 As Label
-    Friend WithEvents Label4 As Label
-    Friend WithEvents Label3 As Label
-    Friend WithEvents btn_panel_ready As Button
-    Friend WithEvents Label6 As Label
+    Friend WithEvents pbox_test_result_visual As PictureBox
+    Friend WithEvents lbl_test_result As Label
 End Class

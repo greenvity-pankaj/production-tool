@@ -159,7 +159,7 @@ void register_segmentation_fault_handler(void){
 #define VERSION_LEN				5
 #define VERSION_FILE_PATH		"/opt/greenvity/prodTool/version.txt"
 
-const char version[VERSION_LEN] = "1.2";
+const char version[VERSION_LEN] = "1.5";
 
 void app_version_control(void){
 
@@ -289,8 +289,8 @@ int main (void){
 	app_version_control();
 
 	// set random MAC address and IP address
-	set_MACAddr();
-	set_ip("eth0", getIP());
+	//set_MACAddr();
+	//set_ip("eth0", getIP());
 	//read_config();
 	
 

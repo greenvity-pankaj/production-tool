@@ -1,0 +1,191 @@
+[wpan_mcps_data_request_t]
+SrcAddrMode = 3 ; 3 = 64 Bit address, 2 = 16 Bit address, 1 = Reserved, 0 = No Address
+DstAddrSpec.AddrMode = 2 ; 3 = 64 Bit address, 2 = 16 Bit address, 1 = Reserved, 0 = No Address
+DstAddrSpec.PANId = 0x4321 ; The 16 bit PAN identifier (0x0000–0xffff)
+DstAddrSpec.Addr.Byte0 = 0x02 ; 64 Bit Address Byte 0
+DstAddrSpec.Addr.Byte1 = 0x00 ; 64 Bit Address Byte 1
+DstAddrSpec.Addr.Byte2 = 0x00 ; 64 Bit Address Byte 2
+DstAddrSpec.Addr.Byte3 = 0x00 ; 64 Bit Address Byte 3
+DstAddrSpec.Addr.Byte4 = 0x00 ; 64 Bit Address Byte 4
+DstAddrSpec.Addr.Byte5 = 0x00 ; 64 Bit Address Byte 5
+DstAddrSpec.Addr.Byte6 = 0x00 ; 64 Bit Address Byte 6
+DstAddrSpec.Addr.Byte7 = 0x00 ; 64 Bit Address Byte 7
+TxOptions.bit0 = 1 ;
+TxOptions.bit1 = 0 ;
+TxOptions.bit2 = 0 ;
+sec.SecurityLevel = 0x00 ; The security level purportedly used by the received data frame. (0x00–0x07)
+sec.KeyIdMode = 0x00 ; The mode used to identify the key to be used. (0x00–0x03)
+sec.KeySource.Byte0 = 0x00 ; Set of 0, 4 or 8 octets | Byte 0
+sec.KeySource.Byte1 = 0x00 ; Set of 0, 4 or 8 octets | Byte 1
+sec.KeySource.Byte2 = 0x00 ; Set of 0, 4 or 8 octets | Byte 2
+sec.KeySource.Byte3 = 0x00 ; Set of 0, 4 or 8 octets | Byte 3
+sec.KeySource.Byte4 = 0x00 ; Set of 0, 4 or 8 octets | Byte 4
+sec.KeySource.Byte5 = 0x00 ; Set of 0, 4 or 8 octets | Byte 5
+sec.KeySource.Byte6 = 0x00 ; Set of 0, 4 or 8 octets | Byte 6
+sec.KeySource.Byte7 = 0x00 ; Set of 0, 4 or 8 octets | Byte 7
+sec.KeyIndex = 0x00 ; The index of the key purportedly used by the originator of the received frame. (0x01-0xff)
+
+
+[mlme_start_req_t]
+PANId = 0x4321 ; The 16 bit PAN identifier (0x0000–0xffff)
+LogicalChannel = 0x1 ; max 32
+StartTime = 0x12345678; Valid Range 0x000000-0xffffff
+BeaconOrder = 0x00 ; 0-15
+SuperFrameOrder = 0x00 ; 8bit number
+PANCoordinator = 0x00 ; 0-1
+BatteryLifeExtension = 0x00 ; 0-1
+CoordRealignment = 0x00 ; 0-1
+CoordRealignmentSecurity.SecurityLevel = 0x00 ; 0-7
+CoordRealignmentSecurity.KeyIdMode = 0x00 ; The mode used to identify the key to be used. (0x00–0x03)
+CoordRealignmentSecurity.KeySource.Byte0 = 0x00 ; Set of 0, 4 or 8 octets | Byte 0
+CoordRealignmentSecurity.KeySource.Byte1 = 0x00 ; Set of 0, 4 or 8 octets | Byte 1
+CoordRealignmentSecurity.KeySource.Byte2 = 0x00 ; Set of 0, 4 or 8 octets | Byte 2
+CoordRealignmentSecurity.KeySource.Byte3 = 0x00 ; Set of 0, 4 or 8 octets | Byte 3
+CoordRealignmentSecurity.KeySource.Byte4 = 0x00 ; Set of 0, 4 or 8 octets | Byte 4
+CoordRealignmentSecurity.KeySource.Byte5 = 0x00 ; Set of 0, 4 or 8 octets | Byte 5
+CoordRealignmentSecurity.KeySource.Byte6 = 0x00 ; Set of 0, 4 or 8 octets | Byte 6
+CoordRealignmentSecurity.KeySource.Byte7 = 0x00 ; Set of 0, 4 or 8 octets | Byte 7
+CoordRealignmentSecurity.KeyIndex = 0x00 ; The index of the key purportedly used by the originator of the received frame. (0x01-0xff)
+BeaconSecurity.SecurityLevel = 0x00 ; 0-7
+BeaconSecurity.KeyIdMode = 0x00 ; The mode used to identify the key to be used. (0x00–0x03)
+BeaconSecurity.KeySource.Byte0 = 0x00 ; Set of 0, 4 or 8 octets | Byte 0
+BeaconSecurity.KeySource.Byte1 = 0x00 ; Set of 0, 4 or 8 octets | Byte 1
+BeaconSecurity.KeySource.Byte2 = 0x00 ; Set of 0, 4 or 8 octets | Byte 2
+BeaconSecurity.KeySource.Byte3 = 0x00 ; Set of 0, 4 or 8 octets | Byte 3
+BeaconSecurity.KeySource.Byte4 = 0x00 ; Set of 0, 4 or 8 octets | Byte 4
+BeaconSecurity.KeySource.Byte5 = 0x00 ; Set of 0, 4 or 8 octets | Byte 5
+BeaconSecurity.KeySource.Byte6 = 0x00 ; Set of 0, 4 or 8 octets | Byte 6
+BeaconSecurity.KeySource.Byte7 = 0x00 ; Set of 0, 4 or 8 octets | Byte 7
+BeaconSecurity.KeyIndex = 0x00 ; The index of the key purportedly used by the originator of the received frame. (0x01-0xff)
+
+
+[mlme_associate_req_t]
+LogicalChannel = 1 ; max 32
+ChannelPage = 0 ;
+CoordAddrMode = 2 ; 0x02-0x03 2 = 16bit,3 = 64bit
+CoordPANId = 0x4321 ; 
+CoordAddress.Addr.Byte0 = 0 ;
+CoordAddress.Addr.Byte1 = 0 ;
+CoordAddress.Addr.Byte2 = 0 ;
+CoordAddress.Addr.Byte3 = 0 ;
+CoordAddress.Addr.Byte4 = 0 ;
+CoordAddress.Addr.Byte5 = 0 ;
+CoordAddress.Addr.Byte6 = 0 ;
+CoordAddress.Addr.Byte7 = 0 ;
+CapabilityInformation  = 0 ;
+Security.SecurityLevel = 0 ; 0x00-0x07
+Security.KEYIdMode = 0 ;
+Security.KeySource.Byte0 = 0x00 ; Set of 0, 4 or 8 octets | Byte 0
+Security.KeySource.Byte1 = 0x00 ; Set of 0, 4 or 8 octets | Byte 1
+Security.KeySource.Byte2 = 0x00 ; Set of 0, 4 or 8 octets | Byte 2
+Security.KeySource.Byte3 = 0x00 ; Set of 0, 4 or 8 octets | Byte 3
+Security.KeySource.Byte4 = 0x00 ; Set of 0, 4 or 8 octets | Byte 4
+Security.KeySource.Byte5 = 0x00 ; Set of 0, 4 or 8 octets | Byte 5
+Security.KeySource.Byte6 = 0x00 ; Set of 0, 4 or 8 octets | Byte 6
+Security.KeySource.Byte7 = 0x00 ; Set of 0, 4 or 8 octets | Byte 7
+Security.KeyIndex = 0x01 ; 0x01-0xff
+
+[mlme_disassociate_req_t]
+DeviceAddress.AddrMode = 0x02 ; 0x02-0x03
+DeviceAddress.PANId = 0x4321 ; 16bit PAN address
+DeviceAddress.Addr.Byte0 = 0 ;
+DeviceAddress.Addr.Byte1 = 0 ;
+DeviceAddress.Addr.Byte2 = 0 ;
+DeviceAddress.Addr.Byte3 = 0 ;
+DeviceAddress.Addr.Byte4 = 0 ;
+DeviceAddress.Addr.Byte5 = 0 ;
+DeviceAddress.Addr.Byte6 = 0 ;
+DeviceAddress.Addr.Byte7 = 0 ;
+DisassociateReason = 0 ; 0x00 to 0xff;
+TxIndirect = 0 ; 0-1
+Security.SecurityLevel = 0 ;
+Security.KEYIdMode = 0;
+Security.KeySource.Byte0 = 0x00 ; Set of 0, 4 or 8 octets | Byte 0
+Security.KeySource.Byte1 = 0x00 ; Set of 0, 4 or 8 octets | Byte 1
+Security.KeySource.Byte2 = 0x00 ; Set of 0, 4 or 8 octets | Byte 2
+Security.KeySource.Byte3 = 0x00 ; Set of 0, 4 or 8 octets | Byte 3
+Security.KeySource.Byte4 = 0x00 ; Set of 0, 4 or 8 octets | Byte 4
+Security.KeySource.Byte5 = 0x00 ; Set of 0, 4 or 8 octets | Byte 5
+Security.KeySource.Byte6 = 0x00 ; Set of 0, 4 or 8 octets | Byte 6
+Security.KeySource.Byte7 = 0x00 ; Set of 0, 4 or 8 octets | Byte 7
+Security.KeyIndex = 0 ;
+
+[mlme_orphan_resp_t]
+OrphanAddress.Byte0 = 0x00 ; 
+OrphanAddress.Byte1 = 0x00 ;
+OrphanAddress.Byte2 = 0x00 ;
+OrphanAddress.Byte3 = 0x00 ;
+OrphanAddress.Byte4 = 0x00 ;
+OrphanAddress.Byte5 = 0x00 ;
+OrphanAddress.Byte6 = 0x00 ;
+OrphanAddress.Byte7 = 0x00 ;
+ShortAddress = 0x4321 ; 16Bit Short Adddress
+AssociatedMember = 0 ; 0-1 False or True
+Security.SecurityLevel = 0 ; 0x00-0x07
+Security.KEYIdMode = 0;
+Security.KeySource.Byte0 = 0x00 ; Set of 0, 4 or 8 octets | Byte 0
+Security.KeySource.Byte1 = 0x00 ; Set of 0, 4 or 8 octets | Byte 1
+Security.KeySource.Byte2 = 0x00 ; Set of 0, 4 or 8 octets | Byte 2
+Security.KeySource.Byte3 = 0x00 ; Set of 0, 4 or 8 octets | Byte 3
+Security.KeySource.Byte4 = 0x00 ; Set of 0, 4 or 8 octets | Byte 4
+Security.KeySource.Byte5 = 0x00 ; Set of 0, 4 or 8 octets | Byte 5
+Security.KeySource.Byte6 = 0x00 ; Set of 0, 4 or 8 octets | Byte 6
+Security.KeySource.Byte7 = 0x00 ; Set of 0, 4 or 8 octets | Byte 7
+Security.KeyIndex = 0x01 ; 0x01-0xff
+
+[mlme_set_req_t]
+PIBAttribute = 0x50 ; 0x00-0xff
+PIBAttributeIndex = 0x00 ; 0x00-0xff
+PIBAttributeValue.Byte0 = 0x21 ;
+PIBAttributeValue.Byte1 = 0x43 ;
+PIBAttributeValue.Byte2 = 0 ;
+PIBAttributeValue.Byte3 = 0 ;
+PIBAttributeValue.Byte4 = 0 ;
+PIBAttributeValue.Byte5 = 0 ;
+PIBAttributeValue.Byte6 = 0 ;
+PIBAttributeValue.Byte7 = 0 ;
+
+[host_mlme_scan_req]
+ScanType = 0x1 ;
+ScanChannels = 0x00fff800 ;
+ScanDuration = 10 ;
+ChannelPage = 0 ;
+Security.SecurityLevel = 0 ;
+Security.KeyIdMode = 0 ;
+Security.KeySource.Byte0 = 0x00 ; Set of 0, 4 or 8 octets | Byte 0
+Security.KeySource.Byte1 = 0x00 ; Set of 0, 4 or 8 octets | Byte 1
+Security.KeySource.Byte2 = 0x00 ; Set of 0, 4 or 8 octets | Byte 2
+Security.KeySource.Byte3 = 0x00 ; Set of 0, 4 or 8 octets | Byte 3
+Security.KeySource.Byte4 = 0x00 ; Set of 0, 4 or 8 octets | Byte 4
+Security.KeySource.Byte5 = 0x00 ; Set of 0, 4 or 8 octets | Byte 5
+Security.KeySource.Byte6 = 0x00 ; Set of 0, 4 or 8 octets | Byte 6
+Security.KeySource.Byte7 = 0x00 ; Set of 0, 4 or 8 octets | Byte 7
+Security.KeyIndex = 0 ;
+
+[mlme_sync_req_t]
+LogicalChannel = 0 ;
+ChannelPage = 0 ;
+TrackBeacon = 0 ;
+
+[mlme_poll_req_t]
+Coordaddress.AddrMode = 2 ; 0x02-0x03 2 = 16bit,3 = 64bit
+Coordaddress.PANId = 0x4321 ; 
+CoordAddress.Addr.Byte0 = 0 ;
+CoordAddress.Addr.Byte1 = 0 ;
+CoordAddress.Addr.Byte2 = 0 ;
+CoordAddress.Addr.Byte3 = 0 ;
+CoordAddress.Addr.Byte4 = 0 ;
+CoordAddress.Addr.Byte5 = 0 ;
+CoordAddress.Addr.Byte6 = 0 ;
+CoordAddress.Addr.Byte7 = 0 ;
+Security.SecurityLevel = 0 ; 0x00-0x07
+Security.KEYIdMode = 0 ;
+Security.KeySource.Byte0 = 0x00 ; Set of 0, 4 or 8 octets | Byte 0
+Security.KeySource.Byte1 = 0x00 ; Set of 0, 4 or 8 octets | Byte 1
+Security.KeySource.Byte2 = 0x00 ; Set of 0, 4 or 8 octets | Byte 2
+Security.KeySource.Byte3 = 0x00 ; Set of 0, 4 or 8 octets | Byte 3
+Security.KeySource.Byte4 = 0x00 ; Set of 0, 4 or 8 octets | Byte 4
+Security.KeySource.Byte5 = 0x00 ; Set of 0, 4 or 8 octets | Byte 5
+Security.KeySource.Byte6 = 0x00 ; Set of 0, 4 or 8 octets | Byte 6
+Security.KeySource.Byte7 = 0x00 ; Set of 0, 4 or 8 octets | Byte 7
+Security.KeyIndex = 0x01 ; 0x01-0xff

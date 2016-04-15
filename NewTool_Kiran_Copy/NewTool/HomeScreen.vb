@@ -156,6 +156,8 @@ Public Class HomeScreen
     Public Shared gMACcounter = New ULong
     Public Shared gMACAddress = New ULong
     Public Shared serialNumber As String = ""
+    Public Shared plc_test_color As Boolean = False
+    Public Shared rf_test_color As Boolean = False
     '   Lists
     Private sockets As List(Of Socket)
     Private clients As New List(Of ConnectedClient)
@@ -302,7 +304,6 @@ Public Class HomeScreen
         ' To allow cross thread access without delegates, however in future developments, 
         ' this shoud be set to true and delegates should be used 
         Control.CheckForIllegalCrossThreadCalls = False
-        panel_disconnect_info.Visible = False
         lblResult.Text = ""
         ' To read the xml settings file for the tool
         Dim s As New readConfig
@@ -375,10 +376,11 @@ Public Class HomeScreen
         Try
             listener = New System.Net.Sockets.TcpListener(System.Net.IPAddress.Any, port)
             listener.Start()
-
+            'txtbxDummy.AppendText("Listner started")
             listenThread = New System.Threading.Thread(AddressOf doListen)
             listenThread.IsBackground = True
             listenThread.Start()
+            'txtbxDummy.AppendText("Listner thread started")
         Catch ex As SocketException
             MessageBox.Show(ex.ToString)
         End Try
@@ -824,7 +826,7 @@ Public Class HomeScreen
 
         Dim headerArray As New List(Of Byte)
         Dim respArray(Marshal.SizeOf(GetType(RunTest.sResponse))) As Byte
-
+        'txtbxDummy.AppendText(vbCrLf & "msg rx")
         '   If the protocol is a match
         If (RunTest.ProductionToolProtocol = packet(0)) Then
 
@@ -1487,15 +1489,10 @@ Public Class HomeScreen
                             lbl_flashDone.ForeColor = Color.ForestGreen
                             If txtbxSerialNum.TextLength >= RunTest.SR_NO_SIZE Then
                                 Dim temp_txtbx_string As String = txtbxSerialNum.Text
-                                txtbxSerialNum.Text = temp_txtbx_string.Trim().Remove(temp_txtbx_string.Length - 4)
+                                txtbxSerialNum.Text = temp_txtbx_string.Trim().Remove(temp_txtbx_string.Length - 2)
                             End If
+                            display_test_color()
                             board_disconnect_cmd()
-                            panel_disconnect_info.Visible = True
-                            'btn_panel_ready.Visible = True
-                            'Dim diagResult As MsgBoxResult = MsgBox("Boards Disconnected. Replace DUT", MessageBoxButtons.OK)
-                            'If (diagResult = MsgBoxResult.Ok) Then
-
-                            'End If
                             Exit Select
                     End Select
                     '   Response Switch Ends
@@ -1569,16 +1566,20 @@ Public Class HomeScreen
 
             If p <= plcTestThreshold Then
                 m.testStatus = True
+                plc_test_color = True
             Else
                 m.testStatus = False
+                plc_test_color = False
             End If
 
         ElseIf m.intf = RunTest.TestInterface.TEST_802_15_5_ID Then
 
             If p <= rfTestThreshold Then
                 m.testStatus = True
+                rf_test_color = True
             Else
                 m.testStatus = False
+                rf_test_color = False
             End If
 
         End If
@@ -1823,12 +1824,15 @@ Public Class HomeScreen
                 lblResult.ForeColor = Color.DarkRed
                 'SetSysColors(3, COLOR_WINDOWFRAME, RGB(255, 0, 0))
                 lblResult.Text = "BOARD FAIL"
+                display_test_color()
+
+
                 pbox_test_status.SizeMode = PictureBoxSizeMode.StretchImage
                 pbox_test_status.Image = My.Resources.test_result_error
-                panel_disconnect_info.Visible = True
+
                 If txtbxSerialNum.TextLength >= RunTest.SR_NO_SIZE Then
                     Dim temp_txtbx_string As String = txtbxSerialNum.Text
-                    txtbxSerialNum.Text = temp_txtbx_string.Trim().Remove(temp_txtbx_string.Length - 4)
+                    txtbxSerialNum.Text = temp_txtbx_string.Trim().Remove(temp_txtbx_string.Length - 2)
                 End If
 
             End If
@@ -1838,7 +1842,17 @@ Public Class HomeScreen
         End If
 
     End Sub
-
+    Private Sub display_test_color()
+        If ((plc_test_color = True) And (rf_test_color = True)) Then
+            pbox_test_result_visual.BackColor = Color.ForestGreen
+        ElseIf plc_test_color = False And rf_test_color = True Then
+            pbox_test_result_visual.BackColor = Color.Blue
+        ElseIf plc_test_color = True And rf_test_color = False Then
+            pbox_test_result_visual.BackColor = Color.Orange
+        ElseIf plc_test_color = False And rf_test_color = False Then
+            pbox_test_result_visual.BackColor = Color.DarkRed
+        End If
+    End Sub
     Private Sub flashParams()
 
         Dim finalResult As Boolean = True
@@ -2283,6 +2297,10 @@ Public Class HomeScreen
         runCount += 1
         testRunning = True
         pbox_test_status.Image = Nothing
+        pbox_test_result_visual.BackColor = Control.DefaultBackColor
+        lbl_flashDone.Text = ""
+        lbl_test_result.Enabled = False
+
         disableUI()
 
         ' Tests to be executed
@@ -3819,6 +3837,7 @@ Public Class HomeScreen
         End If
 
     End Sub
+    
     Private Sub board_disconnect_cmd()
         Dim t As HomeScreen.tests
         t = status.test
@@ -3828,13 +3847,5 @@ Public Class HomeScreen
             End If
         Next
     End Sub
-    Private Sub btn_board_disconnect_Click(sender As Object, e As EventArgs)
-        board_disconnect_cmd()
-    End Sub
 
-    Private Sub btn_panel_ready_Click(sender As Object, e As EventArgs) Handles btn_panel_ready.Click
-        panel_disconnect_info.Visible = False
-
-        'btn_panel_ready.Visible = False
-    End Sub
 End Class

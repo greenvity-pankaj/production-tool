@@ -46,6 +46,15 @@
 #include "gvspi_intf.h"
 #include "eth_socket_interface.h"
 
+typedef struct{
+	u8 cmd;
+	u8 *payload;
+} gv_ioctl_cmd_t;
+
+#define IOCTL_CMD_SPI_CONNECT 0
+#define IOCTL_CMD_SPI_DISCONNECT 1
+
+
 extern mac_addr_t gv_controller_mac_addr;
 extern int gvspi_raw_txsocket;
 
@@ -77,7 +86,9 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 	u8 frameParsed = TRUE;
 	u8 state, cmdState;
 	header *frmHead = NULL;
-
+	gv_ioctl_cmd_t ioctl_cmd;
+	struct ifreq ifr_ioctl;
+	int ioctl_ret_val = -1;
 	frmHead = (header *)rxBuffer;
 	state = frmHead->type;
 	cmdState = frmHead->id;
@@ -114,6 +125,19 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 
 				switch (cmdState){
 					case TOOL_CMD_PREPARE_DUT:
+						ioctl_cmd.cmd = IOCTL_CMD_SPI_CONNECT;
+						ifr_ioctl.ifr_data = &ioctl_cmd;
+						strncpy(ifr_ioctl.ifr_name, (char *)gv_interface_raw, IFNAMSIZ);
+						ioctl_ret_val = ioctl(gvspi_raw_txsocket,SIOCDEVPRIVATE,&ifr_ioctl);
+						printf("\nIOCTL Value %i\n",ioctl_ret_val);
+						if(ioctl_ret_val == -1){
+							MSGLOG(SERVER, LOG_DEBUG,"IOCTL fail: Unable to connect SPI");
+							cmdState = 0xff;
+							state = 0xff;
+							frameParsed = FALSE;
+							break;
+						}
+						
 						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_PREPARE_DUT to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
@@ -122,6 +146,19 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_PREPARE_REFERENCE:
+						ioctl_cmd.cmd = IOCTL_CMD_SPI_CONNECT;
+						ifr_ioctl.ifr_data = &ioctl_cmd;
+						strncpy(ifr_ioctl.ifr_name, (char *)gv_interface_raw, IFNAMSIZ);
+						ioctl_ret_val = ioctl(gvspi_raw_txsocket,SIOCDEVPRIVATE,&ifr_ioctl);
+						printf("\nIOCTL Value %i\n",ioctl_ret_val);
+						if(ioctl_ret_val == -1){
+							MSGLOG(SERVER, LOG_DEBUG,"IOCTL fail: Unable to connect SPI");
+							cmdState = 0xff;
+							state = 0xff;
+							frameParsed = FALSE;
+							break;
+						}
+						
 						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_PREPARE_REFERENCE to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
@@ -130,6 +167,18 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_START_TEST:
+						ioctl_cmd.cmd = IOCTL_CMD_SPI_CONNECT;
+						ifr_ioctl.ifr_data = &ioctl_cmd;
+						strncpy(ifr_ioctl.ifr_name, (char *)gv_interface_raw, IFNAMSIZ);
+						ioctl_ret_val = ioctl(gvspi_raw_txsocket,SIOCDEVPRIVATE,&ifr_ioctl);
+						printf("\nIOCTL Value %i\n",ioctl_ret_val);
+						if(ioctl_ret_val == -1){
+							MSGLOG(SERVER, LOG_DEBUG,"IOCTL fail: Unable to connect SPI");
+							cmdState = 0xff;
+							state = 0xff;
+							frameParsed = FALSE;
+							break;
+						}
 						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_START_TEST to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
@@ -138,6 +187,18 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_STOP_TEST:
+						ioctl_cmd.cmd = IOCTL_CMD_SPI_CONNECT;
+						ifr_ioctl.ifr_data = &ioctl_cmd;
+						strncpy(ifr_ioctl.ifr_name, (char *)gv_interface_raw, IFNAMSIZ);
+						ioctl_ret_val = ioctl(gvspi_raw_txsocket,SIOCDEVPRIVATE,&ifr_ioctl);
+						printf("\nIOCTL Value %i\n",ioctl_ret_val);
+						if(ioctl_ret_val == -1){
+							MSGLOG(SERVER, LOG_DEBUG,"IOCTL fail: Unable to connect SPI");
+							cmdState = 0xff;
+							state = 0xff;
+							frameParsed = FALSE;
+							break;
+						}
 						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_STOP_TEST to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
@@ -146,6 +207,18 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_GET_RESULT:
+						ioctl_cmd.cmd = IOCTL_CMD_SPI_CONNECT;
+						ifr_ioctl.ifr_data = &ioctl_cmd;
+						strncpy(ifr_ioctl.ifr_name, (char *)gv_interface_raw, IFNAMSIZ);
+						ioctl_ret_val = ioctl(gvspi_raw_txsocket,SIOCDEVPRIVATE,&ifr_ioctl);
+						printf("\nIOCTL Value %i\n",ioctl_ret_val);
+						if(ioctl_ret_val == -1){
+							MSGLOG(SERVER, LOG_DEBUG,"IOCTL fail: Unable to connect SPI");
+							cmdState = 0xff;
+							state = 0xff;
+							frameParsed = FALSE;
+							break;
+						}
 						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_GET_RESULT to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
@@ -154,6 +227,19 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_DEVICE_SEARCH:
+						ioctl_cmd.cmd = IOCTL_CMD_SPI_CONNECT;
+						ifr_ioctl.ifr_data = &ioctl_cmd;
+						strncpy(ifr_ioctl.ifr_name, (char *)gv_interface_raw, IFNAMSIZ);
+						ioctl_ret_val = ioctl(gvspi_raw_txsocket,SIOCDEVPRIVATE,&ifr_ioctl);
+						printf("\nIOCTL Value %i\n",ioctl_ret_val);
+						if(ioctl_ret_val == -1){
+							MSGLOG(SERVER, LOG_DEBUG,"IOCTL fail: Unable to connect SPI");
+							cmdState = 0xff;
+							state = 0xff;
+							frameParsed = FALSE;
+							break;
+						}
+						
 						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_DEVICE_SEARCH to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
@@ -162,6 +248,18 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 						
 					case TOOL_CMD_DEVICE_RESET:
+						ioctl_cmd.cmd = IOCTL_CMD_SPI_CONNECT;
+						ifr_ioctl.ifr_data = &ioctl_cmd;
+						strncpy(ifr_ioctl.ifr_name, (char *)gv_interface_raw, IFNAMSIZ);
+						ioctl_ret_val = ioctl(gvspi_raw_txsocket,SIOCDEVPRIVATE,&ifr_ioctl);
+						printf("\nIOCTL Value %i\n",ioctl_ret_val);
+						if(ioctl_ret_val == -1){
+							MSGLOG(SERVER, LOG_DEBUG,"IOCTL fail: Unable to connect SPI");
+							cmdState = 0xff;
+							state = 0xff;
+							frameParsed = FALSE;
+							break;
+						}
 						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_DEVICE_RESET to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
@@ -170,12 +268,40 @@ void run_through_state_machine(u8 *rxBuffer, int readLength){
 						break;
 
 					case TOOL_CMD_DEVICE_FLASH_PARAM:
+						ioctl_cmd.cmd = IOCTL_CMD_SPI_CONNECT;
+						ifr_ioctl.ifr_data = &ioctl_cmd;
+						strncpy(ifr_ioctl.ifr_name, (char *)gv_interface_raw, IFNAMSIZ);
+						ioctl_ret_val = ioctl(gvspi_raw_txsocket,SIOCDEVPRIVATE,&ifr_ioctl);
+						printf("\nIOCTL Value %i\n",ioctl_ret_val);
+						if(ioctl_ret_val == -1){
+							MSGLOG(SERVER, LOG_DEBUG,"IOCTL fail: Unable to connect SPI");
+							cmdState = 0xff;
+							state = 0xff;
+							frameParsed = FALSE;
+							break;
+						}
 						MSGLOG(SERVER, LOG_DEBUG,"Sending TOOL_CMD_DEVICE_FLASH_PARAM to FW");
 						send_Request(rxBuffer, readLength);
 						cmdState = 0xff;
 						state = 0xff;
 						frameParsed = FALSE;
 						break;
+
+					case TOOL_CMD_DEVICE_SPI_DISCONNECT:
+						MSGLOG(SERVER,LOG_DEBUG,"SPI Connection Disconnect");
+						ioctl_cmd.cmd = IOCTL_CMD_SPI_DISCONNECT;
+						ifr_ioctl.ifr_data = (char *)&ioctl_cmd;
+						strncpy(ifr_ioctl.ifr_name, (char *)gv_interface_raw, IFNAMSIZ);
+						ioctl_ret_val = ioctl(gvspi_raw_txsocket,SIOCDEVPRIVATE,&ifr_ioctl);
+
+						if(ioctl_ret_val == -1){
+							MSGLOG(SERVER, LOG_DEBUG,"IOCTL fail: Unable to disconnect SPI");	
+						}
+						cmdState = 0xff;
+						state = 0xff;
+						frameParsed = FALSE;
+						break;
+						
 					default:
 
 						break;

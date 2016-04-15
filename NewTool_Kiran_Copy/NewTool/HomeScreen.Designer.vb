@@ -596,10 +596,10 @@ Partial Class HomeScreen
         'lbl_test_result
         '
         Me.lbl_test_result.AutoSize = True
-        Me.lbl_test_result.Font = New System.Drawing.Font("Segoe UI", 12.0!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.lbl_test_result.Location = New System.Drawing.Point(972, 190)
+        Me.lbl_test_result.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.lbl_test_result.Location = New System.Drawing.Point(964, 208)
         Me.lbl_test_result.Name = "lbl_test_result"
-        Me.lbl_test_result.Size = New System.Drawing.Size(91, 21)
+        Me.lbl_test_result.Size = New System.Drawing.Size(75, 17)
         Me.lbl_test_result.TabIndex = 39
         Me.lbl_test_result.Text = "Test Result"
         '

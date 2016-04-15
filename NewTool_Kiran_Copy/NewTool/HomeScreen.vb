@@ -327,6 +327,7 @@ Public Class HomeScreen
         startServer()
 
         lbl_flashDone.Text = ""
+        lbl_test_result.Text = ""
         'lbl_flashDone.ForeColor = Color.DarkRed
     End Sub
 
@@ -1566,10 +1567,10 @@ Public Class HomeScreen
 
             If p <= plcTestThreshold Then
                 m.testStatus = True
-                plc_test_color = True
+                'plc_test_color = True
             Else
                 m.testStatus = False
-                plc_test_color = False
+                'plc_test_color = False
             End If
 
         ElseIf m.intf = RunTest.TestInterface.TEST_802_15_5_ID Then
@@ -1733,7 +1734,31 @@ Public Class HomeScreen
             End If
             ' Final test result for the board
             Dim finalResult As Boolean = True
+
+            plc_test_color = True
+            rf_test_color = True
+
             For Each t As variations In s.tests
+                If t.name.Contains("RF") Then
+                    If t.result = False Then
+                        If rf_test_color = True Then
+                            rf_test_color = False
+                            'dumpMsg("RF Test Fail")
+                        End If
+                    End If
+                ElseIf t.name.Contains("PLC") Then
+                    If t.result = False Then
+                        If plc_test_color = True Then
+                            plc_test_color = False
+                            'dumpMsg("PLC Test Fail")
+                        End If
+                    End If
+                End If
+
+            Next
+
+            For Each t As variations In s.tests
+                'dumpMsg(t.name)
                 If t.result = False Then
                     finalResult = False
                     Exit For
@@ -1845,13 +1870,19 @@ Public Class HomeScreen
     Private Sub display_test_color()
         If ((plc_test_color = True) And (rf_test_color = True)) Then
             pbox_test_result_visual.BackColor = Color.ForestGreen
+            lbl_test_result.Text = "All Test Passed"
         ElseIf plc_test_color = False And rf_test_color = True Then
             pbox_test_result_visual.BackColor = Color.Blue
+            lbl_test_result.Text = "PLC Test Failed"
         ElseIf plc_test_color = True And rf_test_color = False Then
             pbox_test_result_visual.BackColor = Color.Orange
+            lbl_test_result.Text = "RF Test Failed"
         ElseIf plc_test_color = False And rf_test_color = False Then
             pbox_test_result_visual.BackColor = Color.DarkRed
+            lbl_test_result.Text = "All Test Failed"
         End If
+
+        lbl_test_result.Enabled = True
     End Sub
     Private Sub flashParams()
 
@@ -2299,7 +2330,7 @@ Public Class HomeScreen
         pbox_test_status.Image = Nothing
         pbox_test_result_visual.BackColor = Control.DefaultBackColor
         lbl_flashDone.Text = ""
-        lbl_test_result.Enabled = False
+        lbl_test_result.text = ""
 
         disableUI()
 

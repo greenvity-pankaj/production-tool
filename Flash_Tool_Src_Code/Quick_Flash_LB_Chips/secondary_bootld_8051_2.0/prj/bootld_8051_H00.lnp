@@ -1,0 +1,11 @@
+".\main.obj",
+".\uart.obj",
+".\STARTUP.obj",
+".\cmem_ctrl.obj",
+".\hex_file_hdl.obj",
+".\spiflash.obj",
+".\spiflash_drv.obj" 
+TO "bootld_8051_H00" 
+RAMSIZE(256) 
+CODE( 0X2100-0X50FE )
+XDATA( 0XA000-0XBFFE )

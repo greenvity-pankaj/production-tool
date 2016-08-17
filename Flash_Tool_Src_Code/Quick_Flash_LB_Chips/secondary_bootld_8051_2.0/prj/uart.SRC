@@ -1,0 +1,272 @@
+; .\uart.SRC generated from: ..\src\uart.c
+; COMPILER INVOKED BY:
+;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\uart.c OMF2 OPTIMIZE(8,SIZE) BROWSE INCDIR(..\src;C:\Keil\C51\INC;..\src) DEBUG CODE PRINT(.\uart.lst) TABS(2) PREPRINT(.\uart.i) SRC(.\uart.SRC)
+
+$NOMOD51
+
+NAME	UART
+
+P0	DATA	080H
+P1	DATA	090H
+P2	DATA	0A0H
+BANKSEL	DATA	09FH
+P3	DATA	0B0H
+T0	BIT	0B0H.4
+AC	BIT	0D0H.6
+T1	BIT	0B0H.5
+EA	BIT	0A8H.7
+IE	DATA	0A8H
+RD	BIT	0B0H.7
+MEMCTRL	DATA	0F8H
+ES	BIT	0A8H.4
+IP	DATA	0B8H
+RI	BIT	098H.0
+INT0	BIT	0B0H.2
+CY	BIT	0D0H.7
+TI	BIT	098H.1
+INT1	BIT	0B0H.3
+PS	BIT	0B8H.4
+SP	DATA	081H
+OV	BIT	0D0H.2
+WR	BIT	0B0H.6
+SBUF	DATA	099H
+PCON	DATA	087H
+SCON	DATA	098H
+TMOD	DATA	089H
+TCON	DATA	088H
+IE0	BIT	088H.1
+IE1	BIT	088H.3
+B	DATA	0F0H
+ACC	DATA	0E0H
+ET0	BIT	0A8H.1
+ET1	BIT	0A8H.3
+TF0	BIT	088H.5
+TF1	BIT	088H.7
+CRLA_H	DATA	0F4H
+RB8	BIT	098H.2
+TH0	DATA	08CH
+EX0	BIT	0A8H.0
+IT0	BIT	088H.0
+TH1	DATA	08DH
+TB8	BIT	098H.3
+EX1	BIT	0A8H.2
+IT1	BIT	088H.2
+P	BIT	0D0H.0
+CRLA_L	DATA	0F3H
+SM0	BIT	098H.7
+TL0	DATA	08AH
+SM1	BIT	098H.6
+TL1	DATA	08BH
+SM2	BIT	098H.5
+CRSA_H	DATA	0F2H
+PT0	BIT	0B8H.1
+PT1	BIT	0B8H.3
+RS0	BIT	0D0H.3
+TR0	BIT	088H.4
+RS1	BIT	0D0H.4
+CRSA_L	DATA	0F1H
+TR1	BIT	088H.6
+PX0	BIT	0B8H.0
+PX1	BIT	0B8H.2
+DPH	DATA	083H
+DPL	DATA	082H
+REN	BIT	098H.4
+RXD	BIT	0B0H.0
+TXD	BIT	0B0H.1
+F0	BIT	0D0H.5
+PSW	DATA	0D0H
+?PR?ComInit?UART     SEGMENT CODE 
+?PR?_putchar?UART    SEGMENT CODE 
+?PR?_get1char?UART   SEGMENT CODE 
+?ID?_get1char?UART   SEGMENT IDATA OVERLAYABLE
+	PUBLIC	_get1char
+	PUBLIC	_putchar
+	PUBLIC	ComInit
+
+	RSEG  ?ID?_get1char?UART
+          c?241:   DS   1
+; /*
+; * Description : Uart interface implement - 8051
+; *
+; * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+; * All rights reserved.
+; *
+; * Author      : Peter Nguyen
+; *
+; * Purpose :
+; *    		  To handle build-in uart related functions.
+; *
+; * File: uart.c
+; */
+; 
+; //#include "stdafx.h"
+; #include <reg51.h>
+; #include <stdio.h>
+; #include <cmem_ctrl.h>
+; #include <typedef.h>
+; #include <hex_file_hdl.h>
+; #include <macro_def.h>
+; 
+; void ComInit();
+; char _getkey();
+; char _get1char();
+; char putchar(char);
+; 
+; 
+; 
+; void ComInit()
+
+	RSEG  ?PR?ComInit?UART
+ComInit:
+	USING	0
+			; SOURCE LINE # 30
+; {
+			; SOURCE LINE # 31
+; 	TMOD	= 0x21;     //Timer1: reload, timer0: 16bit counter
+			; SOURCE LINE # 32
+	MOV  	TMOD,#021H
+; 
+; 	//TH1	= 249;		//Reload values for 9600bps/12.5MHz clk
+; 	//TH1   = 251;    //Osc 4.6Mhz, br 4.8kbps
+; 	//TH1     = 0xE6;     //24MHZ / 4.8Kbps
+; 	//TH1     = 0xF3;     //24MHz 9.6Kbps 
+; 	//TH1     = 0xE5;   //25MHz @ 4.8Kbps
+; 	//TH1     = 0xF9;     //12.5MHz @ 9.6Kbps
+; 	//TH1     = 0xFA;     //11MHz @ 9.6Kbps
+; 	TH1     =  0xF2;    //25MHz @ 9.6Kbps
+			; SOURCE LINE # 41
+	MOV  	TH1,#0F2H
+; 	//TH1     = 0xD7;     //12.5MHz @ 1655bps (x12 = 19200)
+; 
+; 	PCON 	= 0x80;     //Set double baurate
+			; SOURCE LINE # 44
+	MOV  	PCON,#080H
+; 	IE0	    = 0x0;          //Disable all interrupts
+			; SOURCE LINE # 45
+	CLR  	IE0
+; 	SCON	= 0x50;		//8bit mode, rx enable scon.4 = 1
+			; SOURCE LINE # 46
+	MOV  	SCON,#050H
+; 	TR1	    = 1;		//Turn on timer1
+			; SOURCE LINE # 47
+	SETB 	TR1
+; 	TI      = 0;
+			; SOURCE LINE # 48
+	CLR  	TI
+; 	RI      = 0;
+			; SOURCE LINE # 49
+	CLR  	RI
+; }
+			; SOURCE LINE # 50
+	RET  	
+; END OF ComInit
+
+; 
+; #if 0
+; char _getkey()
+; {
+;     char idata c;															  7											  
+;     do
+;     {
+;         while (RI == 0);
+;         RI = 0;
+;         c = SBUF;
+;     } while (c == 0x11);    // Ignore 0x11 - XOn sync signal from Keil
+;     return c;
+; }
+; #endif
+; char putchar(char c)
+
+	RSEG  ?PR?_putchar?UART
+_putchar:
+	USING	0
+			; SOURCE LINE # 65
+;---- Variable 'c?140' assigned to Register 'R7' ----
+; {
+			; SOURCE LINE # 66
+;     if (c == '\n')  
+			; SOURCE LINE # 67
+	CJNE 	R7,#0AH,?C0002
+;     {
+			; SOURCE LINE # 68
+;         TI = 0;
+			; SOURCE LINE # 69
+	CLR  	TI
+;         SBUF = '\r';        // output CR before LF
+			; SOURCE LINE # 70
+	MOV  	SBUF,#0DH
+?C0003:
+;         while (TI == 0);
+			; SOURCE LINE # 71
+	JNB  	TI,?C0003
+?C0004:
+;         TI = 0;
+			; SOURCE LINE # 72
+	CLR  	TI
+;     }
+			; SOURCE LINE # 73
+?C0002:
+;     TI = 0;
+			; SOURCE LINE # 74
+	CLR  	TI
+;     SBUF = c;        // output CR before LF
+			; SOURCE LINE # 75
+	MOV  	SBUF,R7
+?C0005:
+;     while (TI == 0);
+			; SOURCE LINE # 76
+	JNB  	TI,?C0005
+?C0006:
+;     TI = 0;
+			; SOURCE LINE # 77
+	CLR  	TI
+;     return c;
+			; SOURCE LINE # 78
+; }
+			; SOURCE LINE # 79
+?C0007:
+	RET  	
+; END OF _putchar
+
+; 
+; #if 1
+; //***************************************************************
+; //
+; //***************************************************************
+; char _get1char()
+
+	RSEG  ?PR?_get1char?UART
+_get1char:
+	USING	0
+			; SOURCE LINE # 85
+; {
+			; SOURCE LINE # 86
+; 	char idata c;
+; 	c = 0;
+			; SOURCE LINE # 88
+	CLR  	A
+	MOV  	R0,#LOW (c?241)
+	MOV  	@R0,A
+?C0008:
+; 	while (RI==0);
+			; SOURCE LINE # 89
+	JNB  	RI,?C0008
+?C0009:
+; 	c = SBUF;
+			; SOURCE LINE # 90
+	MOV  	R0,#LOW (c?241)
+	MOV  	@R0,SBUF
+; 	RI = 0;
+			; SOURCE LINE # 91
+	CLR  	RI
+; 	return c;
+			; SOURCE LINE # 92
+	MOV  	A,@R0
+	MOV  	R7,A
+; }
+			; SOURCE LINE # 93
+?C0010:
+	RET  	
+; END OF _get1char
+
+	END

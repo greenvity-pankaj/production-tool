@@ -1,0 +1,567 @@
+; .\main.SRC generated from: ..\src\main.c
+; COMPILER INVOKED BY:
+;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\main.c OPTIMIZE(9,SIZE) BROWSE INCDIR(..\src;C:\Keil\C51\INC;..\src) DEBUG OBJECTEXTEND CODE PRINT(.\main.lst) TABS(2) PREPRINT(.\main.i) SRC(.\main.SRC)
+
+$NOMOD51
+
+NAME	MAIN
+
+P0	DATA	080H
+P1	DATA	090H
+P2	DATA	0A0H
+BANKSEL	DATA	09FH
+P3	DATA	0B0H
+T0	BIT	0B0H.4
+AC	BIT	0D0H.6
+T1	BIT	0B0H.5
+EA	BIT	0A8H.7
+IE	DATA	0A8H
+RD	BIT	0B0H.7
+MEMCTRL	DATA	0F8H
+ES	BIT	0A8H.4
+IP	DATA	0B8H
+RI	BIT	098H.0
+INT0	BIT	0B0H.2
+CY	BIT	0D0H.7
+TI	BIT	098H.1
+INT1	BIT	0B0H.3
+PS	BIT	0B8H.4
+SP	DATA	081H
+OV	BIT	0D0H.2
+WR	BIT	0B0H.6
+SBUF	DATA	099H
+PCON	DATA	087H
+SCON	DATA	098H
+TMOD	DATA	089H
+TCON	DATA	088H
+IE0	BIT	088H.1
+IE1	BIT	088H.3
+B	DATA	0F0H
+ACC	DATA	0E0H
+ET0	BIT	0A8H.1
+ET1	BIT	0A8H.3
+TF0	BIT	088H.5
+TF1	BIT	088H.7
+CRLA_H	DATA	0F4H
+RB8	BIT	098H.2
+TH0	DATA	08CH
+EX0	BIT	0A8H.0
+IT0	BIT	088H.0
+TH1	DATA	08DH
+TB8	BIT	098H.3
+EX1	BIT	0A8H.2
+IT1	BIT	088H.2
+P	BIT	0D0H.0
+CRLA_L	DATA	0F3H
+SM0	BIT	098H.7
+TL0	DATA	08AH
+SM1	BIT	098H.6
+TL1	DATA	08BH
+SM2	BIT	098H.5
+CRSA_H	DATA	0F2H
+PT0	BIT	0B8H.1
+PT1	BIT	0B8H.3
+RS0	BIT	0D0H.3
+TR0	BIT	088H.4
+RS1	BIT	0D0H.4
+CRSA_L	DATA	0F1H
+TR1	BIT	088H.6
+PX0	BIT	0B8H.0
+PX1	BIT	0B8H.2
+DPH	DATA	083H
+DPL	DATA	082H
+REN	BIT	098H.4
+RXD	BIT	0B0H.0
+TXD	BIT	0B0H.1
+F0	BIT	0D0H.5
+PSW	DATA	0D0H
+?PR?main?MAIN        SEGMENT CODE 
+?CO?MAIN             SEGMENT CODE 
+?XD?MAIN             SEGMENT XDATA 
+?ID?MAIN             SEGMENT IDATA 
+?ID?main?MAIN        SEGMENT IDATA OVERLAYABLE 
+	EXTRN	CODE (_printf)
+	EXTRN	DATA (?_printf?BYTE)
+	EXTRN	CODE (ComInit)
+	EXTRN	CODE (Download_Uart2Sflash)
+	EXTRN	CODE (DisableWrCRam)
+	EXTRN	CODE (?C_STARTUP)
+	EXTRN	CODE (?C?LSTKIDATA)
+	EXTRN	CODE (?C?LLDIDATA)
+	EXTRN	CODE (?C?LSTIDATA)
+	EXTRN	CODE (?C?LLDIDATA0)
+	EXTRN	CODE (?C?ULCMP)
+	PUBLIC	Addr32_1
+	PUBLIC	SflashAddr
+	PUBLIC	Uart2EramAddr
+	PUBLIC	ErrCnt
+	PUBLIC	AddrL
+	PUBLIC	AddrH
+	PUBLIC	ProgCnt
+	PUBLIC	Eram2SflashAddr
+	PUBLIC	main
+
+	RSEG  ?XD?MAIN
+Eram2SflashAddr:   DS   2
+          AddrH:   DS   1
+          AddrL:   DS   1
+  Uart2EramAddr:   DS   2
+     SflashAddr:   DS   4
+       Addr32_1:   DS   4
+
+	RSEG  ?ID?MAIN
+        ProgCnt:   DS   12
+         ErrCnt:   DS   12
+
+	RSEG  ?ID?main?MAIN
+       Temp?040:   DS   4
+
+	RSEG  ?ID?main?MAIN
+          c?041:   DS   1
+
+	RSEG  ?CO?MAIN
+?SC_0:
+	DB  00AH,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,000H
+
+?SC_47:
+	DB  00AH,'*' ,'*' ,' ' ,' ' ,' ' ,' ' ,' ' ,'G' ,'R' 
+	DB  'E' ,'E' ,'N' ,'V' ,'I' ,'T' ,'Y' ,' ' ,'C' ,'O' 
+	DB  'M' ,'M' ,'U' ,'N' ,'I' ,'C' ,'A' ,'T' ,'I' ,'O' 
+	DB  'N' ,'S' ,' ' ,'I' ,'N' ,'C' ,' ' ,' ' ,' ' ,' ' 
+	DB  ' ' ,' ' ,' ' ,' ' ,'*' ,'*' ,000H
+
+?SC_94:
+	DB  00AH,'*' ,'*' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' 
+	DB  ' ' ,' ' ,' ' ,'B' ,'o' ,'o' ,'t' ,' ' ,'l' ,'o' 
+	DB  'a' ,'d' ,'e' ,'r' ,' ' ,'V' ,'3' ,'.' ,'0' ,' ' 
+	DB  ' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' 
+	DB  ' ' ,' ' ,' ' ,' ' ,'*' ,'*' ,000H
+
+?SC_141:
+	DB  00AH,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+	DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,00AH,00AH,000H
+
+?SC_190:
+	DB  00AH,00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'P' ,'r' ,'e' 
+	DB  's' ,'s' ,' ' ,'r' ,'e' ,'s' ,'e' ,'t' ,' ' ,'o' 
+	DB  'r' ,' ' ,'h' ,'i' ,'t' ,' ' ,027H,'s' ,027H,' ' 
+	DB  't' ,'o' ,' ' ,'r' ,'e' ,'b' ,'o' ,'o' ,'t' ,' ' 
+	DB  't' ,'h' ,'e' ,' ' ,'s' ,'y' ,'s' ,'t' ,'e' ,'m' 
+	DB  000H
+
+; /*
+; * Description : 8051 bootloader main function
+; *
+; * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+; * All rights reserved.
+; *
+; * Author      : Peter Nguyen
+; * Release Date: 04/27/2013
+; * Purpose :
+; *     function main of bootloader project
+; *
+; * File: bootld_80251.c
+; */
+; 
+; //#include <stdafx.h>
+; #include "test.h"
+; #include <reg51.h>                  /* Include 251SB header file */	
+; #include <stdio.h>
+; #include <stdarg.h>
+; #include <string.h>
+; #include "typedef.h"
+; #include "uart.h"
+; #include "hex_file_hdl.h"
+; #include "spiflash.h"
+; #include "macro_def.h"
+; #include "cmem_ctrl.h"
+; #include "spiflash_drv.h"
+; #include "static_var.h"
+; 
+; 
+; #define RESET_REG 0x34
+; void main(void)
+
+	RSEG  ?PR?main?MAIN
+main:
+	USING	0
+			; SOURCE LINE # 32
+; {
+			; SOURCE LINE # 33
+; 	u32 idata Temp;
+; 	char idata c;
+; 	BANKSEL = 0;
+			; SOURCE LINE # 36
+	CLR  	A
+	MOV  	BANKSEL,A
+; 	DisableWrCRam();
+			; SOURCE LINE # 37
+	LCALL	DisableWrCRam
+; 
+; 	ComInit();
+			; SOURCE LINE # 39
+	LCALL	ComInit
+; 
+; 	EA = 0;
+			; SOURCE LINE # 41
+	CLR  	EA
+; 	c = 0;
+			; SOURCE LINE # 42
+	CLR  	A
+	MOV  	R0,#LOW (c?041)
+	MOV  	@R0,A
+; 	Temp = 0;
+			; SOURCE LINE # 43
+	MOV  	R0,#LOW (Temp?040)
+	LCALL	?C?LSTKIDATA
+	DB   	00H
+	DB   	00H
+	DB   	00H
+	DB   	00H
+; 	//printf("\n*********************************************");
+; //	printf("\n*********************************************");
+; //	printf("\n*********************************************");
+; //	printf("\n*********************************************");
+; //	printf("\n*********************************************");
+; //	printf("\n*********************************************");
+; 	printf("\n*********************************************");
+			; SOURCE LINE # 50
+; 	printf("\n*********************************************");
+			; SOURCE LINE # 51
+; 	printf("\n*********************************************");
+			; SOURCE LINE # 52
+	LCALL	L?0017
+	MOV  	R2,#HIGH (?SC_0)
+	MOV  	R1,#LOW (?SC_0)
+	LCALL	_printf
+; 	printf("\n*********************************************");
+			; SOURCE LINE # 53
+; 	printf("\n*********************************************");
+			; SOURCE LINE # 54
+; 	printf("\n**     GREENVITY COMMUNICATIONS INC        **");
+			; SOURCE LINE # 55
+	LCALL	L?0017
+	MOV  	R2,#HIGH (?SC_47)
+	MOV  	R1,#LOW (?SC_47)
+	LCALL	_printf
+; 	printf("\n**          Boot loader V3.0               **");
+			; SOURCE LINE # 56
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_94)
+	MOV  	R1,#LOW (?SC_94)
+	LCALL	_printf
+; 	printf("\n*********************************************\n\n");
+			; SOURCE LINE # 57
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_141)
+	MOV  	R1,#LOW (?SC_141)
+	LCALL	_printf
+?C0001:
+; 	
+; 	while(1)
+			; SOURCE LINE # 59
+; 	{
+			; SOURCE LINE # 60
+; 		switch(c)
+			; SOURCE LINE # 61
+	MOV  	R0,#LOW (c?041)
+	MOV  	A,@R0
+	DEC  	A
+	JZ   	?C0010
+	ADD  	A,#0D0H
+	JZ   	?C0009
+	ADD  	A,#0DEH
+	JZ   	?main?Bootup
+	ADD  	A,#0EDH
+	JZ   	?C0008
+	ADD  	A,#0F3H
+	JZ   	?main?Bootup
+	ADD  	A,#02DH
+	JNZ  	?C0013
+; 		{
+			; SOURCE LINE # 62
+; 		case ('s'):
+			; SOURCE LINE # 63
+; 		case ('S'):
+			; SOURCE LINE # 64
+; 			goto Bootup;
+			; SOURCE LINE # 65
+; 			break;
+			; SOURCE LINE # 66
+; #if 0		
+; 		case ('u'):
+; 		case ('U'):
+; 			EnableWrCRam ();
+; 			for (c=0;c<NUM_OF_BANK;c++)
+; 			{
+; 				printf("\n\n ##### Download code from UART to CRAM - BANK-%02X #####\n", (U16)c);
+; 				BANKSEL = c;
+; 				ParseHexRecord(&ErrCnt[0], &ProgCnt[0]);
+; 			}
+; 			DisableWrCRam ();
+; 			#pragma asm
+; 				MOV   SP,#06FH
+; 				LJMP  CRAM_START;
+; 			#pragma endasm
+; 			break;
+; #endif			
+; 		case ('f'):
+			; SOURCE LINE # 84
+; 		case ('F'):
+			; SOURCE LINE # 85
+?C0008:
+; 			Download_Uart2Sflash();
+			; SOURCE LINE # 86
+	LCALL	Download_Uart2Sflash
+; 			c = '1';
+			; SOURCE LINE # 87
+	MOV  	R0,#LOW (c?041)
+	MOV  	@R0,#031H
+; 			break;
+			; SOURCE LINE # 88
+	SJMP 	?C0001
+; #if 0		
+; 		case ('t'):
+; 		case ('T'):
+; 			test_cram();
+; 			printf("\n --> Finished testing CRAM");
+; 			c = '1';
+; 			break;
+; 		
+; 		case ('j'):
+; 		case ('J'):
+; 			#pragma asm
+; 				MOV  SP,#06FH;
+; 				LJMP CRAM_START;
+; 			#pragma endasm
+; 			
+; 		case ('d'):
+; 		case ('D'):
+; 			dump_code(0);
+; 			printf("\n --> Finished dumping CRAM");
+; 			c='1';
+; 			break;
+; 	
+; 		case ('p'):
+; 		case ('P'):
+; 			dump_code(1); 
+; 			printf("\n --> Finished dumping SFLASH");
+; 			c = '1';
+; 			break;
+; 		case 'r':
+; 		case 'R':
+; 			dump_code(2);
+; 			printf("\n --> Finished dumping erams");
+; 			c = '1';
+; 			break;
+; 		case 'e':
+; 		case 'E':
+; 			dump_BackupCode();
+; 			c = '1';
+; 			break;
+; #endif		
+; 		case ('1'):
+			; SOURCE LINE # 129
+?C0009:
+; 			//printf("\n\n --> Press reset to reboot the system");
+; 		  //*(u8 xdata *)34 = 1;	
+; 		  //*(u8 xdata *)RESET_REG = 1;
+; 			printf("\n\n --> Press reset or hit 's' to reboot the system");
+			; SOURCE LINE # 133
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_190)
+	MOV  	R1,#LOW (?SC_190)
+	LCALL	_printf
+; 			*((volatile u8 xdata *)(0x34)) = (u8)(1);
+			; SOURCE LINE # 134
+	MOV  	DPTR,#034H
+	MOV  	A,#01H
+	MOVX 	@DPTR,A
+; 			Temp = 0;
+			; SOURCE LINE # 135
+	MOV  	R0,#LOW (Temp?040)
+	LCALL	?C?LSTKIDATA
+	DB   	00H
+	DB   	00H
+	DB   	00H
+	DB   	00H
+; 			c = 1;
+			; SOURCE LINE # 136
+	MOV  	R0,#LOW (c?041)
+	MOV  	@R0,#01H
+; 			break;
+			; SOURCE LINE # 137
+	SJMP 	?C0001
+; #ifdef PROGRAM_CONFIGURATION
+; 		case ('c'):
+; 		case ('C'):
+; 			Program_Config_Data();
+; 			c = '1';
+; 			break;
+; 		case ('g'):
+; 		case ('G'):
+; 			Load_Config_Data(1);
+; 			c = '1';
+; 			break;
+; 		case ('l'):
+; 		case ('L'):
+; 			Load_Config_Data(0);
+; 			c = '1';
+; 			break;
+; #endif
+; #if 0		
+; 		case 'b':
+; 		case 'B':
+; 			(void)spiflash_BackupCodeImage();
+; 			c = '1';
+; 			break;
+; 		case 'z':
+; 		case 'Z':
+; 			(void)spiflash_RestoreCodeImage();
+; 			c = '1';
+; 			break;
+; #endif		
+; #ifdef FEATURE_CHIPERASE
+; 		case ('e'):
+; 		case ('E'):
+; 			printf("\n   *** THIS FUNCTION WILL ERASE 2MBYTE OF SPI FLASH Y/N? :");
+; 			c = _get1char();
+; 			TI = 0;
+; 			SBUF = c;
+; 			if (c!='Y')
+; 			{
+; 				c = '1';
+; 				break;
+; 			}
+; 			c = 0;
+; 			printf("\n   *** Ready Y/N? :");
+; 		    c = _get1char();
+; 			TI = 0;
+; 			SBUF = c;
+; 			if (c!='Y')
+; 			{
+; 				c = '1';
+; 				break;
+; 			}
+; 			spiflash_chiperase();
+; 			printf ("\n  --> Erase spi flash done\n"); 
+; 			c = '1';
+; 			break;
+; #endif
+; 		case 1:
+			; SOURCE LINE # 194
+?C0010:
+; 			if (RI){
+			; SOURCE LINE # 195
+	MOV  	R0,#LOW (c?041)
+	JNB  	RI,?C0011
+; 				c = SBUF;
+			; SOURCE LINE # 196
+	MOV  	@R0,SBUF
+; 				RI = 0;
+			; SOURCE LINE # 197
+	CLR  	RI
+; 			} else {
+			; SOURCE LINE # 198
+	SJMP 	?C0001
+?C0011:
+; 				c = 1;
+			; SOURCE LINE # 199
+	MOV  	@R0,#01H
+; 			}
+			; SOURCE LINE # 200
+; 			break;
+			; SOURCE LINE # 201
+	SJMP 	?C0001
+; 		default:
+			; SOURCE LINE # 202
+?C0013:
+; 			if (RI==1){
+			; SOURCE LINE # 203
+	JNB  	RI,?C0014
+; 				c = SBUF;
+			; SOURCE LINE # 204
+	MOV  	R0,#LOW (c?041)
+	MOV  	@R0,SBUF
+; 				RI = 0;
+			; SOURCE LINE # 205
+	CLR  	RI
+; 			}
+			; SOURCE LINE # 206
+?C0014:
+; 			Temp++;
+			; SOURCE LINE # 207
+	MOV  	R0,#LOW (Temp?040)
+	LCALL	?C?LLDIDATA
+	MOV  	A,R7
+	ADD  	A,#01H
+	MOV  	R7,A
+	CLR  	A
+	ADDC 	A,R6
+	MOV  	R6,A
+	CLR  	A
+	ADDC 	A,R5
+	MOV  	R5,A
+	CLR  	A
+	ADDC 	A,R4
+	MOV  	R4,A
+	MOV  	R0,#LOW (Temp?040)
+	LCALL	?C?LSTIDATA
+; 			if (Temp>=GVTY_STARTING_TIMEOUT)
+			; SOURCE LINE # 208
+	MOV  	R7,#080H
+	MOV  	R6,#038H
+	MOV  	R5,#01H
+	MOV  	R4,#00H
+	MOV  	R0,#LOW (Temp?040)
+	LCALL	?C?LLDIDATA0
+	CLR  	C
+	LCALL	?C?ULCMP
+	JNC  	$ + 5H
+	LJMP 	?C0001
+; Bootup:
+			; SOURCE LINE # 209
+?main?Bootup:
+; 			{
+			; SOURCE LINE # 210
+; #ifdef PROGRAM_CONFIGURATION
+; 				Load_Config_Data(1);
+; #endif
+; 				//load_sflash2cram();
+; 				*((volatile u8 xdata *)(0x34)) = (u8)(1);
+			; SOURCE LINE # 215
+	MOV  	DPTR,#034H
+	MOV  	A,#01H
+	MOVX 	@DPTR,A
+; 			}
+			; SOURCE LINE # 216
+; 			break;
+			; SOURCE LINE # 217
+	LJMP 	?C0001
+; 		}
+			; SOURCE LINE # 218
+; 	}
+			; SOURCE LINE # 219
+; }
+			; SOURCE LINE # 220
+L?0017:
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_0)
+	MOV  	R1,#LOW (?SC_0)
+	LCALL	_printf
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_0)
+	MOV  	R1,#LOW (?SC_0)
+	LCALL	_printf
+	MOV  	R3,#0FFH
+	RET  	
+; END OF main
+
+	END

@@ -1,0 +1,1423 @@
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.02c
+OBJECT MODULE PLACED IN .\spiflash.OBJ
+ASSEMBLER INVOKED BY: C:\Keil_v5\C51\BIN\A51.EXE .\spiflash.src PR(.\spiflash.ls1) EP DEBUG
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     ; .\spiflash.SRC generated from: ..\src\spiflash.c
+                       2     ; COMPILER INVOKED BY:
+                       3     ;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\spiflash.c OPTIMIZE(9,SIZE) BROWSE INCDIR(..\src
+                             ;C:\Keil\C51\INC;..\src) DEBUG OBJECTEXTEND CODE PRINT(.\spiflash.lst) TABS(2) PREPRINT(.\s
+                             piflash.i) SRC(.\spiflash.SRC)
+                       4     
+                       5     $nomod51 
+                       6     
+                       7     NAME    SPIFLASH
+                       8     
+  0080                 9     P0      DATA    080H
+  0090                10     P1      DATA    090H
+  00A0                11     P2      DATA    0A0H
+  009F                12     BANKSEL DATA    09FH
+  00B0                13     P3      DATA    0B0H
+  00B4                14     T0      BIT     0B0H.4
+  00D6                15     AC      BIT     0D0H.6
+  00B5                16     T1      BIT     0B0H.5
+  00AF                17     EA      BIT     0A8H.7
+  00A8                18     IE      DATA    0A8H
+  00B7                19     RD      BIT     0B0H.7
+  00F8                20     MEMCTRL DATA    0F8H
+  00AC                21     ES      BIT     0A8H.4
+  00B8                22     IP      DATA    0B8H
+  0098                23     RI      BIT     098H.0
+  00B2                24     INT0    BIT     0B0H.2
+  00D7                25     CY      BIT     0D0H.7
+  0099                26     TI      BIT     098H.1
+  00B3                27     INT1    BIT     0B0H.3
+  00BC                28     PS      BIT     0B8H.4
+  0081                29     SP      DATA    081H
+  00D2                30     OV      BIT     0D0H.2
+  00B6                31     WR      BIT     0B0H.6
+  0099                32     SBUF    DATA    099H
+  0087                33     PCON    DATA    087H
+  0098                34     SCON    DATA    098H
+  0089                35     TMOD    DATA    089H
+  0088                36     TCON    DATA    088H
+  0089                37     IE0     BIT     088H.1
+  008B                38     IE1     BIT     088H.3
+  00F0                39     B       DATA    0F0H
+  00E0                40     ACC     DATA    0E0H
+  00A9                41     ET0     BIT     0A8H.1
+  00AB                42     ET1     BIT     0A8H.3
+  008D                43     TF0     BIT     088H.5
+  008F                44     TF1     BIT     088H.7
+  00F4                45     CRLA_H  DATA    0F4H
+  009A                46     RB8     BIT     098H.2
+  008C                47     TH0     DATA    08CH
+  00A8                48     EX0     BIT     0A8H.0
+  0088                49     IT0     BIT     088H.0
+  008D                50     TH1     DATA    08DH
+  009B                51     TB8     BIT     098H.3
+  00AA                52     EX1     BIT     0A8H.2
+  008A                53     IT1     BIT     088H.2
+  00D0                54     P       BIT     0D0H.0
+  00F3                55     CRLA_L  DATA    0F3H
+  009F                56     SM0     BIT     098H.7
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE     2
+
+  008A                57     TL0     DATA    08AH
+  009E                58     SM1     BIT     098H.6
+  008B                59     TL1     DATA    08BH
+  009D                60     SM2     BIT     098H.5
+  00F2                61     CRSA_H  DATA    0F2H
+  00B9                62     PT0     BIT     0B8H.1
+  00BB                63     PT1     BIT     0B8H.3
+  00D3                64     RS0     BIT     0D0H.3
+  008C                65     TR0     BIT     088H.4
+  00D4                66     RS1     BIT     0D0H.4
+  00F1                67     CRSA_L  DATA    0F1H
+  008E                68     TR1     BIT     088H.6
+  00B8                69     PX0     BIT     0B8H.0
+  00BA                70     PX1     BIT     0B8H.2
+  0083                71     DPH     DATA    083H
+  0082                72     DPL     DATA    082H
+  009C                73     REN     BIT     098H.4
+  00B0                74     RXD     BIT     0B0H.0
+  00B1                75     TXD     BIT     0B0H.1
+  00D5                76     F0      BIT     0D0H.5
+  00D0                77     PSW     DATA    0D0H
+                      78     ?PR?_swUtil_SwapEndian?SPIFLASH          SEGMENT CODE 
+                      79     ?DT?_swUtil_SwapEndian?SPIFLASH          SEGMENT DATA OVERLAYABLE 
+                      80     ?PR?_memUtil_ClearEram?SPIFLASH          SEGMENT CODE 
+                      81     ?PR?Download_Uart2Sflash?SPIFLASH        SEGMENT CODE 
+                      82     ?CO?SPIFLASH         SEGMENT CODE 
+                      83     ?ID?Download_Uart2Sflash?SPIFLASH        SEGMENT IDATA OVERLAYABLE 
+                      84     ?PR?SPIFLASH         SEGMENT CODE 
+                      85             EXTRN   CODE (_spiflash_wrsr_unlock)
+                      86             EXTRN   CODE (_ParseHexRecord)
+                      87             EXTRN   CODE (_printf)
+                      88             EXTRN   DATA (?_printf?BYTE)
+                      89             EXTRN   XDATA (Eram2SflashAddr)
+                      90             EXTRN   IDATA (ProgCnt)
+                      91             EXTRN   IDATA (ErrCnt)
+                      92             EXTRN   XDATA (Uart2EramAddr)
+                      93             EXTRN   CODE (_spiflash_pageReadVerify)
+                      94             EXTRN   DATA (?_spiflash_pageReadVerify?BYTE)
+                      95             EXTRN   XDATA (SflashAddr)
+                      96             EXTRN   CODE (DisableWrCRam)
+                      97             EXTRN   CODE (spiflash_eraseLower256k)
+                      98             EXTRN   CODE (_spiflash_pageWrite)
+                      99             EXTRN   DATA (?_spiflash_pageWrite?BYTE)
+                     100             EXTRN   CODE (_get1char)
+                     101             EXTRN   CODE (?C?LSHL)
+                     102             EXTRN   CODE (?C?LOR)
+                     103             EXTRN   CODE (?C?ULSHR)
+                     104             EXTRN   CODE (?C?IILDX)
+                     105             EXTRN   CODE (?C?LSTKXDATA)
+                     106             EXTRN   CODE (?C?LLDXDATA0)
+                     107             EXTRN   CODE (?C?LADD)
+                     108             EXTRN   CODE (?C?LLDXDATA)
+                     109             EXTRN   CODE (?C?IMUL)
+                     110             EXTRN   CODE (?C?LSTXDATA)
+                     111             PUBLIC  Download_Uart2Sflash
+                     112             PUBLIC  _memUtil_ClearEram
+                     113             PUBLIC  _swUtil_SwapEndian
+                     114     
+----                 115             RSEG  ?DT?_swUtil_SwapEndian?SPIFLASH
+0000                 116     ?_swUtil_SwapEndian?BYTE:
+0000                 117           var32?040:   DS   4
+                     118     
+----                 119             RSEG  ?ID?Download_Uart2Sflash?SPIFLASH
+0000                 120               c?242:   DS   1
+                     121     
+----                 122             RSEG  ?CO?SPIFLASH
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE     3
+
+0000                 123     ?SC_0:
+0000 0A202D2D        124             DB  00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'P' ,'r' ,'o' ,'g' 
+0004 3E205072                
+0008 6F67                    
+000A 72616D20        125             DB  'r' ,'a' ,'m' ,' ' ,'S' ,'F' ,'L' ,'A' ,'S' ,'H' 
+000E 53464C41                
+0012 5348                    
+0014 20592F4E        126             DB  ' ' ,'Y' ,'/' ,'N' ,'?' ,' ' ,':' ,000H
+0018 3F203A00                
+                     127     
+001C                 128     ?SC_28:
+001C 0A202D2D        129             DB  00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'D' ,'e' ,'l' ,'e' 
+0020 3E204465                
+0024 6C65                    
+0026 74652063        130             DB  't' ,'e' ,' ' ,'c' ,'u' ,'r' ,'r' ,'e' ,'n' ,'t' 
+002A 75727265                
+002E 6E74                    
+0030 20636F64        131             DB  ' ' ,'c' ,'o' ,'d' ,'e' ,' ' ,'Y' ,'/' ,'N' ,'?' 
+0034 6520592F                
+0038 4E3F                    
+003A 203A00          132             DB  ' ' ,':' ,000H
+                     133     
+003D                 134     ?SC_61:
+003D 0A0A2023        135             DB  00AH,00AH,' ' ,'#' ,'#' ,'#' ,'#' ,'#' ,' ' ,'D' 
+0041 23232323                
+0045 2044                    
+0047 6F776E6C        136             DB  'o' ,'w' ,'n' ,'l' ,'o' ,'a' ,'d' ,' ' ,'c' ,'o' 
+004B 6F616420                
+004F 636F                    
+0051 64652066        137             DB  'd' ,'e' ,' ' ,'f' ,'o' ,'r' ,' ' ,'-' ,' ' ,'C' 
+0055 6F72202D                
+0059 2043                    
+005B 6F6D6D6F        138             DB  'o' ,'m' ,'m' ,'o' ,'n' ,' ' ,'#' ,'#' ,'#' ,'#' 
+005F 6E202323                
+0063 2323                    
+0065 230A00          139             DB  '#' ,00AH,000H
+                     140     
+0068                 141     ?SC_104:
+0068 0A202D2D        142             DB  00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'W' ,'r' ,'i' ,'t' 
+006C 3E205772                
+0070 6974                    
+0072 696E6720        143             DB  'i' ,'n' ,'g' ,' ' ,'t' ,'o' ,' ' ,'s' ,'f' ,'l' 
+0076 746F2073                
+007A 666C                    
+007C 61736820        144             DB  'a' ,'s' ,'h' ,' ' ,000H
+0080 00                      
+                     145     
+0081                 146     ?SC_129:
+0081 0A202A2A        147             DB  00AH,' ' ,'*' ,'*' ,'*' ,' ' ,'E' ,'R' ,'R' ,'O' 
+0085 2A204552                
+0089 524F                    
+008B 5220646F        148             DB  'R' ,' ' ,'d' ,'o' ,'w' ,'n' ,'l' ,'o' ,'a' ,'d' 
+008F 776E6C6F                
+0093 6164                    
+0095 696E6720        149             DB  'i' ,'n' ,'g' ,' ' ,'f' ,'r' ,'o' ,'m' ,' ' ,'U' 
+0099 66726F6D                
+009D 2055                    
+009F 41525420        150             DB  'A' ,'R' ,'T' ,' ' ,'t' ,'o' ,' ' ,'R' ,'A' ,'M' 
+00A3 746F2052                
+00A7 414D                    
+00A9 00              151             DB  000H
+                     152     
+00AA                 153     ?SC_170:
+00AA 0A0A2023        154             DB  00AH,00AH,' ' ,'#' ,'#' ,'#' ,'#' ,'#' ,' ' ,'D' 
+00AE 23232323                
+00B2 2044                    
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE     4
+
+00B4 6F776E6C        155             DB  'o' ,'w' ,'n' ,'l' ,'o' ,'a' ,'d' ,' ' ,'c' ,'o' 
+00B8 6F616420                
+00BC 636F                    
+00BE 64652066        156             DB  'd' ,'e' ,' ' ,'f' ,'o' ,'r' ,' ' ,'-' ,' ' ,'B' 
+00C2 6F72202D                
+00C6 2042                    
+00C8 414E4B2D        157             DB  'A' ,'N' ,'K' ,'-' ,'%' ,'0' ,'2' ,'b' ,'X' ,' ' 
+00CC 25303262                
+00D0 5820                    
+00D2 23232323        158             DB  '#' ,'#' ,'#' ,'#' ,'#' ,00AH,000H
+00D6 230A00                  
+                     159     
+00D9                 160     ?SC_217:
+00D9 0A202A2A        161             DB  00AH,' ' ,'*' ,'*' ,'*' ,' ' ,'P' ,'r' ,'o' ,'g' 
+00DD 2A205072                
+00E1 6F67                    
+00E3 72616D6D        162             DB  'r' ,'a' ,'m' ,'m' ,'i' ,'n' ,'g' ,' ' ,'s' ,'f' 
+00E7 696E6720                
+00EB 7366                    
+00ED 6C617368        163             DB  'l' ,'a' ,'s' ,'h' ,' ' ,'d' ,'o' ,'n' ,'e' ,'!' 
+00F1 20646F6E                
+00F5 6521                    
+00F7 0A00            164             DB  00AH,000H
+                     165     
+                     166     ; /*
+                     167     ; * Description : 8051 bootloader spiflash utility
+                     168     ; *
+                     169     ; * Copyright (c) 2011-2012 Greenvity Communications, Inc.
+                     170     ; * All rights reserved.
+                     171     ; *
+                     172     ; * Author      : Peter Nguyen
+                     173     ; * Release Date: 04/27/2013
+                     174     ; * Purpose :
+                     175     ; *     spiflash utility functions for bootloader
+                     176     ; *
+                     177     ; * File: spiflash_drv.c
+                     178     ; */
+                     179     ; #include <stdio.h>
+                     180     ; #include <stdlib.h>
+                     181     ; #include <ctype.h>
+                     182     ; #include <REG51.h>
+                     183     ; #include <intrins.h>
+                     184     ; #include "typedef.h"
+                     185     ; #include "macro_def.h"
+                     186     ; #include "cmem_ctrl.h"
+                     187     ; #include "hex_file_hdl.h"
+                     188     ; #include "Spiflash_drv.h"
+                     189     ; #include "uart.h"
+                     190     ; #include "global_var.h"
+                     191     ; #if 0
+                     192     ; void test_cram()
+                     193     ; {
+                     194     ;       u8 idata rdata, cmp;
+                     195     ;       u16 idata addr, memcnt, bankn;
+                     196     ;       
+                     197     ;       EnableWrCRam();
+                     198     ;     printf("\n --> Testing cram\n");
+                     199     ;       BANKSEL = 0;
+                     200     ;       addr = COMMONADDR_L;
+                     201     ;       for (memcnt=0; memcnt<COMMON_LEN; memcnt++) 
+                     202     ;       {
+                     203     ;               cmp = (u8)addr;
+                     204     ;               *(u8 xdata *)addr = (u8)cmp;
+                     205     ;               addr++;
+                     206     ;       }
+                     207     ;       for (bankn=0; bankn<NUM_OF_BANK; bankn++)
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE     5
+
+                     208     ;       {
+                     209     ;               addr = BANKADDR_L;
+                     210     ;               BANKSEL = bankn;
+                     211     ;               for (memcnt=0; memcnt<CBANK_LEN; memcnt++)
+                     212     ;               {
+                     213     ;                       cmp =  (u8)(addr+bankn);
+                     214     ;                       *(u8 xdata *)addr = (u8)cmp;
+                     215     ;                       addr++;
+                     216     ;               }       
+                     217     ;       }
+                     218     ;       DisableWrCRam ();
+                     219     ;       BANKSEL = 0;
+                     220     ;       addr = COMMONADDR_L;
+                     221     ;       for (memcnt=0; memcnt<COMMON_LEN; memcnt++)
+                     222     ;       {
+                     223     ;               rdata = *(u8 code *)addr;
+                     224     ;               cmp = (u8)addr;
+                     225     ;               if (rdata!=cmp){
+                     226     ;                       printf("\nF:%04X %02X", addr, (u16)rdata);
+                     227     ;               } else if ((addr & 0x0F)==0){
+                     228     ;                       printf(".");
+                     229     ;               }
+                     230     ;               addr++;
+                     231     ;       }
+                     232     ;       for (bankn=0; bankn<NUM_OF_BANK; bankn++)
+                     233     ;       {
+                     234     ;               addr = BANKADDR_L;
+                     235     ;               BANKSEL = bankn;
+                     236     ;               for (memcnt=0; memcnt<CBANK_LEN; memcnt++)
+                     237     ;               {
+                     238     ;                       rdata = *(u8 code *)addr;
+                     239     ;                       cmp =  (u8)(addr+bankn);
+                     240     ;                       if (rdata!=cmp){
+                     241     ;                               printf("\nFB%x:%04X %02X", bankn, addr, (u16)rdata);
+                     242     ;                       } else if ((addr & 0x0F)==0){
+                     243     ;                               printf(".");
+                     244     ;                       }
+                     245     ;                       addr++;
+                     246     ;               }       
+                     247     ;       }
+                     248     ;       return;
+                     249     ; }
+                     250     ; #endif
+                     251     ; //***************************************************************
+                     252     ; //void dump_code(u8 dflag)
+                     253     ; //Dump code from CRAM or SFLASH
+                     254     ; //Input:
+                     255     ; //            dflag = 0: Dump code from CRAM
+                     256     ; //                     = 1: Dump code from SFLASH
+                     257     ; //***************************************************************
+                     258     ; #if 0
+                     259     ; void load_sflash2cram()
+                     260     ; {
+                     261     ;     u8 idata dbyte, banks;                                            
+                     262     ;       u16 idata addr, datcnt, progcnt;                  
+                     263     ;       
+                     264     ;       printf("\n --> System is booting up ");
+                     265     ; 
+                     266     ;     EnableWrCRam();
+                     267     ;       addr = COMMONADDR_L; 
+                     268     ;                       
+                     269     ;       progcnt = 0;
+                     270     ;       BANKSEL = 0;
+                     271     ; 
+                     272     ;       for (datcnt = 0; datcnt<COM_BANK0_LEN; datcnt++)  
+                     273     ;       {
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE     6
+
+                     274     ;               dbyte = *((u8 code * )addr);
+                     275     ;               *((u8 xdata * )addr) = dbyte;
+                     276     ;               addr++;
+                     277     ;               progcnt++;
+                     278     ;               if (progcnt==5000)
+                     279     ;               {
+                     280     ;                       printf(".");
+                     281     ;                       progcnt = 0;
+                     282     ;               }               
+                     283     ;       }
+                     284     ;       
+                     285     ;       progcnt = 0;
+                     286     ;       for (banks=1;banks<NUM_OF_BANK;banks++)
+                     287     ;       {
+                     288     ;               BANKSEL = banks;
+                     289     ;               addr = BANKADDR_L;
+                     290     ;               for (datcnt=0; datcnt<CBANK_LEN; datcnt++)
+                     291     ;               {
+                     292     ;                       dbyte = *((u8 code * )addr);
+                     293     ;                       *((u8 xdata * )addr) = dbyte;
+                     294     ;                       addr++;
+                     295     ;                       progcnt++;
+                     296     ;                       if (progcnt==5000)
+                     297     ;                       {
+                     298     ;                               printf(".");
+                     299     ;                               progcnt = 0;
+                     300     ;                       }               
+                     301     ;               }
+                     302     ;       }
+                     303     ;       DisableWrCRam ();
+                     304     ; 
+                     305     ;       printf("\n --> Running firmware\n\n");
+                     306     ;       #pragma asm
+                     307     ;               MOV     SP, #06FH
+                     308     ;               LJMP  CRAM_START;
+                     309     ;       #pragma endasm
+                     310     ;       return;
+                     311     ; }
+                     312     ; #endif
+                     313     ; //***************************************************************
+                     314     ; //void dump_code(u8 dflag)
+                     315     ; //Dump code from CRAM or SFLASH
+                     316     ; //Input:
+                     317     ; //            dflag = 0: Dump code from CRAM
+                     318     ; //                     = 1: Dump code from SFLASH
+                     319     ; //***************************************************************
+                     320     ; #if 0
+                     321     ; void dump_code(u8 dflag)
+                     322     ; {
+                     323     ;       u16 idata addr, i;
+                     324     ;       u8 idata dbyte, banks;
+                     325     ;       if (dflag==0)
+                     326     ;       {
+                     327     ;               printf("\n --> Dump code RAM");
+                     328     ;               DisableWrCRam ();
+                     329     ;       }
+                     330     ;       else if (dflag==1)
+                     331     ;       {
+                     332     ;               EnableWrCRam();
+                     333     ;               printf("\n --> Dump sflash");
+                     334     ;       } else if (dflag==2)
+                     335     ;       {
+                     336     ;               printf("\n --> Dump 64K eram");
+                     337     ;               goto dump_eram;
+                     338     ; 
+                     339     ;       }
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE     7
+
+                     340     ;       addr = COMMONADDR_L; 
+                     341     ;       for (i=0; i<COM_BANK0_LEN; i++)
+                     342     ;       {
+                     343     ;               if ((addr&0x0007)==0)
+                     344     ;                       printf ("\n0x%04X:", addr);
+                     345     ; 
+                     346     ;               dbyte = *(u8 code *)addr;
+                     347     ;               addr++;
+                     348     ;               printf (" %02X", (u16)dbyte);
+                     349     ;       }
+                     350     ;       for (banks=1; banks<8;banks++)
+                     351     ;       {
+                     352     ;               printf("\n\n --> Bank %02X\n", (u16)banks);
+                     353     ;               BANKSEL = banks;
+                     354     ;               addr = BANKADDR_L;
+                     355     ;               for (i=0; i<CBANK_LEN; i++)
+                     356     ;               {
+                     357     ;                       if ((addr&0x0007)==0)
+                     358     ;                               printf ("\n0x%04X:", addr);
+                     359     ; 
+                     360     ;                       dbyte = *(u8 code *)addr;
+                     361     ;                       addr++;
+                     362     ;                       printf (" %02X", (u16)dbyte);
+                     363     ;               }
+                     364     ;       }
+                     365     ;       DisableWrCRam ();
+                     366     ;       return;
+                     367     ;       
+                     368     ; dump_eram:
+                     369     ;       addr = COMMONADDR_L;
+                     370     ; Cont_dump_eram:
+                     371     ;       if ((addr&0x0007)==0){
+                     372     ;               printf ("\n0x%04X:", addr);
+                     373     ;       }
+                     374     ;       dbyte = *(u8 xdata *)addr;
+                     375     ;       printf (" %02X", (u16)dbyte);
+                     376     ;       if (addr!=0xFFFF)
+                     377     ;       {
+                     378     ;               addr++;
+                     379     ;               goto Cont_dump_eram;
+                     380     ;       }       
+                     381     ;       return;
+                     382     ; }
+                     383     ; #endif
+                     384     ; #if 0
+                     385     ; //***************************************************************
+                     386     ; //void dump_BackupImage()
+                     387     ; //Dump code from backup image
+                     388     ; //***************************************************************
+                     389     ; 
+                     390     ; void dump_BackupCode()
+                     391     ; {
+                     392     ;       u16 idata addr, i;
+                     393     ;       u8 idata dbyte, banks;
+                     394     ;       SflashAddr = 0x50000;
+                     395     ;       printf("\n --> Dump backup code");
+                     396     ;       for (i=0; i<COM_BANK0_LEN; i++)
+                     397     ;       {
+                     398     ;               if ((i&0x0007)==0){
+                     399     ;                       printf ("\n0x%04X:",(u16)(i+0x2000));
+                     400     ;               }
+                     401     ;               dbyte = spiflash_ReadByte(SflashAddr);
+                     402     ;               SflashAddr++;
+                     403     ;               printf (" %02X", (u16)dbyte);
+                     404     ;       }
+                     405     ;       for (banks=1; banks<8;banks++)
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE     8
+
+                     406     ;       {
+                     407     ;               printf("\n\n --> Bank %02X\n", (u16)banks);
+                     408     ;               addr = BANKADDR_L;
+                     409     ;               for (i=0; i<CBANK_LEN; i++)
+                     410     ;               {
+                     411     ;                       if ((addr&0x0007)==0)
+                     412     ;                               printf ("\n0x%04X:", addr);
+                     413     ; 
+                     414     ;                       addr++;
+                     415     ;                       dbyte = spiflash_ReadByte(SflashAddr);
+                     416     ;                       SflashAddr++;
+                     417     ;                       printf (" %02X", (u16)dbyte);
+                     418     ;               }
+                     419     ;       }
+                     420     ;       return;
+                     421     ; }
+                     422     ; #endif
+                     423     ; #ifdef PROGRAM_CONFIGURATION
+                     424     ; //***************************************************************
+                     425     ; // Program_Config_Data() is to program configuration data into spi flash at the address
+                     426     ; // 0x00100000
+                     427     ; //***************************************************************
+                     428     ; void Program_Config_Data()
+                     429     ; {
+                     430     ;       char idata c;
+                     431     ;       u32 idata ConfigAddr;
+                     432     ;       u8 idata HexVal;
+                     433     ;       u8 idata FirstChar = 0;
+                     434     ;       DisableWrCRam ();
+                     435     ;       printf("\n **** PROGRAM CONFIGURATION DATA ****\n");
+                     436     ;       printf("\n --> Erase configuration data Y/N?: ");
+                     437     ;       c = _get1char();
+                     438     ;       TI = 0;
+                     439     ;       SBUF = c;
+                     440     ;       while (TI==0);
+                     441     ;       if (c!='Y')
+                     442     ;       {
+                     443     ;               c = '1';
+                     444     ;               goto AbortPrgConfigData;
+                     445     ;       }
+                     446     ;       spiflash_eraseConfigMem();
+                     447     ;       spiflash_wrsr_unlock((u8)1);
+                     448     ;       printf("\n --> Waiting for configuration data (equal or less than 512 bytes, ended 
+                             by $): ");   
+                     449     ;       ConfigAddr = GVTY_CONFIG_DATA_ADDR;
+                     450     ; Read_Config_data:
+                     451     ;       c = _get1char();
+                     452     ;       switch (c)
+                     453     ;       {       
+                     454     ;       case 27:
+                     455     ;               goto AbortPrgConfigData;
+                     456     ;               break;
+                     457     ;       case '$':
+                     458     ;               goto EndPrgConfigData;
+                     459     ;               break;
+                     460     ;       default:
+                     461     ;               if (isxdigit(c))
+                     462     ;               {
+                     463     ;                       if (FirstChar++==0)
+                     464     ;                       {
+                     465     ;                               HexVal = (u8)((Asc2Hex((u8*)&c))<<4);
+                     466     ;                       }
+                     467     ;                       else 
+                     468     ;                       {
+                     469     ;                               HexVal |= Asc2Hex((u8*)&c);
+                     470     ;                               spiflash_WriteByte(ConfigAddr++,HexVal);
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE     9
+
+                     471     ;                               if ((ConfigAddr&0x7)==0)
+                     472     ;                                       printf(".");
+                     473     ;                               FirstChar=0;
+                     474     ;                       }
+                     475     ;               }
+                     476     ;               break;
+                     477     ;       }       
+                     478     ;       if (ConfigAddr==(GVTY_CONFIG_END_ADDR+1))
+                     479     ;       {
+                     480     ;               goto EndPrgConfigData;
+                     481     ;       } else {
+                     482     ;               goto Read_Config_data;
+                     483     ;       }
+                     484     ; AbortPrgConfigData:
+                     485     ;       printf ("\n\n --> Abort programming configuration data\n");
+                     486     ;       goto CloseConfigProgramming;
+                     487     ; EndPrgConfigData:
+                     488     ;       printf ("\n\n --> Finish programming configuration data\n");
+                     489     ; CloseConfigProgramming:
+                     490     ;       spiflash_wrsr_unlock(0);
+                     491     ;       return;
+                     492     ; }
+                     493     ; //***************************************************************
+                     494     ; //Load_Config_Data();
+                     495     ; //Load configuration data into the data ram @ 0xE000
+                     496     ; //Input:
+                     497     ; //    LoadConfig = 1: Load configuration data to data ram
+                     498     ; //                       = 0: Dump configuration data onto screen
+                     499     ; //***************************************************************
+                     500     ; void Load_Config_Data(u8 LoadConfig)
+                     501     ; {
+                     502     ;       u32 idata Temp;
+                     503     ;       u8 idata c, d, e;
+                     504     ;       if (LoadConfig==0)
+                     505     ;               printf("\n --> Dump configuration data\n");
+                     506     ;       else
+                     507     ;               printf("\n --> Loading configuration data ");
+                     508     ;       for (Temp=0;Temp<512;Temp++)
+                     509     ;       {
+                     510     ;               c = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR+Temp));
+                     511     ;               d = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR+Temp+1));
+                     512     ;               e = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR+Temp+2));
+                     513     ;               if (c==0xFF && d==0xFF & e==0xFF) 
+                     514     ;                       break;
+                     515     ;               if (LoadConfig==0)
+                     516     ;               {                       
+                     517     ;                       printf("\n@0x%03X: 0x%02X",(u16)(0xFFFF&Temp), (u16)(0xFF&c));
+                     518     ;               }
+                     519     ;               else
+                     520     ;               {
+                     521     ;                       *(u8 xdata *)((u16)(0xFFFF&(GVTY_CONFIG_DRAM_ADDR + Temp))) = c;
+                     522     ;                       if (Temp&0x7==0)
+                     523     ;                               printf(".");
+                     524     ;               }
+                     525     ;       }
+                     526     ;       printf("\n");
+                     527     ;       return;
+                     528     ; }
+                     529     ; #endif
+                     530     ; //***************************************************************
+                     531     ; // salutil_Big2LittleEndian(u32)
+                     532     ; // Sofware Abstraction Utility to convert a 32 bit big endian to 32 bit little endian or 
+                             vs
+                     533     ; //***************************************************************
+                     534     
+----                 535             RSEG  ?PR?SPIFLASH
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    10
+
+0000                 536     Com001B:
+0000                 537     L?0028:
+                     538             USING   0
+0000 900000   F      539             MOV     DPTR,#Eram2SflashAddr+01H
+0003 E0              540             MOVX    A,@DPTR
+0004 2400            541             ADD     A,#00H
+0006 FF              542             MOV     R7,A
+0007 900000   F      543             MOV     DPTR,#Eram2SflashAddr
+000A E0              544             MOVX    A,@DPTR
+000B 347F            545             ADDC    A,#07FH
+000D FE              546             MOV     R6,A
+000E                 547     L?0029:
+000E C3              548             CLR     C
+000F 900000   F      549             MOV     DPTR,#Uart2EramAddr+01H
+0012 E0              550             MOVX    A,@DPTR
+0013 9F              551             SUBB    A,R7
+0014 FF              552             MOV     R7,A
+0015 900000   F      553             MOV     DPTR,#Uart2EramAddr
+0018 E0              554             MOVX    A,@DPTR
+0019 9E              555             SUBB    A,R6
+001A FE              556             MOV     R6,A
+001B E4              557             CLR     A
+001C FC              558             MOV     R4,A
+001D FD              559             MOV     R5,A
+001E 900000   F      560             MOV     DPTR,#SflashAddr
+0021 120000   F      561             LCALL   ?C?LLDXDATA0
+0024 020000   F      562             LJMP    ?C?LADD
+0027                 563     L?0030:
+                     564             USING   0
+0027 8F00     F      565             MOV     ?_spiflash_pageWrite?BYTE+07H,R7
+0029 8E00     F      566             MOV     ?_spiflash_pageWrite?BYTE+06H,R6
+002B 8D00     F      567             MOV     ?_spiflash_pageWrite?BYTE+05H,R5
+002D 8C00     F      568             MOV     ?_spiflash_pageWrite?BYTE+04H,R4
+002F 900000   F      569             MOV     DPTR,#Eram2SflashAddr
+0032 E0              570             MOVX    A,@DPTR
+0033 F500     F      571             MOV     ?_spiflash_pageWrite?BYTE+08H,A
+0035 A3              572             INC     DPTR
+0036 E0              573             MOVX    A,@DPTR
+0037 F500     F      574             MOV     ?_spiflash_pageWrite?BYTE+09H,A
+0039                 575     L?0031:
+0039 900000   F      576             MOV     DPTR,#SflashAddr
+003C 020000   F      577             LJMP    ?C?LLDXDATA
+003F                 578     L?0032:
+                     579             USING   0
+003F 8F00     F      580             MOV     ?_spiflash_pageReadVerify?BYTE+07H,R7
+0041 8E00     F      581             MOV     ?_spiflash_pageReadVerify?BYTE+06H,R6
+0043 8D00     F      582             MOV     ?_spiflash_pageReadVerify?BYTE+05H,R5
+0045 8C00     F      583             MOV     ?_spiflash_pageReadVerify?BYTE+04H,R4
+0047 900000   F      584             MOV     DPTR,#Eram2SflashAddr
+004A E0              585             MOVX    A,@DPTR
+004B F500     F      586             MOV     ?_spiflash_pageReadVerify?BYTE+08H,A
+004D A3              587             INC     DPTR
+004E E0              588             MOVX    A,@DPTR
+004F F500     F      589             MOV     ?_spiflash_pageReadVerify?BYTE+09H,A
+0051 22              590             RET     
+0052                 591     L?0034:
+                     592             USING   0
+0052 900000   F      593             MOV     DPTR,#Eram2SflashAddr
+0055 7421            594             MOV     A,#021H
+0057 F0              595             MOVX    @DPTR,A
+0058 A3              596             INC     DPTR
+0059 E4              597             CLR     A
+005A F0              598             MOVX    @DPTR,A
+005B 7800     F      599             MOV     R0,#LOW (ErrCnt+09H)
+005D E6              600             MOV     A,@R0
+005E 18              601             DEC     R0
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    11
+
+005F 46              602             ORL     A,@R0
+0060 22              603             RET     
+                     604     ; END OF Com001B
+                     605     
+                     606     ; u32 swUtil_SwapEndian(u32 var32)
+                     607     
+----                 608             RSEG  ?PR?_swUtil_SwapEndian?SPIFLASH
+0000                 609     _swUtil_SwapEndian:
+                     610             USING   0
+                     611                             ; SOURCE LINE # 369
+0000 8F00     F      612             MOV     var32?040+03H,R7
+0002 8E00     F      613             MOV     var32?040+02H,R6
+0004 8D00     F      614             MOV     var32?040+01H,R5
+0006 8C00     F      615             MOV     var32?040,R4
+                     616     ; {
+                     617                             ; SOURCE LINE # 370
+                     618     ;       return ((var32&0x000000FF)<<24 |
+                     619                             ; SOURCE LINE # 371
+0008 E4              620             CLR     A
+0009 FF              621             MOV     R7,A
+000A E4              622             CLR     A
+000B FD              623             MOV     R5,A
+000C FC              624             MOV     R4,A
+000D 7808            625             MOV     R0,#08H
+000F 120000   F      626             LCALL   ?C?LSHL
+0012 C004            627             PUSH    AR4
+0014 C005            628             PUSH    AR5
+0016 C006            629             PUSH    AR6
+0018 C007            630             PUSH    AR7
+001A E500     F      631             MOV     A,var32?040+03H
+001C FF              632             MOV     R7,A
+001D E4              633             CLR     A
+001E FE              634             MOV     R6,A
+001F FD              635             MOV     R5,A
+0020 FC              636             MOV     R4,A
+0021 7818            637             MOV     R0,#018H
+0023 120000   F      638             LCALL   ?C?LSHL
+0026 D003            639             POP     AR3
+0028 D002            640             POP     AR2
+002A D001            641             POP     AR1
+002C D000            642             POP     AR0
+002E 120000   F      643             LCALL   ?C?LOR
+0031 C004            644             PUSH    AR4
+0033 C005            645             PUSH    AR5
+0035 C006            646             PUSH    AR6
+0037 C007            647             PUSH    AR7
+0039 E4              648             CLR     A
+003A FF              649             MOV     R7,A
+003B FE              650             MOV     R6,A
+003C E500     F      651             MOV     A,var32?040+01H
+003E FD              652             MOV     R5,A
+003F E4              653             CLR     A
+0040 FC              654             MOV     R4,A
+0041 7808            655             MOV     R0,#08H
+0043 120000   F      656             LCALL   ?C?ULSHR
+0046 D003            657             POP     AR3
+0048 D002            658             POP     AR2
+004A D001            659             POP     AR1
+004C D000            660             POP     AR0
+004E 120000   F      661             LCALL   ?C?LOR
+0051 C004            662             PUSH    AR4
+0053 C005            663             PUSH    AR5
+0055 C006            664             PUSH    AR6
+0057 C007            665             PUSH    AR7
+0059 E4              666             CLR     A
+005A FF              667             MOV     R7,A
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    12
+
+005B FE              668             MOV     R6,A
+005C FD              669             MOV     R5,A
+005D E500     F      670             MOV     A,var32?040
+005F FC              671             MOV     R4,A
+0060 7818            672             MOV     R0,#018H
+0062 120000   F      673             LCALL   ?C?ULSHR
+0065 D003            674             POP     AR3
+0067 D002            675             POP     AR2
+0069 D001            676             POP     AR1
+006B D000            677             POP     AR0
+006D 120000   F      678             LCALL   ?C?LOR
+                     679     ;                       (var32&0x0000FF00)<<8 |
+                     680     ;                       (var32&0x00FF0000)>>8 |
+                     681     ;                       (var32&0xFF000000)>>24);
+                     682     ; }             
+                     683                             ; SOURCE LINE # 375
+0070                 684     ?C0001:
+0070 22              685             RET     
+                     686     ; END OF _swUtil_SwapEndian
+                     687     
+                     688     ; //---------------------------------------------------------------------------
+                     689     ; // void memUtil_ClearEram(u8 SetData)
+                     690     ; // Description: to clear ERAM from 2100 to 0xFFFF
+                     691     ; //---------------------------------------------------------------------------
+                     692     ; void memUtil_ClearEram(u8 SetData)
+                     693     
+----                 694             RSEG  ?PR?_memUtil_ClearEram?SPIFLASH
+0000                 695     _memUtil_ClearEram:
+                     696             USING   0
+                     697                             ; SOURCE LINE # 380
+                     698     ;---- Variable 'SetData?141' assigned to Register 'R7' ----
+                     699     ; {
+                     700                             ; SOURCE LINE # 381
+                     701     ;       Uart2EramAddr=0x2100;
+                     702                             ; SOURCE LINE # 382
+0000 900000   F      703             MOV     DPTR,#Uart2EramAddr
+0003 7421            704             MOV     A,#021H
+0005 F0              705             MOVX    @DPTR,A
+0006 A3              706             INC     DPTR
+0007 E4              707             CLR     A
+0008 F0              708             MOVX    @DPTR,A
+                     709     ; Erase_Ram:
+                     710                             ; SOURCE LINE # 383
+0009                 711     ?_memUtil_ClearEram?Erase_Ram:
+                     712     ;       *(u8 xdata *)Uart2EramAddr = SetData;
+                     713                             ; SOURCE LINE # 384
+0009 900000   F      714             MOV     DPTR,#Uart2EramAddr
+000C E0              715             MOVX    A,@DPTR
+000D FC              716             MOV     R4,A
+000E A3              717             INC     DPTR
+000F E0              718             MOVX    A,@DPTR
+0010 FD              719             MOV     R5,A
+0011 F582            720             MOV     DPL,A
+0013 8C83            721             MOV     DPH,R4
+0015 EF              722             MOV     A,R7
+0016 F0              723             MOVX    @DPTR,A
+                     724     ;       if (Uart2EramAddr<0xDFFF){
+                     725                             ; SOURCE LINE # 385
+0017 C3              726             CLR     C
+0018 ED              727             MOV     A,R5
+0019 94FF            728             SUBB    A,#0FFH
+001B EC              729             MOV     A,R4
+001C 94DF            730             SUBB    A,#0DFH
+001E 500C            731             JNC     ?C0004
+                     732     ;               Uart2EramAddr = Uart2EramAddr+1;
+                     733                             ; SOURCE LINE # 386
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    13
+
+0020 900000   F      734             MOV     DPTR,#Uart2EramAddr
+0023 E4              735             CLR     A
+0024 75F001          736             MOV     B,#01H
+0027 120000   F      737             LCALL   ?C?IILDX
+                     738     ;               goto Erase_Ram;
+                     739                             ; SOURCE LINE # 387
+002A 80DD            740             SJMP    ?_memUtil_ClearEram?Erase_Ram
+                     741     ;       }
+                     742                             ; SOURCE LINE # 388
+                     743     ;       return;
+                     744     ; }
+                     745                             ; SOURCE LINE # 390
+002C                 746     ?C0004:
+002C 22              747             RET     
+                     748     ; END OF _memUtil_ClearEram
+                     749     
+                     750     ; 
+                     751     ; extern void spiflash_pageWrite(u32  startAddr, u32  endAddr, u16  srcAddress);
+                     752     ; extern u8 spiflash_pageReadVerify(u32  startAddr, u32  endAddr, u16 srcAddress);
+                     753     ; //---------------------------------------------------------------------------
+                     754     ; //void Download_Uart2Sflash()
+                     755     ; //Handle the task to download code from UART to Sflash
+                     756     ; //---------------------------------------------------------------------------
+                     757     ; #if 1
+                     758     ; void Download_Uart2Sflash()
+                     759     
+----                 760             RSEG  ?PR?Download_Uart2Sflash?SPIFLASH
+0000                 761     Download_Uart2Sflash:
+                     762             USING   0
+                     763                             ; SOURCE LINE # 399
+                     764     ; {
+                     765                             ; SOURCE LINE # 400
+                     766     ;       u8 idata c;
+                     767     ;       printf("\n --> Program SFLASH Y/N? :");
+                     768                             ; SOURCE LINE # 402
+0000 7A00     F      769             MOV     R2,#HIGH (?SC_0)
+0002 7900     F      770             MOV     R1,#LOW (?SC_0)
+                     771     ;       c = _get1char(); 
+                     772                             ; SOURCE LINE # 403
+                     773     ;       if (c!='Y')
+                     774                             ; SOURCE LINE # 404
+0004 120000   F      775             LCALL   L?0035
+0007 6003            776             JZ      ?C0005
+                     777     ;       {
+                     778                             ; SOURCE LINE # 405
+                     779     ;               c = '1';
+                     780                             ; SOURCE LINE # 406
+0009 7631            781             MOV     @R0,#031H
+000B 22              782             RET     
+                     783     ;               return;
+                     784     ;       }
+                     785                             ; SOURCE LINE # 408
+000C                 786     ?C0005:
+                     787     ;       c = 0;
+                     788                             ; SOURCE LINE # 409
+000C E4              789             CLR     A
+000D 7800     F      790             MOV     R0,#LOW (c?242)
+000F F6              791             MOV     @R0,A
+                     792     ;       printf("\n --> Delete current code Y/N? :");
+                     793                             ; SOURCE LINE # 410
+0010 7A00     F      794             MOV     R2,#HIGH (?SC_28)
+0012 7900     F      795             MOV     R1,#LOW (?SC_28)
+                     796     ;       c = _get1char(); 
+                     797                             ; SOURCE LINE # 411
+                     798     ;       if (c!='Y')
+                     799                             ; SOURCE LINE # 412
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    14
+
+0014 120000   F      800             LCALL   L?0035
+0017 6003            801             JZ      ?C0007
+                     802     ;       {
+                     803                             ; SOURCE LINE # 413
+                     804     ;               c = '1';
+                     805                             ; SOURCE LINE # 414
+0019 7631            806             MOV     @R0,#031H
+001B 22              807             RET     
+                     808     ; 
+                     809     ;               return;
+                     810     ;       }
+                     811                             ; SOURCE LINE # 417
+001C                 812     ?C0007:
+                     813     ; 
+                     814     ;       spiflash_wrsr_unlock(1);
+                     815                             ; SOURCE LINE # 419
+001C 7F01            816             MOV     R7,#01H
+001E 120000   F      817             LCALL   _spiflash_wrsr_unlock
+                     818     ; 
+                     819     ;       spiflash_eraseLower256k();
+                     820                             ; SOURCE LINE # 421
+0021 120000   F      821             LCALL   spiflash_eraseLower256k
+                     822     ; 
+                     823     ; Program_Common_bank:
+                     824                             ; SOURCE LINE # 423
+0024                 825     ?Download_Uart2Sflash?Program_Common_bank:
+                     826     ; 
+                     827     ;       {
+                     828                             ; SOURCE LINE # 425
+                     829     ;               memUtil_ClearEram(SetDataFF);
+                     830                             ; SOURCE LINE # 426
+0024 7FFF            831             MOV     R7,#0FFH
+0026 120000   F      832             LCALL   _memUtil_ClearEram
+                     833     ;               printf("\n\n ##### Download code for - Common #####\n");
+                     834                             ; SOURCE LINE # 427
+0029 7BFF            835             MOV     R3,#0FFH
+002B 7A00     F      836             MOV     R2,#HIGH (?SC_61)
+002D 7900     F      837             MOV     R1,#LOW (?SC_61)
+                     838     ;               Uart2EramAddr = 0;
+                     839                             ; SOURCE LINE # 428
+                     840     ;               ParseHexRecord(&ErrCnt[0], &ProgCnt[0]);
+                     841                             ; SOURCE LINE # 429
+002F 120000   F      842             LCALL   L?0033
+                     843     ; 
+                     844     ;               SflashAddr = (u32)(CRAM_START - SFLASH_CRAM_OFFSET);
+                     845                             ; SOURCE LINE # 431
+0032 900000   F      846             MOV     DPTR,#SflashAddr
+0035 120000   F      847             LCALL   ?C?LSTKXDATA
+0038 00              848             DB      00H
+0039 00              849             DB      00H
+003A 01              850             DB      01H
+003B 00              851             DB      00H
+                     852     ;               Eram2SflashAddr = (u16)CRAM_START;
+                     853                             ; SOURCE LINE # 432
+                     854     ;               if (ErrCnt[4]==0){
+                     855                             ; SOURCE LINE # 433
+003C 120000   F      856             LCALL   L?0034
+003F 6003            857             JZ      $ + 5H
+0041 020000   F      858             LJMP    ?C0025
+                     859     ;                       printf("\n --> Writing to sflash ");
+                     860                             ; SOURCE LINE # 434
+0044 120000   F      861             LCALL   L?0036
+                     862     ;                       spiflash_pageWrite(SflashAddr,(SflashAddr + (Uart2EramAddr - Eram2S
+                             flashAddr)) , Eram2SflashAddr);
+                     863                             ; SOURCE LINE # 435
+0047 900000   F      864             MOV     DPTR,#Eram2SflashAddr
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    15
+
+004A E0              865             MOVX    A,@DPTR
+004B FE              866             MOV     R6,A
+004C A3              867             INC     DPTR
+004D E0              868             MOVX    A,@DPTR
+004E FF              869             MOV     R7,A
+004F 120000   F      870             LCALL   L?0029
+0052 120000   F      871             LCALL   L?0030
+0055 120000   F      872             LCALL   _spiflash_pageWrite
+                     873     ;                       if(spiflash_pageReadVerify(SflashAddr,(SflashAddr + (Uart2EramAddr 
+                             - Eram2SflashAddr)) , Eram2SflashAddr)==0){
+                     874                             ; SOURCE LINE # 436
+0058 900000   F      875             MOV     DPTR,#Eram2SflashAddr
+005B E0              876             MOVX    A,@DPTR
+005C FE              877             MOV     R6,A
+005D A3              878             INC     DPTR
+005E E0              879             MOVX    A,@DPTR
+005F FF              880             MOV     R7,A
+0060 120000   F      881             LCALL   L?0029
+0063 120000   F      882             LCALL   L?0032
+0066 120000   F      883             LCALL   L?0031
+0069 120000   F      884             LCALL   _spiflash_pageReadVerify
+006C EF              885             MOV     A,R7
+006D 7003            886             JNZ     ?Download_Uart2Sflash?Prog_Bank0
+                     887     ;                               goto End_sflash_programming;
+                     888                             ; SOURCE LINE # 437
+006F 020000   F      889             LJMP    ?Download_Uart2Sflash?End_sflash_programming
+                     890     ;                       }
+                     891                             ; SOURCE LINE # 438
+                     892     ;                       else{
+                     893                             ; SOURCE LINE # 439
+                     894     ;                               goto Prog_Bank0;
+                     895                             ; SOURCE LINE # 440
+                     896     ;                       }
+                     897                             ; SOURCE LINE # 441
+                     898     ; #if 0
+                     899     ; Cont_ProgSflash1:                     
+                     900     ;                       spiflash_WriteByte(SflashAddr, *(u8 xdata *)Eram2SflashAddr);
+                     901     ;                       if (spiflash_ReadByte(SflashAddr)!= *(u8 xdata *)Eram2SflashAddr){
+                     902     ;                               printf("\n\n *** SFLASH programming error @ 0x%02X%04X - tr
+                             y again\n\n",(u16)(0xFF&(SflashAddr>>16)),(u16)(0xFFFF&SflashAddr));
+                     903     ;                               goto End_sflash_programming;
+                     904     ;                       }
+                     905     ;                       
+                     906     ;                       if ((Eram2SflashAddr & 0xFF)==0){
+                     907     ;                               printf(".");
+                     908     ;                       }
+                     909     ;                       if (Eram2SflashAddr<Uart2EramAddr){
+                     910     ;                               SflashAddr++;
+                     911     ;                               Eram2SflashAddr++;
+                     912     ;                               goto Cont_ProgSflash1;
+                     913     ;                       } else {
+                     914     ;                               goto Prog_Bank0;
+                     915     ;                       }
+                     916     ; #endif        
+                     917     ; 
+                     918     ;               } else {
+                     919                             ; SOURCE LINE # 462
+                     920     ;                       printf("\n *** ERROR downloading from UART to RAM");
+                     921     ;                       goto End_sflash_programming;
+                     922     ;               }
+                     923                             ; SOURCE LINE # 465
+                     924     ;       }
+                     925                             ; SOURCE LINE # 466
+                     926     ; Prog_Bank0:
+                     927                             ; SOURCE LINE # 467
+0072                 928     ?Download_Uart2Sflash?Prog_Bank0:
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    16
+
+                     929     ;       
+                     930     ;       c = 0;
+                     931                             ; SOURCE LINE # 469
+0072 E4              932             CLR     A
+0073 7800     F      933             MOV     R0,#LOW (c?242)
+0075 F6              934             MOV     @R0,A
+                     935     ;       //printf("\nProg_Bank0, %bu\n",c);
+                     936     ;       //spiflash_wrsr_unlock((u8)1);
+                     937     ;       //    spiflash_wren(1);
+                     938     ; Program_Next_bank:
+                     939                             ; SOURCE LINE # 473
+0076                 940     ?Download_Uart2Sflash?Program_Next_bank:
+                     941     ;       {
+                     942                             ; SOURCE LINE # 474
+                     943     ;               memUtil_ClearEram(SetDataFF);
+                     944                             ; SOURCE LINE # 475
+0076 7FFF            945             MOV     R7,#0FFH
+0078 120000   F      946             LCALL   _memUtil_ClearEram
+                     947     ;               printf("\n\n ##### Download code for - BANK-%02bX #####\n", c);
+                     948                             ; SOURCE LINE # 476
+007B 7BFF            949             MOV     R3,#0FFH
+007D 7A00     F      950             MOV     R2,#HIGH (?SC_170)
+007F 7900     F      951             MOV     R1,#LOW (?SC_170)
+0081 7800     F      952             MOV     R0,#LOW (c?242)
+0083 E6              953             MOV     A,@R0
+0084 F500     F      954             MOV     ?_printf?BYTE+03H,A
+                     955     ;               //BANKSEL = c;
+                     956     ;               Uart2EramAddr = 0;
+                     957                             ; SOURCE LINE # 478
+                     958     ;               ParseHexRecord(&ErrCnt[0], &ProgCnt[0]);
+                     959                             ; SOURCE LINE # 479
+0086 120000   F      960             LCALL   L?0033
+                     961     ;               //printf("\nparsing done\n");
+                     962     ;               if (c==0){
+                     963                             ; SOURCE LINE # 481
+0089 7800     F      964             MOV     R0,#LOW (c?242)
+008B E6              965             MOV     A,@R0
+008C FB              966             MOV     R3,A
+008D 700C            967             JNZ     ?C0016
+                     968     ;                       SflashAddr = (u32)((CRAM_START - SFLASH_CRAM_OFFSET) + (BANKADDR_L 
+                             - CRAM_START));
+                     969                             ; SOURCE LINE # 482
+008F 900000   F      970             MOV     DPTR,#SflashAddr
+0092 120000   F      971             LCALL   ?C?LSTKXDATA
+0095 00              972             DB      00H
+0096 00              973             DB      00H
+0097 80              974             DB      080H
+0098 00              975             DB      00H
+                     976     ;                       //Eram2SflashAddr = (u16)CRAM_START;
+                     977     ;               } else {
+                     978                             ; SOURCE LINE # 484
+0099 8028            979             SJMP    ?C0017
+009B                 980     ?C0016:
+                     981     ;                       SflashAddr = (u32)(((c-1)*6)+0x10-0x02);
+                     982                             ; SOURCE LINE # 485
+009B EB              983             MOV     A,R3
+009C FF              984             MOV     R7,A
+009D 7E00            985             MOV     R6,#00H
+009F 7C00            986             MOV     R4,#00H
+00A1 7D06            987             MOV     R5,#06H
+00A3 120000   F      988             LCALL   ?C?IMUL
+00A6 EF              989             MOV     A,R7
+00A7 2408            990             ADD     A,#08H
+00A9 FF              991             MOV     R7,A
+00AA E4              992             CLR     A
+00AB 3E              993             ADDC    A,R6
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    17
+
+00AC FE              994             MOV     R6,A
+00AD E4              995             CLR     A
+00AE FD              996             MOV     R5,A
+00AF 900000   F      997             MOV     DPTR,#SflashAddr
+00B2 120000   F      998             LCALL   ?C?LSTXDATA
+                     999     ;                       SflashAddr = SflashAddr<<12;
+                    1000                             ; SOURCE LINE # 486
+00B5 120000   F     1001             LCALL   L?0031
+00B8 780C           1002             MOV     R0,#0CH
+00BA 120000   F     1003             LCALL   ?C?LSHL
+00BD 900000   F     1004             MOV     DPTR,#SflashAddr
+00C0 120000   F     1005             LCALL   ?C?LSTXDATA
+                    1006     ;                       //Eram2SflashAddr = BANKADDR_L;
+                    1007     ;               }
+                    1008                             ; SOURCE LINE # 488
+00C3                1009     ?C0017:
+                    1010     ;               Eram2SflashAddr = (u16)CRAM_START;
+                    1011                             ; SOURCE LINE # 489
+                    1012     ;               if (ErrCnt[4]==0){
+                    1013                             ; SOURCE LINE # 490
+00C3 120000   F     1014             LCALL   L?0034
+00C6 701D           1015             JNZ     ?C0018
+                    1016     ;                       printf("\n --> Writing to sflash ");
+                    1017                             ; SOURCE LINE # 491
+00C8 120000   F     1018             LCALL   L?0036
+                    1019     ; 
+                    1020     ;                       spiflash_pageWrite(SflashAddr,(SflashAddr + (Uart2EramAddr - (Eram2
+                             SflashAddr+0x7F00))) , Eram2SflashAddr);
+                    1021                             ; SOURCE LINE # 493
+00CB 120000   F     1022             LCALL   L?0028
+00CE 120000   F     1023             LCALL   L?0030
+00D1 120000   F     1024             LCALL   _spiflash_pageWrite
+                    1025     ;                       if(spiflash_pageReadVerify(SflashAddr,(SflashAddr + (Uart2EramAddr 
+                             - (Eram2SflashAddr+0x7F00))) , Eram2SflashAddr)==0){
+                    1026                             ; SOURCE LINE # 494
+00D4 120000   F     1027             LCALL   L?0028
+00D7 120000   F     1028             LCALL   L?0032
+00DA 120000   F     1029             LCALL   L?0031
+00DD 120000   F     1030             LCALL   _spiflash_pageReadVerify
+00E0 EF             1031             MOV     A,R7
+00E1 700A           1032             JNZ     ?Download_Uart2Sflash?Check_next_bank
+                    1033     ;                               goto End_sflash_programming;
+                    1034                             ; SOURCE LINE # 495
+00E3 801C           1035             SJMP    ?Download_Uart2Sflash?End_sflash_programming
+                    1036     ;                       }
+                    1037                             ; SOURCE LINE # 496
+                    1038     ;                       else{
+                    1039                             ; SOURCE LINE # 497
+                    1040     ;                               goto Check_next_bank;
+                    1041                             ; SOURCE LINE # 498
+                    1042     ;                       }
+                    1043                             ; SOURCE LINE # 499
+                    1044     ; #if 0
+                    1045     ; Cont_ProgSflash:
+                    1046     ;       
+                    1047     ;                       spiflash_WriteByte(SflashAddr, *(u8 xdata *)Eram2SflashAddr);
+                    1048     ;                       if (spiflash_ReadByte(SflashAddr)!= *(u8 xdata *)Eram2SflashAddr){
+                    1049     ;                               printf("\n\n *** SFLASH programming error @ 0x%02X%04X - tr
+                             y again\n\n",(u16)(0xFF&(SflashAddr>>16)),(u16)(0xFFFF&SflashAddr));
+                    1050     ;                               goto End_sflash_programming;
+                    1051     ;                       }
+                    1052     ;                       
+                    1053     ;                       if ((Eram2SflashAddr & 0xFF)==0){
+                    1054     ;                               printf(".");
+                    1055     ;                       }
+                    1056     ;                       if ((Eram2SflashAddr + 0x7F00)<Uart2EramAddr){
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    18
+
+                    1057     ;                               SflashAddr++;
+                    1058     ;                               Eram2SflashAddr++;
+                    1059     ;                               goto Cont_ProgSflash;
+                    1060     ;                       } else {
+                    1061     ;                               goto Check_next_bank;
+                    1062     ;                       }
+                    1063     ; #endif                        
+                    1064     ;               } else {
+                    1065                             ; SOURCE LINE # 520
+00E5                1066     ?C0018:
+                    1067     ;                       printf("\n *** ERROR downloading from UART to RAM");
+                    1068                             ; SOURCE LINE # 521
+00E5                1069     ?C0025:
+00E5 7BFF           1070             MOV     R3,#0FFH
+00E7 7A00     F     1071             MOV     R2,#HIGH (?SC_129)
+00E9 7900     F     1072             MOV     R1,#LOW (?SC_129)
+                    1073     ;                       goto End_sflash_programming;
+                    1074                             ; SOURCE LINE # 522
+00EB 8011           1075             SJMP    ?C0026
+                    1076     ;               }
+                    1077                             ; SOURCE LINE # 523
+                    1078     ;       }
+                    1079                             ; SOURCE LINE # 524
+                    1080     ; Check_next_bank:
+                    1081                             ; SOURCE LINE # 525
+00ED                1082     ?Download_Uart2Sflash?Check_next_bank:
+                    1083     ;       c++;
+                    1084                             ; SOURCE LINE # 526
+00ED 7800     F     1085             MOV     R0,#LOW (c?242)
+00EF 06             1086             INC     @R0
+                    1087     ;       if (c!=8){
+                    1088                             ; SOURCE LINE # 527
+00F0 E6             1089             MOV     A,@R0
+00F1 6408           1090             XRL     A,#08H
+00F3 6003           1091             JZ      ?C0023
+                    1092     ;               goto Program_Next_bank;
+                    1093                             ; SOURCE LINE # 528
+00F5 020000   F     1094             LJMP    ?Download_Uart2Sflash?Program_Next_bank
+                    1095     ;       } else {
+                    1096                             ; SOURCE LINE # 529
+00F8                1097     ?C0023:
+                    1098     ;               printf("\n *** Programming sflash done!\n");
+                    1099                             ; SOURCE LINE # 530
+00F8 7BFF           1100             MOV     R3,#0FFH
+00FA 7A00     F     1101             MOV     R2,#HIGH (?SC_217)
+00FC 7900     F     1102             MOV     R1,#LOW (?SC_217)
+00FE                1103     ?C0026:
+00FE 120000   F     1104             LCALL   _printf
+                    1105     ;       }
+                    1106                             ; SOURCE LINE # 531
+                    1107     ; End_sflash_programming:
+                    1108                             ; SOURCE LINE # 532
+0101                1109     ?Download_Uart2Sflash?End_sflash_programming:
+                    1110     ;       spiflash_wrsr_unlock(0);
+                    1111                             ; SOURCE LINE # 533
+0101 E4             1112             CLR     A
+0102 FF             1113             MOV     R7,A
+0103 120000   F     1114             LCALL   _spiflash_wrsr_unlock
+                    1115     ;       DisableWrCRam();
+                    1116                             ; SOURCE LINE # 534
+0106 120000   F     1117             LCALL   DisableWrCRam
+                    1118     ;       return;
+                    1119     ; }
+                    1120                             ; SOURCE LINE # 536
+0109                1121     ?C0006:
+0109 22             1122             RET     
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    19
+
+010A                1123     L?0033:
+010A 120000   F     1124             LCALL   _printf
+010D E4             1125             CLR     A
+010E 900000   F     1126             MOV     DPTR,#Uart2EramAddr
+0111 F0             1127             MOVX    @DPTR,A
+0112 A3             1128             INC     DPTR
+0113 F0             1129             MOVX    @DPTR,A
+0114 7F00     F     1130             MOV     R7,#LOW (ErrCnt)
+0116 7D00     F     1131             MOV     R5,#LOW (ProgCnt)
+0118 120000   F     1132             LCALL   _ParseHexRecord
+011B 22             1133             RET     
+011C                1134     L?0035:
+011C 7BFF           1135             MOV     R3,#0FFH
+011E 120000   F     1136             LCALL   _printf
+0121 120000   F     1137             LCALL   _get1char
+0124 7800     F     1138             MOV     R0,#LOW (c?242)
+0126 EF             1139             MOV     A,R7
+0127 F6             1140             MOV     @R0,A
+0128 6459           1141             XRL     A,#059H
+012A 22             1142             RET     
+012B                1143     L?0036:
+012B 7BFF           1144             MOV     R3,#0FFH
+012D 7A00     F     1145             MOV     R2,#HIGH (?SC_104)
+012F 7900     F     1146             MOV     R1,#LOW (?SC_104)
+0131 120000   F     1147             LCALL   _printf
+0134 22             1148             RET     
+                    1149     ; END OF Download_Uart2Sflash
+                    1150     
+                    1151             END
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    20
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E                                    T Y P E  V A L U E   ATTRIBUTES
+
+?C0001. . . . . . . . . . . . . . . . .    C ADDR   0070H   R   SEG=?PR?_SWUTIL_SWAPENDIAN?SPIFLASH
+?C0004. . . . . . . . . . . . . . . . .    C ADDR   002CH   R   SEG=?PR?_MEMUTIL_CLEARERAM?SPIFLASH
+?C0005. . . . . . . . . . . . . . . . .    C ADDR   000CH   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?C0006. . . . . . . . . . . . . . . . .    C ADDR   0109H   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?C0007. . . . . . . . . . . . . . . . .    C ADDR   001CH   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?C0016. . . . . . . . . . . . . . . . .    C ADDR   009BH   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?C0017. . . . . . . . . . . . . . . . .    C ADDR   00C3H   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?C0018. . . . . . . . . . . . . . . . .    C ADDR   00E5H   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?C0023. . . . . . . . . . . . . . . . .    C ADDR   00F8H   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?C0025. . . . . . . . . . . . . . . . .    C ADDR   00E5H   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?C0026. . . . . . . . . . . . . . . . .    C ADDR   00FEH   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?C?IILDX. . . . . . . . . . . . . . . .    C ADDR   -----       EXT
+?C?IMUL . . . . . . . . . . . . . . . .    C ADDR   -----       EXT
+?C?LADD . . . . . . . . . . . . . . . .    C ADDR   -----       EXT
+?C?LLDXDATA . . . . . . . . . . . . . .    C ADDR   -----       EXT
+?C?LLDXDATA0. . . . . . . . . . . . . .    C ADDR   -----       EXT
+?C?LOR. . . . . . . . . . . . . . . . .    C ADDR   -----       EXT
+?C?LSHL . . . . . . . . . . . . . . . .    C ADDR   -----       EXT
+?C?LSTKXDATA. . . . . . . . . . . . . .    C ADDR   -----       EXT
+?C?LSTXDATA . . . . . . . . . . . . . .    C ADDR   -----       EXT
+?C?ULSHR. . . . . . . . . . . . . . . .    C ADDR   -----       EXT
+?CO?SPIFLASH. . . . . . . . . . . . . .    C SEG    00F9H       REL=UNIT
+?DOWNLOAD_UART2SFLASH?CHECK_NEXT_BANK .    C ADDR   00EDH   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?DOWNLOAD_UART2SFLASH?END_SFLASH_PROGRAMMINC ADDR   0101H   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?DOWNLOAD_UART2SFLASH?PROGRAM_COMMON_BANK  C ADDR   0024H   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?DOWNLOAD_UART2SFLASH?PROGRAM_NEXT_BANK    C ADDR   0076H   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?DOWNLOAD_UART2SFLASH?PROG_BANK0. . . .    C ADDR   0072H   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+?DT?_SWUTIL_SWAPENDIAN?SPIFLASH . . . .    D SEG    0004H       REL=UNIT
+?ID?DOWNLOAD_UART2SFLASH?SPIFLASH . . .    I SEG    0001H       REL=UNIT
+?PR?DOWNLOAD_UART2SFLASH?SPIFLASH . . .    C SEG    0135H       REL=UNIT
+?PR?SPIFLASH. . . . . . . . . . . . . .    C SEG    0061H       REL=UNIT
+?PR?_MEMUTIL_CLEARERAM?SPIFLASH . . . .    C SEG    002DH       REL=UNIT
+?PR?_SWUTIL_SWAPENDIAN?SPIFLASH . . . .    C SEG    0071H       REL=UNIT
+?SC_0 . . . . . . . . . . . . . . . . .    C ADDR   0000H   R   SEG=?CO?SPIFLASH
+?SC_104 . . . . . . . . . . . . . . . .    C ADDR   0068H   R   SEG=?CO?SPIFLASH
+?SC_129 . . . . . . . . . . . . . . . .    C ADDR   0081H   R   SEG=?CO?SPIFLASH
+?SC_170 . . . . . . . . . . . . . . . .    C ADDR   00AAH   R   SEG=?CO?SPIFLASH
+?SC_217 . . . . . . . . . . . . . . . .    C ADDR   00D9H   R   SEG=?CO?SPIFLASH
+?SC_28. . . . . . . . . . . . . . . . .    C ADDR   001CH   R   SEG=?CO?SPIFLASH
+?SC_61. . . . . . . . . . . . . . . . .    C ADDR   003DH   R   SEG=?CO?SPIFLASH
+?_MEMUTIL_CLEARERAM?ERASE_RAM . . . . .    C ADDR   0009H   R   SEG=?PR?_MEMUTIL_CLEARERAM?SPIFLASH
+?_PRINTF?BYTE . . . . . . . . . . . . .    D ADDR   -----       EXT
+?_SPIFLASH_PAGEREADVERIFY?BYTE. . . . .    D ADDR   -----       EXT
+?_SPIFLASH_PAGEWRITE?BYTE . . . . . . .    D ADDR   -----       EXT
+?_SWUTIL_SWAPENDIAN?BYTE. . . . . . . .    D ADDR   0000H   R   SEG=?DT?_SWUTIL_SWAPENDIAN?SPIFLASH
+AC. . . . . . . . . . . . . . . . . . .    B ADDR   00D0H.6 A   
+ACC . . . . . . . . . . . . . . . . . .    D ADDR   00E0H   A   
+AR0 . . . . . . . . . . . . . . . . . .    D ADDR   0000H   A   
+AR1 . . . . . . . . . . . . . . . . . .    D ADDR   0001H   A   
+AR2 . . . . . . . . . . . . . . . . . .    D ADDR   0002H   A   
+AR3 . . . . . . . . . . . . . . . . . .    D ADDR   0003H   A   
+AR4 . . . . . . . . . . . . . . . . . .    D ADDR   0004H   A   
+AR5 . . . . . . . . . . . . . . . . . .    D ADDR   0005H   A   
+AR6 . . . . . . . . . . . . . . . . . .    D ADDR   0006H   A   
+AR7 . . . . . . . . . . . . . . . . . .    D ADDR   0007H   A   
+B . . . . . . . . . . . . . . . . . . .    D ADDR   00F0H   A   
+BANKSEL . . . . . . . . . . . . . . . .    D ADDR   009FH   A   
+C?242 . . . . . . . . . . . . . . . . .    I ADDR   0000H   R   SEG=?ID?DOWNLOAD_UART2SFLASH?SPIFLASH
+COM001B . . . . . . . . . . . . . . . .    C ADDR   0000H   R   SEG=?PR?SPIFLASH
+CRLA_H. . . . . . . . . . . . . . . . .    D ADDR   00F4H   A   
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    21
+
+CRLA_L. . . . . . . . . . . . . . . . .    D ADDR   00F3H   A   
+CRSA_H. . . . . . . . . . . . . . . . .    D ADDR   00F2H   A   
+CRSA_L. . . . . . . . . . . . . . . . .    D ADDR   00F1H   A   
+CY. . . . . . . . . . . . . . . . . . .    B ADDR   00D0H.7 A   
+DISABLEWRCRAM . . . . . . . . . . . . .    C ADDR   -----       EXT
+DOWNLOAD_UART2SFLASH. . . . . . . . . .    C ADDR   0000H   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+DPH . . . . . . . . . . . . . . . . . .    D ADDR   0083H   A   
+DPL . . . . . . . . . . . . . . . . . .    D ADDR   0082H   A   
+EA. . . . . . . . . . . . . . . . . . .    B ADDR   00A8H.7 A   
+ERAM2SFLASHADDR . . . . . . . . . . . .    X ADDR   -----       EXT
+ERRCNT. . . . . . . . . . . . . . . . .    I ADDR   -----       EXT
+ES. . . . . . . . . . . . . . . . . . .    B ADDR   00A8H.4 A   
+ET0 . . . . . . . . . . . . . . . . . .    B ADDR   00A8H.1 A   
+ET1 . . . . . . . . . . . . . . . . . .    B ADDR   00A8H.3 A   
+EX0 . . . . . . . . . . . . . . . . . .    B ADDR   00A8H.0 A   
+EX1 . . . . . . . . . . . . . . . . . .    B ADDR   00A8H.2 A   
+F0. . . . . . . . . . . . . . . . . . .    B ADDR   00D0H.5 A   
+IE. . . . . . . . . . . . . . . . . . .    D ADDR   00A8H   A   
+IE0 . . . . . . . . . . . . . . . . . .    B ADDR   0088H.1 A   
+IE1 . . . . . . . . . . . . . . . . . .    B ADDR   0088H.3 A   
+INT0. . . . . . . . . . . . . . . . . .    B ADDR   00B0H.2 A   
+INT1. . . . . . . . . . . . . . . . . .    B ADDR   00B0H.3 A   
+IP. . . . . . . . . . . . . . . . . . .    D ADDR   00B8H   A   
+IT0 . . . . . . . . . . . . . . . . . .    B ADDR   0088H.0 A   
+IT1 . . . . . . . . . . . . . . . . . .    B ADDR   0088H.2 A   
+L?0028. . . . . . . . . . . . . . . . .    C ADDR   0000H   R   SEG=?PR?SPIFLASH
+L?0029. . . . . . . . . . . . . . . . .    C ADDR   000EH   R   SEG=?PR?SPIFLASH
+L?0030. . . . . . . . . . . . . . . . .    C ADDR   0027H   R   SEG=?PR?SPIFLASH
+L?0031. . . . . . . . . . . . . . . . .    C ADDR   0039H   R   SEG=?PR?SPIFLASH
+L?0032. . . . . . . . . . . . . . . . .    C ADDR   003FH   R   SEG=?PR?SPIFLASH
+L?0033. . . . . . . . . . . . . . . . .    C ADDR   010AH   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+L?0034. . . . . . . . . . . . . . . . .    C ADDR   0052H   R   SEG=?PR?SPIFLASH
+L?0035. . . . . . . . . . . . . . . . .    C ADDR   011CH   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+L?0036. . . . . . . . . . . . . . . . .    C ADDR   012BH   R   SEG=?PR?DOWNLOAD_UART2SFLASH?SPIFLASH
+MEMCTRL . . . . . . . . . . . . . . . .    D ADDR   00F8H   A   
+OV. . . . . . . . . . . . . . . . . . .    B ADDR   00D0H.2 A   
+P . . . . . . . . . . . . . . . . . . .    B ADDR   00D0H.0 A   
+P0. . . . . . . . . . . . . . . . . . .    D ADDR   0080H   A   
+P1. . . . . . . . . . . . . . . . . . .    D ADDR   0090H   A   
+P2. . . . . . . . . . . . . . . . . . .    D ADDR   00A0H   A   
+P3. . . . . . . . . . . . . . . . . . .    D ADDR   00B0H   A   
+PCON. . . . . . . . . . . . . . . . . .    D ADDR   0087H   A   
+PROGCNT . . . . . . . . . . . . . . . .    I ADDR   -----       EXT
+PS. . . . . . . . . . . . . . . . . . .    B ADDR   00B8H.4 A   
+PSW . . . . . . . . . . . . . . . . . .    D ADDR   00D0H   A   
+PT0 . . . . . . . . . . . . . . . . . .    B ADDR   00B8H.1 A   
+PT1 . . . . . . . . . . . . . . . . . .    B ADDR   00B8H.3 A   
+PX0 . . . . . . . . . . . . . . . . . .    B ADDR   00B8H.0 A   
+PX1 . . . . . . . . . . . . . . . . . .    B ADDR   00B8H.2 A   
+RB8 . . . . . . . . . . . . . . . . . .    B ADDR   0098H.2 A   
+RD. . . . . . . . . . . . . . . . . . .    B ADDR   00B0H.7 A   
+REN . . . . . . . . . . . . . . . . . .    B ADDR   0098H.4 A   
+RI. . . . . . . . . . . . . . . . . . .    B ADDR   0098H.0 A   
+RS0 . . . . . . . . . . . . . . . . . .    B ADDR   00D0H.3 A   
+RS1 . . . . . . . . . . . . . . . . . .    B ADDR   00D0H.4 A   
+RXD . . . . . . . . . . . . . . . . . .    B ADDR   00B0H.0 A   
+SBUF. . . . . . . . . . . . . . . . . .    D ADDR   0099H   A   
+SCON. . . . . . . . . . . . . . . . . .    D ADDR   0098H   A   
+SFLASHADDR. . . . . . . . . . . . . . .    X ADDR   -----       EXT
+SM0 . . . . . . . . . . . . . . . . . .    B ADDR   0098H.7 A   
+SM1 . . . . . . . . . . . . . . . . . .    B ADDR   0098H.6 A   
+SM2 . . . . . . . . . . . . . . . . . .    B ADDR   0098H.5 A   
+SP. . . . . . . . . . . . . . . . . . .    D ADDR   0081H   A   
+SPIFLASH. . . . . . . . . . . . . . . .    N NUMB   -----       
+SPIFLASH_ERASELOWER256K . . . . . . . .    C ADDR   -----       EXT
+T0. . . . . . . . . . . . . . . . . . .    B ADDR   00B0H.4 A   
+A51 MACRO ASSEMBLER  SPIFLASH                                                             08/17/2016 10:02:50 PAGE    22
+
+T1. . . . . . . . . . . . . . . . . . .    B ADDR   00B0H.5 A   
+TB8 . . . . . . . . . . . . . . . . . .    B ADDR   0098H.3 A   
+TCON. . . . . . . . . . . . . . . . . .    D ADDR   0088H   A   
+TF0 . . . . . . . . . . . . . . . . . .    B ADDR   0088H.5 A   
+TF1 . . . . . . . . . . . . . . . . . .    B ADDR   0088H.7 A   
+TH0 . . . . . . . . . . . . . . . . . .    D ADDR   008CH   A   
+TH1 . . . . . . . . . . . . . . . . . .    D ADDR   008DH   A   
+TI. . . . . . . . . . . . . . . . . . .    B ADDR   0098H.1 A   
+TL0 . . . . . . . . . . . . . . . . . .    D ADDR   008AH   A   
+TL1 . . . . . . . . . . . . . . . . . .    D ADDR   008BH   A   
+TMOD. . . . . . . . . . . . . . . . . .    D ADDR   0089H   A   
+TR0 . . . . . . . . . . . . . . . . . .    B ADDR   0088H.4 A   
+TR1 . . . . . . . . . . . . . . . . . .    B ADDR   0088H.6 A   
+TXD . . . . . . . . . . . . . . . . . .    B ADDR   00B0H.1 A   
+UART2ERAMADDR . . . . . . . . . . . . .    X ADDR   -----       EXT
+VAR32?040 . . . . . . . . . . . . . . .    D ADDR   0000H   R   SEG=?DT?_SWUTIL_SWAPENDIAN?SPIFLASH
+WR. . . . . . . . . . . . . . . . . . .    B ADDR   00B0H.6 A   
+_GET1CHAR . . . . . . . . . . . . . . .    C ADDR   -----       EXT
+_MEMUTIL_CLEARERAM. . . . . . . . . . .    C ADDR   0000H   R   SEG=?PR?_MEMUTIL_CLEARERAM?SPIFLASH
+_PARSEHEXRECORD . . . . . . . . . . . .    C ADDR   -----       EXT
+_PRINTF . . . . . . . . . . . . . . . .    C ADDR   -----       EXT
+_SPIFLASH_PAGEREADVERIFY. . . . . . . .    C ADDR   -----       EXT
+_SPIFLASH_PAGEWRITE . . . . . . . . . .    C ADDR   -----       EXT
+_SPIFLASH_WRSR_UNLOCK . . . . . . . . .    C ADDR   -----       EXT
+_SWUTIL_SWAPENDIAN. . . . . . . . . . .    C ADDR   0000H   R   SEG=?PR?_SWUTIL_SWAPENDIAN?SPIFLASH
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

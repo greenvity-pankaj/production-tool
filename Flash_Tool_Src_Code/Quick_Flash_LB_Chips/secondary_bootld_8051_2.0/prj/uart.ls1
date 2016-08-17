@@ -1,0 +1,395 @@
+AX51 MACRO ASSEMBLER  UART                                                                  08/08/16 13:21:01 PAGE     1
+
+
+MACRO ASSEMBLER AX51 V3.13.0.0
+OBJECT MODULE PLACED IN .\uart.OBJ
+ASSEMBLER INVOKED BY: C:\Keil_v5\C51\BIN\AX51.EXE .\uart.src PR(.\uart.ls1) EP DEBUG
+
+LOC    OBJ             LINE     SOURCE
+
+                          1     ; .\uart.SRC generated from: ..\src\uart.c
+                          2     ; COMPILER INVOKED BY:
+                          3     ;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\uart.c OMF2 OPTIMIZE(8,SIZE) BROWSE INCDIR(..
+                               \src;C:\Keil\C51\INC;..\src) DEBUG CODE PRINT(.\uart.lst) TABS(2) PREPRINT(.\uart.i) SRC(.\uart.SRC)
+                          4     
+                          5     $nomod51 
+                          6     
+                          7     NAME    UART
+                          8     
+ 0080                     9     P0      DATA    080H
+ 0090                    10     P1      DATA    090H
+ 00A0                    11     P2      DATA    0A0H
+ 009F                    12     BANKSEL DATA    09FH
+ 00B0                    13     P3      DATA    0B0H
+ 00B0.4                  14     T0      BIT     0B0H.4
+ 00D0.6                  15     AC      BIT     0D0H.6
+ 00B0.5                  16     T1      BIT     0B0H.5
+ 00A8.7                  17     EA      BIT     0A8H.7
+ 00A8                    18     IE      DATA    0A8H
+ 00B0.7                  19     RD      BIT     0B0H.7
+ 00F8                    20     MEMCTRL DATA    0F8H
+ 00A8.4                  21     ES      BIT     0A8H.4
+ 00B8                    22     IP      DATA    0B8H
+ 0098.0                  23     RI      BIT     098H.0
+ 00B0.2                  24     INT0    BIT     0B0H.2
+ 00D0.7                  25     CY      BIT     0D0H.7
+ 0098.1                  26     TI      BIT     098H.1
+ 00B0.3                  27     INT1    BIT     0B0H.3
+ 00B8.4                  28     PS      BIT     0B8H.4
+ 0081                    29     SP      DATA    081H
+ 00D0.2                  30     OV      BIT     0D0H.2
+ 00B0.6                  31     WR      BIT     0B0H.6
+ 0099                    32     SBUF    DATA    099H
+ 0087                    33     PCON    DATA    087H
+ 0098                    34     SCON    DATA    098H
+ 0089                    35     TMOD    DATA    089H
+ 0088                    36     TCON    DATA    088H
+ 0088.1                  37     IE0     BIT     088H.1
+ 0088.3                  38     IE1     BIT     088H.3
+ 00F0                    39     B       DATA    0F0H
+ 00E0                    40     ACC     DATA    0E0H
+ 00A8.1                  41     ET0     BIT     0A8H.1
+ 00A8.3                  42     ET1     BIT     0A8H.3
+ 0088.5                  43     TF0     BIT     088H.5
+ 0088.7                  44     TF1     BIT     088H.7
+ 00F4                    45     CRLA_H  DATA    0F4H
+ 0098.2                  46     RB8     BIT     098H.2
+ 008C                    47     TH0     DATA    08CH
+ 00A8.0                  48     EX0     BIT     0A8H.0
+ 0088.0                  49     IT0     BIT     088H.0
+ 008D                    50     TH1     DATA    08DH
+ 0098.3                  51     TB8     BIT     098H.3
+ 00A8.2                  52     EX1     BIT     0A8H.2
+ 0088.2                  53     IT1     BIT     088H.2
+ 00D0.0                  54     P       BIT     0D0H.0
+ 00F3                    55     CRLA_L  DATA    0F3H
+ 0098.7                  56     SM0     BIT     098H.7
+ 008A                    57     TL0     DATA    08AH
+AX51 MACRO ASSEMBLER  UART                                                                  08/08/16 13:21:01 PAGE     2
+
+ 0098.6                  58     SM1     BIT     098H.6
+ 008B                    59     TL1     DATA    08BH
+ 0098.5                  60     SM2     BIT     098H.5
+ 00F2                    61     CRSA_H  DATA    0F2H
+ 00B8.1                  62     PT0     BIT     0B8H.1
+ 00B8.3                  63     PT1     BIT     0B8H.3
+ 00D0.3                  64     RS0     BIT     0D0H.3
+ 0088.4                  65     TR0     BIT     088H.4
+ 00D0.4                  66     RS1     BIT     0D0H.4
+ 00F1                    67     CRSA_L  DATA    0F1H
+ 0088.6                  68     TR1     BIT     088H.6
+ 00B8.0                  69     PX0     BIT     0B8H.0
+ 00B8.2                  70     PX1     BIT     0B8H.2
+ 0083                    71     DPH     DATA    083H
+ 0082                    72     DPL     DATA    082H
+ 0098.4                  73     REN     BIT     098H.4
+ 00B0.0                  74     RXD     BIT     0B0H.0
+ 00B0.1                  75     TXD     BIT     0B0H.1
+ 00D0.5                  76     F0      BIT     0D0H.5
+ 00D0                    77     PSW     DATA    0D0H
+------                   78     ?PR?ComInit?UART     SEGMENT CODE 
+------                   79     ?PR?_putchar?UART    SEGMENT CODE 
+------                   80     ?PR?_get1char?UART   SEGMENT CODE 
+------                   81     ?ID?_get1char?UART   SEGMENT IDATA OVERLAYABLE
+                         82             PUBLIC  _get1char
+                         83             PUBLIC  _putchar
+                         84             PUBLIC  ComInit
+                         85     
+------                   86             RSEG  ?ID?_get1char?UART
+000000                   87               c?241:   DS   1
+                         88     ; /*
+                         89     ; * Description : Uart interface implement - 8051
+                         90     ; *
+                         91     ; * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+                         92     ; * All rights reserved.
+                         93     ; *
+                         94     ; * Author      : Peter Nguyen
+                         95     ; *
+                         96     ; * Purpose :
+                         97     ; *               To handle build-in uart related functions.
+                         98     ; *
+                         99     ; * File: uart.c
+                        100     ; */
+                        101     ; 
+                        102     ; //#include "stdafx.h"
+                        103     ; #include <reg51.h>
+                        104     ; #include <stdio.h>
+                        105     ; #include <cmem_ctrl.h>
+                        106     ; #include <typedef.h>
+                        107     ; #include <hex_file_hdl.h>
+                        108     ; #include <macro_def.h>
+                        109     ; 
+                        110     ; void ComInit();
+                        111     ; char _getkey();
+                        112     ; char _get1char();
+                        113     ; char putchar(char);
+                        114     ; 
+                        115     ; 
+                        116     ; 
+                        117     ; void ComInit()
+                        118     
+------                  119             RSEG  ?PR?ComInit?UART
+000000                  120     ComInit:
+                        121             USING   0
+                        122                             ; SOURCE LINE # 30
+                        123     ; {
+AX51 MACRO ASSEMBLER  UART                                                                  08/08/16 13:21:01 PAGE     3
+
+                        124                             ; SOURCE LINE # 31
+                        125     ;       TMOD    = 0x21;     //Timer1: reload, timer0: 16bit counter
+                        126                             ; SOURCE LINE # 32
+000000 758921           127             MOV     TMOD,#021H
+                        128     ; 
+                        129     ;       //TH1   = 249;          //Reload values for 9600bps/12.5MHz clk
+                        130     ;       //TH1   = 251;    //Osc 4.6Mhz, br 4.8kbps
+                        131     ;       //TH1     = 0xE6;     //24MHZ / 4.8Kbps
+                        132     ;       //TH1     = 0xF3;     //24MHz 9.6Kbps 
+                        133     ;       //TH1     = 0xE5;   //25MHz @ 4.8Kbps
+                        134     ;       //TH1     = 0xF9;     //12.5MHz @ 9.6Kbps
+                        135     ;       //TH1     = 0xFA;     //11MHz @ 9.6Kbps
+                        136     ;       TH1     =  0xF2;    //25MHz @ 9.6Kbps
+                        137                             ; SOURCE LINE # 41
+000003 758DF2           138             MOV     TH1,#0F2H
+                        139     ;       //TH1     = 0xD7;     //12.5MHz @ 1655bps (x12 = 19200)
+                        140     ; 
+                        141     ;       PCON    = 0x80;     //Set double baurate
+                        142                             ; SOURCE LINE # 44
+000006 758780           143             MOV     PCON,#080H
+                        144     ;       IE0         = 0x0;          //Disable all interrupts
+                        145                             ; SOURCE LINE # 45
+000009 C289             146             CLR     IE0
+                        147     ;       SCON    = 0x50;         //8bit mode, rx enable scon.4 = 1
+                        148                             ; SOURCE LINE # 46
+00000B 759850           149             MOV     SCON,#050H
+                        150     ;       TR1         = 1;                //Turn on timer1
+                        151                             ; SOURCE LINE # 47
+00000E D28E             152             SETB    TR1
+                        153     ;       TI      = 0;
+                        154                             ; SOURCE LINE # 48
+000010 C299             155             CLR     TI
+                        156     ;       RI      = 0;
+                        157                             ; SOURCE LINE # 49
+000012 C298             158             CLR     RI
+                        159     ; }
+                        160                             ; SOURCE LINE # 50
+000014 22               161             RET     
+                        162     ; END OF ComInit
+                        163     
+                        164     ; 
+                        165     ; #if 0
+                        166     ; char _getkey()
+                        167     ; {
+                        168     ;     char idata c;                                                                     
+                                                                                 7                                      
+                                                                                
+                        169     ;     do
+                        170     ;     {
+                        171     ;         while (RI == 0);
+                        172     ;         RI = 0;
+                        173     ;         c = SBUF;
+                        174     ;     } while (c == 0x11);    // Ignore 0x11 - XOn sync signal from Keil
+                        175     ;     return c;
+                        176     ; }
+                        177     ; #endif
+                        178     ; char putchar(char c)
+                        179     
+------                  180             RSEG  ?PR?_putchar?UART
+000000                  181     _putchar:
+                        182             USING   0
+                        183                             ; SOURCE LINE # 65
+                        184     ;---- Variable 'c?140' assigned to Register 'R7' ----
+                        185     ; {
+                        186                             ; SOURCE LINE # 66
+                        187     ;     if (c == '\n')  
+AX51 MACRO ASSEMBLER  UART                                                                  08/08/16 13:21:01 PAGE     4
+
+                        188                             ; SOURCE LINE # 67
+000000 BF0A0A           189             CJNE    R7,#0AH,?C0002
+                        190     ;     {
+                        191                             ; SOURCE LINE # 68
+                        192     ;         TI = 0;
+                        193                             ; SOURCE LINE # 69
+000003 C299             194             CLR     TI
+                        195     ;         SBUF = '\r';        // output CR before LF
+                        196                             ; SOURCE LINE # 70
+000005 75990D           197             MOV     SBUF,#0DH
+000008                  198     ?C0003:
+                        199     ;         while (TI == 0);
+                        200                             ; SOURCE LINE # 71
+000008 3099FD           201             JNB     TI,?C0003
+00000B                  202     ?C0004:
+                        203     ;         TI = 0;
+                        204                             ; SOURCE LINE # 72
+00000B C299             205             CLR     TI
+                        206     ;     }
+                        207                             ; SOURCE LINE # 73
+00000D                  208     ?C0002:
+                        209     ;     TI = 0;
+                        210                             ; SOURCE LINE # 74
+00000D C299             211             CLR     TI
+                        212     ;     SBUF = c;        // output CR before LF
+                        213                             ; SOURCE LINE # 75
+00000F 8F99             214             MOV     SBUF,R7
+000011                  215     ?C0005:
+                        216     ;     while (TI == 0);
+                        217                             ; SOURCE LINE # 76
+000011 3099FD           218             JNB     TI,?C0005
+000014                  219     ?C0006:
+                        220     ;     TI = 0;
+                        221                             ; SOURCE LINE # 77
+000014 C299             222             CLR     TI
+                        223     ;     return c;
+                        224                             ; SOURCE LINE # 78
+                        225     ; }
+                        226                             ; SOURCE LINE # 79
+000016                  227     ?C0007:
+000016 22               228             RET     
+                        229     ; END OF _putchar
+                        230     
+                        231     ; 
+                        232     ; #if 1
+                        233     ; //***************************************************************
+                        234     ; //
+                        235     ; //***************************************************************
+                        236     ; char _get1char()
+                        237     
+------                  238             RSEG  ?PR?_get1char?UART
+000000                  239     _get1char:
+                        240             USING   0
+                        241                             ; SOURCE LINE # 85
+                        242     ; {
+                        243                             ; SOURCE LINE # 86
+                        244     ;       char idata c;
+                        245     ;       c = 0;
+                        246                             ; SOURCE LINE # 88
+000000 E4               247             CLR     A
+000001 7800       F     248             MOV     R0,#LOW (c?241)
+000003 F6               249             MOV     @R0,A
+000004                  250     ?C0008:
+                        251     ;       while (RI==0);
+                        252                             ; SOURCE LINE # 89
+000004 3098FD           253             JNB     RI,?C0008
+AX51 MACRO ASSEMBLER  UART                                                                  08/08/16 13:21:01 PAGE     5
+
+000007                  254     ?C0009:
+                        255     ;       c = SBUF;
+                        256                             ; SOURCE LINE # 90
+000007 7800       F     257             MOV     R0,#LOW (c?241)
+000009 A699             258             MOV     @R0,SBUF
+                        259     ;       RI = 0;
+                        260                             ; SOURCE LINE # 91
+00000B C298             261             CLR     RI
+                        262     ;       return c;
+                        263                             ; SOURCE LINE # 92
+00000D E6               264             MOV     A,@R0
+00000E FF               265             MOV     R7,A
+                        266     ; }
+                        267                             ; SOURCE LINE # 93
+00000F                  268     ?C0010:
+00000F 22               269             RET     
+                        270     ; END OF _get1char
+                        271     
+                        272             END
+AX51 MACRO ASSEMBLER  UART                                                                  08/08/16 13:21:01 PAGE     6
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E                             T Y P E  V A L U E     ATTRIBUTES
+
+?C0002 . . . . . . . . . . . . . .  C  ADDR  000DH     R   SEG=?PR?_PUTCHAR?UART
+?C0003 . . . . . . . . . . . . . .  C  ADDR  0008H     R   SEG=?PR?_PUTCHAR?UART
+?C0004 . . . . . . . . . . . . . .  C  ADDR  000BH     R   SEG=?PR?_PUTCHAR?UART
+?C0005 . . . . . . . . . . . . . .  C  ADDR  0011H     R   SEG=?PR?_PUTCHAR?UART
+?C0006 . . . . . . . . . . . . . .  C  ADDR  0014H     R   SEG=?PR?_PUTCHAR?UART
+?C0007 . . . . . . . . . . . . . .  C  ADDR  0016H     R   SEG=?PR?_PUTCHAR?UART
+?C0008 . . . . . . . . . . . . . .  C  ADDR  0004H     R   SEG=?PR?_GET1CHAR?UART
+?C0009 . . . . . . . . . . . . . .  C  ADDR  0007H     R   SEG=?PR?_GET1CHAR?UART
+?C0010 . . . . . . . . . . . . . .  C  ADDR  000FH     R   SEG=?PR?_GET1CHAR?UART
+?ID?_GET1CHAR?UART . . . . . . . .  I  SEG   000001H       REL=UNIT, ALN=BYTE
+?PR?_GET1CHAR?UART . . . . . . . .  C  SEG   000010H       REL=UNIT, ALN=BYTE
+?PR?_PUTCHAR?UART. . . . . . . . .  C  SEG   000017H       REL=UNIT, ALN=BYTE
+?PR?COMINIT?UART . . . . . . . . .  C  SEG   000015H       REL=UNIT, ALN=BYTE
+_GET1CHAR. . . . . . . . . . . . .  C  ADDR  0000H     R   SEG=?PR?_GET1CHAR?UART
+_PUTCHAR . . . . . . . . . . . . .  C  ADDR  0000H     R   SEG=?PR?_PUTCHAR?UART
+AC . . . . . . . . . . . . . . . .  B  ADDR  00D0H.6   A   
+ACC. . . . . . . . . . . . . . . .  D  ADDR  00E0H     A   
+B. . . . . . . . . . . . . . . . .  D  ADDR  00F0H     A   
+BANKSEL. . . . . . . . . . . . . .  D  ADDR  009FH     A   
+C?241. . . . . . . . . . . . . . .  I  ADDR  0000H     R   SEG=?ID?_GET1CHAR?UART
+COMINIT. . . . . . . . . . . . . .  C  ADDR  0000H     R   SEG=?PR?COMINIT?UART
+CRLA_H . . . . . . . . . . . . . .  D  ADDR  00F4H     A   
+CRLA_L . . . . . . . . . . . . . .  D  ADDR  00F3H     A   
+CRSA_H . . . . . . . . . . . . . .  D  ADDR  00F2H     A   
+CRSA_L . . . . . . . . . . . . . .  D  ADDR  00F1H     A   
+CY . . . . . . . . . . . . . . . .  B  ADDR  00D0H.7   A   
+DPH. . . . . . . . . . . . . . . .  D  ADDR  0083H     A   
+DPL. . . . . . . . . . . . . . . .  D  ADDR  0082H     A   
+EA . . . . . . . . . . . . . . . .  B  ADDR  00A8H.7   A   
+ES . . . . . . . . . . . . . . . .  B  ADDR  00A8H.4   A   
+ET0. . . . . . . . . . . . . . . .  B  ADDR  00A8H.1   A   
+ET1. . . . . . . . . . . . . . . .  B  ADDR  00A8H.3   A   
+EX0. . . . . . . . . . . . . . . .  B  ADDR  00A8H.0   A   
+EX1. . . . . . . . . . . . . . . .  B  ADDR  00A8H.2   A   
+F0 . . . . . . . . . . . . . . . .  B  ADDR  00D0H.5   A   
+IE . . . . . . . . . . . . . . . .  D  ADDR  00A8H     A   
+IE0. . . . . . . . . . . . . . . .  B  ADDR  0088H.1   A   
+IE1. . . . . . . . . . . . . . . .  B  ADDR  0088H.3   A   
+INT0 . . . . . . . . . . . . . . .  B  ADDR  00B0H.2   A   
+INT1 . . . . . . . . . . . . . . .  B  ADDR  00B0H.3   A   
+IP . . . . . . . . . . . . . . . .  D  ADDR  00B8H     A   
+IT0. . . . . . . . . . . . . . . .  B  ADDR  0088H.0   A   
+IT1. . . . . . . . . . . . . . . .  B  ADDR  0088H.2   A   
+MEMCTRL. . . . . . . . . . . . . .  D  ADDR  00F8H     A   
+OV . . . . . . . . . . . . . . . .  B  ADDR  00D0H.2   A   
+P. . . . . . . . . . . . . . . . .  B  ADDR  00D0H.0   A   
+P0 . . . . . . . . . . . . . . . .  D  ADDR  0080H     A   
+P1 . . . . . . . . . . . . . . . .  D  ADDR  0090H     A   
+P2 . . . . . . . . . . . . . . . .  D  ADDR  00A0H     A   
+P3 . . . . . . . . . . . . . . . .  D  ADDR  00B0H     A   
+PCON . . . . . . . . . . . . . . .  D  ADDR  0087H     A   
+PS . . . . . . . . . . . . . . . .  B  ADDR  00B8H.4   A   
+PSW. . . . . . . . . . . . . . . .  D  ADDR  00D0H     A   
+PT0. . . . . . . . . . . . . . . .  B  ADDR  00B8H.1   A   
+PT1. . . . . . . . . . . . . . . .  B  ADDR  00B8H.3   A   
+PX0. . . . . . . . . . . . . . . .  B  ADDR  00B8H.0   A   
+PX1. . . . . . . . . . . . . . . .  B  ADDR  00B8H.2   A   
+RB8. . . . . . . . . . . . . . . .  B  ADDR  0098H.2   A   
+RD . . . . . . . . . . . . . . . .  B  ADDR  00B0H.7   A   
+REN. . . . . . . . . . . . . . . .  B  ADDR  0098H.4   A   
+AX51 MACRO ASSEMBLER  UART                                                                  08/08/16 13:21:01 PAGE     7
+
+RI . . . . . . . . . . . . . . . .  B  ADDR  0098H.0   A   
+RS0. . . . . . . . . . . . . . . .  B  ADDR  00D0H.3   A   
+RS1. . . . . . . . . . . . . . . .  B  ADDR  00D0H.4   A   
+RXD. . . . . . . . . . . . . . . .  B  ADDR  00B0H.0   A   
+SBUF . . . . . . . . . . . . . . .  D  ADDR  0099H     A   
+SCON . . . . . . . . . . . . . . .  D  ADDR  0098H     A   
+SM0. . . . . . . . . . . . . . . .  B  ADDR  0098H.7   A   
+SM1. . . . . . . . . . . . . . . .  B  ADDR  0098H.6   A   
+SM2. . . . . . . . . . . . . . . .  B  ADDR  0098H.5   A   
+SP . . . . . . . . . . . . . . . .  D  ADDR  0081H     A   
+T0 . . . . . . . . . . . . . . . .  B  ADDR  00B0H.4   A   
+T1 . . . . . . . . . . . . . . . .  B  ADDR  00B0H.5   A   
+TB8. . . . . . . . . . . . . . . .  B  ADDR  0098H.3   A   
+TCON . . . . . . . . . . . . . . .  D  ADDR  0088H     A   
+TF0. . . . . . . . . . . . . . . .  B  ADDR  0088H.5   A   
+TF1. . . . . . . . . . . . . . . .  B  ADDR  0088H.7   A   
+TH0. . . . . . . . . . . . . . . .  D  ADDR  008CH     A   
+TH1. . . . . . . . . . . . . . . .  D  ADDR  008DH     A   
+TI . . . . . . . . . . . . . . . .  B  ADDR  0098H.1   A   
+TL0. . . . . . . . . . . . . . . .  D  ADDR  008AH     A   
+TL1. . . . . . . . . . . . . . . .  D  ADDR  008BH     A   
+TMOD . . . . . . . . . . . . . . .  D  ADDR  0089H     A   
+TR0. . . . . . . . . . . . . . . .  B  ADDR  0088H.4   A   
+TR1. . . . . . . . . . . . . . . .  B  ADDR  0088H.6   A   
+TXD. . . . . . . . . . . . . . . .  B  ADDR  00B0H.1   A   
+UART . . . . . . . . . . . . . . .  -- ----  -------       
+WR . . . . . . . . . . . . . . . .  B  ADDR  00B0H.6   A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S).

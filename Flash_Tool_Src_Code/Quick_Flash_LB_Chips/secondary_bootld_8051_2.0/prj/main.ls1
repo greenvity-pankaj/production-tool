@@ -1,0 +1,770 @@
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.02c
+OBJECT MODULE PLACED IN .\main.OBJ
+ASSEMBLER INVOKED BY: C:\Keil_v5\C51\BIN\A51.EXE .\main.src PR(.\main.ls1) EP DEBUG
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     ; .\main.SRC generated from: ..\src\main.c
+                       2     ; COMPILER INVOKED BY:
+                       3     ;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\main.c OPTIMIZE(9,SIZE) BROWSE INCDIR(..\src;C:\
+                             Keil\C51\INC;..\src) DEBUG OBJECTEXTEND CODE PRINT(.\main.lst) TABS(2) PREPRINT(.\main.i) SRC(.\main.SRC)
+                       4     
+                       5     $nomod51 
+                       6     
+                       7     NAME    MAIN
+                       8     
+  0080                 9     P0      DATA    080H
+  0090                10     P1      DATA    090H
+  00A0                11     P2      DATA    0A0H
+  009F                12     BANKSEL DATA    09FH
+  00B0                13     P3      DATA    0B0H
+  00B4                14     T0      BIT     0B0H.4
+  00D6                15     AC      BIT     0D0H.6
+  00B5                16     T1      BIT     0B0H.5
+  00AF                17     EA      BIT     0A8H.7
+  00A8                18     IE      DATA    0A8H
+  00B7                19     RD      BIT     0B0H.7
+  00F8                20     MEMCTRL DATA    0F8H
+  00AC                21     ES      BIT     0A8H.4
+  00B8                22     IP      DATA    0B8H
+  0098                23     RI      BIT     098H.0
+  00B2                24     INT0    BIT     0B0H.2
+  00D7                25     CY      BIT     0D0H.7
+  0099                26     TI      BIT     098H.1
+  00B3                27     INT1    BIT     0B0H.3
+  00BC                28     PS      BIT     0B8H.4
+  0081                29     SP      DATA    081H
+  00D2                30     OV      BIT     0D0H.2
+  00B6                31     WR      BIT     0B0H.6
+  0099                32     SBUF    DATA    099H
+  0087                33     PCON    DATA    087H
+  0098                34     SCON    DATA    098H
+  0089                35     TMOD    DATA    089H
+  0088                36     TCON    DATA    088H
+  0089                37     IE0     BIT     088H.1
+  008B                38     IE1     BIT     088H.3
+  00F0                39     B       DATA    0F0H
+  00E0                40     ACC     DATA    0E0H
+  00A9                41     ET0     BIT     0A8H.1
+  00AB                42     ET1     BIT     0A8H.3
+  008D                43     TF0     BIT     088H.5
+  008F                44     TF1     BIT     088H.7
+  00F4                45     CRLA_H  DATA    0F4H
+  009A                46     RB8     BIT     098H.2
+  008C                47     TH0     DATA    08CH
+  00A8                48     EX0     BIT     0A8H.0
+  0088                49     IT0     BIT     088H.0
+  008D                50     TH1     DATA    08DH
+  009B                51     TB8     BIT     098H.3
+  00AA                52     EX1     BIT     0A8H.2
+  008A                53     IT1     BIT     088H.2
+  00D0                54     P       BIT     0D0H.0
+  00F3                55     CRLA_L  DATA    0F3H
+  009F                56     SM0     BIT     098H.7
+  008A                57     TL0     DATA    08AH
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE     2
+
+  009E                58     SM1     BIT     098H.6
+  008B                59     TL1     DATA    08BH
+  009D                60     SM2     BIT     098H.5
+  00F2                61     CRSA_H  DATA    0F2H
+  00B9                62     PT0     BIT     0B8H.1
+  00BB                63     PT1     BIT     0B8H.3
+  00D3                64     RS0     BIT     0D0H.3
+  008C                65     TR0     BIT     088H.4
+  00D4                66     RS1     BIT     0D0H.4
+  00F1                67     CRSA_L  DATA    0F1H
+  008E                68     TR1     BIT     088H.6
+  00B8                69     PX0     BIT     0B8H.0
+  00BA                70     PX1     BIT     0B8H.2
+  0083                71     DPH     DATA    083H
+  0082                72     DPL     DATA    082H
+  009C                73     REN     BIT     098H.4
+  00B0                74     RXD     BIT     0B0H.0
+  00B1                75     TXD     BIT     0B0H.1
+  00D5                76     F0      BIT     0D0H.5
+  00D0                77     PSW     DATA    0D0H
+                      78     ?PR?main?MAIN        SEGMENT CODE 
+                      79     ?CO?MAIN             SEGMENT CODE 
+                      80     ?XD?MAIN             SEGMENT XDATA 
+                      81     ?ID?MAIN             SEGMENT IDATA 
+                      82     ?ID?main?MAIN        SEGMENT IDATA OVERLAYABLE 
+                      83             EXTRN   CODE (_printf)
+                      84             EXTRN   DATA (?_printf?BYTE)
+                      85             EXTRN   CODE (ComInit)
+                      86             EXTRN   CODE (Download_Uart2Sflash)
+                      87             EXTRN   CODE (DisableWrCRam)
+                      88             EXTRN   CODE (?C_STARTUP)
+                      89             EXTRN   CODE (?C?LSTKIDATA)
+                      90             EXTRN   CODE (?C?LLDIDATA)
+                      91             EXTRN   CODE (?C?LSTIDATA)
+                      92             EXTRN   CODE (?C?LLDIDATA0)
+                      93             EXTRN   CODE (?C?ULCMP)
+                      94             PUBLIC  Addr32_1
+                      95             PUBLIC  SflashAddr
+                      96             PUBLIC  Uart2EramAddr
+                      97             PUBLIC  ErrCnt
+                      98             PUBLIC  AddrL
+                      99             PUBLIC  AddrH
+                     100             PUBLIC  ProgCnt
+                     101             PUBLIC  Eram2SflashAddr
+                     102             PUBLIC  main
+                     103     
+----                 104             RSEG  ?XD?MAIN
+0000                 105     Eram2SflashAddr:   DS   2
+0002                 106               AddrH:   DS   1
+0003                 107               AddrL:   DS   1
+0004                 108       Uart2EramAddr:   DS   2
+0006                 109          SflashAddr:   DS   4
+000A                 110            Addr32_1:   DS   4
+                     111     
+----                 112             RSEG  ?ID?MAIN
+0000                 113             ProgCnt:   DS   12
+000C                 114              ErrCnt:   DS   12
+                     115     
+----                 116             RSEG  ?ID?main?MAIN
+0000                 117            Temp?040:   DS   4
+                     118     
+----                 119             RSEG  ?ID?main?MAIN
+0004                 120               c?041:   DS   1
+                     121     
+----                 122             RSEG  ?CO?MAIN
+0000                 123     ?SC_0:
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE     3
+
+0000 0A2A2A2A        124             DB  00AH,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+0004 2A2A2A2A                
+0008 2A2A                    
+000A 2A2A2A2A        125             DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+000E 2A2A2A2A                
+0012 2A2A                    
+0014 2A2A2A2A        126             DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+0018 2A2A2A2A                
+001C 2A2A                    
+001E 2A2A2A2A        127             DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+0022 2A2A2A2A                
+0026 2A2A                    
+0028 2A2A2A2A        128             DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,000H
+002C 2A2A00                  
+                     129     
+002F                 130     ?SC_47:
+002F 0A2A2A20        131             DB  00AH,'*' ,'*' ,' ' ,' ' ,' ' ,' ' ,' ' ,'G' ,'R' 
+0033 20202020                
+0037 4752                    
+0039 45454E56        132             DB  'E' ,'E' ,'N' ,'V' ,'I' ,'T' ,'Y' ,' ' ,'C' ,'O' 
+003D 49545920                
+0041 434F                    
+0043 4D4D554E        133             DB  'M' ,'M' ,'U' ,'N' ,'I' ,'C' ,'A' ,'T' ,'I' ,'O' 
+0047 49434154                
+004B 494F                    
+004D 4E532049        134             DB  'N' ,'S' ,' ' ,'I' ,'N' ,'C' ,' ' ,' ' ,' ' ,' ' 
+0051 4E432020                
+0055 2020                    
+0057 20202020        135             DB  ' ' ,' ' ,' ' ,' ' ,'*' ,'*' ,000H
+005B 2A2A00                  
+                     136     
+005E                 137     ?SC_94:
+005E 0A2A2A20        138             DB  00AH,'*' ,'*' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' 
+0062 20202020                
+0066 2020                    
+0068 20202042        139             DB  ' ' ,' ' ,' ' ,'B' ,'o' ,'o' ,'t' ,' ' ,'l' ,'o' 
+006C 6F6F7420                
+0070 6C6F                    
+0072 61646572        140             DB  'a' ,'d' ,'e' ,'r' ,' ' ,'V' ,'3' ,'.' ,'0' ,' ' 
+0076 2056332E                
+007A 3020                    
+007C 20202020        141             DB  ' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' ,' ' 
+0080 20202020                
+0084 2020                    
+0086 20202020        142             DB  ' ' ,' ' ,' ' ,' ' ,'*' ,'*' ,000H
+008A 2A2A00                  
+                     143     
+008D                 144     ?SC_141:
+008D 0A2A2A2A        145             DB  00AH,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+0091 2A2A2A2A                
+0095 2A2A                    
+0097 2A2A2A2A        146             DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+009B 2A2A2A2A                
+009F 2A2A                    
+00A1 2A2A2A2A        147             DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+00A5 2A2A2A2A                
+00A9 2A2A                    
+00AB 2A2A2A2A        148             DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' ,'*' 
+00AF 2A2A2A2A                
+00B3 2A2A                    
+00B5 2A2A2A2A        149             DB  '*' ,'*' ,'*' ,'*' ,'*' ,'*' ,00AH,00AH,000H
+00B9 2A2A0A0A                
+00BD 00                      
+                     150     
+00BE                 151     ?SC_190:
+00BE 0A0A202D        152             DB  00AH,00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'P' ,'r' ,'e' 
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE     4
+
+00C2 2D3E2050                
+00C6 7265                    
+00C8 73732072        153             DB  's' ,'s' ,' ' ,'r' ,'e' ,'s' ,'e' ,'t' ,' ' ,'o' 
+00CC 65736574                
+00D0 206F                    
+00D2 72206869        154             DB  'r' ,' ' ,'h' ,'i' ,'t' ,' ' ,027H,'s' ,027H,' ' 
+00D6 74202773                
+00DA 2720                    
+00DC 746F2072        155             DB  't' ,'o' ,' ' ,'r' ,'e' ,'b' ,'o' ,'o' ,'t' ,' ' 
+00E0 65626F6F                
+00E4 7420                    
+00E6 74686520        156             DB  't' ,'h' ,'e' ,' ' ,'s' ,'y' ,'s' ,'t' ,'e' ,'m' 
+00EA 73797374                
+00EE 656D                    
+00F0 00              157             DB  000H
+                     158     
+                     159     ; /*
+                     160     ; * Description : 8051 bootloader main function
+                     161     ; *
+                     162     ; * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+                     163     ; * All rights reserved.
+                     164     ; *
+                     165     ; * Author      : Peter Nguyen
+                     166     ; * Release Date: 04/27/2013
+                     167     ; * Purpose :
+                     168     ; *     function main of bootloader project
+                     169     ; *
+                     170     ; * File: bootld_80251.c
+                     171     ; */
+                     172     ; 
+                     173     ; //#include <stdafx.h>
+                     174     ; #include "test.h"
+                     175     ; #include <reg51.h>                  /* Include 251SB header file */   
+                     176     ; #include <stdio.h>
+                     177     ; #include <stdarg.h>
+                     178     ; #include <string.h>
+                     179     ; #include "typedef.h"
+                     180     ; #include "uart.h"
+                     181     ; #include "hex_file_hdl.h"
+                     182     ; #include "spiflash.h"
+                     183     ; #include "macro_def.h"
+                     184     ; #include "cmem_ctrl.h"
+                     185     ; #include "spiflash_drv.h"
+                     186     ; #include "static_var.h"
+                     187     ; 
+                     188     ; 
+                     189     ; #define RESET_REG 0x34
+                     190     ; void main(void)
+                     191     
+----                 192             RSEG  ?PR?main?MAIN
+0000                 193     main:
+                     194             USING   0
+                     195                             ; SOURCE LINE # 32
+                     196     ; {
+                     197                             ; SOURCE LINE # 33
+                     198     ;       u32 idata Temp;
+                     199     ;       char idata c;
+                     200     ;       BANKSEL = 0;
+                     201                             ; SOURCE LINE # 36
+0000 E4              202             CLR     A
+0001 F59F            203             MOV     BANKSEL,A
+                     204     ;       DisableWrCRam();
+                     205                             ; SOURCE LINE # 37
+0003 120000   F      206             LCALL   DisableWrCRam
+                     207     ; 
+                     208     ;       ComInit();
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE     5
+
+                     209                             ; SOURCE LINE # 39
+0006 120000   F      210             LCALL   ComInit
+                     211     ; 
+                     212     ;       EA = 0;
+                     213                             ; SOURCE LINE # 41
+0009 C2AF            214             CLR     EA
+                     215     ;       c = 0;
+                     216                             ; SOURCE LINE # 42
+000B E4              217             CLR     A
+000C 7800     F      218             MOV     R0,#LOW (c?041)
+000E F6              219             MOV     @R0,A
+                     220     ;       Temp = 0;
+                     221                             ; SOURCE LINE # 43
+000F 7800     F      222             MOV     R0,#LOW (Temp?040)
+0011 120000   F      223             LCALL   ?C?LSTKIDATA
+0014 00              224             DB      00H
+0015 00              225             DB      00H
+0016 00              226             DB      00H
+0017 00              227             DB      00H
+                     228     ;       //printf("\n*********************************************");
+                     229     ; //    printf("\n*********************************************");
+                     230     ; //    printf("\n*********************************************");
+                     231     ; //    printf("\n*********************************************");
+                     232     ; //    printf("\n*********************************************");
+                     233     ; //    printf("\n*********************************************");
+                     234     ;       printf("\n*********************************************");
+                     235                             ; SOURCE LINE # 50
+                     236     ;       printf("\n*********************************************");
+                     237                             ; SOURCE LINE # 51
+                     238     ;       printf("\n*********************************************");
+                     239                             ; SOURCE LINE # 52
+0018 120000   F      240             LCALL   L?0017
+001B 7A00     F      241             MOV     R2,#HIGH (?SC_0)
+001D 7900     F      242             MOV     R1,#LOW (?SC_0)
+001F 120000   F      243             LCALL   _printf
+                     244     ;       printf("\n*********************************************");
+                     245                             ; SOURCE LINE # 53
+                     246     ;       printf("\n*********************************************");
+                     247                             ; SOURCE LINE # 54
+                     248     ;       printf("\n**     GREENVITY COMMUNICATIONS INC        **");
+                     249                             ; SOURCE LINE # 55
+0022 120000   F      250             LCALL   L?0017
+0025 7A00     F      251             MOV     R2,#HIGH (?SC_47)
+0027 7900     F      252             MOV     R1,#LOW (?SC_47)
+0029 120000   F      253             LCALL   _printf
+                     254     ;       printf("\n**          Boot loader V3.0               **");
+                     255                             ; SOURCE LINE # 56
+002C 7BFF            256             MOV     R3,#0FFH
+002E 7A00     F      257             MOV     R2,#HIGH (?SC_94)
+0030 7900     F      258             MOV     R1,#LOW (?SC_94)
+0032 120000   F      259             LCALL   _printf
+                     260     ;       printf("\n*********************************************\n\n");
+                     261                             ; SOURCE LINE # 57
+0035 7BFF            262             MOV     R3,#0FFH
+0037 7A00     F      263             MOV     R2,#HIGH (?SC_141)
+0039 7900     F      264             MOV     R1,#LOW (?SC_141)
+003B 120000   F      265             LCALL   _printf
+003E                 266     ?C0001:
+                     267     ;       
+                     268     ;       while(1)
+                     269                             ; SOURCE LINE # 59
+                     270     ;       {
+                     271                             ; SOURCE LINE # 60
+                     272     ;               switch(c)
+                     273                             ; SOURCE LINE # 61
+003E 7800     F      274             MOV     R0,#LOW (c?041)
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE     6
+
+0040 E6              275             MOV     A,@R0
+0041 14              276             DEC     A
+0042 603B            277             JZ      ?C0010
+0044 24D0            278             ADD     A,#0D0H
+0046 6019            279             JZ      ?C0009
+0048 24DE            280             ADD     A,#0DEH
+004A 6078            281             JZ      ?main?Bootup
+004C 24ED            282             ADD     A,#0EDH
+004E 6008            283             JZ      ?C0008
+0050 24F3            284             ADD     A,#0F3H
+0052 6070            285             JZ      ?main?Bootup
+0054 242D            286             ADD     A,#02DH
+0056 7036            287             JNZ     ?C0013
+                     288     ;               {
+                     289                             ; SOURCE LINE # 62
+                     290     ;               case ('s'):
+                     291                             ; SOURCE LINE # 63
+                     292     ;               case ('S'):
+                     293                             ; SOURCE LINE # 64
+                     294     ;                       goto Bootup;
+                     295                             ; SOURCE LINE # 65
+                     296     ;                       break;
+                     297                             ; SOURCE LINE # 66
+                     298     ; #if 0         
+                     299     ;               case ('u'):
+                     300     ;               case ('U'):
+                     301     ;                       EnableWrCRam ();
+                     302     ;                       for (c=0;c<NUM_OF_BANK;c++)
+                     303     ;                       {
+                     304     ;                               printf("\n\n ##### Download code from UART to CRAM - BANK-%
+                             02X #####\n", (U16)c);
+                     305     ;                               BANKSEL = c;
+                     306     ;                               ParseHexRecord(&ErrCnt[0], &ProgCnt[0]);
+                     307     ;                       }
+                     308     ;                       DisableWrCRam ();
+                     309     ;                       #pragma asm
+                     310     ;                               MOV   SP,#06FH
+                     311     ;                               LJMP  CRAM_START;
+                     312     ;                       #pragma endasm
+                     313     ;                       break;
+                     314     ; #endif                        
+                     315     ;               case ('f'):
+                     316                             ; SOURCE LINE # 84
+                     317     ;               case ('F'):
+                     318                             ; SOURCE LINE # 85
+0058                 319     ?C0008:
+                     320     ;                       Download_Uart2Sflash();
+                     321                             ; SOURCE LINE # 86
+0058 120000   F      322             LCALL   Download_Uart2Sflash
+                     323     ;                       c = '1';
+                     324                             ; SOURCE LINE # 87
+005B 7800     F      325             MOV     R0,#LOW (c?041)
+005D 7631            326             MOV     @R0,#031H
+                     327     ;                       break;
+                     328                             ; SOURCE LINE # 88
+005F 80DD            329             SJMP    ?C0001
+                     330     ; #if 0         
+                     331     ;               case ('t'):
+                     332     ;               case ('T'):
+                     333     ;                       test_cram();
+                     334     ;                       printf("\n --> Finished testing CRAM");
+                     335     ;                       c = '1';
+                     336     ;                       break;
+                     337     ;               
+                     338     ;               case ('j'):
+                     339     ;               case ('J'):
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE     7
+
+                     340     ;                       #pragma asm
+                     341     ;                               MOV  SP,#06FH;
+                     342     ;                               LJMP CRAM_START;
+                     343     ;                       #pragma endasm
+                     344     ;                       
+                     345     ;               case ('d'):
+                     346     ;               case ('D'):
+                     347     ;                       dump_code(0);
+                     348     ;                       printf("\n --> Finished dumping CRAM");
+                     349     ;                       c='1';
+                     350     ;                       break;
+                     351     ;       
+                     352     ;               case ('p'):
+                     353     ;               case ('P'):
+                     354     ;                       dump_code(1); 
+                     355     ;                       printf("\n --> Finished dumping SFLASH");
+                     356     ;                       c = '1';
+                     357     ;                       break;
+                     358     ;               case 'r':
+                     359     ;               case 'R':
+                     360     ;                       dump_code(2);
+                     361     ;                       printf("\n --> Finished dumping erams");
+                     362     ;                       c = '1';
+                     363     ;                       break;
+                     364     ;               case 'e':
+                     365     ;               case 'E':
+                     366     ;                       dump_BackupCode();
+                     367     ;                       c = '1';
+                     368     ;                       break;
+                     369     ; #endif                
+                     370     ;               case ('1'):
+                     371                             ; SOURCE LINE # 129
+0061                 372     ?C0009:
+                     373     ;                       //printf("\n\n --> Press reset to reboot the system");
+                     374     ;                 //*(u8 xdata *)34 = 1;        
+                     375     ;                 //*(u8 xdata *)RESET_REG = 1;
+                     376     ;                       printf("\n\n --> Press reset or hit 's' to reboot the system");
+                     377                             ; SOURCE LINE # 133
+0061 7BFF            378             MOV     R3,#0FFH
+0063 7A00     F      379             MOV     R2,#HIGH (?SC_190)
+0065 7900     F      380             MOV     R1,#LOW (?SC_190)
+0067 120000   F      381             LCALL   _printf
+                     382     ;                       *((volatile u8 xdata *)(0x34)) = (u8)(1);
+                     383                             ; SOURCE LINE # 134
+006A 900034          384             MOV     DPTR,#034H
+006D 7401            385             MOV     A,#01H
+006F F0              386             MOVX    @DPTR,A
+                     387     ;                       Temp = 0;
+                     388                             ; SOURCE LINE # 135
+0070 7800     F      389             MOV     R0,#LOW (Temp?040)
+0072 120000   F      390             LCALL   ?C?LSTKIDATA
+0075 00              391             DB      00H
+0076 00              392             DB      00H
+0077 00              393             DB      00H
+0078 00              394             DB      00H
+                     395     ;                       c = 1;
+                     396                             ; SOURCE LINE # 136
+0079 7800     F      397             MOV     R0,#LOW (c?041)
+007B 7601            398             MOV     @R0,#01H
+                     399     ;                       break;
+                     400                             ; SOURCE LINE # 137
+007D 80BF            401             SJMP    ?C0001
+                     402     ; #ifdef PROGRAM_CONFIGURATION
+                     403     ;               case ('c'):
+                     404     ;               case ('C'):
+                     405     ;                       Program_Config_Data();
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE     8
+
+                     406     ;                       c = '1';
+                     407     ;                       break;
+                     408     ;               case ('g'):
+                     409     ;               case ('G'):
+                     410     ;                       Load_Config_Data(1);
+                     411     ;                       c = '1';
+                     412     ;                       break;
+                     413     ;               case ('l'):
+                     414     ;               case ('L'):
+                     415     ;                       Load_Config_Data(0);
+                     416     ;                       c = '1';
+                     417     ;                       break;
+                     418     ; #endif
+                     419     ; #if 0         
+                     420     ;               case 'b':
+                     421     ;               case 'B':
+                     422     ;                       (void)spiflash_BackupCodeImage();
+                     423     ;                       c = '1';
+                     424     ;                       break;
+                     425     ;               case 'z':
+                     426     ;               case 'Z':
+                     427     ;                       (void)spiflash_RestoreCodeImage();
+                     428     ;                       c = '1';
+                     429     ;                       break;
+                     430     ; #endif                
+                     431     ; #ifdef FEATURE_CHIPERASE
+                     432     ;               case ('e'):
+                     433     ;               case ('E'):
+                     434     ;                       printf("\n   *** THIS FUNCTION WILL ERASE 2MBYTE OF SPI FLASH Y/N? 
+                             :");
+                     435     ;                       c = _get1char();
+                     436     ;                       TI = 0;
+                     437     ;                       SBUF = c;
+                     438     ;                       if (c!='Y')
+                     439     ;                       {
+                     440     ;                               c = '1';
+                     441     ;                               break;
+                     442     ;                       }
+                     443     ;                       c = 0;
+                     444     ;                       printf("\n   *** Ready Y/N? :");
+                     445     ;                   c = _get1char();
+                     446     ;                       TI = 0;
+                     447     ;                       SBUF = c;
+                     448     ;                       if (c!='Y')
+                     449     ;                       {
+                     450     ;                               c = '1';
+                     451     ;                               break;
+                     452     ;                       }
+                     453     ;                       spiflash_chiperase();
+                     454     ;                       printf ("\n  --> Erase spi flash done\n"); 
+                     455     ;                       c = '1';
+                     456     ;                       break;
+                     457     ; #endif
+                     458     ;               case 1:
+                     459                             ; SOURCE LINE # 194
+007F                 460     ?C0010:
+                     461     ;                       if (RI){
+                     462                             ; SOURCE LINE # 195
+007F 7800     F      463             MOV     R0,#LOW (c?041)
+0081 309806          464             JNB     RI,?C0011
+                     465     ;                               c = SBUF;
+                     466                             ; SOURCE LINE # 196
+0084 A699            467             MOV     @R0,SBUF
+                     468     ;                               RI = 0;
+                     469                             ; SOURCE LINE # 197
+0086 C298            470             CLR     RI
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE     9
+
+                     471     ;                       } else {
+                     472                             ; SOURCE LINE # 198
+0088 80B4            473             SJMP    ?C0001
+008A                 474     ?C0011:
+                     475     ;                               c = 1;
+                     476                             ; SOURCE LINE # 199
+008A 7601            477             MOV     @R0,#01H
+                     478     ;                       }
+                     479                             ; SOURCE LINE # 200
+                     480     ;                       break;
+                     481                             ; SOURCE LINE # 201
+008C 80B0            482             SJMP    ?C0001
+                     483     ;               default:
+                     484                             ; SOURCE LINE # 202
+008E                 485     ?C0013:
+                     486     ;                       if (RI==1){
+                     487                             ; SOURCE LINE # 203
+008E 309806          488             JNB     RI,?C0014
+                     489     ;                               c = SBUF;
+                     490                             ; SOURCE LINE # 204
+0091 7800     F      491             MOV     R0,#LOW (c?041)
+0093 A699            492             MOV     @R0,SBUF
+                     493     ;                               RI = 0;
+                     494                             ; SOURCE LINE # 205
+0095 C298            495             CLR     RI
+                     496     ;                       }
+                     497                             ; SOURCE LINE # 206
+0097                 498     ?C0014:
+                     499     ;                       Temp++;
+                     500                             ; SOURCE LINE # 207
+0097 7800     F      501             MOV     R0,#LOW (Temp?040)
+0099 120000   F      502             LCALL   ?C?LLDIDATA
+009C EF              503             MOV     A,R7
+009D 2401            504             ADD     A,#01H
+009F FF              505             MOV     R7,A
+00A0 E4              506             CLR     A
+00A1 3E              507             ADDC    A,R6
+00A2 FE              508             MOV     R6,A
+00A3 E4              509             CLR     A
+00A4 3D              510             ADDC    A,R5
+00A5 FD              511             MOV     R5,A
+00A6 E4              512             CLR     A
+00A7 3C              513             ADDC    A,R4
+00A8 FC              514             MOV     R4,A
+00A9 7800     F      515             MOV     R0,#LOW (Temp?040)
+00AB 120000   F      516             LCALL   ?C?LSTIDATA
+                     517     ;                       if (Temp>=GVTY_STARTING_TIMEOUT)
+                     518                             ; SOURCE LINE # 208
+00AE 7F80            519             MOV     R7,#080H
+00B0 7E38            520             MOV     R6,#038H
+00B2 7D01            521             MOV     R5,#01H
+00B4 7C00            522             MOV     R4,#00H
+00B6 7800     F      523             MOV     R0,#LOW (Temp?040)
+00B8 120000   F      524             LCALL   ?C?LLDIDATA0
+00BB C3              525             CLR     C
+00BC 120000   F      526             LCALL   ?C?ULCMP
+00BF 5003            527             JNC     $ + 5H
+00C1 020000   F      528             LJMP    ?C0001
+                     529     ; Bootup:
+                     530                             ; SOURCE LINE # 209
+00C4                 531     ?main?Bootup:
+                     532     ;                       {
+                     533                             ; SOURCE LINE # 210
+                     534     ; #ifdef PROGRAM_CONFIGURATION
+                     535     ;                               Load_Config_Data(1);
+                     536     ; #endif
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE    10
+
+                     537     ;                               //load_sflash2cram();
+                     538     ;                               *((volatile u8 xdata *)(0x34)) = (u8)(1);
+                     539                             ; SOURCE LINE # 215
+00C4 900034          540             MOV     DPTR,#034H
+00C7 7401            541             MOV     A,#01H
+00C9 F0              542             MOVX    @DPTR,A
+                     543     ;                       }
+                     544                             ; SOURCE LINE # 216
+                     545     ;                       break;
+                     546                             ; SOURCE LINE # 217
+00CA 020000   F      547             LJMP    ?C0001
+                     548     ;               }
+                     549                             ; SOURCE LINE # 218
+                     550     ;       }
+                     551                             ; SOURCE LINE # 219
+                     552     ; }
+                     553                             ; SOURCE LINE # 220
+00CD                 554     L?0017:
+00CD 7BFF            555             MOV     R3,#0FFH
+00CF 7A00     F      556             MOV     R2,#HIGH (?SC_0)
+00D1 7900     F      557             MOV     R1,#LOW (?SC_0)
+00D3 120000   F      558             LCALL   _printf
+00D6 7BFF            559             MOV     R3,#0FFH
+00D8 7A00     F      560             MOV     R2,#HIGH (?SC_0)
+00DA 7900     F      561             MOV     R1,#LOW (?SC_0)
+00DC 120000   F      562             LCALL   _printf
+00DF 7BFF            563             MOV     R3,#0FFH
+00E1 22              564             RET     
+                     565     ; END OF main
+                     566     
+                     567             END
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE    11
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E               T Y P E  V A L U E   ATTRIBUTES
+
+?C0001 . . . . . . .  C ADDR   003EH   R   SEG=?PR?MAIN?MAIN
+?C0008 . . . . . . .  C ADDR   0058H   R   SEG=?PR?MAIN?MAIN
+?C0009 . . . . . . .  C ADDR   0061H   R   SEG=?PR?MAIN?MAIN
+?C0010 . . . . . . .  C ADDR   007FH   R   SEG=?PR?MAIN?MAIN
+?C0011 . . . . . . .  C ADDR   008AH   R   SEG=?PR?MAIN?MAIN
+?C0013 . . . . . . .  C ADDR   008EH   R   SEG=?PR?MAIN?MAIN
+?C0014 . . . . . . .  C ADDR   0097H   R   SEG=?PR?MAIN?MAIN
+?C?LLDIDATA. . . . .  C ADDR   -----       EXT
+?C?LLDIDATA0 . . . .  C ADDR   -----       EXT
+?C?LSTIDATA. . . . .  C ADDR   -----       EXT
+?C?LSTKIDATA . . . .  C ADDR   -----       EXT
+?C?ULCMP . . . . . .  C ADDR   -----       EXT
+?CO?MAIN . . . . . .  C SEG    00F1H       REL=UNIT
+?C_STARTUP . . . . .  C ADDR   -----       EXT
+?ID?MAIN . . . . . .  I SEG    0018H       REL=UNIT
+?ID?MAIN?MAIN. . . .  I SEG    0005H       REL=UNIT
+?MAIN?BOOTUP . . . .  C ADDR   00C4H   R   SEG=?PR?MAIN?MAIN
+?PR?MAIN?MAIN. . . .  C SEG    00E2H       REL=UNIT
+?SC_0. . . . . . . .  C ADDR   0000H   R   SEG=?CO?MAIN
+?SC_141. . . . . . .  C ADDR   008DH   R   SEG=?CO?MAIN
+?SC_190. . . . . . .  C ADDR   00BEH   R   SEG=?CO?MAIN
+?SC_47 . . . . . . .  C ADDR   002FH   R   SEG=?CO?MAIN
+?SC_94 . . . . . . .  C ADDR   005EH   R   SEG=?CO?MAIN
+?XD?MAIN . . . . . .  X SEG    000EH       REL=UNIT
+?_PRINTF?BYTE. . . .  D ADDR   -----       EXT
+AC . . . . . . . . .  B ADDR   00D0H.6 A   
+ACC. . . . . . . . .  D ADDR   00E0H   A   
+ADDR32_1 . . . . . .  X ADDR   000AH   R   SEG=?XD?MAIN
+ADDRH. . . . . . . .  X ADDR   0002H   R   SEG=?XD?MAIN
+ADDRL. . . . . . . .  X ADDR   0003H   R   SEG=?XD?MAIN
+B. . . . . . . . . .  D ADDR   00F0H   A   
+BANKSEL. . . . . . .  D ADDR   009FH   A   
+C?041. . . . . . . .  I ADDR   0004H   R   SEG=?ID?MAIN?MAIN
+COMINIT. . . . . . .  C ADDR   -----       EXT
+CRLA_H . . . . . . .  D ADDR   00F4H   A   
+CRLA_L . . . . . . .  D ADDR   00F3H   A   
+CRSA_H . . . . . . .  D ADDR   00F2H   A   
+CRSA_L . . . . . . .  D ADDR   00F1H   A   
+CY . . . . . . . . .  B ADDR   00D0H.7 A   
+DISABLEWRCRAM. . . .  C ADDR   -----       EXT
+DOWNLOAD_UART2SFLASH  C ADDR   -----       EXT
+DPH. . . . . . . . .  D ADDR   0083H   A   
+DPL. . . . . . . . .  D ADDR   0082H   A   
+EA . . . . . . . . .  B ADDR   00A8H.7 A   
+ERAM2SFLASHADDR. . .  X ADDR   0000H   R   SEG=?XD?MAIN
+ERRCNT . . . . . . .  I ADDR   000CH   R   SEG=?ID?MAIN
+ES . . . . . . . . .  B ADDR   00A8H.4 A   
+ET0. . . . . . . . .  B ADDR   00A8H.1 A   
+ET1. . . . . . . . .  B ADDR   00A8H.3 A   
+EX0. . . . . . . . .  B ADDR   00A8H.0 A   
+EX1. . . . . . . . .  B ADDR   00A8H.2 A   
+F0 . . . . . . . . .  B ADDR   00D0H.5 A   
+IE . . . . . . . . .  D ADDR   00A8H   A   
+IE0. . . . . . . . .  B ADDR   0088H.1 A   
+IE1. . . . . . . . .  B ADDR   0088H.3 A   
+INT0 . . . . . . . .  B ADDR   00B0H.2 A   
+INT1 . . . . . . . .  B ADDR   00B0H.3 A   
+IP . . . . . . . . .  D ADDR   00B8H   A   
+IT0. . . . . . . . .  B ADDR   0088H.0 A   
+IT1. . . . . . . . .  B ADDR   0088H.2 A   
+A51 MACRO ASSEMBLER  MAIN                                                                 08/17/2016 10:02:49 PAGE    12
+
+L?0017 . . . . . . .  C ADDR   00CDH   R   SEG=?PR?MAIN?MAIN
+MAIN . . . . . . . .  C ADDR   0000H   R   SEG=?PR?MAIN?MAIN
+MEMCTRL. . . . . . .  D ADDR   00F8H   A   
+OV . . . . . . . . .  B ADDR   00D0H.2 A   
+P. . . . . . . . . .  B ADDR   00D0H.0 A   
+P0 . . . . . . . . .  D ADDR   0080H   A   
+P1 . . . . . . . . .  D ADDR   0090H   A   
+P2 . . . . . . . . .  D ADDR   00A0H   A   
+P3 . . . . . . . . .  D ADDR   00B0H   A   
+PCON . . . . . . . .  D ADDR   0087H   A   
+PROGCNT. . . . . . .  I ADDR   0000H   R   SEG=?ID?MAIN
+PS . . . . . . . . .  B ADDR   00B8H.4 A   
+PSW. . . . . . . . .  D ADDR   00D0H   A   
+PT0. . . . . . . . .  B ADDR   00B8H.1 A   
+PT1. . . . . . . . .  B ADDR   00B8H.3 A   
+PX0. . . . . . . . .  B ADDR   00B8H.0 A   
+PX1. . . . . . . . .  B ADDR   00B8H.2 A   
+RB8. . . . . . . . .  B ADDR   0098H.2 A   
+RD . . . . . . . . .  B ADDR   00B0H.7 A   
+REN. . . . . . . . .  B ADDR   0098H.4 A   
+RI . . . . . . . . .  B ADDR   0098H.0 A   
+RS0. . . . . . . . .  B ADDR   00D0H.3 A   
+RS1. . . . . . . . .  B ADDR   00D0H.4 A   
+RXD. . . . . . . . .  B ADDR   00B0H.0 A   
+SBUF . . . . . . . .  D ADDR   0099H   A   
+SCON . . . . . . . .  D ADDR   0098H   A   
+SFLASHADDR . . . . .  X ADDR   0006H   R   SEG=?XD?MAIN
+SM0. . . . . . . . .  B ADDR   0098H.7 A   
+SM1. . . . . . . . .  B ADDR   0098H.6 A   
+SM2. . . . . . . . .  B ADDR   0098H.5 A   
+SP . . . . . . . . .  D ADDR   0081H   A   
+T0 . . . . . . . . .  B ADDR   00B0H.4 A   
+T1 . . . . . . . . .  B ADDR   00B0H.5 A   
+TB8. . . . . . . . .  B ADDR   0098H.3 A   
+TCON . . . . . . . .  D ADDR   0088H   A   
+TEMP?040 . . . . . .  I ADDR   0000H   R   SEG=?ID?MAIN?MAIN
+TF0. . . . . . . . .  B ADDR   0088H.5 A   
+TF1. . . . . . . . .  B ADDR   0088H.7 A   
+TH0. . . . . . . . .  D ADDR   008CH   A   
+TH1. . . . . . . . .  D ADDR   008DH   A   
+TI . . . . . . . . .  B ADDR   0098H.1 A   
+TL0. . . . . . . . .  D ADDR   008AH   A   
+TL1. . . . . . . . .  D ADDR   008BH   A   
+TMOD . . . . . . . .  D ADDR   0089H   A   
+TR0. . . . . . . . .  B ADDR   0088H.4 A   
+TR1. . . . . . . . .  B ADDR   0088H.6 A   
+TXD. . . . . . . . .  B ADDR   00B0H.1 A   
+UART2ERAMADDR. . . .  X ADDR   0004H   R   SEG=?XD?MAIN
+WR . . . . . . . . .  B ADDR   00B0H.6 A   
+_PRINTF. . . . . . .  C ADDR   -----       EXT
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

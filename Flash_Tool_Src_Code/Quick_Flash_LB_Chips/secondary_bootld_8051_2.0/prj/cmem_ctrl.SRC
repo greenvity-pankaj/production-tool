@@ -1,0 +1,147 @@
+; .\cmem_ctrl.SRC generated from: ..\src\cmem_ctrl.c
+; COMPILER INVOKED BY:
+;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\cmem_ctrl.c OPTIMIZE(9,SIZE) BROWSE INCDIR(..\src;C:\Keil\C51\INC;..\src) DEBUG OBJECTEXTEND CODE PRINT(.\cmem_ctrl.lst) TABS(2) PREPRINT(.\cmem_ctrl.i) SRC(.\cmem_ctrl.SRC)
+
+
+NAME	CMEM_CTRL
+
+?PR?EnableWrCRam?CMEM_CTRL               SEGMENT CODE 
+?PR?DisableWrCRam?CMEM_CTRL              SEGMENT CODE 
+	PUBLIC	DisableWrCRam
+	PUBLIC	EnableWrCRam
+; /*
+; * Description : Functions to control Palmchip's code and data memory
+; *
+; * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+; * All rights reserved.
+; *
+; * Author      : Peter Nguyen
+; *
+; * Purpose :
+; *     Control PalmChip's memory mode 
+; *
+; * File: cmem_ctrl.c
+; */
+; 
+; void EnableWrCRam ()
+
+	RSEG  ?PR?EnableWrCRam?CMEM_CTRL
+EnableWrCRam:
+	USING	0
+			; SOURCE LINE # 15
+; {
+			; SOURCE LINE # 16
+; #pragma asm
+; /*#ifdef 8051_V5
+	 
+;     MOV       0f3h,    #0ffh  
+	 
+;     MOV       0f4h,    #0ffh  
+	 
+;     MOV       0F8H,    #0h	  
+	 
+; #else  //8051 v7
+	 
+; */
+	  
+; 	MOV		  09FH,    #0	 
+	  MOV		  09FH,    #0	 
+; 	MOV       0f1h,    #00h  
+	  MOV       0f1h,    #00h  
+; 	MOV       0f2h,    #20h  
+	  MOV       0f2h,    #20h  
+;     MOV       0f3h,    #0ffh 
+	  MOV       0f3h,    #0ffh 
+;     MOV       0f4h,    #0ffh 
+	  MOV       0f4h,    #0ffh 
+;     MOV       0F8H,    #0h	  
+	  MOV       0F8H,    #0h	  
+; //#endif
+	  
+; #pragma endasm
+; }
+			; SOURCE LINE # 32
+	RET  	
+; END OF EnableWrCRam
+
+; 
+; void DisableWrCRam ()
+
+	RSEG  ?PR?DisableWrCRam?CMEM_CTRL
+DisableWrCRam:
+	USING	0
+			; SOURCE LINE # 34
+; {
+			; SOURCE LINE # 35
+; #pragma asm
+; /*
+	 
+; #ifdef 8051_V5
+	 
+;     //Download size
+	 
+;     MOV       0f3h,    #0FFh
+	 
+;     MOV       0f4h,    #0FFh
+	 
+;     MOV       0F8H,    #01h
+	 
+; #else
+	 
+; */
+	  
+; 	MOV		  09FH,    #0	  
+	  MOV		  09FH,    #0	  
+; 	MOV       0f1h,    #00h   
+	  MOV       0f1h,    #00h   
+; 	MOV       0f2h,    #20h   
+	  MOV       0f2h,    #20h   
+;     MOV       0f3h,    #0ffh  
+	  MOV       0f3h,    #0ffh  
+;     MOV       0f4h,    #0ffh  
+	  MOV       0f4h,    #0ffh  
+;     MOV       0F8H,    #1h	
+	  MOV       0F8H,    #1h	
+; //#endif
+	  
+; #if 0
+	  
+; 	mov		r0,#0;
+	  
+; 	mov		a,#0;
+	  
+; test_mem_lp1:
+	  
+; 	mov 	@r0,a;
+	  
+; 	inc		r0;
+	  
+; 	inc		a;
+	  
+; 	cjne	a,#0,test_mem_lp1;
+	  
+; 	mov		r0,#0;
+	  
+; 	mov		a,#0;	
+	  
+; test_mem_lp2:
+	  
+; 	mov		a,@r0;
+	  
+; 	mov		p1,a;
+	  
+; 	inc		a;
+	  
+; 	inc		r0;
+	  
+; 	cjne	a,#0,test_mem_lp2;
+	  
+; #endif
+	  
+; #pragma endasm
+; }
+			; SOURCE LINE # 70
+	RET  	
+; END OF DisableWrCRam
+
+	END

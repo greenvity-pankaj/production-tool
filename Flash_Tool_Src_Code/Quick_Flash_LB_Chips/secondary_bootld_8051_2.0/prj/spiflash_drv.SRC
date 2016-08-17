@@ -1,0 +1,1104 @@
+; .\spiflash_drv.SRC generated from: ..\src\spiflash_drv.c
+; COMPILER INVOKED BY:
+;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\spiflash_drv.c OMF2 OPTIMIZE(8,SIZE) BROWSE INCDIR(..\src;C:\Keil\C51\INC;..\src) DEBUG CODE PRINT(.\spiflash_drv.lst) TABS(2) PREPRINT(.\spiflash_drv.i) SRC(.\spiflash_drv.SRC)
+
+$NOMOD51
+
+NAME	SPIFLASH_DRV
+
+P0	DATA	080H
+P1	DATA	090H
+P2	DATA	0A0H
+BANKSEL	DATA	09FH
+P3	DATA	0B0H
+T0	BIT	0B0H.4
+AC	BIT	0D0H.6
+T1	BIT	0B0H.5
+EA	BIT	0A8H.7
+IE	DATA	0A8H
+RD	BIT	0B0H.7
+MEMCTRL	DATA	0F8H
+ES	BIT	0A8H.4
+IP	DATA	0B8H
+RI	BIT	098H.0
+INT0	BIT	0B0H.2
+CY	BIT	0D0H.7
+TI	BIT	098H.1
+INT1	BIT	0B0H.3
+PS	BIT	0B8H.4
+SP	DATA	081H
+OV	BIT	0D0H.2
+WR	BIT	0B0H.6
+SBUF	DATA	099H
+PCON	DATA	087H
+SCON	DATA	098H
+TMOD	DATA	089H
+TCON	DATA	088H
+IE0	BIT	088H.1
+IE1	BIT	088H.3
+B	DATA	0F0H
+ACC	DATA	0E0H
+ET0	BIT	0A8H.1
+ET1	BIT	0A8H.3
+TF0	BIT	088H.5
+TF1	BIT	088H.7
+CRLA_H	DATA	0F4H
+RB8	BIT	098H.2
+TH0	DATA	08CH
+EX0	BIT	0A8H.0
+IT0	BIT	088H.0
+TH1	DATA	08DH
+TB8	BIT	098H.3
+EX1	BIT	0A8H.2
+IT1	BIT	088H.2
+P	BIT	0D0H.0
+CRLA_L	DATA	0F3H
+SM0	BIT	098H.7
+TL0	DATA	08AH
+SM1	BIT	098H.6
+TL1	DATA	08BH
+SM2	BIT	098H.5
+CRSA_H	DATA	0F2H
+PT0	BIT	0B8H.1
+PT1	BIT	0B8H.3
+RS0	BIT	0D0H.3
+TR0	BIT	088H.4
+RS1	BIT	0D0H.4
+CRSA_L	DATA	0F1H
+TR1	BIT	088H.6
+PX0	BIT	0B8H.0
+PX1	BIT	0B8H.2
+DPH	DATA	083H
+DPL	DATA	082H
+REN	BIT	098H.4
+RXD	BIT	0B0H.0
+TXD	BIT	0B0H.1
+F0	BIT	0D0H.5
+PSW	DATA	0D0H
+?PR?_spiFlash_Cmd?SPIFLASH_DRV           SEGMENT CODE 
+?DT?_spiFlash_Cmd?SPIFLASH_DRV           SEGMENT DATA OVERLAYABLE
+?PR?_spiflash_wren?SPIFLASH_DRV          SEGMENT CODE 
+?PR?_spiflash_wrsr_unlock?SPIFLASH_DRV   SEGMENT CODE 
+?DT?_spiflash_wrsr_unlock?SPIFLASH_DRV   SEGMENT DATA OVERLAYABLE
+?PR?spiflash_CheckFlashBusy?SPIFLASH_DRV SEGMENT CODE 
+?PR?_spiflash_EraseBlock?SPIFLASH_DRV    SEGMENT CODE 
+?DT?_spiflash_EraseBlock?SPIFLASH_DRV    SEGMENT DATA OVERLAYABLE
+?PR?spiflash_eraseLower256k?SPIFLASH_DRV SEGMENT CODE 
+?PR?spiflash_eraseBackup256k?SPIFLASH_DRV SEGMENT CODE 
+?PR?_spiflash_WriteByte?SPIFLASH_DRV     SEGMENT CODE 
+?DT?_spiflash_WriteByte?SPIFLASH_DRV     SEGMENT DATA OVERLAYABLE
+?PR?_spiflash_ReadByte?SPIFLASH_DRV      SEGMENT CODE 
+?DT?_spiflash_ReadByte?SPIFLASH_DRV      SEGMENT DATA OVERLAYABLE
+?PR?_spiflash_eraseSector?SPIFLASH_DRV   SEGMENT CODE 
+?DT?_spiflash_eraseSector?SPIFLASH_DRV   SEGMENT DATA OVERLAYABLE
+?CO?SPIFLASH_DRV     SEGMENT CODE 
+?ID?_spiFlash_Cmd?SPIFLASH_DRV           SEGMENT IDATA OVERLAYABLE
+?ID?spiflash_CheckFlashBusy?SPIFLASH_DRV SEGMENT IDATA OVERLAYABLE
+?ID?spiflash_eraseLower256k?SPIFLASH_DRV SEGMENT IDATA OVERLAYABLE
+?ID?spiflash_eraseBackup256k?SPIFLASH_DRV SEGMENT IDATA OVERLAYABLE
+	EXTRN	CODE (_printf)
+	EXTRN	DATA (?_printf?BYTE)
+	EXTRN	CODE (_swUtil_SwapEndian)
+	EXTRN	CODE (?C?LSTIDATA)
+	EXTRN	CODE (?C?LLDIDATA)
+	EXTRN	CODE (?C?LSTXDATA)
+	EXTRN	CODE (?C?LSHL)
+	PUBLIC	_spiflash_eraseSector
+	PUBLIC	_spiflash_ReadByte
+	PUBLIC	?_spiflash_WriteByte?BYTE
+	PUBLIC	_spiflash_WriteByte
+	PUBLIC	spiflash_eraseBackup256k
+	PUBLIC	spiflash_eraseLower256k
+	PUBLIC	?_spiflash_EraseBlock?BYTE
+	PUBLIC	_spiflash_EraseBlock
+	PUBLIC	spiflash_CheckFlashBusy
+	PUBLIC	_spiflash_wrsr_unlock
+	PUBLIC	_spiflash_wren
+	PUBLIC	?_spiFlash_Cmd?BYTE
+	PUBLIC	_spiFlash_Cmd
+
+	RSEG  ?DT?_spiflash_wrsr_unlock?SPIFLASH_DRV
+?_spiflash_wrsr_unlock?BYTE:
+     unlock?247:   DS   1
+
+	RSEG  ?DT?_spiflash_EraseBlock?SPIFLASH_DRV
+?_spiflash_EraseBlock?BYTE:
+    BlockID?449:   DS   4
+	ORG  4
+    block64?450:   DS   1
+
+	RSEG  ?DT?_spiFlash_Cmd?SPIFLASH_DRV
+?_spiFlash_Cmd?BYTE:
+NumOfByteCmd?040:   DS   1
+	ORG  1
+    CmdData?041:   DS   4
+	ORG  5
+SpiWriteData?042:   DS   1
+	ORG  6
+       RdWr?043:   DS   1
+
+	RSEG  ?DT?_spiflash_eraseSector?SPIFLASH_DRV
+?_spiflash_eraseSector?BYTE:
+     Sector?956:   DS   4
+
+	RSEG  ?DT?_spiflash_ReadByte?SPIFLASH_DRV
+?_spiflash_ReadByte?BYTE:
+       Addr?855:   DS   4
+
+	RSEG  ?DT?_spiflash_WriteByte?SPIFLASH_DRV
+?_spiflash_WriteByte?BYTE:
+       Addr?753:   DS   4
+	ORG  4
+      IData?754:   DS   1
+
+	RSEG  ?ID?_spiFlash_Cmd?SPIFLASH_DRV
+          c?044:   DS   1
+
+	RSEG  ?ID?_spiFlash_Cmd?SPIFLASH_DRV
+       temp?045:   DS   4
+
+	RSEG  ?ID?spiflash_CheckFlashBusy?SPIFLASH_DRV
+          c?348:   DS   1
+
+	RSEG  ?ID?spiflash_eraseLower256k?SPIFLASH_DRV
+     BlckID?551:   DS   1
+
+	RSEG  ?ID?spiflash_eraseBackup256k?SPIFLASH_DRV
+     BlckID?652:   DS   1
+
+	RSEG  ?CO?SPIFLASH_DRV
+?SC_0:
+	DB  00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'D' ,'e' ,'l' ,'e' 
+	DB  't' ,'i' ,'n' ,'g' ,' ' ,'c' ,'o' ,'d' ,'e' ,' ' 
+	DB  'i' ,'m' ,'a' ,'g' ,'e' ,' ' ,000H
+
+?SC_27:
+	DB  '.' ,000H
+
+?SC_29:
+	DB  00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'D' ,'e' ,'l' ,'e' 
+	DB  't' ,'i' ,'n' ,'g' ,' ' ,'b' ,'a' ,'c' ,'k' ,'u' 
+	DB  'p' ,' ' ,'c' ,'o' ,'d' ,'e' ,' ' ,'i' ,'m' ,'a' 
+	DB  'g' ,'e' ,' ' ,000H
+
+
+	RSEG ?DT?_spiflash_eraseSector?SPIFLASH_DRV
+; /*
+; * Description : 8051 bootloader spiflash driver functions
+; *
+; * Copyright (c) 2011-2012 Greenvity Communications, Inc.
+; * All rights reserved.
+; *
+; * Author      : Peter Nguyen
+; * Release Date: 04/27/2013
+; * Purpose :
+; *     spiflash driver functions for the bootloader
+; *
+; * File: spiflash_drv.c
+; */
+; #include "test.h"
+; 
+; #include <typedef.h>
+; #include <stdio.h>
+; #include <reg51.h>
+; #include <macro_def.h>
+; #include "spiflash.h"
+; 
+; #define SPIFL_TXSTAT  	0x0300
+; #define SPIFL_CFG 	  	0x0304
+; #define SPIFL_MSBDATABIT_FIRST 0x0305
+; #define SPIFL_NOBYTE2TX 0x0306
+; #define SPIFL_TXCTRL  	0x0308
+; #define SPIFL_WRDATA  	0x030C
+; #define SPIFL_RDDATA	0x030C
+; #define SPIFL_WRDATA0 	0x030F  //Command/opcode	- Sent first. 
+; #define SPIFL_WRDATA1 	0x030E  //Address MS byte
+; #define SPIFL_WRDATA2 	0x030D  //Address 2nd byte
+; #define SPIFL_WRDATA3 	0x030C  //Address LS byte  - Compiler is big endian, so if sent more than 2 bytes, sw has to swap byte orders before write 
+; #define SPIFL_WRDATA4 	0x0307  //Data written to sflash	- Sent last
+; 
+; #define SPIFL_RD         0x03  //Read 1 byte
+; #define SPIFL_SECERASE	 0x20000000  //Sector erase
+; #define SPIFL_BLKERASE   0x52000000
+; #define SPIFL_BLK64ERASE 0xD8000000
+; #ifdef ONEBYTE_COMMAND_ERASE
+; #define SPIFL_CHIPERASE  0x60000000 //Chip erase
+; #define SPIFL_CHIPERASE1 0xC7000000
+; #else
+; #define SPIFL_CHIPERASE  0x60	    //Chip erase
+; #define SPIFL_CHIPERASE1 0xC7
+; #endif
+; #define SPIFL_BYTEPRGRM  0x02000000 //Program 1 byte
+; #define SPIFL_BYTEREAD	 0x03000000 //Read 1 bytes
+; #define SPIFL_AAI        0xAF //Auto address increment 
+; #define SPIFL_RDSR       0x05 //Read status register
+; #define SPIFL_EWSR_B     0x50 //Enable write status register
+; #define SPIFL_EWSR       0x50000000 //Enable write status register
+; #define SPIFL_WRSR_B	 0x01 //Write status register
+; #define SPIFL_WRSR       0x00010000 //Write status register
+; #define SPIFL_WREN_B  	 0x06 //Enable write data byte - this is mainly enable to latch the address, so any command with the address needs to have this command execute before.
+; #define SPIFL_WREN       0x06000000 //Enable to write data to spiflash
+; #define SPIFL_WRDI_B 	 0x04 //Disable write byte.
+; #define SPIFL_WRDI       0x04000000 //Write disable
+; #define SPIFL_RDID       0x90 //Read ID
+; 
+; u8 spiflash_ReadStatusReg(void);
+; void spiflash_CheckFlashBusy();
+; void spiFlash_Cmd(u8, u32, u8, u8);
+; void spiflash_wren(u8);
+; void spiflash_eraseConfigMem();
+; void spiflash_eraseSector(u32);
+; void spiflash_wrsr_unlock(u8);
+; void test_spiflash(void);
+; void spiflash_chiperase(void);
+; void spiflash_eraseLower256k();
+; void spiflash_CheckFlashBusy();
+; u8 spiflash_ReadStatusReg(void);
+; void spiflash_WriteByte(u32, u8);
+; u8 spiflash_ReadByte(u32);
+; u8 spiflash_BackupCodeImage();
+; 
+; 
+; 
+; //***************************************************************
+; // void spiFlash_Cmd(u8 NumOfByteCmd, u32 CmdData) is to send a command to the spiflash
+; // An spiflash command may be from 1 to 4 bytes in length
+; // Input:
+; //		NumOfByteCmd: The length of command in number of bytes sent to sflash.
+; //		CmdData: Command data from 1 byte to 4 bytes
+; //		SpiWriteData: 5th byte to transmit to spi flash in case 5-byte command
+; //***************************************************************
+; void spiFlash_Cmd(u8 const NumOfByteCmd, u32 const CmdData, u8 const SpiWriteData, u8 const RdWr)
+
+	RSEG  ?PR?_spiFlash_Cmd?SPIFLASH_DRV
+L?0050:
+	USING	0
+	MOV  	?_spiFlash_Cmd?BYTE+04H,R7
+	MOV  	?_spiFlash_Cmd?BYTE+03H,R6
+	MOV  	?_spiFlash_Cmd?BYTE+02H,R5
+	MOV  	?_spiFlash_Cmd?BYTE+01H,A
+	CLR  	A
+	MOV  	?_spiFlash_Cmd?BYTE+05H,A
+	MOV  	?_spiFlash_Cmd?BYTE+06H,A
+	MOV  	R7,#04H
+_spiFlash_Cmd:
+	USING	0
+			; SOURCE LINE # 86
+	MOV  	NumOfByteCmd?040,R7
+; {
+			; SOURCE LINE # 87
+; 	u8 idata c;
+; 	u32 idata temp;
+; 	temp = swUtil_SwapEndian(CmdData);
+			; SOURCE LINE # 90
+	MOV  	R7,CmdData?041+03H
+	MOV  	R6,CmdData?041+02H
+	MOV  	R5,CmdData?041+01H
+	MOV  	R4,CmdData?041
+	LCALL	_swUtil_SwapEndian
+	MOV  	R0,#LOW (temp?045)
+	LCALL	?C?LSTIDATA
+; 	*(u32 xdata *)SPIFL_WRDATA = (u32)(temp);
+			; SOURCE LINE # 91
+	MOV  	R0,#LOW (temp?045)
+	LCALL	?C?LLDIDATA
+	MOV  	DPTR,#030CH
+	LCALL	?C?LSTXDATA
+; 	*(u8 xdata *)SPIFL_WRDATA4 = (u8)(SpiWriteData);
+			; SOURCE LINE # 92
+	MOV  	DPTR,#0307H
+	MOV  	A,SpiWriteData?042
+	MOVX 	@DPTR,A
+; 	*(u8 xdata *)SPIFL_NOBYTE2TX = NumOfByteCmd;
+			; SOURCE LINE # 93
+	MOV  	DPTR,#0306H
+	MOV  	A,NumOfByteCmd?040
+	MOVX 	@DPTR,A
+; 	if (RdWr){		
+			; SOURCE LINE # 94
+	MOV  	A,RdWr?043
+	JZ   	?C0001
+; 		*(u8 xdata *)SPIFL_TXCTRL    = 0x5; 
+			; SOURCE LINE # 95
+	MOV  	DPTR,#0308H
+	MOV  	A,#05H
+	MOVX 	@DPTR,A
+; 		c = *(u8 xdata *)SPIFL_TXSTAT;
+			; SOURCE LINE # 96
+	MOV  	DPTR,#0300H
+	MOVX 	A,@DPTR
+	MOV  	R0,#LOW (c?044)
+	MOV  	@R0,A
+?C0002:
+; 		while (c!=0)
+			; SOURCE LINE # 97
+	MOV  	R0,#LOW (c?044)
+	MOV  	A,@R0
+	JZ   	?C0003
+; 		{
+			; SOURCE LINE # 98
+; 			c = *(u8 xdata *)SPIFL_TXSTAT;
+			; SOURCE LINE # 99
+	MOV  	DPTR,#0300H
+	MOVX 	A,@DPTR
+	MOV  	@R0,A
+; 		}
+			; SOURCE LINE # 100
+	SJMP 	?C0002
+?C0003:
+; 		*(u8 xdata *)SPIFL_TXCTRL    = 0x3; 
+			; SOURCE LINE # 101
+	MOV  	DPTR,#0308H
+	MOV  	A,#03H
+	MOVX 	@DPTR,A
+; 	} else {
+			; SOURCE LINE # 102
+	SJMP 	?C0004
+?C0001:
+; 		*(u8 xdata *)SPIFL_TXCTRL    = 0x5; 
+			; SOURCE LINE # 103
+	MOV  	DPTR,#0308H
+	MOV  	A,#05H
+	MOVX 	@DPTR,A
+; 	}
+			; SOURCE LINE # 104
+?C0004:
+; 	c = *(u8 xdata *)SPIFL_TXSTAT;
+			; SOURCE LINE # 105
+	MOV  	DPTR,#0300H
+	MOVX 	A,@DPTR
+	MOV  	R0,#LOW (c?044)
+	MOV  	@R0,A
+?C0005:
+; 	while (c!=0)
+			; SOURCE LINE # 106
+	MOV  	R0,#LOW (c?044)
+	MOV  	A,@R0
+	JZ   	?C0006
+; 	{
+			; SOURCE LINE # 107
+; 		c = *(u8 xdata *)SPIFL_TXSTAT;
+			; SOURCE LINE # 108
+	MOV  	DPTR,#0300H
+	MOVX 	A,@DPTR
+	MOV  	@R0,A
+; 	}
+			; SOURCE LINE # 109
+	SJMP 	?C0005
+?C0006:
+; 	*(u8 xdata *)SPIFL_TXCTRL  = 0x0; 
+			; SOURCE LINE # 110
+	MOV  	DPTR,#0308H
+	CLR  	A
+	MOVX 	@DPTR,A
+; 	return;
+; }
+			; SOURCE LINE # 112
+?C0007:
+	RET  	
+; END OF _spiFlash_Cmd
+
+; //***************************************************************
+; // void spiflash_wren(u8 wren) to enable or disable sflash write enable
+; // Input:
+; //		wren = 1: Enable write mode
+; //		wren = 0: Disable write mode
+; //		the write enable mode will be disable automatically after every write command
+; //***************************************************************
+; 
+; void spiflash_wren(u8 const wren)
+
+	RSEG  ?PR?_spiflash_wren?SPIFLASH_DRV
+_spiflash_wren:
+	USING	0
+			; SOURCE LINE # 121
+;---- Variable 'wren?146' assigned to Register 'R7' ----
+; {
+			; SOURCE LINE # 122
+; 	if (wren==1)
+			; SOURCE LINE # 123
+	CJNE 	R7,#01H,?C0008
+; 		spiFlash_Cmd(1,SPIFL_WREN_B,0,0);
+			; SOURCE LINE # 124
+	CLR  	A
+	MOV  	?_spiFlash_Cmd?BYTE+04H,#06H
+	SJMP 	?C0047
+?C0008:
+; 	else
+; 		spiFlash_Cmd(1,SPIFL_WRDI_B,0,0);
+			; SOURCE LINE # 126
+	CLR  	A
+	MOV  	?_spiFlash_Cmd?BYTE+04H,#04H
+?C0047:
+	MOV  	?_spiFlash_Cmd?BYTE+03H,A
+	MOV  	?_spiFlash_Cmd?BYTE+02H,A
+	MOV  	?_spiFlash_Cmd?BYTE+01H,A
+	MOV  	?_spiFlash_Cmd?BYTE+05H,A
+	MOV  	?_spiFlash_Cmd?BYTE+06H,A
+	MOV  	R7,#01H
+	LCALL	_spiFlash_Cmd
+; 	return;
+; }
+			; SOURCE LINE # 128
+?C0010:
+	RET  	
+; END OF _spiflash_wren
+
+; //***************************************************************
+; // void spiflash_wrsr_unlock(u8 unlock) is to unlock or lock the spiflash
+; // Input
+; //		unlock = 1: is to unlock the chip
+; //		unlock = 0: is to lock the chip
+; //***************************************************************
+; 
+; void spiflash_wrsr_unlock(u8 const unlock)
+
+	RSEG  ?PR?_spiflash_wrsr_unlock?SPIFLASH_DRV
+_spiflash_wrsr_unlock:
+	USING	0
+			; SOURCE LINE # 136
+	MOV  	unlock?247,R7
+; {	
+			; SOURCE LINE # 137
+; 	spiflash_wren(1);
+			; SOURCE LINE # 138
+	MOV  	R7,#01H
+	LCALL	_spiflash_wren
+; 	if (unlock==1)
+			; SOURCE LINE # 139
+	MOV  	A,unlock?247
+	CJNE 	A,#01H,?C0011
+; 		spiFlash_Cmd(2,(u32)(SFLASH_PROTECT_NONE|(SPIFL_WRSR_B<<8)),0,0);
+			; SOURCE LINE # 140
+	CLR  	A
+	MOV  	?_spiFlash_Cmd?BYTE+04H,A
+	SJMP 	?C0048
+?C0011:
+; 	else 
+; 		spiFlash_Cmd(2,(u32)(SFLASH_PROTECT_ALL|(SPIFL_WRSR_B<<8)),0,0);
+			; SOURCE LINE # 142
+	CLR  	A
+	MOV  	?_spiFlash_Cmd?BYTE+04H,#0BCH
+?C0048:
+	MOV  	?_spiFlash_Cmd?BYTE+03H,#01H
+	MOV  	?_spiFlash_Cmd?BYTE+02H,A
+	MOV  	?_spiFlash_Cmd?BYTE+01H,A
+	MOV  	?_spiFlash_Cmd?BYTE+05H,A
+	MOV  	?_spiFlash_Cmd?BYTE+06H,A
+	MOV  	R7,#02H
+	LCALL	_spiFlash_Cmd
+?C0012:
+; 	spiflash_CheckFlashBusy();
+			; SOURCE LINE # 143
+	LCALL	spiflash_CheckFlashBusy
+; 	return;
+; }
+			; SOURCE LINE # 145
+?C0013:
+	RET  	
+; END OF _spiflash_wrsr_unlock
+
+; #ifdef FEATURE_CHIPERASE
+; //***************************************************************
+; //spiflash_chiperase(): erase the whole chip
+; //***************************************************************
+; #ifdef ONEBYTE_COMMAND_ERASE
+; void spiflash_chiperase()
+; {
+; 	u8 c;
+; 	spiflash_wrsr_unlock(1);
+; 	spiflash_wren(1);
+; 	*(u8 xdata *)SPIFL_NOBYTE2TX = 0x1;  
+; 	*(u32 xdata *)SPIFL_WRDATA   = (u32)SPIFL_CHIPERASE;
+; 	*(u8 xdata *)SPIFL_TXCTRL    = 0x5;
+; 	c = *(u8 xdata *)SPIFL_TXSTAT;
+; 	while (c!=0)
+; 	{
+; 		c = *(u8 xdata *)SPIFL_TXSTAT;
+; 	}
+; 	*(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+; 
+; 	spiflash_wrsr_unlock(1);
+; 	spiflash_wren(1);
+; 	*(u8 xdata *)SPIFL_NOBYTE2TX = 0x1;  
+; 	*(u32 xdata *)SPIFL_WRDATA	 = (u32)SPIFL_CHIPERASE1;
+; 	*(u8 xdata *)SPIFL_TXCTRL	 = 0x5; 
+; 	c = *(u8 xdata *)SPIFL_TXSTAT;
+; 	while (c!=0)
+; 	{
+; 		c = *(u8 xdata *)SPIFL_TXSTAT;
+; 	}
+; 	*(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+; 	return;
+; }
+; #else
+; void spiflash_chiperase()
+; {
+; 	spiflash_wrsr_unlock(1);
+; 	spiflash_wren(1);
+; 	spiFlash_Cmd((u8)1,(u32)SPIFL_CHIPERASE, 0,0);
+; 	spiflash_wren(1);
+; 	spiFlash_Cmd((u8)1,(u32)SPIFL_CHIPERASE1, 0,0);	
+; 	return;
+; }
+; #endif
+; #endif
+; //***************************************************************
+; //void spiflash_CheckFlashBusy(void)
+; //Read status register untill bit busy == 0
+; //***************************************************************
+; void spiflash_CheckFlashBusy()
+
+	RSEG  ?PR?spiflash_CheckFlashBusy?SPIFLASH_DRV
+spiflash_CheckFlashBusy:
+	USING	0
+			; SOURCE LINE # 195
+; {
+			; SOURCE LINE # 196
+; 	u8 idata c;
+; check_st_reg:
+			; SOURCE LINE # 198
+?spiflash_CheckFlashBusy?check_st_reg:
+; 	*(u8 xdata *)SPIFL_NOBYTE2TX = 1;
+			; SOURCE LINE # 199
+	MOV  	DPTR,#0306H
+	MOV  	A,#01H
+	MOVX 	@DPTR,A
+; 	*(u8 xdata *)SPIFL_WRDATA 	 = (u8)(SPIFL_RDSR);
+			; SOURCE LINE # 200
+	MOV  	DPTR,#030CH
+	MOV  	A,#05H
+	MOVX 	@DPTR,A
+; 	*(u8 xdata *)SPIFL_TXCTRL	 = 0x5;
+			; SOURCE LINE # 201
+	MOV  	DPTR,#0308H
+	MOVX 	@DPTR,A
+; check_Txdone1:
+			; SOURCE LINE # 202
+?spiflash_CheckFlashBusy?check_Txdone1:
+; 	c = *(u8 xdata *)SPIFL_TXSTAT;
+			; SOURCE LINE # 203
+	MOV  	DPTR,#0300H
+	MOVX 	A,@DPTR
+	MOV  	R0,#LOW (c?348)
+	MOV  	@R0,A
+; 	if (c!=0)
+			; SOURCE LINE # 204
+	JNZ  	?spiflash_CheckFlashBusy?check_Txdone1
+; 		goto check_Txdone1;
+			; SOURCE LINE # 205
+?C0016:
+; 	*(u8 xdata *)SPIFL_TXCTRL  = 0x3;
+			; SOURCE LINE # 206
+	MOV  	DPTR,#0308H
+	MOV  	A,#03H
+	MOVX 	@DPTR,A
+; check_Rxdone:
+			; SOURCE LINE # 207
+?spiflash_CheckFlashBusy?check_Rxdone:
+; 	c = *(u8 xdata *)SPIFL_TXSTAT;
+			; SOURCE LINE # 208
+	MOV  	DPTR,#0300H
+	MOVX 	A,@DPTR
+	MOV  	R0,#LOW (c?348)
+	MOV  	@R0,A
+; 	if (c!=0)
+			; SOURCE LINE # 209
+	JNZ  	?spiflash_CheckFlashBusy?check_Rxdone
+; 		goto check_Rxdone;
+			; SOURCE LINE # 210
+?C0018:
+; 	c = (*(u8 xdata *)SPIFL_RDDATA)&0x1;
+			; SOURCE LINE # 211
+	MOV  	DPTR,#030CH
+	MOVX 	A,@DPTR
+	ANL  	A,#01H
+	MOV  	R0,#LOW (c?348)
+	MOV  	@R0,A
+; #ifdef 	TEST_ON_BOARD
+; 	printf("\nBusy = %x",(u16)(0xFF&c));
+; #endif
+; 	if (c==0x1)
+			; SOURCE LINE # 215
+	XRL  	A,#01H
+	JZ   	?spiflash_CheckFlashBusy?check_st_reg
+; 		goto check_st_reg;
+			; SOURCE LINE # 216
+?C0019:
+; 	*(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+			; SOURCE LINE # 217
+	MOV  	DPTR,#0308H
+	CLR  	A
+	MOVX 	@DPTR,A
+; 	return;
+; }
+			; SOURCE LINE # 219
+?C0020:
+	RET  	
+; END OF spiflash_CheckFlashBusy
+
+; #if 0
+; //***************************************************************
+; //spiflash_32KBlkErase(u8 BlockID): a block of 32Kbytes
+; //Input: 
+; //	BlockID: The block ID of each 32K (0,1,2,3..)
+; //***************************************************************
+; void spiflash_32KBlkErase(u32 BlockID)
+; {
+; 	spiflash_wrsr_unlock((u8)1);
+; 	spiflash_wren((u8)1);
+; 	spiFlash_Cmd((u8)4,(u32)(SPIFL_BLKERASE | (BlockID<<15)), 0,0);
+; 	spiflash_CheckFlashBusy();
+; }
+; #endif
+; //***************************************************************
+; //spiflash_64KBlkErase(u8 BlockID, u8 block64): a block of 64Kbytes
+; //Input: 
+; //	BlockID: The block ID of each 32 or 64K (0,1,2,3..)
+; //   block64: 1 - erase block 64K, 0 - erase block 32K
+; //***************************************************************
+; 
+; void spiflash_EraseBlock(u32 BlockID, u8 block64)
+
+	RSEG  ?PR?_spiflash_EraseBlock?SPIFLASH_DRV
+L?0051:
+	USING	0
+	MOV  	A,@R0
+	MOV  	R7,A
+	CLR  	A
+	MOV  	R4,A
+	MOV  	R5,A
+	MOV  	R6,A
+	MOV  	?_spiflash_EraseBlock?BYTE+04H,#01H
+_spiflash_EraseBlock:
+	USING	0
+			; SOURCE LINE # 241
+	MOV  	BlockID?449+03H,R7
+	MOV  	BlockID?449+02H,R6
+	MOV  	BlockID?449+01H,R5
+	MOV  	BlockID?449,R4
+; {
+			; SOURCE LINE # 242
+; 	spiflash_wrsr_unlock((u8)1);
+			; SOURCE LINE # 243
+	MOV  	R7,#01H
+	LCALL	_spiflash_wrsr_unlock
+; 	spiflash_wren((u8)1);
+			; SOURCE LINE # 244
+	MOV  	R7,#01H
+	LCALL	_spiflash_wren
+; 	if (block64==1)
+			; SOURCE LINE # 245
+	MOV  	A,block64?450
+	MOV  	R7,BlockID?449+03H
+	MOV  	R6,BlockID?449+02H
+	MOV  	R5,BlockID?449+01H
+	MOV  	R4,BlockID?449
+	CJNE 	A,#01H,?C0021
+; 		spiFlash_Cmd((u8)4,(u32)(SPIFL_BLK64ERASE | (BlockID<<16)), 0,0);
+			; SOURCE LINE # 246
+	MOV  	R0,#010H
+	LCALL	?C?LSHL
+	MOV  	A,R4
+	ORL  	A,#0D8H
+	SJMP 	?C0049
+?C0021:
+; 	else 
+; 		spiFlash_Cmd((u8)4,(u32)(SPIFL_BLKERASE | (BlockID<<15)), 0,0);		
+			; SOURCE LINE # 248
+	MOV  	R0,#0FH
+	LCALL	?C?LSHL
+	MOV  	A,R4
+	ORL  	A,#052H
+?C0049:
+	LCALL	L?0050
+?C0022:
+; 	spiflash_CheckFlashBusy();
+			; SOURCE LINE # 249
+	LCALL	spiflash_CheckFlashBusy
+; 	return;
+; }
+			; SOURCE LINE # 251
+?C0023:
+	RET  	
+; END OF _spiflash_EraseBlock
+
+; 
+; //***************************************************************
+; //void spiflash_erase256k() erase 0-256K bytes of code area in the spi flash
+; //***************************************************************
+; void spiflash_eraseLower256k()
+
+	RSEG  ?PR?spiflash_eraseLower256k?SPIFLASH_DRV
+spiflash_eraseLower256k:
+	USING	0
+			; SOURCE LINE # 256
+; {
+			; SOURCE LINE # 257
+; 	u8 idata BlckID;
+; 	printf("\n --> Deleting code image ");
+			; SOURCE LINE # 259
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_0)
+	MOV  	R1,#LOW (?SC_0)
+	LCALL	_printf
+; 	for (BlckID=0;BlckID<4;BlckID++){
+			; SOURCE LINE # 260
+	CLR  	A
+	MOV  	R0,#LOW (BlckID?551)
+	MOV  	@R0,A
+?C0024:
+; 		printf(".");
+			; SOURCE LINE # 261
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_27)
+	MOV  	R1,#LOW (?SC_27)
+	LCALL	_printf
+; 		spiflash_EraseBlock(BlckID, 1);
+			; SOURCE LINE # 262
+	MOV  	R0,#LOW (BlckID?551)
+	LCALL	L?0051
+; 	}
+			; SOURCE LINE # 263
+	MOV  	R0,#LOW (BlckID?551)
+	INC  	@R0
+	MOV  	A,@R0
+	CLR  	C
+	SUBB 	A,#04H
+	JC   	?C0024
+?C0025:
+; 	for (BlckID=0;BlckID<8;BlckID++){
+			; SOURCE LINE # 264
+	CLR  	A
+	MOV  	R0,#LOW (BlckID?551)
+	MOV  	@R0,A
+?C0027:
+; 		printf(".");
+			; SOURCE LINE # 265
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_27)
+	MOV  	R1,#LOW (?SC_27)
+	LCALL	_printf
+; 		spiflash_EraseBlock(BlckID, 0);
+			; SOURCE LINE # 266
+	MOV  	R0,#LOW (BlckID?551)
+	MOV  	A,@R0
+	MOV  	R7,A
+	CLR  	A
+	MOV  	R4,A
+	MOV  	R5,A
+	MOV  	R6,A
+	MOV  	?_spiflash_EraseBlock?BYTE+04H,A
+	LCALL	_spiflash_EraseBlock
+; 	}
+			; SOURCE LINE # 267
+	MOV  	R0,#LOW (BlckID?551)
+	INC  	@R0
+	MOV  	A,@R0
+	CLR  	C
+	SUBB 	A,#08H
+	JC   	?C0027
+?C0028:
+; 	for (BlckID=0;BlckID<64;BlckID++){
+			; SOURCE LINE # 268
+	CLR  	A
+	MOV  	R0,#LOW (BlckID?551)
+	MOV  	@R0,A
+?C0030:
+	MOV  	R0,#LOW (BlckID?551)
+	MOV  	A,@R0
+	MOV  	R7,A
+	CLR  	C
+	SUBB 	A,#040H
+	JNC  	?C0033
+; 		spiflash_eraseSector(BlckID);
+			; SOURCE LINE # 269
+	CLR  	A
+	MOV  	R4,A
+	MOV  	R5,A
+	MOV  	R6,A
+	LCALL	_spiflash_eraseSector
+; 		printf(".");		
+			; SOURCE LINE # 270
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_27)
+	MOV  	R1,#LOW (?SC_27)
+	LCALL	_printf
+; 	}
+			; SOURCE LINE # 271
+	MOV  	R0,#LOW (BlckID?551)
+	INC  	@R0
+	SJMP 	?C0030
+; 	return;
+; }
+			; SOURCE LINE # 273
+?C0033:
+	RET  	
+; END OF spiflash_eraseLower256k
+
+; //***************************************************************
+; //void spiflash_eraseBackup256k() 
+; //This function is to erase 256k-512K bytes of backup code area in the spi flash
+; //***************************************************************
+; void spiflash_eraseBackup256k()
+
+	RSEG  ?PR?spiflash_eraseBackup256k?SPIFLASH_DRV
+spiflash_eraseBackup256k:
+	USING	0
+			; SOURCE LINE # 278
+; {
+			; SOURCE LINE # 279
+; 	u8 idata BlckID;
+; 	printf("\n --> Deleting backup code image ");
+			; SOURCE LINE # 281
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_29)
+	MOV  	R1,#LOW (?SC_29)
+	LCALL	_printf
+; 	for (BlckID=4;BlckID<8;BlckID++){
+			; SOURCE LINE # 282
+	MOV  	R0,#LOW (BlckID?652)
+	MOV  	@R0,#04H
+?C0034:
+; 		printf(".");
+			; SOURCE LINE # 283
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_27)
+	MOV  	R1,#LOW (?SC_27)
+	LCALL	_printf
+; 		spiflash_EraseBlock(BlckID, 1);
+			; SOURCE LINE # 284
+	MOV  	R0,#LOW (BlckID?652)
+	LCALL	L?0051
+; 	}
+			; SOURCE LINE # 285
+	MOV  	R0,#LOW (BlckID?652)
+	INC  	@R0
+	MOV  	A,@R0
+	CLR  	C
+	SUBB 	A,#08H
+	JC   	?C0034
+?C0035:
+; 	for (BlckID=8;BlckID<16;BlckID++){
+			; SOURCE LINE # 286
+	MOV  	R0,#LOW (BlckID?652)
+	MOV  	@R0,#08H
+?C0037:
+; 		printf(".");
+			; SOURCE LINE # 287
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_27)
+	MOV  	R1,#LOW (?SC_27)
+	LCALL	_printf
+; 		spiflash_EraseBlock(BlckID, 0);
+			; SOURCE LINE # 288
+	MOV  	R0,#LOW (BlckID?652)
+	MOV  	A,@R0
+	MOV  	R7,A
+	CLR  	A
+	MOV  	R4,A
+	MOV  	R5,A
+	MOV  	R6,A
+	MOV  	?_spiflash_EraseBlock?BYTE+04H,A
+	LCALL	_spiflash_EraseBlock
+; 	}
+			; SOURCE LINE # 289
+	MOV  	R0,#LOW (BlckID?652)
+	INC  	@R0
+	MOV  	A,@R0
+	CLR  	C
+	SUBB 	A,#010H
+	JC   	?C0037
+?C0038:
+; 	for (BlckID=64;BlckID<128;BlckID++){
+			; SOURCE LINE # 290
+	MOV  	R0,#LOW (BlckID?652)
+	MOV  	@R0,#040H
+?C0040:
+	MOV  	R0,#LOW (BlckID?652)
+	MOV  	A,@R0
+	MOV  	R7,A
+	CLR  	C
+	SUBB 	A,#080H
+	JNC  	?C0043
+; 		spiflash_eraseSector(BlckID);
+			; SOURCE LINE # 291
+	CLR  	A
+	MOV  	R4,A
+	MOV  	R5,A
+	MOV  	R6,A
+	LCALL	_spiflash_eraseSector
+; 		printf(".");		
+			; SOURCE LINE # 292
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_27)
+	MOV  	R1,#LOW (?SC_27)
+	LCALL	_printf
+; 	}
+			; SOURCE LINE # 293
+	MOV  	R0,#LOW (BlckID?652)
+	INC  	@R0
+	SJMP 	?C0040
+; 	return;
+; }
+			; SOURCE LINE # 295
+?C0043:
+	RET  	
+; END OF spiflash_eraseBackup256k
+
+; #ifdef PROGRAM_CONFIGURATION
+; //***************************************************************
+; //spiflash_eraseConfigMem() erase 32k bytes of configuration data in the spi flash
+; //Configuration data is located at address 0x00100000 - 0x0x001000FF; 
+; //Sector 256, beyond 1Mbyte
+; //***************************************************************
+; 
+; void spiflash_eraseConfigMem()
+; {
+; 	printf("\n --> Delete configuration memory ...");
+; 	spiflash_eraseSector(GVTY_CONFIG_DATA_SECTOR);
+; 	spiflash_EraseBlock(32, 0);
+; 	spiflash_EraseBlock(16, 1);
+; 	spiflash_wrsr_unlock((u8)0);
+; 	printf("\n");
+; 	return;
+; }
+; #endif
+; 
+; 
+; //***************************************************************
+; //void spiflash_WriteByte(u32 Addr, u8 IData)
+; //***************************************************************
+; 
+; void spiflash_WriteByte(u32 Addr, u8 IData)
+
+	RSEG  ?PR?_spiflash_WriteByte?SPIFLASH_DRV
+_spiflash_WriteByte:
+	USING	0
+			; SOURCE LINE # 320
+	MOV  	Addr?753+03H,R7
+	MOV  	Addr?753+02H,R6
+	MOV  	Addr?753+01H,R5
+	MOV  	Addr?753,R4
+; {
+			; SOURCE LINE # 321
+; 	spiflash_wren(1);
+			; SOURCE LINE # 322
+	MOV  	R7,#01H
+	LCALL	_spiflash_wren
+; 	spiFlash_Cmd(5, (SPIFL_BYTEPRGRM|Addr), IData,0);
+			; SOURCE LINE # 323
+	MOV  	A,Addr?753+03H
+	MOV  	R7,A
+	MOV  	A,Addr?753+02H
+	MOV  	R6,A
+	MOV  	A,Addr?753+01H
+	MOV  	R5,A
+	MOV  	A,Addr?753
+	ORL  	A,#02H
+	MOV  	?_spiFlash_Cmd?BYTE+04H,R7
+	MOV  	?_spiFlash_Cmd?BYTE+03H,R6
+	MOV  	?_spiFlash_Cmd?BYTE+02H,R5
+	MOV  	?_spiFlash_Cmd?BYTE+01H,A
+	MOV  	?_spiFlash_Cmd?BYTE+05H,IData?754
+	CLR  	A
+	MOV  	?_spiFlash_Cmd?BYTE+06H,A
+	MOV  	R7,#05H
+	LCALL	_spiFlash_Cmd
+; 	spiflash_CheckFlashBusy();
+			; SOURCE LINE # 324
+	LCALL	spiflash_CheckFlashBusy
+; 	return;
+; }
+			; SOURCE LINE # 326
+?C0044:
+	RET  	
+; END OF _spiflash_WriteByte
+
+; 
+; //***************************************************************
+; //void spiflash_ReadByte(u32 Addr, u8 IData)
+; //***************************************************************
+; 
+; u8 spiflash_ReadByte(u32 Addr)
+
+	RSEG  ?PR?_spiflash_ReadByte?SPIFLASH_DRV
+_spiflash_ReadByte:
+	USING	0
+			; SOURCE LINE # 332
+	MOV  	Addr?855+03H,R7
+	MOV  	Addr?855+02H,R6
+	MOV  	Addr?855+01H,R5
+	MOV  	Addr?855,R4
+; {
+			; SOURCE LINE # 333
+; 	spiFlash_Cmd((u8)4,(u32)(SPIFL_BYTEREAD|Addr),0,1);
+			; SOURCE LINE # 334
+	MOV  	A,Addr?855
+	ORL  	A,#03H
+	MOV  	?_spiFlash_Cmd?BYTE+04H,R7
+	MOV  	?_spiFlash_Cmd?BYTE+03H,R6
+	MOV  	?_spiFlash_Cmd?BYTE+02H,R5
+	MOV  	?_spiFlash_Cmd?BYTE+01H,A
+	CLR  	A
+	MOV  	?_spiFlash_Cmd?BYTE+05H,A
+	MOV  	?_spiFlash_Cmd?BYTE+06H,#01H
+	MOV  	R7,#04H
+	LCALL	_spiFlash_Cmd
+; 	return (*(u8 xdata *)SPIFL_RDDATA);	
+			; SOURCE LINE # 335
+	MOV  	DPTR,#030CH
+	MOVX 	A,@DPTR
+	MOV  	R7,A
+; }
+			; SOURCE LINE # 336
+?C0045:
+	RET  	
+; END OF _spiflash_ReadByte
+
+; //***************************************************************
+; //void spiflash_eraseSector(u32 Addr)
+; //To erase sectors of 4kbyte
+; //***************************************************************
+; void spiflash_eraseSector(u32 Sector)
+
+	RSEG  ?PR?_spiflash_eraseSector?SPIFLASH_DRV
+_spiflash_eraseSector:
+	USING	0
+			; SOURCE LINE # 341
+	MOV  	Sector?956+03H,R7
+	MOV  	Sector?956+02H,R6
+	MOV  	Sector?956+01H,R5
+	MOV  	Sector?956,R4
+; {
+			; SOURCE LINE # 342
+; 	spiflash_wrsr_unlock((u8)1);
+			; SOURCE LINE # 343
+	MOV  	R7,#01H
+	LCALL	_spiflash_wrsr_unlock
+; 	spiflash_wren((u8)1);
+			; SOURCE LINE # 344
+	MOV  	R7,#01H
+	LCALL	_spiflash_wren
+; 	spiFlash_Cmd((u8)4,(u32)(SPIFL_SECERASE | (Sector<<12)),0,0);
+			; SOURCE LINE # 345
+	MOV  	R7,Sector?956+03H
+	MOV  	R6,Sector?956+02H
+	MOV  	R5,Sector?956+01H
+	MOV  	R4,Sector?956
+	MOV  	R0,#0CH
+	LCALL	?C?LSHL
+	MOV  	A,R4
+	ORL  	A,#020H
+	LCALL	L?0050
+; 	spiflash_CheckFlashBusy();
+			; SOURCE LINE # 346
+	LCALL	spiflash_CheckFlashBusy
+; 	return;
+; }
+			; SOURCE LINE # 348
+?C0046:
+	RET  	
+; END OF _spiflash_eraseSector
+
+	END

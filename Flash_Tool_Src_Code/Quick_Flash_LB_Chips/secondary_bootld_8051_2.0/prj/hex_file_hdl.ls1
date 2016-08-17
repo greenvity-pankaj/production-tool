@@ -1,0 +1,2532 @@
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.02c
+OBJECT MODULE PLACED IN .\hex_file_hdl.OBJ
+ASSEMBLER INVOKED BY: C:\Keil_v5\C51\BIN\A51.EXE .\hex_file_hdl.src PR(.\hex_file_hdl.ls1) EP DEBUG
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     ; .\hex_file_hdl.SRC generated from: ..\src\hex_file_hdl.c
+                       2     ; COMPILER INVOKED BY:
+                       3     ;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\hex_file_hdl.c OPTIMIZE(9,SIZE) BROWSE INCDIR(..
+                             \src;C:\Keil\C51\INC;..\src) DEBUG OBJECTEXTEND CODE PRINT(.\hex_file_hdl.lst) TABS(2) PREP
+                             RINT(.\hex_file_hdl.i) SRC(.\hex_file_hdl.SRC)
+                       4     
+                       5     $nomod51 
+                       6     
+                       7     NAME    HEX_FILE_HDL
+                       8     
+  0080                 9     P0      DATA    080H
+  0090                10     P1      DATA    090H
+  00A0                11     P2      DATA    0A0H
+  009F                12     BANKSEL DATA    09FH
+  00B0                13     P3      DATA    0B0H
+  00B4                14     T0      BIT     0B0H.4
+  00D6                15     AC      BIT     0D0H.6
+  00B5                16     T1      BIT     0B0H.5
+  00AF                17     EA      BIT     0A8H.7
+  00A8                18     IE      DATA    0A8H
+  00B7                19     RD      BIT     0B0H.7
+  00F8                20     MEMCTRL DATA    0F8H
+  00AC                21     ES      BIT     0A8H.4
+  00B8                22     IP      DATA    0B8H
+  0098                23     RI      BIT     098H.0
+  00B2                24     INT0    BIT     0B0H.2
+  00D7                25     CY      BIT     0D0H.7
+  0099                26     TI      BIT     098H.1
+  00B3                27     INT1    BIT     0B0H.3
+  00BC                28     PS      BIT     0B8H.4
+  0081                29     SP      DATA    081H
+  00D2                30     OV      BIT     0D0H.2
+  00B6                31     WR      BIT     0B0H.6
+  0099                32     SBUF    DATA    099H
+  0087                33     PCON    DATA    087H
+  0098                34     SCON    DATA    098H
+  0089                35     TMOD    DATA    089H
+  0088                36     TCON    DATA    088H
+  0089                37     IE0     BIT     088H.1
+  008B                38     IE1     BIT     088H.3
+  00F0                39     B       DATA    0F0H
+  00E0                40     ACC     DATA    0E0H
+  00A9                41     ET0     BIT     0A8H.1
+  00AB                42     ET1     BIT     0A8H.3
+  008D                43     TF0     BIT     088H.5
+  008F                44     TF1     BIT     088H.7
+  00F4                45     CRLA_H  DATA    0F4H
+  009A                46     RB8     BIT     098H.2
+  008C                47     TH0     DATA    08CH
+  00A8                48     EX0     BIT     0A8H.0
+  0088                49     IT0     BIT     088H.0
+  008D                50     TH1     DATA    08DH
+  009B                51     TB8     BIT     098H.3
+  00AA                52     EX1     BIT     0A8H.2
+  008A                53     IT1     BIT     088H.2
+  00D0                54     P       BIT     0D0H.0
+  00F3                55     CRLA_L  DATA    0F3H
+  009F                56     SM0     BIT     098H.7
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE     2
+
+  008A                57     TL0     DATA    08AH
+  009E                58     SM1     BIT     098H.6
+  008B                59     TL1     DATA    08BH
+  009D                60     SM2     BIT     098H.5
+  00F2                61     CRSA_H  DATA    0F2H
+  00B9                62     PT0     BIT     0B8H.1
+  00BB                63     PT1     BIT     0B8H.3
+  00D3                64     RS0     BIT     0D0H.3
+  008C                65     TR0     BIT     088H.4
+  00D4                66     RS1     BIT     0D0H.4
+  00F1                67     CRSA_L  DATA    0F1H
+  008E                68     TR1     BIT     088H.6
+  00B8                69     PX0     BIT     0B8H.0
+  00BA                70     PX1     BIT     0B8H.2
+  0083                71     DPH     DATA    083H
+  0082                72     DPL     DATA    082H
+  009C                73     REN     BIT     098H.4
+  00B0                74     RXD     BIT     0B0H.0
+  00B1                75     TXD     BIT     0B0H.1
+  00D5                76     F0      BIT     0D0H.5
+  00D0                77     PSW     DATA    0D0H
+                      78     ?PR?_ParseHexRecord?HEX_FILE_HDL         SEGMENT CODE 
+                      79     ?DT?_ParseHexRecord?HEX_FILE_HDL         SEGMENT DATA OVERLAYABLE 
+                      80     ?PR?_GetAsc2Hex?HEX_FILE_HDL             SEGMENT CODE 
+                      81     ?DT?_GetAsc2Hex?HEX_FILE_HDL             SEGMENT DATA OVERLAYABLE 
+                      82     ?PR?_GetAscii?HEX_FILE_HDL               SEGMENT CODE 
+                      83     ?DT?_GetAscii?HEX_FILE_HDL               SEGMENT DATA OVERLAYABLE 
+                      84     ?PR?_Asc2Hex?HEX_FILE_HDL                SEGMENT CODE 
+                      85     ?PR?_Wr2CRam?HEX_FILE_HDL                SEGMENT CODE 
+                      86     ?CO?HEX_FILE_HDL     SEGMENT CODE 
+                      87     ?XD?_ParseHexRecord?HEX_FILE_HDL         SEGMENT XDATA OVERLAYABLE 
+                      88     ?ID?_ParseHexRecord?HEX_FILE_HDL         SEGMENT IDATA OVERLAYABLE 
+                      89     ?ID?_GetAsc2Hex?HEX_FILE_HDL             SEGMENT IDATA OVERLAYABLE 
+                      90     ?ID?_GetAscii?HEX_FILE_HDL               SEGMENT IDATA OVERLAYABLE 
+                      91     ?ID?_Asc2Hex?HEX_FILE_HDL                SEGMENT IDATA OVERLAYABLE 
+                      92     ?PR?HEX_FILE_HDL     SEGMENT CODE 
+                      93             EXTRN   CODE (_toupper)
+                      94             EXTRN   CODE (_printf)
+                      95             EXTRN   DATA (?_printf?BYTE)
+                      96             EXTRN   XDATA (Uart2EramAddr)
+                      97             EXTRN   CODE (_isxdigit)
+                      98             EXTRN   CODE (_get1char)
+                      99             EXTRN   CODE (?C?IILDX)
+                     100             EXTRN   CODE (?C?CCASE)
+                     101             EXTRN   CODE (?C?LOR)
+                     102             PUBLIC  _Wr2CRam
+                     103             PUBLIC  _Asc2Hex
+                     104             PUBLIC  _GetAscii
+                     105             PUBLIC  _GetAsc2Hex
+                     106             PUBLIC  _ParseHexRecord
+                     107     
+----                 108             RSEG  ?DT?_ParseHexRecord?HEX_FILE_HDL
+0000                 109     ?_ParseHexRecord?BYTE:
+0000                 110         ErrCntV?040:   DS   1
+0001                 111             ORG  1
+0001                 112        ProgCntV?041:   DS   1
+                     113     
+----                 114             RSEG  ?DT?_GetAscii?HEX_FILE_HDL
+0000                 115     ?_GetAscii?BYTE:
+0000                 116       AsciiHexV?260:   DS   1
+0001                 117             ORG  1
+0001                 118         ErrCntV?261:   DS   1
+                     119     
+----                 120             RSEG  ?DT?_GetAsc2Hex?HEX_FILE_HDL
+0000                 121     ?_GetAsc2Hex?BYTE:
+0000                 122         HexValV?153:   DS   1
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE     3
+
+0001                 123             ORG  1
+0001                 124        ChkSumeV?154:   DS   1
+0002                 125             ORG  2
+0002                 126         ErrCntV?155:   DS   1
+                     127     
+----                 128             RSEG  ?XD?_ParseHexRecord?HEX_FILE_HDL
+0000                 129               i?042:   DS   2
+                     130     
+----                 131             RSEG  ?XD?_ParseHexRecord?HEX_FILE_HDL
+0002                 132               n?043:   DS   2
+                     133     
+----                 134             RSEG  ?XD?_ParseHexRecord?HEX_FILE_HDL
+0004                 135               c?044:   DS   1
+                     136     
+----                 137             RSEG  ?XD?_ParseHexRecord?HEX_FILE_HDL
+0005                 138             Err?050:   DS   2
+                     139     
+----                 140             RSEG  ?XD?_ParseHexRecord?HEX_FILE_HDL
+0007                 141           state?051:   DS   2
+                     142     
+----                 143             RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+0000                 144            temp?045:   DS   2
+                     145     
+----                 146             RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+0002                 147         ChkSume?046:   DS   1
+                     148     
+----                 149             RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+0003                 150          HexVal?047:   DS   1
+                     151     
+----                 152             RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+0004                 153          RecLen?048:   DS   1
+                     154     
+----                 155             RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+0005                 156         RecType?049:   DS   1
+                     157     
+----                 158             RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+0006                 159        CRamAddr?052:   DS   2
+                     160     
+----                 161             RSEG  ?ID?_GetAsc2Hex?HEX_FILE_HDL
+0000                 162        AsciiHex?156:   DS   1
+                     163     
+----                 164             RSEG  ?ID?_GetAsc2Hex?HEX_FILE_HDL
+0001                 165         HexTemp?157:   DS   1
+                     166     
+----                 167             RSEG  ?ID?_GetAsc2Hex?HEX_FILE_HDL
+0002                 168           Error?158:   DS   1
+                     169     
+----                 170             RSEG  ?ID?_GetAsc2Hex?HEX_FILE_HDL
+0003                 171      FirstAscii?159:   DS   1
+                     172     
+----                 173             RSEG  ?ID?_GetAscii?HEX_FILE_HDL
+0000                 174     ErrGetAscii?262:   DS   1
+                     175     
+----                 176             RSEG  ?ID?_GetAscii?HEX_FILE_HDL
+0001                 177               c?263:   DS   1
+                     178     
+----                 179             RSEG  ?ID?_Asc2Hex?HEX_FILE_HDL
+0000                 180               c?365:   DS   1
+                     181     
+----                 182             RSEG  ?CO?HEX_FILE_HDL
+0000                 183     ?SC_0:
+0000 0A202D2D        184             DB  00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'W' ,'a' ,'i' ,'t' 
+0004 3E205761                
+0008 6974                    
+000A 696E6720        185             DB  'i' ,'n' ,'g' ,' ' ,'f' ,'o' ,'r' ,' ' ,'I' ,'n' 
+000E 666F7220                
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE     4
+
+0012 496E                    
+0014 74656C2D        186             DB  't' ,'e' ,'l' ,'-' ,'h' ,'e' ,'x' ,' ' ,'f' ,'i' 
+0018 68657820                
+001C 6669                    
+001E 6C65202E        187             DB  'l' ,'e' ,' ' ,'.' ,000H
+0022 00                      
+                     188     
+0023                 189     ?SC_35:
+0023 6600            190             DB  'f' ,000H
+                     191     
+0025                 192     ?SC_37:
+0025 0A202D2D        193             DB  00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'C' ,'o' ,'d' ,'e' 
+0029 3E20436F                
+002D 6465                    
+002F 20446F77        194             DB  ' ' ,'D' ,'o' ,'w' ,'n' ,'l' ,'o' ,'a' ,'d' ,' ' 
+0033 6E6C6F61                
+0037 6420                    
+0039 53756D6D        195             DB  'S' ,'u' ,'m' ,'m' ,'a' ,'r' ,'y' ,00AH,000H
+003D 6172790A                
+0041 00                      
+                     196     
+0042                 197     ?SC_66:
+0042 202E5375        198             DB  ' ' ,'.' ,'S' ,'u' ,'c' ,'c' ,'e' ,'s' ,'s' ,'f' 
+0046 63636573                
+004A 7366                    
+004C 756C6C79        199             DB  'u' ,'l' ,'l' ,'y' ,' ' ,'d' ,'o' ,'w' ,'n' ,'l' 
+0050 20646F77                
+0054 6E6C                    
+0056 6F616465        200             DB  'o' ,'a' ,'d' ,'e' ,'d' ,' ' ,'b' ,'y' ,'t' ,'e' 
+005A 64206279                
+005E 7465                    
+0060 2873293A        201             DB  '(' ,'s' ,')' ,':' ,' ' ,'%' ,'u' ,00AH,000H
+0064 2025750A                
+0068 00                      
+                     202     
+0069                 203     ?SC_105:
+0069 202E466F        204             DB  ' ' ,'.' ,'F' ,'o' ,'u' ,'n' ,'d' ,' ' ,'l' ,'i' 
+006D 756E6420                
+0071 6C69                    
+0073 6E652873        205             DB  'n' ,'e' ,'(' ,'s' ,')' ,':' ,' ' ,'%' ,'u' ,00AH
+0077 293A2025                
+007B 750A                    
+007D 00              206             DB  000H
+                     207     
+007E                 208     ?SC_126:
+007E 202E4661        209             DB  ' ' ,'.' ,'F' ,'a' ,'l' ,'s' ,'e' ,' ' ,'l' ,'i' 
+0082 6C736520                
+0086 6C69                    
+0088 6E652873        210             DB  'n' ,'e' ,'(' ,'s' ,')' ,':' ,' ' ,'%' ,'u' ,00AH
+008C 293A2025                
+0090 750A                    
+0092 00              211             DB  000H
+                     212     
+0093                 213     ?SC_147:
+0093 202E5265        214             DB  ' ' ,'.' ,'R' ,'e' ,'c' ,'o' ,'r' ,'d' ,' ' ,'t' 
+0097 636F7264                
+009B 2074                    
+009D 79706520        215             DB  'y' ,'p' ,'e' ,' ' ,'e' ,'r' ,'r' ,'o' ,'r' ,'(' 
+00A1 6572726F                
+00A5 7228                    
+00A7 73293A20        216             DB  's' ,')' ,':' ,' ' ,'%' ,'u' ,00AH,000H
+00AB 25750A00                
+                     217     
+00AF                 218     ?SC_175:
+00AF 202E4E6F        219             DB  ' ' ,'.' ,'N' ,'o' ,'n' ,' ' ,'a' ,'s' ,'c' ,'i' 
+00B3 6E206173                
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE     5
+
+00B7 6369                    
+00B9 69206469        220             DB  'i' ,' ' ,'d' ,'i' ,'g' ,'i' ,'t' ,'(' ,'s' ,')' 
+00BD 67697428                
+00C1 7329                    
+00C3 3A202575        221             DB  ':' ,' ' ,'%' ,'u' ,00AH,000H
+00C7 0A00                    
+                     222     
+00C9                 223     ?SC_201:
+00C9 202E4572        224             DB  ' ' ,'.' ,'E' ,'r' ,'r' ,'o' ,'r' ,' ' ,'d' ,'o' 
+00CD 726F7220                
+00D1 646F                    
+00D3 776E6C6F        225             DB  'w' ,'n' ,'l' ,'o' ,'a' ,'d' ,'e' ,'d' ,' ' ,'b' 
+00D7 61646564                
+00DB 2062                    
+00DD 79746528        226             DB  'y' ,'t' ,'e' ,'(' ,'s' ,')' ,':' ,' ' ,'%' ,'u' 
+00E1 73293A20                
+00E5 2575                    
+00E7 0A00            227             DB  00AH,000H
+                     228     
+00E9                 229     ?SC_233:
+00E9 202E4661        230             DB  ' ' ,'.' ,'F' ,'a' ,'i' ,'l' ,'e' ,'d' ,' ' ,'c' 
+00ED 696C6564                
+00F1 2063                    
+00F3 6865636B        231             DB  'h' ,'e' ,'c' ,'k' ,'s' ,'u' ,'m' ,'e' ,'(' ,'s' 
+00F7 73756D65                
+00FB 2873                    
+00FD 293A2025        232             DB  ')' ,':' ,' ' ,'%' ,'u' ,00AH,000H
+0101 750A00                  
+                     233     
+                     234     ; /*
+                     235     ; * Description : Hex file handler header implement 
+                     236     ; *
+                     237     ; * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+                     238     ; * All rights reserved.
+                     239     ; *
+                     240     ; * Author      : Peter Nguyen
+                     241     ; * Release Date: 04/27/2013
+                     242     ; * Purpose :
+                     243     ; *     Parsing hex file and download from uart to code ram
+                     244     ; *
+                     245     ; * File: hex_file_hdl.c
+                     246     ; */
+                     247     ; 
+                     248     ; //#include <stdafx.h>
+                     249     ; #include <stdio.h>
+                     250     ; #include <stdlib.h>
+                     251     ; #include <reg51.h>    
+                     252     ; #include <intrins.h>
+                     253     ; #include <ctype.h>
+                     254     ; #include <typedef.h>
+                     255     ; #include <hex_file_hdl.h>
+                     256     ; #include <uart.h>
+                     257     ; #include <cmem_ctrl.h>
+                     258     ; #include <macro_def.h>
+                     259     ; #include <spiflash_drv.h>
+                     260     ; #include "global_var.h"
+                     261     ; 
+                     262     ; //Error counter index
+                     263     ; #define ErrLineBegin 0
+                     264     ; //#define ErrLBA 1
+                     265     ; #define ErrRecType 1
+                     266     ; #define ErrNonAscDigit 2
+                     267     ; #define ErrWrCRam 3
+                     268     ; #define ErrChkSume 4
+                     269     ; #define ErrSegment 5
+                     270     ; 
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE     6
+
+                     271     ; //Counter good information
+                     272     ; #define CntLine 0
+                     273     ; #define CntAsciiHex 1
+                     274     ; #define CntWrByte 2
+                     275     ; #define CntNonAscii 3
+                     276     ; #define CntGoodRec 4
+                     277     ; 
+                     278     ; //Error return
+                     279     ; #define ExitRet  1
+                     280     ; #define NonAscDigitRet  3
+                     281     ; #define GoodHexByteRet 0
+                     282     ; #define AscDigitRet 0
+                     283     ; #define ExtraRecordRet 2
+                     284     ; #define EnterRet 4
+                     285     ; 
+                     286     ; //Record type
+                     287     ; #define RECTYPE_DATA 0
+                     288     ; #define RECTYPE_EOF  1
+                     289     ; #define RECTYPE_EXT_SEG_ADDR 2
+                     290     ; #define RECTYPE_START_SEG_ADDR 3
+                     291     ; #define RECTYPE_EXT_LIN_ADDR 4
+                     292     ; #define RECTYPE_START_LIN_ADDR 5
+                     293     ; 
+                     294     ; //State define
+                     295     ; #define START_REC 0
+                     296     ; #define GET_REC_LEN 1
+                     297     ; #define GET_OFFSET 2
+                     298     ; #define GET_REC_TYPE 3
+                     299     ; #define GET_REC_DATA   4  //      GET_REC_TYPE //+ RECTYPE_DATA
+                     300     ; #define GET_REC_EOF    5    //  GET_REC_TYPE + RECTYPE_EOF
+                     301     ; #define GET_EXT_SEG_ADDR  6  //   GET_REC_TYPE + RECTYPE_EXT_SEG_ADDR
+                     302     ; #define GET_START_SEG_ADDR  7  // GET_REC_TYPE + RECTYPE_START_SEG_ADDR
+                     303     ; #define GET_EXT_LIN_ADDR    8 // GET_REC_TYPE + RECTYPE_EXT_LIN_ADDR
+                     304     ; #define GET_START_LIN_ADDR  9  // GET_REC_TYPE + RECTYPE_START_LIN_ADDR
+                     305     ; 
+                     306     ; 
+                     307     ; #define GET_CHK_SUME 19
+                     308     ; #define HANDLE_ERROR 20
+                     309     ; #define UNKNOWN_REC 21
+                     310     ; #define END_DOWNLOAD 22
+                     311     ; #define EXIT_DOWNLOAD 23
+                     312     ; 
+                     313     ; #define DNLD_INDICATOR 200
+                     314     ; 
+                     315     ; //#define KEILDEBUG
+                     316     ; 
+                     317     ; //CheckSume = 0xff - (RecLen + Offset + Rectype + infor bytes - 1)
+                     318     ; //Correct record when: CheckSume + (RecLen + Offset + Rectype + infor bytes) = 0 
+                     319     ; 
+                     320     ; #ifdef CPLUSSIM
+                     321     ;       static FILE *datafile;
+                     322     ;       static u8  errfile;
+                     323     ; 
+                     324     ; void open_hex_file()
+                     325     ; {
+                     326     ; //    datafile = fopen("..\..\hexfile\test_80251.hex", "r");
+                     327     ; }
+                     328     ; #endif
+                     329     ; 
+                     330     ; //void ParseHexRecord(u16 idata *ErrCntV, u16 idata *ProgCntV, u8 idata *DldMode)
+                     331     
+----                 332             RSEG  ?PR?HEX_FILE_HDL
+0000                 333     Com0070:
+0000                 334     L?0113:
+                     335             USING   0
+0000 E500     F      336             MOV     A,ProgCntV?041
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE     7
+
+0002                 337     L?0114:
+0002 2409            338             ADD     A,#09H
+0004                 339     L?0115:
+0004 F8              340             MOV     R0,A
+0005 E6              341             MOV     A,@R0
+0006 2401            342             ADD     A,#01H
+0008 FF              343             MOV     R7,A
+0009 18              344             DEC     R0
+000A E4              345             CLR     A
+000B 36              346             ADDC    A,@R0
+000C FE              347             MOV     R6,A
+000D 22              348             RET     
+000E                 349     L?0117:
+                     350             USING   0
+000E E500     F      351             MOV     A,ProgCntV?041
+0010                 352     L?0118:
+0010 2408            353             ADD     A,#08H
+0012                 354     L?0119:
+0012 F8              355             MOV     R0,A
+0013 A606            356             MOV     @R0,AR6
+0015 08              357             INC     R0
+0016 A607            358             MOV     @R0,AR7
+0018 22              359             RET     
+0019                 360     L?0122:
+                     361             USING   0
+0019 F8              362             MOV     R0,A
+001A E4              363             CLR     A
+001B F6              364             MOV     @R0,A
+001C 08              365             INC     R0
+001D F6              366             MOV     @R0,A
+001E 900000   F      367             MOV     DPTR,#i?042
+0021                 368     L?0123:
+0021 75F001          369             MOV     B,#01H
+0024 020000   F      370             LJMP    ?C?IILDX
+0027                 371     L?0124:
+                     372             USING   0
+0027                 373     L?0125:
+0027 900000   F      374             MOV     DPTR,#state?051
+002A E4              375             CLR     A
+002B F0              376             MOVX    @DPTR,A
+002C A3              377             INC     DPTR
+002D 22              378             RET     
+002E                 379     L?0126:
+                     380             USING   0
+002E                 381     L?0127:
+002E 900000   F      382             MOV     DPTR,#i?042
+0031 F0              383             MOVX    @DPTR,A
+0032 A3              384             INC     DPTR
+0033 F0              385             MOVX    @DPTR,A
+0034 22              386             RET     
+0035                 387     L?0128:
+                     388             USING   0
+0035 900000   F      389             MOV     DPTR,#i?042
+0038 E0              390             MOVX    A,@DPTR
+0039 FE              391             MOV     R6,A
+003A A3              392             INC     DPTR
+003B E0              393             MOVX    A,@DPTR
+003C FF              394             MOV     R7,A
+003D C3              395             CLR     C
+003E 22              396             RET     
+                     397     ; END OF Com0070
+                     398     
+                     399     ; void ParseHexRecord(u16 idata *ErrCntV, u16 idata *ProgCntV) 
+                     400     
+----                 401             RSEG  ?PR?_ParseHexRecord?HEX_FILE_HDL
+0000                 402     _ParseHexRecord:
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE     8
+
+                     403             USING   0
+                     404                             ; SOURCE LINE # 98
+0000 8F00     F      405             MOV     ErrCntV?040,R7
+0002 8D00     F      406             MOV     ProgCntV?041,R5
+                     407     ; {
+                     408                             ; SOURCE LINE # 99
+                     409     ;       u16 xdata i, n;  //idata
+                     410     ;       u8 xdata c;  //idata
+                     411     ;       u16 idata temp;
+                     412     ;       u8 idata ChkSume; //idata - 
+                     413     ;       u8 idata HexVal; //idata
+                     414     ;       u8 idata RecLen; //idata - number of data bytes begin right after the record type t
+                             o the last byte before the check sume.
+                     415     ;       u8 idata RecType; //idata
+                     416     ;       u16 xdata Err; //idata
+                     417     ;       u16 xdata state; //idata
+                     418     ;       u16 idata CRamAddr;
+                     419     ; 
+                     420     ;       CRamAddr = (u16)0x0;
+                     421                             ; SOURCE LINE # 111
+0004 E4              422             CLR     A
+0005 7800     F      423             MOV     R0,#LOW (CRamAddr?052)
+0007 F6              424             MOV     @R0,A
+0008 08              425             INC     R0
+0009 F6              426             MOV     @R0,A
+                     427     ;       ChkSume = 0;
+                     428                             ; SOURCE LINE # 112
+000A 7800     F      429             MOV     R0,#LOW (ChkSume?046)
+000C F6              430             MOV     @R0,A
+                     431     ;       HexVal = 0;
+                     432                             ; SOURCE LINE # 113
+000D 08              433             INC     R0
+000E F6              434             MOV     @R0,A
+                     435     ;       i = 0;
+                     436                             ; SOURCE LINE # 114
+000F 120000   F      437             LCALL   L?0126
+                     438     ;       c = 0;
+                     439                             ; SOURCE LINE # 115
+0012 900000   F      440             MOV     DPTR,#c?044
+0015 F0              441             MOVX    @DPTR,A
+                     442     ;       state = START_REC;
+                     443                             ; SOURCE LINE # 116
+0016 900000   F      444             MOV     DPTR,#state?051
+0019 F0              445             MOVX    @DPTR,A
+001A A3              446             INC     DPTR
+001B F0              447             MOVX    @DPTR,A
+                     448     ; 
+                     449     ;       for (i=0; i<8; i++)
+                     450                             ; SOURCE LINE # 118
+001C 120000   F      451             LCALL   L?0126
+001F                 452     ?C0001:
+001F 120000   F      453             LCALL   L?0128
+0022 9408            454             SUBB    A,#08H
+0024 EE              455             MOV     A,R6
+0025 9400            456             SUBB    A,#00H
+0027 500A            457             JNC     ?C0002
+                     458     ;       {
+                     459                             ; SOURCE LINE # 119
+                     460     ;               ErrCntV[i] = 0;
+                     461                             ; SOURCE LINE # 120
+0029 EF              462             MOV     A,R7
+002A 25E0            463             ADD     A,ACC
+002C 2500     F      464             ADD     A,ErrCntV?040
+                     465     ;       }
+                     466                             ; SOURCE LINE # 121
+002E 120000   F      467             LCALL   L?0122
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE     9
+
+0031 80EC            468             SJMP    ?C0001
+0033                 469     ?C0002:
+                     470     ;       for (i=0; i<6; i++)
+                     471                             ; SOURCE LINE # 122
+0033 E4              472             CLR     A
+0034 120000   F      473             LCALL   L?0127
+0037                 474     ?C0004:
+0037 120000   F      475             LCALL   L?0128
+003A 9406            476             SUBB    A,#06H
+003C EE              477             MOV     A,R6
+003D 9400            478             SUBB    A,#00H
+003F 500A            479             JNC     ?C0005
+                     480     ;       {
+                     481                             ; SOURCE LINE # 123
+                     482     ;               ProgCntV[i] = 0;
+                     483                             ; SOURCE LINE # 124
+0041 EF              484             MOV     A,R7
+0042 25E0            485             ADD     A,ACC
+0044 2500     F      486             ADD     A,ProgCntV?041
+                     487     ;       }
+                     488                             ; SOURCE LINE # 125
+0046 120000   F      489             LCALL   L?0122
+0049 80EC            490             SJMP    ?C0004
+004B                 491     ?C0005:
+                     492     ; 
+                     493     ;       printf("\n --> Waiting for Intel-hex file .");
+                     494                             ; SOURCE LINE # 127
+004B 7BFF            495             MOV     R3,#0FFH
+004D 7A00     F      496             MOV     R2,#HIGH (?SC_0)
+004F 7900     F      497             MOV     R1,#LOW (?SC_0)
+0051 120000   F      498             LCALL   _printf
+0054                 499     ?C0007:
+                     500     ; 
+                     501     ; #ifdef CPLUS_READFILE
+                     502     ;       //open_hex_file();
+                     503     ;       datafile = fopen("test_80251_i380.hex", "r"); //test_80251.hex", "r");
+                     504     ;       if (datafile==NULL)
+                     505     ;       {
+                     506     ;               fclose(datafile);
+                     507     ;               printf ("==== Hexfile empty ====\n\n");
+                     508     ;       }
+                     509     ;       else
+                     510     ;               printf ("==== Hexfile openned ===\n\n");
+                     511     ; #endif
+                     512     ;       while (1)
+                     513                             ; SOURCE LINE # 140
+                     514     ;       {
+                     515                             ; SOURCE LINE # 141
+                     516     ;               switch (state)
+                     517                             ; SOURCE LINE # 142
+0054 900000   F      518             MOV     DPTR,#state?051
+0057 E0              519             MOVX    A,@DPTR
+0058 FE              520             MOV     R6,A
+0059 A3              521             INC     DPTR
+005A E0              522             MOVX    A,@DPTR
+005B FF              523             MOV     R7,A
+005C EE              524             MOV     A,R6
+005D 6003            525             JZ      $ + 5H
+005F 020000   F      526             LJMP    ?C0009
+0062 EF              527             MOV     A,R7
+0063 120000   F      528             LCALL   ?C?CCASE
+0066 0000     F      529             DW      ?C0010
+0068 00              530             DB      00H
+0069 0000     F      531             DW      ?C0016
+006B 01              532             DB      01H
+006C 0000     F      533             DW      ?C0019
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    10
+
+006E 02              534             DB      02H
+006F 0000     F      535             DW      ?C0022
+0071 03              536             DB      03H
+0072 0000     F      537             DW      ?C0027
+0074 04              538             DB      04H
+0075 0000     F      539             DW      ?C0033
+0077 05              540             DB      05H
+0078 0000     F      541             DW      ?C0035
+007A 06              542             DB      06H
+007B 0000     F      543             DW      ?C0036
+007D 07              544             DB      07H
+007E 0000     F      545             DW      ?C0037
+0080 08              546             DB      08H
+0081 0000     F      547             DW      ?C0047
+0083 13              548             DB      013H
+0084 0000     F      549             DW      ?C0050
+0086 14              550             DB      014H
+0087 0000     F      551             DW      ?C0056
+0089 15              552             DB      015H
+008A 0000     F      553             DW      ?C0057
+008C 16              554             DB      016H
+008D 0000            555             DW      00H
+008F 0000     F      556             DW      ?C0009
+                     557     ;               {
+                     558                             ; SOURCE LINE # 143
+                     559     ;                       case START_REC:
+                     560                             ; SOURCE LINE # 144
+0091                 561     ?C0010:
+                     562     ;                               #ifdef CPLUSDEBUG
+                     563     ;                                       printf("\n*** Looking for begining of record\n");
+                     564     ;                               #endif
+                     565     ;                               c = _get1char();
+                     566                             ; SOURCE LINE # 148
+0091 120000   F      567             LCALL   _get1char
+0094 900000   F      568             MOV     DPTR,#c?044
+0097 EF              569             MOV     A,R7
+0098 F0              570             MOVX    @DPTR,A
+                     571     ;                               if (c == 27)
+                     572                             ; SOURCE LINE # 149
+0099 BF1B03          573             CJNE    R7,#01BH,?C0011
+                     574     ;                               {
+                     575                             ; SOURCE LINE # 150
+                     576     ;                                       state = END_DOWNLOAD;
+                     577                             ; SOURCE LINE # 151
+                     578     ;                                       break;
+                     579                             ; SOURCE LINE # 152
+009C 020000   F      580             LJMP    ?C0092
+                     581     ;                               }
+                     582                             ; SOURCE LINE # 153
+009F                 583     ?C0011:
+                     584     ;                               else if (c==':')
+                     585                             ; SOURCE LINE # 154
+009F 900000   F      586             MOV     DPTR,#c?044
+00A2 E0              587             MOVX    A,@DPTR
+00A3 FF              588             MOV     R7,A
+00A4 B43A17          589             CJNE    A,#03AH,?C0013
+                     590     ;                               {
+                     591                             ; SOURCE LINE # 155
+                     592     ;                                       ChkSume = 0;
+                     593                             ; SOURCE LINE # 156
+00A7 E4              594             CLR     A
+00A8 7800     F      595             MOV     R0,#LOW (ChkSume?046)
+00AA F6              596             MOV     @R0,A
+                     597     ;                                       state = GET_REC_LEN;
+                     598                             ; SOURCE LINE # 157
+00AB 900000   F      599             MOV     DPTR,#state?051
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    11
+
+00AE F0              600             MOVX    @DPTR,A
+00AF A3              601             INC     DPTR
+00B0 04              602             INC     A
+00B1 F0              603             MOVX    @DPTR,A
+                     604     ;                                       ProgCntV[CntLine] = ProgCntV[CntLine] + 1;
+                     605                             ; SOURCE LINE # 158
+00B2 A800     F      606             MOV     R0,ProgCntV?041
+00B4 08              607             INC     R0
+00B5 06              608             INC     @R0
+00B6 E6              609             MOV     A,@R0
+00B7 18              610             DEC     R0
+00B8 7001            611             JNZ     ?C0086
+00BA 06              612             INC     @R0
+00BB                 613     ?C0086:
+                     614     ;                                       #ifdef KEILDEBUG
+                     615     ;                                               printf("*** %d: Beginning of Record found\n
+                             ", state);
+                     616     ;                                       #endif
+                     617     ;                                       break;
+                     618                             ; SOURCE LINE # 162
+00BB 020000   F      619             LJMP    ?C0009
+                     620     ;                               }
+                     621                             ; SOURCE LINE # 163
+00BE                 622     ?C0013:
+                     623     ;                               else if (!isxdigit(c) && (c!=10))
+                     624                             ; SOURCE LINE # 164
+00BE 120000   F      625             LCALL   _isxdigit
+00C1 5003            626             JNC     $ + 5H
+00C3 020000   F      627             LJMP    ?C0009
+00C6 900000   F      628             MOV     DPTR,#c?044
+00C9 E0              629             MOVX    A,@DPTR
+00CA 640A            630             XRL     A,#0AH
+00CC 7003            631             JNZ     $ + 5H
+00CE 020000   F      632             LJMP    ?C0009
+                     633     ;                                       ErrCntV[ErrNonAscDigit] = ErrCntV[ErrNonAscDigit] +
+                              1;
+                     634                             ; SOURCE LINE # 165
+00D1 E500     F      635             MOV     A,ErrCntV?040
+00D3 2405            636             ADD     A,#05H
+00D5 120000   F      637             LCALL   L?0115
+00D8 E500     F      638             MOV     A,ErrCntV?040
+00DA 2404            639             ADD     A,#04H
+00DC 120000   F      640             LCALL   L?0119
+                     641     ; 
+                     642     ;                               break;
+                     643                             ; SOURCE LINE # 167
+00DF 020000   F      644             LJMP    ?C0009
+                     645     ; 
+                     646     ;                       case GET_REC_LEN:
+                     647                             ; SOURCE LINE # 169
+00E2                 648     ?C0016:
+                     649     ;                               Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+                     650                             ; SOURCE LINE # 170
+00E2 120000   F      651             LCALL   L?0108
+                     652     ;                               if (Err==GoodHexByteRet)
+                     653                             ; SOURCE LINE # 171
+00E5 700F            654             JNZ     ?C0017
+                     655     ;                               {
+                     656                             ; SOURCE LINE # 172
+                     657     ;                                       RecLen = HexVal;     //Get record length
+                     658                             ; SOURCE LINE # 173
+00E7 7800     F      659             MOV     R0,#LOW (HexVal?047)
+00E9 E6              660             MOV     A,@R0
+00EA 08              661             INC     R0
+00EB F6              662             MOV     @R0,A
+                     663     ;                                       state = GET_OFFSET;
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    12
+
+                     664                             ; SOURCE LINE # 174
+00EC A3              665             INC     DPTR
+00ED E4              666             CLR     A
+00EE F0              667             MOVX    @DPTR,A
+00EF A3              668             INC     DPTR
+00F0 7402            669             MOV     A,#02H
+00F2 F0              670             MOVX    @DPTR,A
+                     671     ;                                       #ifdef KEILDEBUG
+                     672     ;                                               printf("==> %d: Rec length = %d - number of
+                              lines: %d\n", (u16)state, (u16)RecLen, (u16)ProgCntV[CntLine]);
+                     673     ;                                       #endif
+                     674     ;                                       break;
+                     675                             ; SOURCE LINE # 178
+00F3 020000   F      676             LJMP    ?C0009
+                     677     ;                               }
+                     678                             ; SOURCE LINE # 179
+00F6                 679     ?C0017:
+                     680     ;                               else 
+                     681     ;                                       state = HANDLE_ERROR;
+                     682                             ; SOURCE LINE # 181
+                     683     ;                               break;
+                     684                             ; SOURCE LINE # 182
+00F6 020000   F      685             LJMP    ?C0093
+                     686     ; 
+                     687     ;                       case GET_OFFSET:
+                     688                             ; SOURCE LINE # 184
+00F9                 689     ?C0019:
+                     690     ;                               Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);  //Get recor
+                             d length high byte
+                     691                             ; SOURCE LINE # 185
+00F9 120000   F      692             LCALL   L?0108
+                     693     ;                               temp = HexVal;
+                     694                             ; SOURCE LINE # 186
+00FC 7800     F      695             MOV     R0,#LOW (HexVal?047)
+00FE E6              696             MOV     A,@R0
+00FF FD              697             MOV     R5,A
+0100 7800     F      698             MOV     R0,#LOW (temp?045)
+0102 7600            699             MOV     @R0,#00H
+0104 08              700             INC     R0
+0105 A605            701             MOV     @R0,AR5
+                     702     ;                               if (Err!=GoodHexByteRet)
+                     703                             ; SOURCE LINE # 187
+0107 EF              704             MOV     A,R7
+0108 6002            705             JZ      ?C0020
+                     706     ;                               {
+                     707                             ; SOURCE LINE # 188
+                     708     ;                                       state = HANDLE_ERROR;
+                     709                             ; SOURCE LINE # 189
+                     710     ;                                       break;
+                     711                             ; SOURCE LINE # 190
+010A 8040            712             SJMP    ?C0095
+                     713     ;                               }
+                     714                             ; SOURCE LINE # 191
+010C                 715     ?C0020:
+                     716     ;                               Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);  //Get recor
+                             d length low byte
+                     717                             ; SOURCE LINE # 192
+010C 120000   F      718             LCALL   L?0109
+                     719     ;                               if (Err!=GoodHexByteRet)
+                     720                             ; SOURCE LINE # 193
+010F 6002            721             JZ      ?C0021
+                     722     ;                               {
+                     723                             ; SOURCE LINE # 194
+                     724     ;                                       state = HANDLE_ERROR;
+                     725                             ; SOURCE LINE # 195
+0111                 726     ?C0094:
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    13
+
+                     727     ;                                       break;
+                     728                             ; SOURCE LINE # 196
+0111 8039            729             SJMP    ?C0095
+                     730     ;                               }
+                     731                             ; SOURCE LINE # 197
+0113                 732     ?C0021:
+                     733     ;                               temp <<= 8;
+                     734                             ; SOURCE LINE # 198
+0113 7800     F      735             MOV     R0,#LOW (temp?045+01H)
+0115 E6              736             MOV     A,@R0
+0116 7F00            737             MOV     R7,#00H
+0118 18              738             DEC     R0
+0119 F6              739             MOV     @R0,A
+011A FE              740             MOV     R6,A
+011B 08              741             INC     R0
+011C EF              742             MOV     A,R7
+011D F6              743             MOV     @R0,A
+                     744     ;                               temp |= HexVal;
+                     745                             ; SOURCE LINE # 199
+011E 7800     F      746             MOV     R0,#LOW (HexVal?047)
+0120 E6              747             MOV     A,@R0
+0121 FD              748             MOV     R5,A
+0122 ED              749             MOV     A,R5
+0123 FF              750             MOV     R7,A
+0124 7800     F      751             MOV     R0,#LOW (temp?045)
+0126 EE              752             MOV     A,R6
+0127 F6              753             MOV     @R0,A
+0128 FE              754             MOV     R6,A
+0129 08              755             INC     R0
+012A EF              756             MOV     A,R7
+012B F6              757             MOV     @R0,A
+012C FF              758             MOV     R7,A
+                     759     ;                               CRamAddr &= 0xFFFF0000;   //Delete previous record's last a
+                             ddress
+                     760                             ; SOURCE LINE # 200
+012D 7C00            761             MOV     R4,#00H
+012F 7800     F      762             MOV     R0,#LOW (CRamAddr?052+01H)
+0131 18              763             DEC     R0
+0132 EC              764             MOV     A,R4
+0133 F6              765             MOV     @R0,A
+0134 08              766             INC     R0
+0135 F6              767             MOV     @R0,A
+                     768     ;                               CRamAddr |= temp;
+                     769                             ; SOURCE LINE # 201
+0136 EE              770             MOV     A,R6
+0137 18              771             DEC     R0
+0138 F6              772             MOV     @R0,A
+0139 EF              773             MOV     A,R7
+013A 08              774             INC     R0
+013B F6              775             MOV     @R0,A
+                     776     ;                               state = GET_REC_TYPE;
+                     777                             ; SOURCE LINE # 202
+013C 120000   F      778             LCALL   L?0124
+013F 7403            779             MOV     A,#03H
+0141 F0              780             MOVX    @DPTR,A
+                     781     ;                               #ifdef KEILDEBUG
+                     782     ;                                       printf("==> %d: Off set address = %04X --> CRamAddr
+                              = ", (u16)state, temp);
+                     783     ;                                       printf("%04X%04X\n", (u16)(CRamAddr>>16), (u16)(CRa
+                             mAddr));
+                     784     ;                               #endif
+                     785     ;                               break;
+                     786                             ; SOURCE LINE # 207
+0142 020000   F      787             LJMP    ?C0009
+                     788     ; 
+                     789     ;                       case GET_REC_TYPE: //3
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    14
+
+                     790                             ; SOURCE LINE # 209
+0145                 791     ?C0022:
+                     792     ;                               Err = GetAsc2Hex (&RecType, &ChkSume, ErrCntV);
+                     793                             ; SOURCE LINE # 210
+0145 7F00     F      794             MOV     R7,#LOW (RecType?049)
+0147 120000   F      795             LCALL   L?0120
+                     796     ;                               if (Err!=GoodHexByteRet)
+                     797                             ; SOURCE LINE # 211
+014A 6004            798             JZ      ?C0023
+                     799     ;                               {
+                     800                             ; SOURCE LINE # 212
+                     801     ;                                       state = HANDLE_ERROR;
+                     802                             ; SOURCE LINE # 213
+014C                 803     ?C0095:
+014C A3              804             INC     DPTR
+                     805     ;                                       break;
+                     806                             ; SOURCE LINE # 214
+014D 020000   F      807             LJMP    ?C0096
+                     808     ;                               }
+                     809                             ; SOURCE LINE # 215
+0150                 810     ?C0023:
+                     811     ;                               else if (RecType > 5)
+                     812                             ; SOURCE LINE # 216
+0150 7800     F      813             MOV     R0,#LOW (RecType?049)
+0152 E6              814             MOV     A,@R0
+0153 FF              815             MOV     R7,A
+0154 D3              816             SETB    C
+0155 9405            817             SUBB    A,#05H
+0157 4003            818             JC      ?C0025
+                     819     ;                               {
+                     820                             ; SOURCE LINE # 217
+                     821     ;                                       state = UNKNOWN_REC;
+                     822                             ; SOURCE LINE # 218
+                     823     ;                                       break;
+                     824                             ; SOURCE LINE # 219
+0159 020000   F      825             LJMP    ?C0102
+                     826     ;                               }
+                     827                             ; SOURCE LINE # 220
+015C                 828     ?C0025:
+                     829     ;                               else
+                     830     ;                               {
+                     831                             ; SOURCE LINE # 222
+                     832     ;                                       #ifdef KEILDEBUG
+                     833     ;                                               printf("==> %d: RecType = %d\n", (u16)state
+                             , (u16)RecType);
+                     834     ;                                       #endif
+                     835     ;                                       state = RecType + GET_REC_TYPE + 1; //Set the statu
+                             s for specific record types
+                     836                             ; SOURCE LINE # 226
+015C EF              837             MOV     A,R7
+015D 2404            838             ADD     A,#04H
+015F FE              839             MOV     R6,A
+0160 E4              840             CLR     A
+0161 33              841             RLC     A
+0162 900000   F      842             MOV     DPTR,#state?051
+0165 F0              843             MOVX    @DPTR,A
+0166 A3              844             INC     DPTR
+0167 CE              845             XCH     A,R6
+0168 F0              846             MOVX    @DPTR,A
+                     847     ;                                       i = 0; //To set the status for the next state
+                     848                             ; SOURCE LINE # 227
+0169 E4              849             CLR     A
+016A 900000   F      850             MOV     DPTR,#i?042
+                     851     ;                                       #ifdef KEILDEBUG
+                     852     ;                                               printf("==> %d: Next state\n", state);
+                     853     ;                                       #endif
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    15
+
+                     854     ;                                       break;
+                     855                             ; SOURCE LINE # 231
+016D 020000   F      856             LJMP    ?C0106
+                     857     ;                               }                                
+                     858                             ; SOURCE LINE # 232
+                     859     ;                       case GET_REC_DATA:  //4
+                     860                             ; SOURCE LINE # 233
+0170                 861     ?C0027:
+                     862     ;                               Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+                     863                             ; SOURCE LINE # 234
+0170 7F00     F      864             MOV     R7,#LOW (HexVal?047)
+0172 7D00     F      865             MOV     R5,#LOW (ChkSume?046)
+0174 AB00     F      866             MOV     R3,ErrCntV?040
+0176 120000   F      867             LCALL   _GetAsc2Hex
+0179 900000   F      868             MOV     DPTR,#Err?050
+017C E4              869             CLR     A
+017D F0              870             MOVX    @DPTR,A
+017E A3              871             INC     DPTR
+017F EF              872             MOV     A,R7
+0180 F0              873             MOVX    @DPTR,A
+                     874     ;                               RecLen--;
+                     875                             ; SOURCE LINE # 235
+0181 7800     F      876             MOV     R0,#LOW (RecLen?048)
+0183 16              877             DEC     @R0
+                     878     ;                               if (CRamAddr>Uart2EramAddr){
+                     879                             ; SOURCE LINE # 236
+0184 7800     F      880             MOV     R0,#LOW (CRamAddr?052)
+0186 E6              881             MOV     A,@R0
+0187 FC              882             MOV     R4,A
+0188 08              883             INC     R0
+0189 E6              884             MOV     A,@R0
+018A FD              885             MOV     R5,A
+018B C3              886             CLR     C
+018C 900000   F      887             MOV     DPTR,#Uart2EramAddr+01H
+018F E0              888             MOVX    A,@DPTR
+0190 9D              889             SUBB    A,R5
+0191 900000   F      890             MOV     DPTR,#Uart2EramAddr
+0194 E0              891             MOVX    A,@DPTR
+0195 9C              892             SUBB    A,R4
+0196 5005            893             JNC     ?C0028
+                     894     ;                                       Uart2EramAddr = CRamAddr;
+                     895                             ; SOURCE LINE # 237
+0198 EC              896             MOV     A,R4
+0199 F0              897             MOVX    @DPTR,A
+019A A3              898             INC     DPTR
+019B ED              899             MOV     A,R5
+019C F0              900             MOVX    @DPTR,A
+                     901     ;                               }
+                     902                             ; SOURCE LINE # 238
+019D                 903     ?C0028:
+                     904     ;                               Err = Wr2CRam(&HexVal, (volatile u8 xdata *)CRamAddr);
+                     905                             ; SOURCE LINE # 239
+019D 7F00     F      906             MOV     R7,#LOW (HexVal?047)
+019F 120000   F      907             LCALL   _Wr2CRam
+01A2 7E00            908             MOV     R6,#00H
+01A4 900000   F      909             MOV     DPTR,#Err?050
+01A7 EE              910             MOV     A,R6
+01A8 F0              911             MOVX    @DPTR,A
+01A9 A3              912             INC     DPTR
+01AA EF              913             MOV     A,R7
+01AB F0              914             MOVX    @DPTR,A
+                     915     ;                               CRamAddr++;
+                     916                             ; SOURCE LINE # 240
+01AC 7800     F      917             MOV     R0,#LOW (CRamAddr?052+01H)
+01AE 06              918             INC     @R0
+01AF E6              919             MOV     A,@R0
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    16
+
+01B0 18              920             DEC     R0
+01B1 7001            921             JNZ     ?C0087
+01B3 06              922             INC     @R0
+01B4                 923     ?C0087:
+                     924     ;                               if (Err==0)
+                     925                             ; SOURCE LINE # 241
+01B4 EF              926             MOV     A,R7
+01B5 4E              927             ORL     A,R6
+01B6 702F            928             JNZ     ?C0029
+                     929     ;                               {
+                     930                             ; SOURCE LINE # 242
+                     931     ;                                       if (n >= DNLD_INDICATOR)
+                     932                             ; SOURCE LINE # 243
+01B8 C3              933             CLR     C
+01B9 900000   F      934             MOV     DPTR,#n?043+01H
+01BC E0              935             MOVX    A,@DPTR
+01BD 94C8            936             SUBB    A,#0C8H
+01BF 900000   F      937             MOV     DPTR,#n?043
+01C2 E0              938             MOVX    A,@DPTR
+01C3 9400            939             SUBB    A,#00H
+01C5 400C            940             JC      ?C0030
+                     941     ;                                       {
+                     942                             ; SOURCE LINE # 244
+                     943     ;                                       #pragma asm
+                     944     ;                                           CLR  TI
+01C7 C299            945               CLR  TI
+                     946     ;                                               MOV SBUF,#02Eh //'.'
+01C9 75992E          947               MOV SBUF,#02Eh  
+                     948     ;                                       #pragma endasm
+                     949     ;                                               n = 0;
+                     950                             ; SOURCE LINE # 249
+01CC E4              951             CLR     A
+01CD 900000   F      952             MOV     DPTR,#n?043
+01D0 F0              953             MOVX    @DPTR,A
+01D1 A3              954             INC     DPTR
+01D2 F0              955             MOVX    @DPTR,A
+                     956     ;                                       }               
+                     957                             ; SOURCE LINE # 250
+01D3                 958     ?C0030:
+                     959     ;                                       n++;
+                     960                             ; SOURCE LINE # 251
+01D3 900000   F      961             MOV     DPTR,#n?043
+01D6 E4              962             CLR     A
+01D7 120000   F      963             LCALL   L?0123
+                     964     ;                                       ProgCntV[CntWrByte] = ProgCntV[CntWrByte] + 1;   //
+                             Count 1 good byte downloaded
+                     965                             ; SOURCE LINE # 252
+01DA E500     F      966             MOV     A,ProgCntV?041
+01DC 2405            967             ADD     A,#05H
+01DE 120000   F      968             LCALL   L?0115
+01E1 E500     F      969             MOV     A,ProgCntV?041
+01E3 2404            970             ADD     A,#04H
+                     971     ;                               }
+                     972                             ; SOURCE LINE # 253
+01E5 8014            973             SJMP    ?C0099
+01E7                 974     ?C0029:
+                     975     ;                               else
+                     976     ;                               {
+                     977                             ; SOURCE LINE # 255
+                     978     ;                                       printf("f");
+                     979                             ; SOURCE LINE # 256
+01E7 7BFF            980             MOV     R3,#0FFH
+01E9 7A00     F      981             MOV     R2,#HIGH (?SC_35)
+01EB 7900     F      982             MOV     R1,#LOW (?SC_35)
+01ED 120000   F      983             LCALL   _printf
+                     984     ;                                       ErrCntV[ErrWrCRam] = ErrCntV[ErrWrCRam] + 1;  //Cou
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    17
+
+                             nt 1 byte download fail
+                     985                             ; SOURCE LINE # 257
+01F0 E500     F      986             MOV     A,ErrCntV?040
+01F2 2407            987             ADD     A,#07H
+01F4 120000   F      988             LCALL   L?0115
+01F7 E500     F      989             MOV     A,ErrCntV?040
+01F9 2406            990             ADD     A,#06H
+01FB                 991     ?C0099:
+01FB 120000   F      992             LCALL   L?0119
+                     993     ;                               }
+                     994                             ; SOURCE LINE # 258
+01FE                 995     ?C0031:
+                     996     ;                               if (RecLen==0)
+                     997                             ; SOURCE LINE # 259
+01FE 7800     F      998             MOV     R0,#LOW (RecLen?048)
+0200 E6              999             MOV     A,@R0
+0201 6003           1000             JZ      $ + 5H
+0203 020000   F     1001             LJMP    ?C0009
+                    1002     ;                                       state = GET_CHK_SUME;
+                    1003                             ; SOURCE LINE # 260
+0206 900000   F     1004             MOV     DPTR,#state?051
+                    1005     ;                               break;
+                    1006                             ; SOURCE LINE # 261
+0209 020000   F     1007             LJMP    ?C0100
+                    1008     ;                       case GET_REC_EOF: //5
+                    1009                             ; SOURCE LINE # 262
+020C                1010     ?C0033:
+                    1011     ;                               Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV); //Get 0xFF c
+                             hecksume of eof
+                    1012                             ; SOURCE LINE # 263
+020C 120000   F     1013             LCALL   L?0109
+                    1014     ;                               if ((Err==0) && (ChkSume==0))
+                    1015                             ; SOURCE LINE # 264
+020F 700B           1016             JNZ     ?C0034
+0211 7800     F     1017             MOV     R0,#LOW (ChkSume?046)
+0213 E6             1018             MOV     A,@R0
+0214 7006           1019             JNZ     ?C0034
+                    1020     ;                                       ProgCntV[CntGoodRec] = ProgCntV[CntGoodRec] + 1; 
+                    1021                             ; SOURCE LINE # 265
+0216 120000   F     1022             LCALL   L?0113
+0219 120000   F     1023             LCALL   L?0117
+021C                1024     ?C0034:
+                    1025     ;                               #ifdef CPLUSDEBUG
+                    1026     ;                                       printf("==> %d: Getting EOF - CheckSume = %d\n", st
+                             ate, (u16)ChkSume);
+                    1027     ;                               #endif
+                    1028     ;                               state = END_DOWNLOAD;
+                    1029                             ; SOURCE LINE # 269
+021C                1030     ?C0092:
+021C 900000   F     1031             MOV     DPTR,#state?051
+021F E4             1032             CLR     A
+                    1033     ;                               break;
+                    1034                             ; SOURCE LINE # 270
+0220 020000   F     1035             LJMP    ?C0101
+                    1036     ; 
+                    1037     ;                       case GET_EXT_SEG_ADDR: //6
+                    1038                             ; SOURCE LINE # 272
+0223                1039     ?C0035:
+                    1040     ;                               state = UNKNOWN_REC;
+                    1041                             ; SOURCE LINE # 273
+0223                1042     ?C0097:
+                    1043     ;                               break;
+                    1044                             ; SOURCE LINE # 274
+0223 8000           1045             SJMP    ?C0102
+                    1046     ; 
+                    1047     ;                       case GET_START_SEG_ADDR: //7
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    18
+
+                    1048                             ; SOURCE LINE # 276
+0225                1049     ?C0036:
+                    1050     ;                               state = UNKNOWN_REC;
+                    1051                             ; SOURCE LINE # 277
+0225                1052     ?C0102:
+0225 120000   F     1053             LCALL   L?0124
+0228 7415           1054             MOV     A,#015H
+022A F0             1055             MOVX    @DPTR,A
+                    1056     ;                               break;
+                    1057                             ; SOURCE LINE # 278
+022B 020000   F     1058             LJMP    ?C0009
+                    1059     ; 
+                    1060     ;                       case GET_EXT_LIN_ADDR: //8
+                    1061                             ; SOURCE LINE # 280
+022E                1062     ?C0037:
+                    1063     ;                               if (i==0)
+                    1064                             ; SOURCE LINE # 281
+022E 900000   F     1065             MOV     DPTR,#i?042
+0231 E0             1066             MOVX    A,@DPTR
+0232 7002           1067             JNZ     ?C0088
+0234 A3             1068             INC     DPTR
+0235 E0             1069             MOVX    A,@DPTR
+0236                1070     ?C0088:
+0236 702F           1071             JNZ     ?C0038
+                    1072     ;                               {
+                    1073                             ; SOURCE LINE # 282
+                    1074     ;                                       temp = 0;
+                    1075                             ; SOURCE LINE # 283
+0238 7800     F     1076             MOV     R0,#LOW (temp?045)
+023A F6             1077             MOV     @R0,A
+023B 08             1078             INC     R0
+023C F6             1079             MOV     @R0,A
+                    1080     ;                                       Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+                    1081                             ; SOURCE LINE # 284
+023D 120000   F     1082             LCALL   L?0110
+                    1083     ;                                       RecLen--;
+                    1084                             ; SOURCE LINE # 285
+0240 7800     F     1085             MOV     R0,#LOW (RecLen?048)
+0242 16             1086             DEC     @R0
+                    1087     ;                                       if (Err==0)
+                    1088                             ; SOURCE LINE # 286
+0243 7015           1089             JNZ     ?C0039
+                    1090     ;                                       {
+                    1091                             ; SOURCE LINE # 287
+                    1092     ;                                               temp = (u32) HexVal;
+                    1093                             ; SOURCE LINE # 288
+0245 18             1094             DEC     R0
+0246 E6             1095             MOV     A,@R0
+0247 FF             1096             MOV     R7,A
+0248 E4             1097             CLR     A
+0249 7800     F     1098             MOV     R0,#LOW (temp?045)
+024B F6             1099             MOV     @R0,A
+024C 08             1100             INC     R0
+024D A607           1101             MOV     @R0,AR7
+                    1102     ;                                               temp <<= 8;
+                    1103                             ; SOURCE LINE # 289
+024F E6             1104             MOV     A,@R0
+0250 F8             1105             MOV     R0,A
+0251 E4             1106             CLR     A
+0252 7900     F     1107             MOV     R1,#LOW (temp?045+01H)
+0254 F7             1108             MOV     @R1,A
+0255 E8             1109             MOV     A,R0
+0256 19             1110             DEC     R1
+0257 F7             1111             MOV     @R1,A
+                    1112     ;                                       }
+                    1113                             ; SOURCE LINE # 290
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    19
+
+0258 8006           1114             SJMP    ?C0040
+025A                1115     ?C0039:
+                    1116     ;                                       else
+                    1117     ;                                               state = HANDLE_ERROR;
+                    1118                             ; SOURCE LINE # 292
+025A 120000   F     1119             LCALL   L?0125
+025D 7414           1120             MOV     A,#014H
+025F F0             1121             MOVX    @DPTR,A
+0260                1122     ?C0040:
+                    1123     ;                                       i = 1;
+                    1124                             ; SOURCE LINE # 293
+0260 900000   F     1125             MOV     DPTR,#i?042
+0263 E4             1126             CLR     A
+                    1127     ;                               }
+                    1128                             ; SOURCE LINE # 294
+0264 020000   F     1129             LJMP    ?C0103
+0267                1130     ?C0038:
+                    1131     ;                               else
+                    1132     ;                               {
+                    1133                             ; SOURCE LINE # 296
+                    1134     ;                                       Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+                    1135                             ; SOURCE LINE # 297
+0267 120000   F     1136             LCALL   L?0110
+                    1137     ;                                       RecLen--;
+                    1138                             ; SOURCE LINE # 298
+026A 7800     F     1139             MOV     R0,#LOW (RecLen?048)
+026C 16             1140             DEC     @R0
+                    1141     ;                                       if (Err==0)
+                    1142                             ; SOURCE LINE # 299
+026D 6003           1143             JZ      $ + 5H
+026F 020000   F     1144             LJMP    ?C0042
+                    1145     ;                                       {
+                    1146                             ; SOURCE LINE # 300
+                    1147     ;                                               temp = temp | (u32)HexVal;
+                    1148                             ; SOURCE LINE # 301
+0272 18             1149             DEC     R0
+0273 E6             1150             MOV     A,@R0
+0274 FF             1151             MOV     R7,A
+0275 E4             1152             CLR     A
+0276 FC             1153             MOV     R4,A
+0277 FD             1154             MOV     R5,A
+0278 C004           1155             PUSH    AR4
+027A A905           1156             MOV     R1,AR5
+027C AA06           1157             MOV     R2,AR6
+027E AB07           1158             MOV     R3,AR7
+0280 7800     F     1159             MOV     R0,#LOW (temp?045)
+0282 E6             1160             MOV     A,@R0
+0283 FE             1161             MOV     R6,A
+0284 08             1162             INC     R0
+0285 E6             1163             MOV     A,@R0
+0286 FF             1164             MOV     R7,A
+0287 E4             1165             CLR     A
+0288 D000           1166             POP     AR0
+028A 120000   F     1167             LCALL   ?C?LOR
+028D 7800     F     1168             MOV     R0,#LOW (temp?045)
+028F EE             1169             MOV     A,R6
+0290 F6             1170             MOV     @R0,A
+0291 08             1171             INC     R0
+0292 EF             1172             MOV     A,R7
+0293 F6             1173             MOV     @R0,A
+                    1174     ;                                               if ((temp >= 0x00fb) && (temp <= 0x00fe))
+                    1175                             ; SOURCE LINE # 302
+0294 C3             1176             CLR     C
+0295 94FB           1177             SUBB    A,#0FBH
+0297 EE             1178             MOV     A,R6
+0298 9400           1179             SUBB    A,#00H
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    20
+
+029A 4016           1180             JC      ?C0043
+029C D3             1181             SETB    C
+029D E6             1182             MOV     A,@R0
+029E 94FE           1183             SUBB    A,#0FEH
+02A0 18             1184             DEC     R0
+02A1 E6             1185             MOV     A,@R0
+02A2 9400           1186             SUBB    A,#00H
+02A4 500C           1187             JNC     ?C0043
+                    1188     ;                                                       temp = temp - 0x00fa; //map segment
+                              to data ram for downloading: fb = 01, fc = 02, fd = 03, fe = 04
+                    1189                             ; SOURCE LINE # 303
+02A6 08             1190             INC     R0
+02A7 7406           1191             MOV     A,#06H
+02A9 26             1192             ADD     A,@R0
+02AA F6             1193             MOV     @R0,A
+02AB 18             1194             DEC     R0
+02AC 74FF           1195             MOV     A,#0FFH
+02AE 36             1196             ADDC    A,@R0
+02AF F6             1197             MOV     @R0,A
+02B0 8015           1198             SJMP    ?C0044
+02B2                1199     ?C0043:
+                    1200     ;                                               else
+                    1201     ;                                               {
+                    1202                             ; SOURCE LINE # 305
+                    1203     ;                                                       ErrCntV[ErrSegment] = ErrCntV[ErrSe
+                             gment] + 1;
+                    1204                             ; SOURCE LINE # 306
+02B2 E500     F     1205             MOV     A,ErrCntV?040
+02B4 240B           1206             ADD     A,#0BH
+02B6 120000   F     1207             LCALL   L?0115
+02B9 E500     F     1208             MOV     A,ErrCntV?040
+02BB 240A           1209             ADD     A,#0AH
+02BD 120000   F     1210             LCALL   L?0119
+                    1211     ;                                                       temp = 0x01; //Map all the wrong se
+                             gment address to 0xfb <=> 0x01 data ram
+                    1212                             ; SOURCE LINE # 307
+02C0 7800     F     1213             MOV     R0,#LOW (temp?045)
+02C2 7600           1214             MOV     @R0,#00H
+02C4 08             1215             INC     R0
+02C5 7601           1216             MOV     @R0,#01H
+                    1217     ;                                               }
+                    1218                             ; SOURCE LINE # 308
+02C7                1219     ?C0044:
+                    1220     ;               
+                    1221     ;                                               temp <<= 16;
+                    1222                             ; SOURCE LINE # 310
+02C7 7800     F     1223             MOV     R0,#LOW (temp?045)
+02C9 E6             1224             MOV     A,@R0
+02CA FE             1225             MOV     R6,A
+02CB 08             1226             INC     R0
+02CC E6             1227             MOV     A,@R0
+02CD 7810           1228             MOV     R0,#010H
+02CF                1229     ?C0089:
+02CF C3             1230             CLR     C
+02D0 33             1231             RLC     A
+02D1 CE             1232             XCH     A,R6
+02D2 33             1233             RLC     A
+02D3 CE             1234             XCH     A,R6
+02D4 D8F9           1235             DJNZ    R0,?C0089
+02D6 FF             1236             MOV     R7,A
+02D7 7800     F     1237             MOV     R0,#LOW (temp?045)
+02D9 EE             1238             MOV     A,R6
+02DA F6             1239             MOV     @R0,A
+02DB 08             1240             INC     R0
+02DC EF             1241             MOV     A,R7
+02DD F6             1242             MOV     @R0,A
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    21
+
+                    1243     ;                                               CRamAddr = temp;
+                    1244                             ; SOURCE LINE # 311
+02DE 7800     F     1245             MOV     R0,#LOW (CRamAddr?052)
+02E0 A606           1246             MOV     @R0,AR6
+02E2 08             1247             INC     R0
+02E3 F6             1248             MOV     @R0,A
+                    1249     ; 
+                    1250     ;                                       #ifdef KEILDEBUG
+                    1251     ;                                               printf("==> %d: Linear extended segment add
+                             ress = 0x%04X%04X\n", state, (u16)(CRamAddr>>16), (u16)CRamAddr);
+                    1252     ;                                       #endif
+                    1253     ;                                               state = GET_CHK_SUME;
+                    1254                             ; SOURCE LINE # 316
+02E4 900000   F     1255             MOV     DPTR,#state?051
+02E7 E4             1256             CLR     A
+02E8                1257     ?C0100:
+02E8 F0             1258             MOVX    @DPTR,A
+02E9 A3             1259             INC     DPTR
+02EA 7413           1260             MOV     A,#013H
+02EC F0             1261             MOVX    @DPTR,A
+                    1262     ;                                       }
+                    1263                             ; SOURCE LINE # 317
+02ED 020000   F     1264             LJMP    ?C0009
+02F0                1265     ?C0042:
+                    1266     ;                                       else
+                    1267     ;                                               state = HANDLE_ERROR;                      
+                                          
+                    1268                             ; SOURCE LINE # 319
+02F0                1269     ?C0093:
+02F0 900000   F     1270             MOV     DPTR,#state?051
+02F3                1271     ?C0096:
+02F3 E4             1272             CLR     A
+02F4 F0             1273             MOVX    @DPTR,A
+02F5 A3             1274             INC     DPTR
+02F6 7414           1275             MOV     A,#014H
+02F8 F0             1276             MOVX    @DPTR,A
+                    1277     ;                               }                       
+                    1278                             ; SOURCE LINE # 320
+                    1279     ;                               break;
+                    1280                             ; SOURCE LINE # 321
+02F9 020000   F     1281             LJMP    ?C0009
+                    1282     ; 
+                    1283     ;                       case GET_START_LIN_ADDR: //9
+                    1284                             ; SOURCE LINE # 323
+                    1285     ;                               break;
+                    1286                             ; SOURCE LINE # 324
+                    1287     ;                       
+                    1288     ;                       case GET_CHK_SUME:
+                    1289                             ; SOURCE LINE # 326
+02FC                1290     ?C0047:
+                    1291     ;                               #ifdef KEILDEBUG
+                    1292     ;                                       printf("\n\n==> %d: Get check sume", state);
+                    1293     ;                               #endif
+                    1294     ;                               Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+                    1295                             ; SOURCE LINE # 330
+02FC 7F00     F     1296             MOV     R7,#LOW (HexVal?047)
+02FE 120000   F     1297             LCALL   L?0120
+                    1298     ;                               if ((Err==0) && (ChkSume==0) && (RecLen==0))
+                    1299                             ; SOURCE LINE # 331
+0301 7014           1300             JNZ     ?C0048
+0303 7800     F     1301             MOV     R0,#LOW (ChkSume?046)
+0305 E6             1302             MOV     A,@R0
+0306 700F           1303             JNZ     ?C0048
+0308 7800     F     1304             MOV     R0,#LOW (RecLen?048)
+030A E6             1305             MOV     A,@R0
+030B 700A           1306             JNZ     ?C0048
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    22
+
+                    1307     ;                               {
+                    1308                             ; SOURCE LINE # 332
+                    1309     ;                                       ProgCntV[CntGoodRec] = ProgCntV[CntGoodRec] + 1; 
+                    1310                             ; SOURCE LINE # 333
+030D 120000   F     1311             LCALL   L?0113
+0310 120000   F     1312             LCALL   L?0117
+                    1313     ;                                       state = START_REC;
+                    1314                             ; SOURCE LINE # 334
+0313 E4             1315             CLR     A
+0314 A3             1316             INC     DPTR
+0315                1317     ?C0098:
+                    1318     ;                               #ifdef KEILDEBUG
+                    1319     ;                                       printf ("\n-- Check sume good\n\n");
+                    1320     ;                               #endif
+                    1321     ;                                       break;
+                    1322                             ; SOURCE LINE # 338
+0315 8059           1323             SJMP    ?C0106
+                    1324     ;                               }
+                    1325                             ; SOURCE LINE # 339
+0317                1326     ?C0048:
+                    1327     ;                               else
+                    1328     ;                               {
+                    1329                             ; SOURCE LINE # 341
+                    1330     ;                                       ErrCntV[ErrChkSume] = ErrCntV[ErrChkSume] + 1;
+                    1331                             ; SOURCE LINE # 342
+0317 E500     F     1332             MOV     A,ErrCntV?040
+0319 120000   F     1333             LCALL   L?0114
+031C E500     F     1334             MOV     A,ErrCntV?040
+031E 120000   F     1335             LCALL   L?0118
+                    1336     ;                               #ifdef KEILDEBUG
+                    1337     ;                                       printf ("\n-- Check sume error\n\n");
+                    1338     ;                               #endif
+                    1339     ;                               }
+                    1340                             ; SOURCE LINE # 346
+0321                1341     ?C0049:
+                    1342     ;                               state = START_REC;
+                    1343                             ; SOURCE LINE # 347
+0321 E4             1344             CLR     A
+0322 900000   F     1345             MOV     DPTR,#state?051
+0325                1346     ?C0104:
+                    1347     ;                               break;
+                    1348                             ; SOURCE LINE # 348
+0325 8049           1349             SJMP    ?C0106
+                    1350     ;                               
+                    1351     ;                       case HANDLE_ERROR:
+                    1352                             ; SOURCE LINE # 350
+0327                1353     ?C0050:
+                    1354     ;                               if (Err==ExitRet)
+                    1355                             ; SOURCE LINE # 351
+0327 900000   F     1356             MOV     DPTR,#Err?050
+032A E0             1357             MOVX    A,@DPTR
+032B FE             1358             MOV     R6,A
+032C A3             1359             INC     DPTR
+032D E0             1360             MOVX    A,@DPTR
+032E FF             1361             MOV     R7,A
+032F 6401           1362             XRL     A,#01H
+0331 4E             1363             ORL     A,R6
+0332 7009           1364             JNZ     ?C0051
+                    1365     ;                               {
+                    1366                             ; SOURCE LINE # 352
+                    1367     ;                                       state = END_DOWNLOAD;
+                    1368                             ; SOURCE LINE # 353
+0334 A3             1369             INC     DPTR
+0335                1370     ?C0101:
+0335 F0             1371             MOVX    @DPTR,A
+0336 A3             1372             INC     DPTR
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    23
+
+0337 7416           1373             MOV     A,#016H
+0339 F0             1374             MOVX    @DPTR,A
+                    1375     ;                                       break;
+                    1376                             ; SOURCE LINE # 354
+033A 020000   F     1377             LJMP    ?C0009
+                    1378     ;                               }
+                    1379                             ; SOURCE LINE # 355
+033D                1380     ?C0051:
+                    1381     ;                               else if (Err==NonAscDigitRet)
+                    1382                             ; SOURCE LINE # 356
+033D EF             1383             MOV     A,R7
+033E 6403           1384             XRL     A,#03H
+0340 4E             1385             ORL     A,R6
+0341 7005           1386             JNZ     ?C0053
+                    1387     ;                               {
+                    1388                             ; SOURCE LINE # 357
+                    1389     ;                                       state = START_REC;
+                    1390                             ; SOURCE LINE # 358
+0343 900000   F     1391             MOV     DPTR,#state?051
+0346                1392     ?C0105:
+                    1393     ;                               }
+                    1394                             ; SOURCE LINE # 359
+0346 8028           1395             SJMP    ?C0106
+0348                1396     ?C0053:
+                    1397     ;                               else if (Err==ExtraRecordRet)
+                    1398                             ; SOURCE LINE # 360
+0348 EF             1399             MOV     A,R7
+0349 6402           1400             XRL     A,#02H
+034B 4E             1401             ORL     A,R6
+034C 6003           1402             JZ      $ + 5H
+034E 020000   F     1403             LJMP    ?C0009
+                    1404     ;                               {
+                    1405                             ; SOURCE LINE # 361
+                    1406     ;                                       ChkSume = 0;
+                    1407                             ; SOURCE LINE # 362
+0351 7800     F     1408             MOV     R0,#LOW (ChkSume?046)
+0353 F6             1409             MOV     @R0,A
+                    1410     ;                                       state = GET_REC_LEN;   //Line found, jump back to t
+                             he look for RECLEN
+                    1411                             ; SOURCE LINE # 363
+0354 900000   F     1412             MOV     DPTR,#state?051
+0357                1413     ?C0103:
+0357 F0             1414             MOVX    @DPTR,A
+0358 A3             1415             INC     DPTR
+0359 04             1416             INC     A
+035A F0             1417             MOVX    @DPTR,A
+                    1418     ;                               }
+                    1419                             ; SOURCE LINE # 364
+                    1420     ;                               break;
+                    1421                             ; SOURCE LINE # 365
+035B 020000   F     1422             LJMP    ?C0009
+                    1423     ; 
+                    1424     ;                       case UNKNOWN_REC:
+                    1425                             ; SOURCE LINE # 367
+035E                1426     ?C0056:
+                    1427     ;                               #ifdef KEILDEBUG
+                    1428     ;                                       printf("\n\n==> %d: Unknown Record", state);
+                    1429     ;                               #endif
+                    1430     ;                               //Keep read the record to the end or new line
+                    1431     ;                               ErrCntV[ErrRecType] = ErrCntV[ErrRecType] + 1;
+                    1432                             ; SOURCE LINE # 372
+035E E500     F     1433             MOV     A,ErrCntV?040
+0360 2403           1434             ADD     A,#03H
+0362 120000   F     1435             LCALL   L?0115
+0365 E500     F     1436             MOV     A,ErrCntV?040
+0367 2402           1437             ADD     A,#02H
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    24
+
+0369 120000   F     1438             LCALL   L?0119
+                    1439     ;                               state = START_REC;
+                    1440                             ; SOURCE LINE # 373
+036C E4             1441             CLR     A
+036D 900000   F     1442             MOV     DPTR,#state?051
+0370                1443     ?C0106:
+0370 F0             1444             MOVX    @DPTR,A
+0371 A3             1445             INC     DPTR
+0372 F0             1446             MOVX    @DPTR,A
+                    1447     ;                               break;
+                    1448                             ; SOURCE LINE # 374
+0373 020000   F     1449             LJMP    ?C0009
+                    1450     ; 
+                    1451     ;                       case END_DOWNLOAD:
+                    1452                             ; SOURCE LINE # 376
+0376                1453     ?C0057:
+                    1454     ;                               printf("\n --> Code Download Summary\n");
+                    1455                             ; SOURCE LINE # 377
+0376 7BFF           1456             MOV     R3,#0FFH
+0378 7A00     F     1457             MOV     R2,#HIGH (?SC_37)
+037A 7900     F     1458             MOV     R1,#LOW (?SC_37)
+037C 120000   F     1459             LCALL   _printf
+                    1460     ;                               printf(" .Successfully downloaded byte(s): %u\n", (u16)Prog
+                             CntV[CntWrByte]);
+                    1461                             ; SOURCE LINE # 378
+037F 7A00     F     1462             MOV     R2,#HIGH (?SC_66)
+0381 7900     F     1463             MOV     R1,#LOW (?SC_66)
+0383 E500     F     1464             MOV     A,ProgCntV?041
+0385 120000   F     1465             LCALL   L?0111
+                    1466     ;                               printf(" .Found line(s): %u\n", (u16)ProgCntV[CntLine]);
+                    1467                             ; SOURCE LINE # 379
+0388 7A00     F     1468             MOV     R2,#HIGH (?SC_105)
+038A 7900     F     1469             MOV     R1,#LOW (?SC_105)
+038C A800     F     1470             MOV     R0,ProgCntV?041
+038E 120000   F     1471             LCALL   L?0116
+                    1472     ;                               printf(" .False line(s): %u\n", (u16)ErrCntV[ErrLineBegin])
+                             ;
+                    1473                             ; SOURCE LINE # 380
+0391 7A00     F     1474             MOV     R2,#HIGH (?SC_126)
+0393 7900     F     1475             MOV     R1,#LOW (?SC_126)
+0395 A800     F     1476             MOV     R0,ErrCntV?040
+0397 120000   F     1477             LCALL   L?0116
+                    1478     ;                               printf(" .Record type error(s): %u\n", (u16)ErrCntV[ErrRecT
+                             ype]);
+                    1479                             ; SOURCE LINE # 381
+039A 7BFF           1480             MOV     R3,#0FFH
+039C 7A00     F     1481             MOV     R2,#HIGH (?SC_147)
+039E 7900     F     1482             MOV     R1,#LOW (?SC_147)
+03A0 E500     F     1483             MOV     A,ErrCntV?040
+03A2 2402           1484             ADD     A,#02H
+03A4 120000   F     1485             LCALL   L?0121
+                    1486     ;                               printf(" .Non ascii digit(s): %u\n", (u16)ErrCntV[ErrNonAsc
+                             Digit]);
+                    1487                             ; SOURCE LINE # 382
+03A7 7A00     F     1488             MOV     R2,#HIGH (?SC_175)
+03A9 7900     F     1489             MOV     R1,#LOW (?SC_175)
+03AB E500     F     1490             MOV     A,ErrCntV?040
+03AD 120000   F     1491             LCALL   L?0111
+                    1492     ;                               printf(" .Error downloaded byte(s): %u\n", (u16)ErrCntV[Err
+                             WrCRam]);
+                    1493                             ; SOURCE LINE # 383
+03B0 7BFF           1494             MOV     R3,#0FFH
+03B2 7A00     F     1495             MOV     R2,#HIGH (?SC_201)
+03B4 7900     F     1496             MOV     R1,#LOW (?SC_201)
+03B6 E500     F     1497             MOV     A,ErrCntV?040
+03B8 2406           1498             ADD     A,#06H
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    25
+
+03BA 120000   F     1499             LCALL   L?0121
+                    1500     ;                               printf(" .Failed checksume(s): %u\n", (u16)ErrCntV[ErrChkSu
+                             me]);
+                    1501                             ; SOURCE LINE # 384
+03BD 7BFF           1502             MOV     R3,#0FFH
+03BF 7A00     F     1503             MOV     R2,#HIGH (?SC_233)
+03C1 7900     F     1504             MOV     R1,#LOW (?SC_233)
+03C3 E500     F     1505             MOV     A,ErrCntV?040
+03C5 2408           1506             ADD     A,#08H
+03C7 F8             1507             MOV     R0,A
+03C8 E6             1508             MOV     A,@R0
+03C9 F500     F     1509             MOV     ?_printf?BYTE+03H,A
+03CB 08             1510             INC     R0
+03CC E6             1511             MOV     A,@R0
+03CD F500     F     1512             MOV     ?_printf?BYTE+04H,A
+03CF 120000   F     1513             LCALL   _printf
+                    1514     ;                               //printf("- Error segment address(s): %u\n", (u16)ErrCntV[E
+                             rrSegment]); 
+                    1515     ;                               state = EXIT_DOWNLOAD;
+                    1516                             ; SOURCE LINE # 386
+03D2 120000   F     1517             LCALL   L?0125
+03D5 7417           1518             MOV     A,#017H
+03D7 F0             1519             MOVX    @DPTR,A
+                    1520     ;                               break;
+                    1521                             ; SOURCE LINE # 387
+                    1522     ;                       default:
+                    1523                             ; SOURCE LINE # 388
+                    1524     ;                               break;
+                    1525                             ; SOURCE LINE # 389
+                    1526     ;               }
+                    1527                             ; SOURCE LINE # 390
+03D8                1528     ?C0009:
+                    1529     ;               if (state==EXIT_DOWNLOAD){
+                    1530                             ; SOURCE LINE # 391
+03D8 900000   F     1531             MOV     DPTR,#state?051
+03DB E0             1532             MOVX    A,@DPTR
+03DC 7004           1533             JNZ     ?C0090
+03DE A3             1534             INC     DPTR
+03DF E0             1535             MOVX    A,@DPTR
+03E0 6417           1536             XRL     A,#017H
+03E2                1537     ?C0090:
+03E2 6003           1538             JZ      $ + 5H
+03E4 020000   F     1539             LJMP    ?C0007
+                    1540     ; 
+                    1541     ;                       break;
+                    1542                             ; SOURCE LINE # 393
+03E7 22             1543             RET     
+                    1544     ;               }
+                    1545                             ; SOURCE LINE # 394
+                    1546     ;       }
+                    1547     ; //    printf("\nparse return\n");
+                    1548     ;       return;
+                    1549     ; }
+                    1550                             ; SOURCE LINE # 398
+03E8                1551     L?0108:
+03E8 7F00     F     1552             MOV     R7,#LOW (HexVal?047)
+03EA 7D00     F     1553             MOV     R5,#LOW (ChkSume?046)
+03EC AB00     F     1554             MOV     R3,ErrCntV?040
+03EE 120000   F     1555             LCALL   _GetAsc2Hex
+03F1 7E00           1556             MOV     R6,#00H
+03F3 900000   F     1557             MOV     DPTR,#Err?050
+03F6 EE             1558             MOV     A,R6
+03F7 F0             1559             MOVX    @DPTR,A
+03F8 A3             1560             INC     DPTR
+03F9 EF             1561             MOV     A,R7
+03FA F0             1562             MOVX    @DPTR,A
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    26
+
+03FB 22             1563             RET     
+03FC                1564     L?0109:
+03FC 7F00     F     1565             MOV     R7,#LOW (HexVal?047)
+03FE 7D00     F     1566             MOV     R5,#LOW (ChkSume?046)
+0400 AB00     F     1567             MOV     R3,ErrCntV?040
+0402 120000   F     1568             LCALL   _GetAsc2Hex
+0405 7E00           1569             MOV     R6,#00H
+0407 900000   F     1570             MOV     DPTR,#Err?050
+040A EE             1571             MOV     A,R6
+040B F0             1572             MOVX    @DPTR,A
+040C A3             1573             INC     DPTR
+040D EF             1574             MOV     A,R7
+040E F0             1575             MOVX    @DPTR,A
+040F 22             1576             RET     
+0410                1577     L?0110:
+0410 7F00     F     1578             MOV     R7,#LOW (HexVal?047)
+0412 7D00     F     1579             MOV     R5,#LOW (ChkSume?046)
+0414 AB00     F     1580             MOV     R3,ErrCntV?040
+0416 120000   F     1581             LCALL   _GetAsc2Hex
+0419 7E00           1582             MOV     R6,#00H
+041B 900000   F     1583             MOV     DPTR,#Err?050
+041E EE             1584             MOV     A,R6
+041F F0             1585             MOVX    @DPTR,A
+0420 A3             1586             INC     DPTR
+0421 EF             1587             MOV     A,R7
+0422 F0             1588             MOVX    @DPTR,A
+0423 22             1589             RET     
+0424                1590     L?0111:
+0424 7BFF           1591             MOV     R3,#0FFH
+0426 2404           1592             ADD     A,#04H
+0428 F8             1593             MOV     R0,A
+0429 E6             1594             MOV     A,@R0
+042A F500     F     1595             MOV     ?_printf?BYTE+03H,A
+042C 08             1596             INC     R0
+042D E6             1597             MOV     A,@R0
+042E F500     F     1598             MOV     ?_printf?BYTE+04H,A
+0430 120000   F     1599             LCALL   _printf
+0433 22             1600             RET     
+0434                1601     L?0116:
+0434 7BFF           1602             MOV     R3,#0FFH
+0436 E6             1603             MOV     A,@R0
+0437 F500     F     1604             MOV     ?_printf?BYTE+03H,A
+0439 08             1605             INC     R0
+043A E6             1606             MOV     A,@R0
+043B F500     F     1607             MOV     ?_printf?BYTE+04H,A
+043D 120000   F     1608             LCALL   _printf
+0440 22             1609             RET     
+0441                1610     L?0120:
+0441 7D00     F     1611             MOV     R5,#LOW (ChkSume?046)
+0443 AB00     F     1612             MOV     R3,ErrCntV?040
+0445 120000   F     1613             LCALL   _GetAsc2Hex
+0448 7E00           1614             MOV     R6,#00H
+044A 900000   F     1615             MOV     DPTR,#Err?050
+044D EE             1616             MOV     A,R6
+044E F0             1617             MOVX    @DPTR,A
+044F A3             1618             INC     DPTR
+0450 EF             1619             MOV     A,R7
+0451 F0             1620             MOVX    @DPTR,A
+0452 22             1621             RET     
+0453                1622     L?0121:
+0453 F8             1623             MOV     R0,A
+0454 E6             1624             MOV     A,@R0
+0455 F500     F     1625             MOV     ?_printf?BYTE+03H,A
+0457 08             1626             INC     R0
+0458 E6             1627             MOV     A,@R0
+0459 F500     F     1628             MOV     ?_printf?BYTE+04H,A
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    27
+
+045B 120000   F     1629             LCALL   _printf
+045E 22             1630             RET     
+                    1631     ; END OF _ParseHexRecord
+                    1632     
+                    1633     ; 
+                    1634     ; //***************************************************************************
+                    1635     ; //u8 GetAsc2Hex (u8 *HexValV, u8 *ChkSumeV, u16 *ProgCntV, u16 *ErrCntV)
+                    1636     ; //    Return: 
+                    1637     ; //            HexVal of 2 ascii digits
+                    1638     ; //            Check Sume of the record
+                    1639     ; //            Progress log: number of bytes, records.. of the hex file parsing
+                    1640     ; //            Error of the process in ErrCntV
+                    1641     ; //
+                    1642     ; //            Error of the function:
+                    1643     ; //                    0: good hex value is read
+                    1644     ; //                    1: Escape char read
+                    1645     ; //                    2: Error extra record beginning found
+                    1646     ; //***************************************************************************
+                    1647     ; 
+                    1648     ; //u8 GetAsc2Hex (u8 idata *HexValV, u8 idata *ChkSumeV, u16 idata *ErrCntV)
+                    1649     ; u8 GetAsc2Hex (u8 idata *HexValV, u8 idata *ChkSumeV, u16 idata *ErrCntV)
+                    1650     
+----                1651             RSEG  ?PR?_GetAsc2Hex?HEX_FILE_HDL
+0000                1652     _GetAsc2Hex:
+                    1653             USING   0
+                    1654                             ; SOURCE LINE # 415
+0000 8F00     F     1655             MOV     HexValV?153,R7
+0002 8D00     F     1656             MOV     ChkSumeV?154,R5
+0004 8B00     F     1657             MOV     ErrCntV?155,R3
+                    1658     ; 
+                    1659     ; {
+                    1660                             ; SOURCE LINE # 417
+                    1661     ;       u8 idata AsciiHex;
+                    1662     ;       u8 idata HexTemp;
+                    1663     ;       u8 idata Error, FirstAscii;
+                    1664     ;       FirstAscii = 0;
+                    1665                             ; SOURCE LINE # 421
+0006 E4             1666             CLR     A
+0007 7800     F     1667             MOV     R0,#LOW (FirstAscii?159)
+0009 F6             1668             MOV     @R0,A
+                    1669     ;       AsciiHex = 0;
+                    1670                             ; SOURCE LINE # 422
+000A 7800     F     1671             MOV     R0,#LOW (AsciiHex?156)
+000C F6             1672             MOV     @R0,A
+000D                1673     ?C0061:
+                    1674     ; #ifdef CPLUSDEBUG
+                    1675     ;       printf ("\n===== GetAsc2Hex\n");
+                    1676     ; #endif
+                    1677     ;       while (1)
+                    1678                             ; SOURCE LINE # 426
+                    1679     ;       {
+                    1680                             ; SOURCE LINE # 427
+                    1681     ;               Error = GetAscii(&AsciiHex, ErrCntV);
+                    1682                             ; SOURCE LINE # 428
+000D 7F00     F     1683             MOV     R7,#LOW (AsciiHex?156)
+000F AD00     F     1684             MOV     R5,ErrCntV?155
+0011 120000   F     1685             LCALL   _GetAscii
+0014 7800     F     1686             MOV     R0,#LOW (Error?158)
+0016 EF             1687             MOV     A,R7
+0017 F6             1688             MOV     @R0,A
+                    1689     ;               switch (Error)
+                    1690                             ; SOURCE LINE # 429
+0018 24FD           1691             ADD     A,#0FDH
+001A 60F1           1692             JZ      ?C0061
+001C 2403           1693             ADD     A,#03H
+001E 7025           1694             JNZ     ?C0069
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    28
+
+                    1695     ;               {
+                    1696                             ; SOURCE LINE # 430
+                    1697     ;               case AscDigitRet:
+                    1698                             ; SOURCE LINE # 431
+0020                1699     ?C0064:
+                    1700     ;                       if (FirstAscii == 0)
+                    1701                             ; SOURCE LINE # 432
+0020 7800     F     1702             MOV     R0,#LOW (FirstAscii?159)
+0022 E6             1703             MOV     A,@R0
+0023 700D           1704             JNZ     ?C0065
+                    1705     ;                       {
+                    1706                             ; SOURCE LINE # 433
+                    1707     ;                               HexTemp = AsciiHex << 4;
+                    1708                             ; SOURCE LINE # 434
+0025 7800     F     1709             MOV     R0,#LOW (AsciiHex?156)
+0027 E6             1710             MOV     A,@R0
+0028 C4             1711             SWAP    A
+0029 54F0           1712             ANL     A,#0F0H
+002B 08             1713             INC     R0
+002C F6             1714             MOV     @R0,A
+                    1715     ;                               FirstAscii++;
+                    1716                             ; SOURCE LINE # 435
+002D 7800     F     1717             MOV     R0,#LOW (FirstAscii?159)
+002F 06             1718             INC     @R0
+                    1719     ;                               break;
+                    1720                             ; SOURCE LINE # 436
+0030 80DB           1721             SJMP    ?C0061
+                    1722     ;                       }
+                    1723                             ; SOURCE LINE # 437
+0032                1724     ?C0065:
+                    1725     ;                       else
+                    1726     ;                       {
+                    1727                             ; SOURCE LINE # 439
+                    1728     ;                               HexTemp |= AsciiHex;
+                    1729                             ; SOURCE LINE # 440
+0032 7800     F     1730             MOV     R0,#LOW (HexTemp?157)
+0034 E6             1731             MOV     A,@R0
+0035 7900     F     1732             MOV     R1,#LOW (AsciiHex?156)
+0037 47             1733             ORL     A,@R1
+0038 F6             1734             MOV     @R0,A
+                    1735     ;                               *HexValV = HexTemp;
+                    1736                             ; SOURCE LINE # 441
+0039 E6             1737             MOV     A,@R0
+003A FF             1738             MOV     R7,A
+003B A800     F     1739             MOV     R0,HexValV?153
+003D F6             1740             MOV     @R0,A
+                    1741     ;                               *ChkSumeV += HexTemp;
+                    1742                             ; SOURCE LINE # 442
+003E A800     F     1743             MOV     R0,ChkSumeV?154
+0040 EF             1744             MOV     A,R7
+0041 26             1745             ADD     A,@R0
+0042 F6             1746             MOV     @R0,A
+                    1747     ;                               #ifdef CPLUSDEBUG
+                    1748     ;                                       printf ("%02X\n", *HexValV);
+                    1749     ;                               #endif
+                    1750     ;                               return Error;  //Exit GetAsc2Hex
+                    1751                             ; SOURCE LINE # 446
+0043 8000           1752             SJMP    ?C0107
+                    1753     ;                       }
+                    1754                             ; SOURCE LINE # 447
+                    1755     ;               case NonAscDigitRet:
+                    1756                             ; SOURCE LINE # 448
+                    1757     ;                       break;  //Non ascii char received, loop to consum all the junk data
+                              
+                    1758                             ; SOURCE LINE # 449
+                    1759     ; 
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    29
+
+                    1760     ;               default: //1: Escape, 2: Error extra record beginning
+                    1761                             ; SOURCE LINE # 451
+0045                1762     ?C0069:
+                    1763     ;                       return Error; //Exit GetAsc2Hex         
+                    1764                             ; SOURCE LINE # 452
+0045                1765     ?C0107:
+0045 7800     F     1766             MOV     R0,#LOW (Error?158)
+0047 E6             1767             MOV     A,@R0
+0048 FF             1768             MOV     R7,A
+                    1769     ;                 }
+                    1770                             ; SOURCE LINE # 453
+                    1771     ;       }
+                    1772                             ; SOURCE LINE # 454
+                    1773     ; }
+                    1774                             ; SOURCE LINE # 455
+0049                1775     ?C0067:
+0049 22             1776             RET     
+                    1777     ; END OF _GetAsc2Hex
+                    1778     
+                    1779     ; //*****************************************************************************
+                    1780     ; //Get an ascii char
+                    1781     ; //Change the argument: Hex value of the asccii digit and Erro counter record
+                    1782     ; //Return error: 
+                    1783     ; //             0 - No error, 2 chars of ascii digit is read (1 byte hex) 
+                    1784     ; //             1 = Escape key is hit
+                    1785     ; //             2 = beginning of line found
+                    1786     ; //             3 = Non ascii digit 
+                    1787     ; //*****************************************************************************
+                    1788     ; 
+                    1789     ; u8 GetAscii(u8 idata *AsciiHexV, u16 idata *ErrCntV)
+                    1790     
+----                1791             RSEG  ?PR?_GetAscii?HEX_FILE_HDL
+0000                1792     _GetAscii:
+                    1793             USING   0
+                    1794                             ; SOURCE LINE # 466
+0000 8F00     F     1795             MOV     AsciiHexV?260,R7
+0002 8D00     F     1796             MOV     ErrCntV?261,R5
+                    1797     ; {
+                    1798                             ; SOURCE LINE # 467
+                    1799     ;       u8 idata ErrGetAscii;
+                    1800     ;       u8 idata c;
+                    1801     ;       *AsciiHexV = 0;
+                    1802                             ; SOURCE LINE # 470
+0004 A807           1803             MOV     R0,AR7
+0006 E4             1804             CLR     A
+0007 F6             1805             MOV     @R0,A
+                    1806     ;       ErrGetAscii = 0;
+                    1807                             ; SOURCE LINE # 471
+0008 7800     F     1808             MOV     R0,#LOW (ErrGetAscii?262)
+000A F6             1809             MOV     @R0,A
+                    1810     ;       c = 0;
+                    1811                             ; SOURCE LINE # 472
+000B 08             1812             INC     R0
+000C F6             1813             MOV     @R0,A
+                    1814     ;       c = _get1char(); //_getkey(); //_getchar();
+                    1815                             ; SOURCE LINE # 473
+000D 120000   F     1816             LCALL   _get1char
+0010 7800     F     1817             MOV     R0,#LOW (c?263)
+0012 A607           1818             MOV     @R0,AR7
+                    1819     ; #ifdef CPLUSDEBUG
+                    1820     ;       printf ("======= GetAscii\n");
+                    1821     ; #endif
+                    1822     ;       switch (c)
+                    1823                             ; SOURCE LINE # 477
+0014 E6             1824             MOV     A,@R0
+0015 FF             1825             MOV     R7,A
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    30
+
+0016 24C6           1826             ADD     A,#0C6H
+0018 600A           1827             JZ      ?C0072
+001A 241F           1828             ADD     A,#01FH
+001C 7015           1829             JNZ     ?C0073
+                    1830     ;       {       
+                    1831                             ; SOURCE LINE # 478
+                    1832     ;       case 27:
+                    1833                             ; SOURCE LINE # 479
+001E                1834     ?C0071:
+                    1835     ;               ErrGetAscii = ExitRet;  //Exit download SR
+                    1836                             ; SOURCE LINE # 480
+001E 7800     F     1837             MOV     R0,#LOW (ErrGetAscii?262)
+0020 7601           1838             MOV     @R0,#01H
+                    1839     ;               break;
+                    1840                             ; SOURCE LINE # 481
+0022 8040           1841             SJMP    ?C0070
+                    1842     ;       case ':':
+                    1843                             ; SOURCE LINE # 482
+0024                1844     ?C0072:
+                    1845     ;               ErrCntV[ErrLineBegin] = ErrCntV[ErrLineBegin] + 1; 
+                    1846                             ; SOURCE LINE # 483
+0024 A800     F     1847             MOV     R0,ErrCntV?261
+0026 08             1848             INC     R0
+0027 06             1849             INC     @R0
+0028 E6             1850             MOV     A,@R0
+0029 18             1851             DEC     R0
+002A 7001           1852             JNZ     ?C0091
+002C 06             1853             INC     @R0
+002D                1854     ?C0091:
+                    1855     ;               ErrGetAscii = ExtraRecordRet;  //Process unexpected line beginning, exit to
+                              read another line
+                    1856                             ; SOURCE LINE # 484
+002D 7800     F     1857             MOV     R0,#LOW (ErrGetAscii?262)
+002F 7602           1858             MOV     @R0,#02H
+                    1859     ;               break;
+                    1860                             ; SOURCE LINE # 485
+0031 8031           1861             SJMP    ?C0070
+                    1862     ;       default:
+                    1863                             ; SOURCE LINE # 486
+0033                1864     ?C0073:
+                    1865     ;               if (isxdigit(c))
+                    1866                             ; SOURCE LINE # 487
+0033 120000   F     1867             LCALL   _isxdigit
+0036 500F           1868             JNC     ?C0074
+                    1869     ;               {
+                    1870                             ; SOURCE LINE # 488
+                    1871     ;                       *AsciiHexV = Asc2Hex(&c);
+                    1872                             ; SOURCE LINE # 489
+0038 7F00     F     1873             MOV     R7,#LOW (c?263)
+003A 120000   F     1874             LCALL   _Asc2Hex
+003D A800     F     1875             MOV     R0,AsciiHexV?260
+003F A607           1876             MOV     @R0,AR7
+                    1877     ;                       ErrGetAscii = AscDigitRet;   //First correct ascii code - hight nip
+                             ple
+                    1878                             ; SOURCE LINE # 490
+0041 E4             1879             CLR     A
+0042 7800     F     1880             MOV     R0,#LOW (ErrGetAscii?262)
+0044 F6             1881             MOV     @R0,A
+                    1882     ;               }
+                    1883                             ; SOURCE LINE # 491
+0045 801D           1884             SJMP    ?C0070
+0047                1885     ?C0074:
+                    1886     ;               else if (c==10)
+                    1887                             ; SOURCE LINE # 492
+0047 7800     F     1888             MOV     R0,#LOW (c?263)
+0049 E6             1889             MOV     A,@R0
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    31
+
+004A B40A05         1890             CJNE    A,#0AH,?C0076
+                    1891     ;                       ErrGetAscii = EnterRet;
+                    1892                             ; SOURCE LINE # 493
+004D 18             1893             DEC     R0
+004E 7604           1894             MOV     @R0,#04H
+0050 8012           1895             SJMP    ?C0070
+0052                1896     ?C0076:
+                    1897     ;               else 
+                    1898     ;               {
+                    1899                             ; SOURCE LINE # 495
+                    1900     ;                       ErrCntV[ErrNonAscDigit] = ErrCntV[ErrNonAscDigit] + 1;
+                    1901                             ; SOURCE LINE # 496
+0052 E500     F     1902             MOV     A,ErrCntV?261
+0054 2405           1903             ADD     A,#05H
+0056 120000   F     1904             LCALL   L?0115
+0059 E500     F     1905             MOV     A,ErrCntV?261
+005B 2404           1906             ADD     A,#04H
+005D 120000   F     1907             LCALL   L?0119
+                    1908     ;                       ErrGetAscii = NonAscDigitRet;  //Non ascii value read
+                    1909                             ; SOURCE LINE # 497
+0060 7800     F     1910             MOV     R0,#LOW (ErrGetAscii?262)
+0062 7603           1911             MOV     @R0,#03H
+                    1912     ;               }
+                    1913                             ; SOURCE LINE # 498
+                    1914     ;               break;
+                    1915                             ; SOURCE LINE # 499
+                    1916     ;       }
+                    1917                             ; SOURCE LINE # 500
+0064                1918     ?C0070:
+                    1919     ;       return ErrGetAscii;
+                    1920                             ; SOURCE LINE # 501
+0064 7800     F     1921             MOV     R0,#LOW (ErrGetAscii?262)
+0066 E6             1922             MOV     A,@R0
+0067 FF             1923             MOV     R7,A
+                    1924     ; }
+                    1925                             ; SOURCE LINE # 502
+0068                1926     ?C0078:
+0068 22             1927             RET     
+                    1928     ; END OF _GetAscii
+                    1929     
+                    1930     ; 
+                    1931     ; //***************************************************************************
+                    1932     ; //_getchar() - for debugging on pc, return a char entered from the keyboard
+                    1933     ; //           - for 80251, return a char received from uart
+                    1934     ; //Check macro: CPLUSSIM
+                    1935     ; //***************************************************************************
+                    1936     ; #if 0
+                    1937     ; #ifdef CPLUSSIM
+                    1938     ; u8 _getchar()
+                    1939     ; {
+                    1940     ; #ifdef CPLUSSIM
+                    1941     ;       u8 c;
+                    1942     ; #ifdef KEYBRD_CONSOLE
+                    1943     ;       printf ("\n*** _getchar : ");
+                    1944     ;       scanf("%c", &c);
+                    1945     ;       fflush(stdin); //To flush the enter key still in the key board buffer when the firs
+                             t char already read
+                    1946     ; #else
+                    1947     ;       if (!feof(datafile))
+                    1948     ;               fscanf(datafile, "%c", &c);
+                    1949     ;       else
+                    1950     ;               fclose(datafile);
+                    1951     ; #endif
+                    1952     ; 
+                    1953     ; #else
+                    1954     ;       u8 idata c;
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    32
+
+                    1955     ;       while (1)
+                    1956     ;       {
+                    1957     ;               if (RI == 1)
+                    1958     ;               {
+                    1959     ;                       RI = 0;
+                    1960     ;                       c = SBUF;
+                    1961     ;               }
+                    1962     ;       }
+                    1963     ; #endif
+                    1964     ; 
+                    1965     ;       return c;
+                    1966     ; }
+                    1967     ; #endif //CPLUSSIM
+                    1968     ; #endif
+                    1969     ; //***************************************************************
+                    1970     ; //Asc2Hex(u8) 
+                    1971     ; //           Input: an ascii hex digit
+                    1972     ; //           ouput: the hex value of the input
+                    1973     ; //***************************************************************
+                    1974     ; u8 Asc2Hex (u8 idata *AscDigit)
+                    1975     
+----                1976             RSEG  ?PR?_Asc2Hex?HEX_FILE_HDL
+0000                1977     _Asc2Hex:
+                    1978             USING   0
+                    1979                             ; SOURCE LINE # 547
+                    1980     ;---- Variable 'AscDigit?364' assigned to Register 'R0' ----
+0000 A807           1981             MOV     R0,AR7
+                    1982     ; {
+                    1983                             ; SOURCE LINE # 548
+                    1984     ;       u8 idata c;
+                    1985     ;       c = toupper(*AscDigit);
+                    1986                             ; SOURCE LINE # 550
+0002 E6             1987             MOV     A,@R0
+0003 FF             1988             MOV     R7,A
+0004 120000   F     1989             LCALL   _toupper
+0007 7800     F     1990             MOV     R0,#LOW (c?365)
+0009 EF             1991             MOV     A,R7
+000A F6             1992             MOV     @R0,A
+                    1993     ;       if (c <= 57)
+                    1994                             ; SOURCE LINE # 551
+000B D3             1995             SETB    C
+000C 9439           1996             SUBB    A,#039H
+000E 5006           1997             JNC     ?C0079
+                    1998     ;               c = c - 48; //ascii hex digit 0-9 
+                    1999                             ; SOURCE LINE # 552
+0010 74D0           2000             MOV     A,#0D0H
+0012 26             2001             ADD     A,@R0
+0013 F6             2002             MOV     @R0,A
+0014 8006           2003             SJMP    ?C0080
+0016                2004     ?C0079:
+                    2005     ;       else
+                    2006     ;               c = c - 55; //ascii hex digit A-F
+                    2007                             ; SOURCE LINE # 554
+0016 7800     F     2008             MOV     R0,#LOW (c?365)
+0018 74C9           2009             MOV     A,#0C9H
+001A 26             2010             ADD     A,@R0
+001B F6             2011             MOV     @R0,A
+001C                2012     ?C0080:
+                    2013     ;       return c;
+                    2014                             ; SOURCE LINE # 555
+001C 7800     F     2015             MOV     R0,#LOW (c?365)
+001E E6             2016             MOV     A,@R0
+001F FF             2017             MOV     R7,A
+                    2018     ; }
+                    2019                             ; SOURCE LINE # 556
+0020                2020     ?C0081:
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    33
+
+0020 22             2021             RET     
+                    2022     ; END OF _Asc2Hex
+                    2023     
+                    2024     ; //***************************************************************
+                    2025     ; //Write 1 byte of data into code ram
+                    2026     ; //u8 Wr2CRam(u8 *HexValV, u8 *CRamAddr)
+                    2027     ; //           Input: an ascii hex digit
+                    2028     ; //           Input: code ram address
+                    2029     ; //           output: return value = 1 <=> error
+                    2030     ; //                   return value = 0 <=> good
+                    2031     ; //**************************************************************
+                    2032     ; #ifdef CPLUSSIM
+                    2033     ; u8 Wr2CRam(u8 *HexValV, u8 *CRamAddr)
+                    2034     ; #else
+                    2035     ; u8 Wr2CRam(u8 idata *HexValV, u8 xdata * CRamAddr)
+                    2036     
+----                2037             RSEG  ?PR?_Wr2CRam?HEX_FILE_HDL
+0000                2038     _Wr2CRam:
+                    2039             USING   0
+                    2040                             ; SOURCE LINE # 568
+                    2041     ;---- Variable 'CRamAddr?467' assigned to Register 'DPTR' ----
+0000 8D82           2042             MOV     DPL,R5
+0002 8C83           2043             MOV     DPH,R4
+                    2044     ;---- Variable 'HexValV?466' assigned to Register 'R7' ----
+                    2045     ; #endif
+                    2046     ; {
+                    2047                             ; SOURCE LINE # 570
+                    2048     ; #ifdef CPLUSSIM
+                    2049     ; #ifdef CPLUSDEBUG
+                    2050     ;       printf("CRamAddr = %08X\n", CRamAddr);
+                    2051     ; #endif
+                    2052     ;       u8 temp;
+                    2053     ;       u8 CRamAddr_t;
+                    2054     ;       CRamAddr_t = *HexValV;
+                    2055     ;       temp = CRamAddr_t;
+                    2056     ;       printf("%02X",temp);
+                    2057     ;       if (temp != *HexValV)
+                    2058     ;               return 1;
+                    2059     ;       else
+                    2060     ;               return 0;
+                    2061     ; #else
+                    2062     ;       if(CRamAddr >= 0xA000)
+                    2063                             ; SOURCE LINE # 585
+0004 C3             2064             CLR     C
+0005 EC             2065             MOV     A,R4
+0006 94A0           2066             SUBB    A,#0A0H
+0008 400B           2067             JC      ?C0082
+                    2068     ;               CRamAddr = CRamAddr - 0x7F00;   
+                    2069                             ; SOURCE LINE # 586
+000A E4             2070             CLR     A
+000B 2582           2071             ADD     A,DPL
+000D F582           2072             MOV     DPL,A
+000F 7481           2073             MOV     A,#081H
+0011 3583           2074             ADDC    A,DPH
+0013 F583           2075             MOV     DPH,A
+0015                2076     ?C0082:
+                    2077     ; 
+                    2078     ;       *CRamAddr = *HexValV;
+                    2079                             ; SOURCE LINE # 588
+0015 A807           2080             MOV     R0,AR7
+0017 E6             2081             MOV     A,@R0
+0018 F0             2082             MOVX    @DPTR,A
+                    2083     ;       if (*CRamAddr!=*HexValV){
+                    2084                             ; SOURCE LINE # 589
+0019 E0             2085             MOVX    A,@DPTR
+001A 66             2086             XRL     A,@R0
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    34
+
+001B 6003           2087             JZ      ?C0083
+                    2088     ;               return 1;
+                    2089                             ; SOURCE LINE # 590
+001D 7F01           2090             MOV     R7,#01H
+001F 22             2091             RET     
+                    2092     ;       }
+                    2093                             ; SOURCE LINE # 591
+0020                2094     ?C0083:
+                    2095     ;       else{
+                    2096                             ; SOURCE LINE # 592
+                    2097     ;               return 0;
+                    2098                             ; SOURCE LINE # 593
+0020 7F00           2099             MOV     R7,#00H
+                    2100     ;       }
+                    2101                             ; SOURCE LINE # 594
+                    2102     ; #endif
+                    2103     ; }
+                    2104                             ; SOURCE LINE # 596
+0022                2105     ?C0084:
+0022 22             2106             RET     
+                    2107     ; END OF _Wr2CRam
+                    2108     
+                    2109             END
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    35
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E                           T Y P E  V A L U E   ATTRIBUTES
+
+?C0001 . . . . . . . . . . . . .  C ADDR   001FH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0002 . . . . . . . . . . . . .  C ADDR   0033H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0004 . . . . . . . . . . . . .  C ADDR   0037H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0005 . . . . . . . . . . . . .  C ADDR   004BH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0007 . . . . . . . . . . . . .  C ADDR   0054H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0009 . . . . . . . . . . . . .  C ADDR   03D8H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0010 . . . . . . . . . . . . .  C ADDR   0091H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0011 . . . . . . . . . . . . .  C ADDR   009FH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0013 . . . . . . . . . . . . .  C ADDR   00BEH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0016 . . . . . . . . . . . . .  C ADDR   00E2H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0017 . . . . . . . . . . . . .  C ADDR   00F6H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0019 . . . . . . . . . . . . .  C ADDR   00F9H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0020 . . . . . . . . . . . . .  C ADDR   010CH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0021 . . . . . . . . . . . . .  C ADDR   0113H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0022 . . . . . . . . . . . . .  C ADDR   0145H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0023 . . . . . . . . . . . . .  C ADDR   0150H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0025 . . . . . . . . . . . . .  C ADDR   015CH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0027 . . . . . . . . . . . . .  C ADDR   0170H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0028 . . . . . . . . . . . . .  C ADDR   019DH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0029 . . . . . . . . . . . . .  C ADDR   01E7H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0030 . . . . . . . . . . . . .  C ADDR   01D3H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0031 . . . . . . . . . . . . .  C ADDR   01FEH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0033 . . . . . . . . . . . . .  C ADDR   020CH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0034 . . . . . . . . . . . . .  C ADDR   021CH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0035 . . . . . . . . . . . . .  C ADDR   0223H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0036 . . . . . . . . . . . . .  C ADDR   0225H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0037 . . . . . . . . . . . . .  C ADDR   022EH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0038 . . . . . . . . . . . . .  C ADDR   0267H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0039 . . . . . . . . . . . . .  C ADDR   025AH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0040 . . . . . . . . . . . . .  C ADDR   0260H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0042 . . . . . . . . . . . . .  C ADDR   02F0H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0043 . . . . . . . . . . . . .  C ADDR   02B2H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0044 . . . . . . . . . . . . .  C ADDR   02C7H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0047 . . . . . . . . . . . . .  C ADDR   02FCH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0048 . . . . . . . . . . . . .  C ADDR   0317H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0049 . . . . . . . . . . . . .  C ADDR   0321H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0050 . . . . . . . . . . . . .  C ADDR   0327H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0051 . . . . . . . . . . . . .  C ADDR   033DH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0053 . . . . . . . . . . . . .  C ADDR   0348H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0056 . . . . . . . . . . . . .  C ADDR   035EH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0057 . . . . . . . . . . . . .  C ADDR   0376H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0061 . . . . . . . . . . . . .  C ADDR   000DH   R   SEG=?PR?_GETASC2HEX?HEX_FILE_HDL
+?C0064 . . . . . . . . . . . . .  C ADDR   0020H   R   SEG=?PR?_GETASC2HEX?HEX_FILE_HDL
+?C0065 . . . . . . . . . . . . .  C ADDR   0032H   R   SEG=?PR?_GETASC2HEX?HEX_FILE_HDL
+?C0067 . . . . . . . . . . . . .  C ADDR   0049H   R   SEG=?PR?_GETASC2HEX?HEX_FILE_HDL
+?C0069 . . . . . . . . . . . . .  C ADDR   0045H   R   SEG=?PR?_GETASC2HEX?HEX_FILE_HDL
+?C0070 . . . . . . . . . . . . .  C ADDR   0064H   R   SEG=?PR?_GETASCII?HEX_FILE_HDL
+?C0071 . . . . . . . . . . . . .  C ADDR   001EH   R   SEG=?PR?_GETASCII?HEX_FILE_HDL
+?C0072 . . . . . . . . . . . . .  C ADDR   0024H   R   SEG=?PR?_GETASCII?HEX_FILE_HDL
+?C0073 . . . . . . . . . . . . .  C ADDR   0033H   R   SEG=?PR?_GETASCII?HEX_FILE_HDL
+?C0074 . . . . . . . . . . . . .  C ADDR   0047H   R   SEG=?PR?_GETASCII?HEX_FILE_HDL
+?C0076 . . . . . . . . . . . . .  C ADDR   0052H   R   SEG=?PR?_GETASCII?HEX_FILE_HDL
+?C0078 . . . . . . . . . . . . .  C ADDR   0068H   R   SEG=?PR?_GETASCII?HEX_FILE_HDL
+?C0079 . . . . . . . . . . . . .  C ADDR   0016H   R   SEG=?PR?_ASC2HEX?HEX_FILE_HDL
+?C0080 . . . . . . . . . . . . .  C ADDR   001CH   R   SEG=?PR?_ASC2HEX?HEX_FILE_HDL
+?C0081 . . . . . . . . . . . . .  C ADDR   0020H   R   SEG=?PR?_ASC2HEX?HEX_FILE_HDL
+?C0082 . . . . . . . . . . . . .  C ADDR   0015H   R   SEG=?PR?_WR2CRAM?HEX_FILE_HDL
+?C0083 . . . . . . . . . . . . .  C ADDR   0020H   R   SEG=?PR?_WR2CRAM?HEX_FILE_HDL
+?C0084 . . . . . . . . . . . . .  C ADDR   0022H   R   SEG=?PR?_WR2CRAM?HEX_FILE_HDL
+?C0086 . . . . . . . . . . . . .  C ADDR   00BBH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    36
+
+?C0087 . . . . . . . . . . . . .  C ADDR   01B4H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0088 . . . . . . . . . . . . .  C ADDR   0236H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0089 . . . . . . . . . . . . .  C ADDR   02CFH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0090 . . . . . . . . . . . . .  C ADDR   03E2H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0091 . . . . . . . . . . . . .  C ADDR   002DH   R   SEG=?PR?_GETASCII?HEX_FILE_HDL
+?C0092 . . . . . . . . . . . . .  C ADDR   021CH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0093 . . . . . . . . . . . . .  C ADDR   02F0H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0094 . . . . . . . . . . . . .  C ADDR   0111H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0095 . . . . . . . . . . . . .  C ADDR   014CH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0096 . . . . . . . . . . . . .  C ADDR   02F3H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0097 . . . . . . . . . . . . .  C ADDR   0223H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0098 . . . . . . . . . . . . .  C ADDR   0315H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0099 . . . . . . . . . . . . .  C ADDR   01FBH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0100 . . . . . . . . . . . . .  C ADDR   02E8H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0101 . . . . . . . . . . . . .  C ADDR   0335H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0102 . . . . . . . . . . . . .  C ADDR   0225H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0103 . . . . . . . . . . . . .  C ADDR   0357H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0104 . . . . . . . . . . . . .  C ADDR   0325H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0105 . . . . . . . . . . . . .  C ADDR   0346H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0106 . . . . . . . . . . . . .  C ADDR   0370H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+?C0107 . . . . . . . . . . . . .  C ADDR   0045H   R   SEG=?PR?_GETASC2HEX?HEX_FILE_HDL
+?C?CCASE . . . . . . . . . . . .  C ADDR   -----       EXT
+?C?IILDX . . . . . . . . . . . .  C ADDR   -----       EXT
+?C?LOR . . . . . . . . . . . . .  C ADDR   -----       EXT
+?CO?HEX_FILE_HDL . . . . . . . .  C SEG    0104H       REL=UNIT
+?DT?_GETASC2HEX?HEX_FILE_HDL . .  D SEG    0003H       REL=UNIT
+?DT?_GETASCII?HEX_FILE_HDL . . .  D SEG    0002H       REL=UNIT
+?DT?_PARSEHEXRECORD?HEX_FILE_HDL  D SEG    0002H       REL=UNIT
+?ID?_ASC2HEX?HEX_FILE_HDL. . . .  I SEG    0001H       REL=UNIT
+?ID?_GETASC2HEX?HEX_FILE_HDL . .  I SEG    0004H       REL=UNIT
+?ID?_GETASCII?HEX_FILE_HDL . . .  I SEG    0002H       REL=UNIT
+?ID?_PARSEHEXRECORD?HEX_FILE_HDL  I SEG    0008H       REL=UNIT
+?PR?HEX_FILE_HDL . . . . . . . .  C SEG    003FH       REL=UNIT
+?PR?_ASC2HEX?HEX_FILE_HDL. . . .  C SEG    0021H       REL=UNIT
+?PR?_GETASC2HEX?HEX_FILE_HDL . .  C SEG    004AH       REL=UNIT
+?PR?_GETASCII?HEX_FILE_HDL . . .  C SEG    0069H       REL=UNIT
+?PR?_PARSEHEXRECORD?HEX_FILE_HDL  C SEG    045FH       REL=UNIT
+?PR?_WR2CRAM?HEX_FILE_HDL. . . .  C SEG    0023H       REL=UNIT
+?SC_0. . . . . . . . . . . . . .  C ADDR   0000H   R   SEG=?CO?HEX_FILE_HDL
+?SC_105. . . . . . . . . . . . .  C ADDR   0069H   R   SEG=?CO?HEX_FILE_HDL
+?SC_126. . . . . . . . . . . . .  C ADDR   007EH   R   SEG=?CO?HEX_FILE_HDL
+?SC_147. . . . . . . . . . . . .  C ADDR   0093H   R   SEG=?CO?HEX_FILE_HDL
+?SC_175. . . . . . . . . . . . .  C ADDR   00AFH   R   SEG=?CO?HEX_FILE_HDL
+?SC_201. . . . . . . . . . . . .  C ADDR   00C9H   R   SEG=?CO?HEX_FILE_HDL
+?SC_233. . . . . . . . . . . . .  C ADDR   00E9H   R   SEG=?CO?HEX_FILE_HDL
+?SC_35 . . . . . . . . . . . . .  C ADDR   0023H   R   SEG=?CO?HEX_FILE_HDL
+?SC_37 . . . . . . . . . . . . .  C ADDR   0025H   R   SEG=?CO?HEX_FILE_HDL
+?SC_66 . . . . . . . . . . . . .  C ADDR   0042H   R   SEG=?CO?HEX_FILE_HDL
+?XD?_PARSEHEXRECORD?HEX_FILE_HDL  X SEG    0009H       REL=UNIT
+?_GETASC2HEX?BYTE. . . . . . . .  D ADDR   0000H   R   SEG=?DT?_GETASC2HEX?HEX_FILE_HDL
+?_GETASCII?BYTE. . . . . . . . .  D ADDR   0000H   R   SEG=?DT?_GETASCII?HEX_FILE_HDL
+?_PARSEHEXRECORD?BYTE. . . . . .  D ADDR   0000H   R   SEG=?DT?_PARSEHEXRECORD?HEX_FILE_HDL
+?_PRINTF?BYTE. . . . . . . . . .  D ADDR   -----       EXT
+AC . . . . . . . . . . . . . . .  B ADDR   00D0H.6 A   
+ACC. . . . . . . . . . . . . . .  D ADDR   00E0H   A   
+AR0. . . . . . . . . . . . . . .  D ADDR   0000H   A   
+AR4. . . . . . . . . . . . . . .  D ADDR   0004H   A   
+AR5. . . . . . . . . . . . . . .  D ADDR   0005H   A   
+AR6. . . . . . . . . . . . . . .  D ADDR   0006H   A   
+AR7. . . . . . . . . . . . . . .  D ADDR   0007H   A   
+ASCIIHEX?156 . . . . . . . . . .  I ADDR   0000H   R   SEG=?ID?_GETASC2HEX?HEX_FILE_HDL
+ASCIIHEXV?260. . . . . . . . . .  D ADDR   0000H   R   SEG=?DT?_GETASCII?HEX_FILE_HDL
+B. . . . . . . . . . . . . . . .  D ADDR   00F0H   A   
+BANKSEL. . . . . . . . . . . . .  D ADDR   009FH   A   
+C?044. . . . . . . . . . . . . .  X ADDR   0004H   R   SEG=?XD?_PARSEHEXRECORD?HEX_FILE_HDL
+C?263. . . . . . . . . . . . . .  I ADDR   0001H   R   SEG=?ID?_GETASCII?HEX_FILE_HDL
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    37
+
+C?365. . . . . . . . . . . . . .  I ADDR   0000H   R   SEG=?ID?_ASC2HEX?HEX_FILE_HDL
+CHKSUME?046. . . . . . . . . . .  I ADDR   0002H   R   SEG=?ID?_PARSEHEXRECORD?HEX_FILE_HDL
+CHKSUMEV?154 . . . . . . . . . .  D ADDR   0001H   R   SEG=?DT?_GETASC2HEX?HEX_FILE_HDL
+COM0070. . . . . . . . . . . . .  C ADDR   0000H   R   SEG=?PR?HEX_FILE_HDL
+CRAMADDR?052 . . . . . . . . . .  I ADDR   0006H   R   SEG=?ID?_PARSEHEXRECORD?HEX_FILE_HDL
+CRLA_H . . . . . . . . . . . . .  D ADDR   00F4H   A   
+CRLA_L . . . . . . . . . . . . .  D ADDR   00F3H   A   
+CRSA_H . . . . . . . . . . . . .  D ADDR   00F2H   A   
+CRSA_L . . . . . . . . . . . . .  D ADDR   00F1H   A   
+CY . . . . . . . . . . . . . . .  B ADDR   00D0H.7 A   
+DPH. . . . . . . . . . . . . . .  D ADDR   0083H   A   
+DPL. . . . . . . . . . . . . . .  D ADDR   0082H   A   
+EA . . . . . . . . . . . . . . .  B ADDR   00A8H.7 A   
+ERR?050. . . . . . . . . . . . .  X ADDR   0005H   R   SEG=?XD?_PARSEHEXRECORD?HEX_FILE_HDL
+ERRCNTV?040. . . . . . . . . . .  D ADDR   0000H   R   SEG=?DT?_PARSEHEXRECORD?HEX_FILE_HDL
+ERRCNTV?155. . . . . . . . . . .  D ADDR   0002H   R   SEG=?DT?_GETASC2HEX?HEX_FILE_HDL
+ERRCNTV?261. . . . . . . . . . .  D ADDR   0001H   R   SEG=?DT?_GETASCII?HEX_FILE_HDL
+ERRGETASCII?262. . . . . . . . .  I ADDR   0000H   R   SEG=?ID?_GETASCII?HEX_FILE_HDL
+ERROR?158. . . . . . . . . . . .  I ADDR   0002H   R   SEG=?ID?_GETASC2HEX?HEX_FILE_HDL
+ES . . . . . . . . . . . . . . .  B ADDR   00A8H.4 A   
+ET0. . . . . . . . . . . . . . .  B ADDR   00A8H.1 A   
+ET1. . . . . . . . . . . . . . .  B ADDR   00A8H.3 A   
+EX0. . . . . . . . . . . . . . .  B ADDR   00A8H.0 A   
+EX1. . . . . . . . . . . . . . .  B ADDR   00A8H.2 A   
+F0 . . . . . . . . . . . . . . .  B ADDR   00D0H.5 A   
+FIRSTASCII?159 . . . . . . . . .  I ADDR   0003H   R   SEG=?ID?_GETASC2HEX?HEX_FILE_HDL
+HEXTEMP?157. . . . . . . . . . .  I ADDR   0001H   R   SEG=?ID?_GETASC2HEX?HEX_FILE_HDL
+HEXVAL?047 . . . . . . . . . . .  I ADDR   0003H   R   SEG=?ID?_PARSEHEXRECORD?HEX_FILE_HDL
+HEXVALV?153. . . . . . . . . . .  D ADDR   0000H   R   SEG=?DT?_GETASC2HEX?HEX_FILE_HDL
+HEX_FILE_HDL . . . . . . . . . .  N NUMB   -----       
+I?042. . . . . . . . . . . . . .  X ADDR   0000H   R   SEG=?XD?_PARSEHEXRECORD?HEX_FILE_HDL
+IE . . . . . . . . . . . . . . .  D ADDR   00A8H   A   
+IE0. . . . . . . . . . . . . . .  B ADDR   0088H.1 A   
+IE1. . . . . . . . . . . . . . .  B ADDR   0088H.3 A   
+INT0 . . . . . . . . . . . . . .  B ADDR   00B0H.2 A   
+INT1 . . . . . . . . . . . . . .  B ADDR   00B0H.3 A   
+IP . . . . . . . . . . . . . . .  D ADDR   00B8H   A   
+IT0. . . . . . . . . . . . . . .  B ADDR   0088H.0 A   
+IT1. . . . . . . . . . . . . . .  B ADDR   0088H.2 A   
+L?0108 . . . . . . . . . . . . .  C ADDR   03E8H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+L?0109 . . . . . . . . . . . . .  C ADDR   03FCH   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+L?0110 . . . . . . . . . . . . .  C ADDR   0410H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+L?0111 . . . . . . . . . . . . .  C ADDR   0424H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+L?0113 . . . . . . . . . . . . .  C ADDR   0000H   R   SEG=?PR?HEX_FILE_HDL
+L?0114 . . . . . . . . . . . . .  C ADDR   0002H   R   SEG=?PR?HEX_FILE_HDL
+L?0115 . . . . . . . . . . . . .  C ADDR   0004H   R   SEG=?PR?HEX_FILE_HDL
+L?0116 . . . . . . . . . . . . .  C ADDR   0434H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+L?0117 . . . . . . . . . . . . .  C ADDR   000EH   R   SEG=?PR?HEX_FILE_HDL
+L?0118 . . . . . . . . . . . . .  C ADDR   0010H   R   SEG=?PR?HEX_FILE_HDL
+L?0119 . . . . . . . . . . . . .  C ADDR   0012H   R   SEG=?PR?HEX_FILE_HDL
+L?0120 . . . . . . . . . . . . .  C ADDR   0441H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+L?0121 . . . . . . . . . . . . .  C ADDR   0453H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+L?0122 . . . . . . . . . . . . .  C ADDR   0019H   R   SEG=?PR?HEX_FILE_HDL
+L?0123 . . . . . . . . . . . . .  C ADDR   0021H   R   SEG=?PR?HEX_FILE_HDL
+L?0124 . . . . . . . . . . . . .  C ADDR   0027H   R   SEG=?PR?HEX_FILE_HDL
+L?0125 . . . . . . . . . . . . .  C ADDR   0027H   R   SEG=?PR?HEX_FILE_HDL
+L?0126 . . . . . . . . . . . . .  C ADDR   002EH   R   SEG=?PR?HEX_FILE_HDL
+L?0127 . . . . . . . . . . . . .  C ADDR   002EH   R   SEG=?PR?HEX_FILE_HDL
+L?0128 . . . . . . . . . . . . .  C ADDR   0035H   R   SEG=?PR?HEX_FILE_HDL
+MEMCTRL. . . . . . . . . . . . .  D ADDR   00F8H   A   
+N?043. . . . . . . . . . . . . .  X ADDR   0002H   R   SEG=?XD?_PARSEHEXRECORD?HEX_FILE_HDL
+OV . . . . . . . . . . . . . . .  B ADDR   00D0H.2 A   
+P. . . . . . . . . . . . . . . .  B ADDR   00D0H.0 A   
+P0 . . . . . . . . . . . . . . .  D ADDR   0080H   A   
+P1 . . . . . . . . . . . . . . .  D ADDR   0090H   A   
+P2 . . . . . . . . . . . . . . .  D ADDR   00A0H   A   
+A51 MACRO ASSEMBLER  HEX_FILE_HDL                                                         08/17/2016 10:02:50 PAGE    38
+
+P3 . . . . . . . . . . . . . . .  D ADDR   00B0H   A   
+PCON . . . . . . . . . . . . . .  D ADDR   0087H   A   
+PROGCNTV?041 . . . . . . . . . .  D ADDR   0001H   R   SEG=?DT?_PARSEHEXRECORD?HEX_FILE_HDL
+PS . . . . . . . . . . . . . . .  B ADDR   00B8H.4 A   
+PSW. . . . . . . . . . . . . . .  D ADDR   00D0H   A   
+PT0. . . . . . . . . . . . . . .  B ADDR   00B8H.1 A   
+PT1. . . . . . . . . . . . . . .  B ADDR   00B8H.3 A   
+PX0. . . . . . . . . . . . . . .  B ADDR   00B8H.0 A   
+PX1. . . . . . . . . . . . . . .  B ADDR   00B8H.2 A   
+RB8. . . . . . . . . . . . . . .  B ADDR   0098H.2 A   
+RD . . . . . . . . . . . . . . .  B ADDR   00B0H.7 A   
+RECLEN?048 . . . . . . . . . . .  I ADDR   0004H   R   SEG=?ID?_PARSEHEXRECORD?HEX_FILE_HDL
+RECTYPE?049. . . . . . . . . . .  I ADDR   0005H   R   SEG=?ID?_PARSEHEXRECORD?HEX_FILE_HDL
+REN. . . . . . . . . . . . . . .  B ADDR   0098H.4 A   
+RI . . . . . . . . . . . . . . .  B ADDR   0098H.0 A   
+RS0. . . . . . . . . . . . . . .  B ADDR   00D0H.3 A   
+RS1. . . . . . . . . . . . . . .  B ADDR   00D0H.4 A   
+RXD. . . . . . . . . . . . . . .  B ADDR   00B0H.0 A   
+SBUF . . . . . . . . . . . . . .  D ADDR   0099H   A   
+SCON . . . . . . . . . . . . . .  D ADDR   0098H   A   
+SM0. . . . . . . . . . . . . . .  B ADDR   0098H.7 A   
+SM1. . . . . . . . . . . . . . .  B ADDR   0098H.6 A   
+SM2. . . . . . . . . . . . . . .  B ADDR   0098H.5 A   
+SP . . . . . . . . . . . . . . .  D ADDR   0081H   A   
+STATE?051. . . . . . . . . . . .  X ADDR   0007H   R   SEG=?XD?_PARSEHEXRECORD?HEX_FILE_HDL
+T0 . . . . . . . . . . . . . . .  B ADDR   00B0H.4 A   
+T1 . . . . . . . . . . . . . . .  B ADDR   00B0H.5 A   
+TB8. . . . . . . . . . . . . . .  B ADDR   0098H.3 A   
+TCON . . . . . . . . . . . . . .  D ADDR   0088H   A   
+TEMP?045 . . . . . . . . . . . .  I ADDR   0000H   R   SEG=?ID?_PARSEHEXRECORD?HEX_FILE_HDL
+TF0. . . . . . . . . . . . . . .  B ADDR   0088H.5 A   
+TF1. . . . . . . . . . . . . . .  B ADDR   0088H.7 A   
+TH0. . . . . . . . . . . . . . .  D ADDR   008CH   A   
+TH1. . . . . . . . . . . . . . .  D ADDR   008DH   A   
+TI . . . . . . . . . . . . . . .  B ADDR   0098H.1 A   
+TL0. . . . . . . . . . . . . . .  D ADDR   008AH   A   
+TL1. . . . . . . . . . . . . . .  D ADDR   008BH   A   
+TMOD . . . . . . . . . . . . . .  D ADDR   0089H   A   
+TR0. . . . . . . . . . . . . . .  B ADDR   0088H.4 A   
+TR1. . . . . . . . . . . . . . .  B ADDR   0088H.6 A   
+TXD. . . . . . . . . . . . . . .  B ADDR   00B0H.1 A   
+UART2ERAMADDR. . . . . . . . . .  X ADDR   -----       EXT
+WR . . . . . . . . . . . . . . .  B ADDR   00B0H.6 A   
+_ASC2HEX . . . . . . . . . . . .  C ADDR   0000H   R   SEG=?PR?_ASC2HEX?HEX_FILE_HDL
+_GET1CHAR. . . . . . . . . . . .  C ADDR   -----       EXT
+_GETASC2HEX. . . . . . . . . . .  C ADDR   0000H   R   SEG=?PR?_GETASC2HEX?HEX_FILE_HDL
+_GETASCII. . . . . . . . . . . .  C ADDR   0000H   R   SEG=?PR?_GETASCII?HEX_FILE_HDL
+_ISXDIGIT. . . . . . . . . . . .  C ADDR   -----       EXT
+_PARSEHEXRECORD. . . . . . . . .  C ADDR   0000H   R   SEG=?PR?_PARSEHEXRECORD?HEX_FILE_HDL
+_PRINTF. . . . . . . . . . . . .  C ADDR   -----       EXT
+_TOUPPER . . . . . . . . . . . .  C ADDR   -----       EXT
+_WR2CRAM . . . . . . . . . . . .  C ADDR   0000H   R   SEG=?PR?_WR2CRAM?HEX_FILE_HDL
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

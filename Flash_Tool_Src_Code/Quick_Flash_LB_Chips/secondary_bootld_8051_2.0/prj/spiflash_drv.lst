@@ -1,0 +1,1719 @@
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE SPIFLASH_DRV
+OBJECT MODULE PLACED IN .\spiflash_drv.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\src\spiflash_drv.c OPTIMIZE(9,SIZE) BROWSE INCDIR(..\src;C:\Keil\C51\
+                    -INC;..\src) DEBUG OBJECTEXTEND CODE PRINT(.\spiflash_drv.lst) TABS(2) PREPRINT(.\spiflash_drv.i) OBJECT(.\spiflash_drv.o
+                    -bj)
+
+line level    source
+
+   1          /*
+   2          * Description : 8051 bootloader spiflash driver functions
+   3          *
+   4          * Copyright (c) 2011-2012 Greenvity Communications, Inc.
+   5          * All rights reserved.
+   6          *
+   7          * Author      : Peter Nguyen
+   8          * Release Date: 04/27/2013
+   9          * Purpose :
+  10          *     spiflash driver functions for the bootloader
+  11          *
+  12          * File: spiflash_drv.c
+  13          */
+  14          #include "test.h"
+  15          
+  16          #include <typedef.h>
+  17          #include <stdio.h>
+  18          #include <reg51.h>
+  19          #include <macro_def.h>
+  20          #include "spiflash.h"
+  21          
+  22          #define SPIFL_TXSTAT    0x0300
+  23          #define SPIFL_CFG       0x0304
+  24          #define SPIFL_MSBDATABIT_FIRST 0x0305
+  25          #define SPIFL_NOBYTE2TX 0x0306
+  26          #define SPIFL_TXCTRL    0x0308
+  27          #define SPIFL_WRDATA    0x030C
+  28          #define SPIFL_RDDATA  0x030C
+  29          #define SPIFL_WRDATA0   0x030F  //Command/opcode  - Sent first. 
+  30          #define SPIFL_WRDATA1   0x030E  //Address MS byte
+  31          #define SPIFL_WRDATA2   0x030D  //Address 2nd byte
+  32          #define SPIFL_WRDATA3   0x030C  //Address LS byte  - Compiler is big endian, so if sent more than 2 bytes, 
+             -sw has to swap byte orders before write 
+  33          #define SPIFL_WRDATA4   0x0307  //Data written to sflash  - Sent last
+  34          
+  35          #define SPIFL_RD         0x03  //Read 1 byte
+  36          #define SPIFL_SECERASE   0x20000000  //Sector erase
+  37          #define SPIFL_BLKERASE   0x52000000
+  38          #define SPIFL_BLK64ERASE 0xD8000000
+  39          #ifdef ONEBYTE_COMMAND_ERASE
+              #define SPIFL_CHIPERASE  0x60000000 //Chip erase
+              #define SPIFL_CHIPERASE1 0xC7000000
+              #else
+  43          #define SPIFL_CHIPERASE  0x60     //Chip erase
+  44          #define SPIFL_CHIPERASE1 0xC7
+  45          #endif
+  46          #define SPIFL_BYTEPRGRM  0x02000000 //Program 1 byte
+  47          #define SPIFL_BYTEREAD   0x03000000 //Read 1 bytes
+  48          #define SPIFL_AAI        0xAF //Auto address increment 
+  49          #define SPIFL_RDSR       0x05 //Read status register
+  50          #define SPIFL_EWSR_B     0x50 //Enable write status register
+  51          #define SPIFL_EWSR       0x50000000 //Enable write status register
+  52          #define SPIFL_WRSR_B   0x01 //Write status register
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 2   
+
+  53          #define SPIFL_WRSR       0x00010000 //Write status register
+  54          #define SPIFL_WREN_B     0x06 //Enable write data byte - this is mainly enable to latch the address, so any
+             - command with the address needs to have this command execute before.
+  55          #define SPIFL_WREN       0x06000000 //Enable to write data to spiflash
+  56          #define SPIFL_WRDI_B   0x04 //Disable write byte.
+  57          #define SPIFL_WRDI       0x04000000 //Write disable
+  58          #define SPIFL_RDID       0x90 //Read ID
+  59          
+  60          u8 spiflash_ReadStatusReg(void);
+  61          void spiflash_CheckFlashBusy();
+  62          void spiFlash_Cmd(u8, u32, u8, u8);
+  63          void spiflash_wren(u8);
+  64          void spiflash_eraseConfigMem();
+  65          void spiflash_eraseSector(u32);
+  66          void spiflash_wrsr_unlock(u8);
+  67          void test_spiflash(void);
+  68          void spiflash_chiperase(void);
+  69          void spiflash_eraseLower256k();
+  70          void spiflash_CheckFlashBusy();
+  71          u8 spiflash_ReadStatusReg(void);
+  72          void spiflash_WriteByte(u32, u8);
+  73          u8 spiflash_ReadByte(u32);
+  74          u8 spiflash_BackupCodeImage();
+  75          
+  76          
+  77          
+  78          //***************************************************************
+  79          // void spiFlash_Cmd(u8 NumOfByteCmd, u32 CmdData) is to send a command to the spiflash
+  80          // An spiflash command may be from 1 to 4 bytes in length
+  81          // Input:
+  82          //    NumOfByteCmd: The length of command in number of bytes sent to sflash.
+  83          //    CmdData: Command data from 1 byte to 4 bytes
+  84          //    SpiWriteData: 5th byte to transmit to spi flash in case 5-byte command
+  85          //***************************************************************
+  86          void spiFlash_Cmd(u8 const NumOfByteCmd, u32 const CmdData, u8 const SpiWriteData, u8 const RdWr)
+  87          {
+  88   1        u8 xdata c;
+  89   1        u32 xdata temp;
+  90   1        //printf("\ncmd\n");
+  91   1        temp = swUtil_SwapEndian(CmdData);
+  92   1        *(u32 xdata *)SPIFL_WRDATA = (u32)(temp);
+  93   1        *(u8 xdata *)SPIFL_WRDATA4 = (u8)(SpiWriteData);
+  94   1        *(u8 xdata *)SPIFL_NOBYTE2TX = NumOfByteCmd;
+  95   1        if (RdWr){    
+  96   2          *(u8 xdata *)SPIFL_TXCTRL    = 0x5; 
+  97   2          c = *(u8 xdata *)SPIFL_TXSTAT;
+  98   2          while (c!=0)
+  99   2          {
+ 100   3            c = *(u8 xdata *)SPIFL_TXSTAT;
+ 101   3          }
+ 102   2          *(u8 xdata *)SPIFL_TXCTRL    = 0x3; 
+ 103   2        } else {
+ 104   2          *(u8 xdata *)SPIFL_TXCTRL    = 0x5; 
+ 105   2        }
+ 106   1        c = *(u8 xdata *)SPIFL_TXSTAT;
+ 107   1        while (c!=0)
+ 108   1        {
+ 109   2          c = *(u8 xdata *)SPIFL_TXSTAT;
+ 110   2        }
+ 111   1        *(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+ 112   1        //printf("\ncmd exit\n");
+ 113   1        return;
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 3   
+
+ 114   1      }
+ 115          //***************************************************************
+ 116          // void spiflash_wren(u8 wren) to enable or disable sflash write enable
+ 117          // Input:
+ 118          //    wren = 1: Enable write mode
+ 119          //    wren = 0: Disable write mode
+ 120          //    the write enable mode will be disable automatically after every write command
+ 121          //***************************************************************
+ 122          
+ 123          void spiflash_wren(u8 const wren)
+ 124          {
+ 125   1        //printf("\nwren\n");
+ 126   1      
+ 127   1        if (wren==1)
+ 128   1          spiFlash_Cmd(1,SPIFL_WREN_B,0,0);
+ 129   1        else
+ 130   1          spiFlash_Cmd(1,SPIFL_WRDI_B,0,0);
+ 131   1      
+ 132   1        //printf("\nwren exit\n");
+ 133   1        return;
+ 134   1      }
+ 135          //***************************************************************
+ 136          // void spiflash_wrsr_unlock(u8 unlock) is to unlock or lock the spiflash
+ 137          // Input
+ 138          //    unlock = 1: is to unlock the chip
+ 139          //    unlock = 0: is to lock the chip
+ 140          //***************************************************************
+ 141          
+ 142          void spiflash_wrsr_unlock(u8 const unlock)
+ 143          { 
+ 144   1        //printf("\nunlock\n");
+ 145   1        spiflash_wren(1);
+ 146   1        if (unlock==1)
+ 147   1          spiFlash_Cmd(2,(u32)(SFLASH_PROTECT_NONE|(SPIFL_WRSR_B<<8)),0,0);
+ 148   1        else 
+ 149   1          spiFlash_Cmd(2,(u32)(SFLASH_PROTECT_ALL|(SPIFL_WRSR_B<<8)),0,0);
+ 150   1        spiflash_CheckFlashBusy();
+ 151   1      
+ 152   1        //printf("\nunlock exit\n");
+ 153   1        return;
+ 154   1      }
+ 155          #ifdef FEATURE_CHIPERASE
+              //***************************************************************
+              //spiflash_chiperase(): erase the whole chip
+              //***************************************************************
+              #ifdef ONEBYTE_COMMAND_ERASE
+              void spiflash_chiperase()
+              {
+                u8 c;
+                spiflash_wrsr_unlock(1);
+                spiflash_wren(1);
+                *(u8 xdata *)SPIFL_NOBYTE2TX = 0x1;  
+                *(u32 xdata *)SPIFL_WRDATA   = (u32)SPIFL_CHIPERASE;
+                *(u8 xdata *)SPIFL_TXCTRL    = 0x5;
+                c = *(u8 xdata *)SPIFL_TXSTAT;
+                while (c!=0)
+                {
+                  c = *(u8 xdata *)SPIFL_TXSTAT;
+                }
+                *(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+              
+                spiflash_wrsr_unlock(1);
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 4   
+
+                spiflash_wren(1);
+                *(u8 xdata *)SPIFL_NOBYTE2TX = 0x1;  
+                *(u32 xdata *)SPIFL_WRDATA   = (u32)SPIFL_CHIPERASE1;
+                *(u8 xdata *)SPIFL_TXCTRL  = 0x5; 
+                c = *(u8 xdata *)SPIFL_TXSTAT;
+                while (c!=0)
+                {
+                  c = *(u8 xdata *)SPIFL_TXSTAT;
+                }
+                *(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+                return;
+              }
+              #else
+              void spiflash_chiperase()
+              {
+                spiflash_wrsr_unlock(1);
+                spiflash_wren(1);
+                spiFlash_Cmd((u8)1,(u32)SPIFL_CHIPERASE, 0,0);
+                spiflash_wren(1);
+                spiFlash_Cmd((u8)1,(u32)SPIFL_CHIPERASE1, 0,0); 
+                return;
+              }
+              #endif
+              #endif
+ 200          //***************************************************************
+ 201          //void spiflash_CheckFlashBusy(void)
+ 202          //Read status register untill bit busy == 0
+ 203          //***************************************************************
+ 204          void spiflash_CheckFlashBusy()
+ 205          {
+ 206   1        u8 xdata c;
+ 207   1      
+ 208   1      check_st_reg:
+ 209   1        *(u8 xdata *)SPIFL_NOBYTE2TX = 1;
+ 210   1        *(u8 xdata *)SPIFL_WRDATA    = (u8)(SPIFL_RDSR);
+ 211   1        *(u8 xdata *)SPIFL_TXCTRL  = 0x5;
+ 212   1      check_Txdone1:
+ 213   1        //printf("check_Txdone1: SP %bu\n",SP);
+ 214   1        c = *(u8 xdata *)SPIFL_TXSTAT;
+ 215   1        //printf("C = %bu\n",c);
+ 216   1        if (c!=0)
+ 217   1          goto check_Txdone1;
+ 218   1      
+ 219   1        //printf("Tx done\n");
+ 220   1        *(u8 xdata *)SPIFL_TXCTRL  = 0x3;
+ 221   1        //printf("Tx done1\n");
+ 222   1      check_Rxdone:
+ 223   1        
+ 224   1        //printf("check_Rxdone\n");
+ 225   1        c = *(u8 xdata *)SPIFL_TXSTAT;
+ 226   1        if (c!=0)
+ 227   1          goto check_Rxdone;
+ 228   1        c = (*(u8 xdata *)SPIFL_RDDATA)&0x1;
+ 229   1      #ifdef  TEST_ON_BOARD
+                printf("\nBusy = %x",(u16)(0xFF&c));
+              #endif
+ 232   1        if (c==0x1)
+ 233   1          goto check_st_reg;
+ 234   1        *(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+ 235   1        //printf("busy exit\n");
+ 236   1        return;
+ 237   1      }
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 5   
+
+ 238          #if 0
+              //***************************************************************
+              //spiflash_32KBlkErase(u8 BlockID): a block of 32Kbytes
+              //Input: 
+              //  BlockID: The block ID of each 32K (0,1,2,3..)
+              //***************************************************************
+              void spiflash_32KBlkErase(u32 BlockID)
+              {
+                spiflash_wrsr_unlock((u8)1);
+                spiflash_wren((u8)1);
+                spiFlash_Cmd((u8)4,(u32)(SPIFL_BLKERASE | (BlockID<<15)), 0,0);
+                spiflash_CheckFlashBusy();
+              }
+              #endif
+ 252          //***************************************************************
+ 253          //spiflash_64KBlkErase(u8 BlockID, u8 block64): a block of 64Kbytes
+ 254          //Input: 
+ 255          //  BlockID: The block ID of each 32 or 64K (0,1,2,3..)
+ 256          //   block64: 1 - erase block 64K, 0 - erase block 32K
+ 257          //***************************************************************
+ 258          
+ 259          void spiflash_EraseBlock(u32 BlockID, u8 block64)
+ 260          {
+ 261   1        spiflash_wrsr_unlock((u8)1);
+ 262   1        spiflash_wren((u8)1);
+ 263   1        if (block64==1)
+ 264   1          spiFlash_Cmd((u8)4,(u32)(SPIFL_BLK64ERASE | (BlockID<<16)), 0,0);
+ 265   1        else 
+ 266   1          spiFlash_Cmd((u8)4,(u32)(SPIFL_BLKERASE | (BlockID<<15)), 0,0);   
+ 267   1        spiflash_CheckFlashBusy();
+ 268   1        return;
+ 269   1      }
+ 270          
+ 271          //***************************************************************
+ 272          //void spiflash_erase256k() erase 0-256K bytes of code area in the spi flash
+ 273          //***************************************************************
+ 274          void spiflash_eraseLower256k()// scope of optimization this is unnecessorily erasing same memory with diff
+             -erent block size
+ 275          {
+ 276   1        u8 xdata BlckID;
+ 277   1        printf("\n --> Deleting code image ");
+ 278   1      
+ 279   1        for (BlckID=0;BlckID<4;BlckID++){
+ 280   2          printf(".");
+ 281   2          spiflash_EraseBlock(BlckID, 1);
+ 282   2        }
+ 283   1      #if 0 
+                for (BlckID=0;BlckID<8;BlckID++){
+                  printf(".");
+                  spiflash_EraseBlock(BlckID, 0);
+                }
+              
+                for (BlckID=0;BlckID<64;BlckID++){
+                  spiflash_eraseSector(BlckID);
+                  printf(".");    
+                }
+              #endif    
+ 294   1        return;
+ 295   1      }
+ 296          //***************************************************************
+ 297          //void spiflash_eraseBackup256k() 
+ 298          //This function is to erase 256k-512K bytes of backup code area in the spi flash
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 6   
+
+ 299          //***************************************************************
+ 300          #if 0
+              void spiflash_eraseBackup256k()
+              {
+                u8 idata BlckID;
+                printf("\n --> Deleting backup code image ");
+                for (BlckID=4;BlckID<8;BlckID++){
+                  printf(".");
+                  spiflash_EraseBlock(BlckID, 1);
+                }
+                for (BlckID=8;BlckID<16;BlckID++){
+                  printf(".");
+                  spiflash_EraseBlock(BlckID, 0);
+                }
+                for (BlckID=64;BlckID<128;BlckID++){
+                  spiflash_eraseSector(BlckID);
+                  printf(".");    
+                }
+                return;
+              }
+              #endif
+ 320          #ifdef PROGRAM_CONFIGURATION
+              //***************************************************************
+              //spiflash_eraseConfigMem() erase 32k bytes of configuration data in the spi flash
+              //Configuration data is located at address 0x00100000 - 0x0x001000FF; 
+              //Sector 256, beyond 1Mbyte
+              //***************************************************************
+              
+              void spiflash_eraseConfigMem()
+              {
+                printf("\n --> Delete configuration memory ...");
+                spiflash_eraseSector(GVTY_CONFIG_DATA_SECTOR);
+                spiflash_EraseBlock(32, 0);
+                spiflash_EraseBlock(16, 1);
+                spiflash_wrsr_unlock((u8)0);
+                printf("\n");
+                return;
+              }
+              #endif
+ 338          
+ 339          
+ 340          //***************************************************************
+ 341          //void spiflash_WriteByte(u32 Addr, u8 IData)
+ 342          //***************************************************************
+ 343          #if 0
+              void spiflash_WriteByte(u32 Addr, u8 IData)
+              {
+                spiflash_wren(1);
+                spiFlash_Cmd(5, (SPIFL_BYTEPRGRM|Addr), IData,0);
+                spiflash_CheckFlashBusy();
+                return;
+              }
+              #endif
+ 352          //***************************************************************
+ 353          //void spiflash_ReadByte(u32 Addr, u8 IData)
+ 354          //***************************************************************
+ 355          #if 0
+              u8 spiflash_ReadByte(u32 Addr)
+              {
+                spiFlash_Cmd((u8)4,(u32)(SPIFL_BYTEREAD|Addr),0,1);
+                return (*(u8 xdata *)SPIFL_RDDATA); 
+              }
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 7   
+
+              #endif
+ 362          //***************************************************************
+ 363          //void spiflash_eraseSector(u32 Addr)
+ 364          //To erase sectors of 4kbyte
+ 365          //***************************************************************
+ 366          #if 0
+              void spiflash_eraseSector(u32 Sector)
+              {
+                spiflash_wrsr_unlock((u8)1);
+                spiflash_wren((u8)1);
+                spiFlash_Cmd((u8)4,(u32)(SPIFL_SECERASE | (Sector<<12)),0,0);
+                spiflash_CheckFlashBusy();
+                return;
+              }
+              #endif
+ 376          #if 1
+ 377          //#define FLASH_PAGE_SIZE 256
+ 378          void spiflash_pageWrite(u32  startAddr, u32  endAddr, u16 srcAddress)
+ 379          {
+ 380   1      
+ 381   1      //u16 xdata total_pages;
+ 382   1      u32  xdata write_bytes_num_curr_page= 0;
+ 383   1      u8  xdata start_page_offset = 0;
+ 384   1      //u32 xdata addr_range;
+ 385   1      u8 xdata last_page_bytes = 0;
+ 386   1      //u8 xdata partial_page_length;
+ 387   1      u32 xdata length = 0;
+ 388   1      u8  xdata c = 0;// holds flash controller busy state
+ 389   1      u32 xdata temp = 0; // holds command and address
+ 390   1      u32 xdata flash_address = startAddr;
+ 391   1      u16 xdata flash_counter = 0;
+ 392   1      u32 xdata address_counter = 0;
+ 393   1      u32 xdata FLASH_PAGE_SIZE = 256;
+ 394   1      //addr_range = endAddr - startAddr;
+ 395   1      length = (endAddr + 1) - flash_address;
+ 396   1      
+ 397   1        start_page_offset = (flash_address % (u32)FLASH_PAGE_SIZE);
+ 398   1      //partial_page_length = addr_range % FLASH_PAGE_SIZE;// 
+ 399   1      //printf("\nflash_address %lX, endAddr %lX srcAddress %X, offset %bX\n",flash_address,endAddr,srcAddress,s
+             -tart_page_offset);
+ 400   1      
+ 401   1      //start_page_offset = 0;
+ 402   1      
+ 403   1        while(length > 0)
+ 404   1        {
+ 405   2      
+ 406   2            
+ 407   2          if (length < FLASH_PAGE_SIZE ){
+ 408   3            write_bytes_num_curr_page = (length - start_page_offset);
+ 409   3            //printf("len < page %lu\n",write_bytes_num_curr_page);
+ 410   3          
+ 411   3          }else{
+ 412   3            write_bytes_num_curr_page = (FLASH_PAGE_SIZE - start_page_offset) ;
+ 413   3            //printf("len >= page %lu\n",write_bytes_num_curr_page);
+ 414   3          }
+ 415   2          
+ 416   2          //printf("length %lu, page length %lu\n",length,write_bytes_num_curr_page);
+ 417   2          start_page_offset = 0;
+ 418   2          
+ 419   2          spiflash_wrsr_unlock((u8)1);
+ 420   2            spiflash_wren(1);
+ 421   2      
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 8   
+
+ 422   2          temp = swUtil_SwapEndian((0x02000000 | flash_address));
+ 423   2          *(u32 xdata *)SPIFL_WRDATA = (u32)(temp);
+ 424   2          *(u8 xdata *)SPIFL_WRDATA4 = *(u8 xdata *)(srcAddress + address_counter);
+ 425   2          *(u8 xdata *)SPIFL_NOBYTE2TX = 5;
+ 426   2          
+ 427   2          *(u8 xdata *)SPIFL_TXCTRL  = 0x5; 
+ 428   2        
+ 429   2          c = *(u8 xdata *)SPIFL_TXSTAT;
+ 430   2          while (c!=0)
+ 431   2          {
+ 432   3            c = *(u8 xdata *)SPIFL_TXSTAT;
+ 433   3          }
+ 434   2          address_counter++;  
+ 435   2          for(flash_counter=1; flash_counter < write_bytes_num_curr_page;flash_counter++,address_counter++)
+ 436   2          {
+ 437   3            
+ 438   3            *(u8 xdata *)SPIFL_WRDATA = *(u8 xdata *)(srcAddress + address_counter);
+ 439   3            *(u8 xdata *)SPIFL_NOBYTE2TX = 1;
+ 440   3          
+ 441   3            *(u8 xdata *)SPIFL_TXCTRL  = 0x5; 
+ 442   3        
+ 443   3            c = *(u8 xdata *)SPIFL_TXSTAT;
+ 444   3            while (c!=0)
+ 445   3            {
+ 446   4              c = *(u8 xdata *)SPIFL_TXSTAT;
+ 447   4            }   
+ 448   3          }
+ 449   2          printf(".");
+ 450   2          *(u8 xdata *)SPIFL_TXCTRL  = 0x0; 
+ 451   2          spiflash_CheckFlashBusy();
+ 452   2          spiflash_wrsr_unlock(0);    
+ 453   2      
+ 454   2          flash_address += flash_counter;
+ 455   2          //printf("\naddr counter %lu  flash address %lu\n\n",address_counter,flash_address);
+ 456   2          length -= write_bytes_num_curr_page;
+ 457   2        }
+ 458   1      
+ 459   1      //printf("exit while\n");
+ 460   1      
+ 461   1      }
+ 462          
+ 463          
+ 464          u8 spiflash_pageReadVerify(u32  startAddr, u32  endAddr, u16 srcAddress)
+ 465          {
+ 466   1      
+ 467   1      //u16 xdata total_pages;
+ 468   1      u32  xdata write_bytes_num_curr_page= 0;
+ 469   1      u8  xdata start_page_offset = 0;
+ 470   1      //u32 xdata addr_range;
+ 471   1      u8 xdata last_page_bytes = 0;
+ 472   1      //u8 xdata partial_page_length;
+ 473   1      u32 xdata length = 0;
+ 474   1      u8  xdata c = 0;// holds flash controller busy state
+ 475   1      u32 xdata temp = 0; // holds command and address
+ 476   1      u32 xdata flash_address = startAddr;
+ 477   1      u16 xdata flash_counter = 0;
+ 478   1      u32 xdata address_counter = 0;
+ 479   1      u32 xdata FLASH_PAGE_SIZE = 256;
+ 480   1      u8 xdata flash_rd_data = 0;
+ 481   1      //addr_range = endAddr - startAddr;
+ 482   1      length = (endAddr + 1) - flash_address;
+ 483   1      
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 9   
+
+ 484   1        start_page_offset = (flash_address % (u32)FLASH_PAGE_SIZE);
+ 485   1      //partial_page_length = addr_range % FLASH_PAGE_SIZE;// 
+ 486   1      //printf("\nflash_address %lX, endAddr %lX srcAddress %X, offset %bX\n",flash_address,endAddr,srcAddress,s
+             -tart_page_offset);
+ 487   1      
+ 488   1      //start_page_offset = 0;
+ 489   1      
+ 490   1        while(length > 0)
+ 491   1        {
+ 492   2      
+ 493   2            
+ 494   2          if (length < FLASH_PAGE_SIZE ){
+ 495   3            write_bytes_num_curr_page = (length - start_page_offset);
+ 496   3            //printf("len < page %lu\n",write_bytes_num_curr_page);
+ 497   3          
+ 498   3          }else{
+ 499   3            write_bytes_num_curr_page = (FLASH_PAGE_SIZE - start_page_offset) ;
+ 500   3            //printf("len >= page %lu\n",write_bytes_num_curr_page);
+ 501   3          }
+ 502   2          
+ 503   2          //printf("length %lu, page length %lu\n",length,write_bytes_num_curr_page);
+ 504   2          start_page_offset = 0;
+ 505   2          
+ 506   2      
+ 507   2          temp = swUtil_SwapEndian((0x03000000 | flash_address));
+ 508   2          *(u32 xdata *)SPIFL_WRDATA = (u32)(temp);
+ 509   2          *(u8 xdata *)SPIFL_WRDATA4 = 0;
+ 510   2          *(u8 xdata *)SPIFL_NOBYTE2TX = 4;
+ 511   2          
+ 512   2          *(u8 xdata *)SPIFL_TXCTRL  = 0x5; 
+ 513   2        
+ 514   2          c = *(u8 xdata *)SPIFL_TXSTAT;
+ 515   2          while (c!=0)
+ 516   2          {
+ 517   3            c = *(u8 xdata *)SPIFL_TXSTAT;
+ 518   3          }
+ 519   2          *(u8 xdata *)SPIFL_TXCTRL  = 0x3; 
+ 520   2          c = *(u8 xdata *)SPIFL_TXSTAT;
+ 521   2          while (c!=0)
+ 522   2          {
+ 523   3            c = *(u8 xdata *)SPIFL_TXSTAT;
+ 524   3          }
+ 525   2          flash_rd_data = *(u8 xdata *)SPIFL_RDDATA;
+ 526   2          if(flash_rd_data != *(u8 xdata *)(srcAddress + address_counter))
+ 527   2          {
+ 528   3            //printf("err %bx, %bx\n",flash_rd_data,*(u8 xdata *)(srcAddress + address_counter));
+ 529   3            printf("\n\n *** SFLASH programming error @ 0x%lX - try again\n\n",flash_address);
+ 530   3            return 0;
+ 531   3          }
+ 532   2          else{
+ 533   3            //printf("#");
+ 534   3          }
+ 535   2          address_counter++;  
+ 536   2          for(flash_counter=1; flash_counter < write_bytes_num_curr_page;flash_counter++,address_counter++)
+ 537   2          {
+ 538   3            //*(u8 xdata *)SPIFL_RDDATA
+ 539   3            //*(u8 xdata *)SPIFL_WRDATA = *(u8 xdata *)(srcAddress + address_counter);
+ 540   3            *(u8 xdata *)SPIFL_NOBYTE2TX = 1;
+ 541   3          
+ 542   3            *(u8 xdata *)SPIFL_TXCTRL  = 0x3; 
+ 543   3        
+ 544   3            c = *(u8 xdata *)SPIFL_TXSTAT;
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 10  
+
+ 545   3            while (c!=0)
+ 546   3            {
+ 547   4              c = *(u8 xdata *)SPIFL_TXSTAT;
+ 548   4            } 
+ 549   3            flash_rd_data = *(u8 xdata *)SPIFL_RDDATA;
+ 550   3            if(flash_rd_data != *(u8 xdata *)(srcAddress + address_counter))
+ 551   3            {
+ 552   4              //printf("\n\n *** SFLASH programming error @ %bx, %bx\n",flash_rd_data,*(u8 xdata *)(srcAddress + add
+             -ress_counter));
+ 553   4              printf("\n\n *** SFLASH programming error @ 0x%lX - try again\n\n",flash_address+flash_counter);
+ 554   4              return 0;
+ 555   4            }
+ 556   3            else{
+ 557   4              //printf("#");
+ 558   4            }
+ 559   3          }
+ 560   2          printf("#");
+ 561   2          *(u8 xdata *)SPIFL_TXCTRL  = 0x0; 
+ 562   2          spiflash_CheckFlashBusy();
+ 563   2          //spiflash_wrsr_unlock(0);    
+ 564   2      
+ 565   2          flash_address += flash_counter;
+ 566   2          //printf("\naddr counter %lu  flash address %lu\n\n",address_counter,flash_address);
+ 567   2          length -= write_bytes_num_curr_page;
+ 568   2        }
+ 569   1      
+ 570   1      //printf("exit while\n");
+ 571   1      return 1;
+ 572   1      }
+ 573          
+ 574          #endif
+ 575          #if 0
+              void tempcode()
+              {
+                u32 flash_address = 400 * 4096;
+                u8 flash_data_wr[5];
+                u8 flash_counter;
+                //use flash sector 400
+                spiflash_eraseSector(400);
+                
+                spiflash_wrsr_unlock((u8)1);
+                spiflash_wren(1);
+                //(0x02000000 | flash_address)
+                  //void spiFlash_Cmd(u8 const NumOfByteCmd, u32 const CmdData, u8 const SpiWriteData, u8 const RdWr)
+                  {
+                    u8  c;
+                    u32  temp;
+                    temp = swUtil_SwapEndian((0x02000000 | flash_address));
+                    *(u32 xdata *)SPIFL_WRDATA = (u32)(temp);
+                    *(u8 xdata *)SPIFL_WRDATA4 = flash_data_wr[0];
+                    *(u8 xdata *)SPIFL_NOBYTE2TX = 5;
+                    
+                    *(u8 xdata *)SPIFL_TXCTRL  = 0x5; 
+                  
+                    c = *(u8 xdata *)SPIFL_TXSTAT;
+                    while (c!=0)
+                    {
+                      c = *(u8 xdata *)SPIFL_TXSTAT;
+                    }
+              
+                    for(flash_counter=1;flash_counter<256;flash_counter++)
+                    {
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 11  
+
+                      *(u8 xdata *)SPIFL_WRDATA = (flash_data_wr[flash_counter]);
+                      *(u8 xdata *)SPIFL_NOBYTE2TX = 1;
+                    
+                      *(u8 xdata *)SPIFL_TXCTRL  = 0x5; 
+                  
+                      c = *(u8 xdata *)SPIFL_TXSTAT;
+                      while (c!=0)
+                      {
+                        c = *(u8 xdata *)SPIFL_TXSTAT;
+                      }
+              
+                    }
+                    
+                    *(u8 xdata *)SPIFL_TXCTRL  = 0x0; 
+                    
+                  }
+              
+                spiflash_CheckFlashBusy();
+                //spiflash_wren(0);
+                spiflash_wrsr_unlock(0);
+              
+              
+              }
+              #endif
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 12  
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION Com0047 (BEGIN)
+0000         L?0072:
+0000 900000      R     MOV     DPTR,#address_counter
+0003 120000      E     LCALL   ?C?LLDXDATA
+0006 900000      R     MOV     DPTR,#address_counter
+0009         L?0073:
+0009 EF                MOV     A,R7
+000A 2401              ADD     A,#01H
+000C FF                MOV     R7,A
+000D E4                CLR     A
+000E 3E                ADDC    A,R6
+000F FE                MOV     R6,A
+0010 E4                CLR     A
+0011 3D                ADDC    A,R5
+0012 FD                MOV     R5,A
+0013 E4                CLR     A
+0014 3C                ADDC    A,R4
+0015 FC                MOV     R4,A
+0016 020000      E     LJMP    ?C?LSTXDATA
+0019         L?0074:
+0019 90030C            MOV     DPTR,#030CH
+001C E0                MOVX    A,@DPTR
+001D FF                MOV     R7,A
+001E 900000      R     MOV     DPTR,#flash_rd_data
+0021 F0                MOVX    @DPTR,A
+0022 FB                MOV     R3,A
+0023 900000      R     MOV     DPTR,#address_counter
+0026 120000      E     LCALL   ?C?LLDXDATA
+0029 E500        R     MOV     A,srcAddress+01H
+002B 2F                ADD     A,R7
+002C FF                MOV     R7,A
+002D E500        R     MOV     A,srcAddress
+002F         L?0075:
+002F 3E                ADDC    A,R6
+0030 8F82              MOV     DPL,R7
+0032 F583              MOV     DPH,A
+0034 E0                MOVX    A,@DPTR
+0035 22                RET     
+0036         L?0076:
+0036         L?0077:
+0036 900000      R     MOV     DPTR,#flash_counter
+0039         L?0078:
+0039 E0                MOVX    A,@DPTR
+003A FE                MOV     R6,A
+003B A3                INC     DPTR
+003C E0                MOVX    A,@DPTR
+003D FF                MOV     R7,A
+003E E4                CLR     A
+003F FC                MOV     R4,A
+0040 FD                MOV     R5,A
+0041 22                RET     
+0042         L?0079:
+0042 E4                CLR     A
+0043 FF                MOV     R7,A
+0044 FE                MOV     R6,A
+0045 FD                MOV     R5,A
+0046 FC                MOV     R4,A
+0047         L?0080:
+0047 120000      E     LCALL   ?C?LLDXDATA0
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 13  
+
+004A D3                SETB    C
+004B 020000      E     LJMP    ?C?ULCMP
+004E         L?0081:
+004E 900306            MOV     DPTR,#0306H
+0051 F0                MOVX    @DPTR,A
+0052 900308            MOV     DPTR,#0308H
+0055 22                RET     
+0056         L?0082:
+0056         L?0083:
+0056 120000      E     LCALL   ?C?LLDXDATA
+0059 90030C            MOV     DPTR,#030CH
+005C 020000      E     LJMP    ?C?LSTXDATA
+005F         L?0084:
+005F FC                MOV     R4,A
+0060         L?0085:
+0060 120000      E     LCALL   ?C?LLDXDATA0
+0063 020000      E     LJMP    ?C?LSUB
+0066         L?0086:
+0066         L?0087:
+0066 900300            MOV     DPTR,#0300H
+0069 E0                MOVX    A,@DPTR
+006A 900000      R     MOV     DPTR,#c
+006D F0                MOVX    @DPTR,A
+006E 22                RET     
+006F         L?0088:
+006F         L?0089:
+006F 900308            MOV     DPTR,#0308H
+0072 7403              MOV     A,#03H
+0074 F0                MOVX    @DPTR,A
+0075 22                RET     
+0076         L?0090:
+0076 900000      R     MOV     DPTR,#address_counter
+0079 120000      E     LCALL   ?C?LLDXDATA
+007C E500        R     MOV     A,srcAddress+01H
+007E 2F                ADD     A,R7
+007F FF                MOV     R7,A
+0080 E500        R     MOV     A,srcAddress
+0082 22                RET     
+0083         L?0091:
+0083         L?0092:
+0083 900000      R     MOV     DPTR,#flash_address
+0086 020000      E     LJMP    ?C?LLDXDATA
+             ; FUNCTION Com0047 (END)
+
+             ; FUNCTION _spiFlash_Cmd (BEGIN)
+                                           ; SOURCE LINE # 86
+0000 8F00        R     MOV     NumOfByteCmd,R7
+                                           ; SOURCE LINE # 87
+                                           ; SOURCE LINE # 91
+0002 AF00        R     MOV     R7,CmdData+03H
+0004 AE00        R     MOV     R6,CmdData+02H
+0006 AD00        R     MOV     R5,CmdData+01H
+0008 AC00        R     MOV     R4,CmdData
+000A 120000      E     LCALL   _swUtil_SwapEndian
+000D 900000      R     MOV     DPTR,#temp
+0010 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 92
+0013 900000      R     MOV     DPTR,#temp
+0016 120000      R     LCALL   L?0082
+                                           ; SOURCE LINE # 93
+0019 900307            MOV     DPTR,#0307H
+001C E500        R     MOV     A,SpiWriteData
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 14  
+
+001E F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 94
+001F 900306            MOV     DPTR,#0306H
+0022 E500        R     MOV     A,NumOfByteCmd
+0024 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 95
+0025 E500        R     MOV     A,RdWr
+0027 601D              JZ      ?C0001
+                                           ; SOURCE LINE # 96
+0029 900308            MOV     DPTR,#0308H
+002C 7405              MOV     A,#05H
+002E F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 97
+002F 8006              SJMP    ?C0058
+0031         ?C0002:
+                                           ; SOURCE LINE # 98
+0031 900000      R     MOV     DPTR,#c
+0034 E0                MOVX    A,@DPTR
+0035 600A              JZ      ?C0003
+                                           ; SOURCE LINE # 99
+                                           ; SOURCE LINE # 100
+0037         ?C0058:
+0037 900300            MOV     DPTR,#0300H
+003A E0                MOVX    A,@DPTR
+003B 900000      R     MOV     DPTR,#c
+003E F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 101
+003F 80F0              SJMP    ?C0002
+0041         ?C0003:
+                                           ; SOURCE LINE # 102
+0041 120000      R     LCALL   L?0088
+                                           ; SOURCE LINE # 103
+0044 800E              SJMP    ?C0059
+0046         ?C0001:
+                                           ; SOURCE LINE # 104
+0046 900308            MOV     DPTR,#0308H
+0049 7405              MOV     A,#05H
+004B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 105
+004C         ?C0004:
+                                           ; SOURCE LINE # 106
+004C 8006              SJMP    ?C0059
+004E         ?C0005:
+                                           ; SOURCE LINE # 107
+004E 900000      R     MOV     DPTR,#c
+0051 E0                MOVX    A,@DPTR
+0052 600A              JZ      ?C0006
+                                           ; SOURCE LINE # 108
+                                           ; SOURCE LINE # 109
+0054         ?C0059:
+0054 900300            MOV     DPTR,#0300H
+0057 E0                MOVX    A,@DPTR
+0058 900000      R     MOV     DPTR,#c
+005B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 110
+005C 80F0              SJMP    ?C0005
+005E         ?C0006:
+                                           ; SOURCE LINE # 111
+005E 900308            MOV     DPTR,#0308H
+0061 E4                CLR     A
+0062 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 114
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 15  
+
+0063         ?C0007:
+0063 22                RET     
+             ; FUNCTION _spiFlash_Cmd (END)
+
+             ; FUNCTION _spiflash_wren (BEGIN)
+                                           ; SOURCE LINE # 123
+;---- Variable 'wren' assigned to Register 'R7' ----
+                                           ; SOURCE LINE # 124
+                                           ; SOURCE LINE # 127
+0000 BF0106            CJNE    R7,#01H,?C0008
+                                           ; SOURCE LINE # 128
+0003 E4                CLR     A
+0004 750006      R     MOV     ?_spiFlash_Cmd?BYTE+04H,#06H
+0007 8004              SJMP    ?C0060
+0009         ?C0008:
+                                           ; SOURCE LINE # 130
+0009 E4                CLR     A
+000A 750004      R     MOV     ?_spiFlash_Cmd?BYTE+04H,#04H
+000D         ?C0060:
+000D F500        R     MOV     ?_spiFlash_Cmd?BYTE+03H,A
+000F F500        R     MOV     ?_spiFlash_Cmd?BYTE+02H,A
+0011 F500        R     MOV     ?_spiFlash_Cmd?BYTE+01H,A
+0013 F500        R     MOV     ?_spiFlash_Cmd?BYTE+05H,A
+0015 F500        R     MOV     ?_spiFlash_Cmd?BYTE+06H,A
+0017 7F01              MOV     R7,#01H
+0019 120000      R     LCALL   _spiFlash_Cmd
+                                           ; SOURCE LINE # 134
+001C         ?C0010:
+001C 22                RET     
+             ; FUNCTION _spiflash_wren (END)
+
+             ; FUNCTION _spiflash_wrsr_unlock (BEGIN)
+                                           ; SOURCE LINE # 142
+0000 8F00        R     MOV     unlock,R7
+                                           ; SOURCE LINE # 143
+                                           ; SOURCE LINE # 145
+0002 7F01              MOV     R7,#01H
+0004 120000      R     LCALL   _spiflash_wren
+                                           ; SOURCE LINE # 146
+0007 E500        R     MOV     A,unlock
+0009 B40105            CJNE    A,#01H,?C0011
+                                           ; SOURCE LINE # 147
+000C E4                CLR     A
+000D F500        R     MOV     ?_spiFlash_Cmd?BYTE+04H,A
+000F 8004              SJMP    ?C0061
+0011         ?C0011:
+                                           ; SOURCE LINE # 149
+0011 E4                CLR     A
+0012 7500BC      R     MOV     ?_spiFlash_Cmd?BYTE+04H,#0BCH
+0015         ?C0061:
+0015 750001      R     MOV     ?_spiFlash_Cmd?BYTE+03H,#01H
+0018 F500        R     MOV     ?_spiFlash_Cmd?BYTE+02H,A
+001A F500        R     MOV     ?_spiFlash_Cmd?BYTE+01H,A
+001C F500        R     MOV     ?_spiFlash_Cmd?BYTE+05H,A
+001E F500        R     MOV     ?_spiFlash_Cmd?BYTE+06H,A
+0020 7F02              MOV     R7,#02H
+0022 120000      R     LCALL   _spiFlash_Cmd
+0025         ?C0012:
+                                           ; SOURCE LINE # 150
+0025 120000      R     LCALL   spiflash_CheckFlashBusy
+                                           ; SOURCE LINE # 154
+0028         ?C0013:
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 16  
+
+0028 22                RET     
+             ; FUNCTION _spiflash_wrsr_unlock (END)
+
+             ; FUNCTION spiflash_CheckFlashBusy (BEGIN)
+                                           ; SOURCE LINE # 204
+                                           ; SOURCE LINE # 205
+                                           ; SOURCE LINE # 208
+0000         check_st_reg:
+                                           ; SOURCE LINE # 209
+0000 900306            MOV     DPTR,#0306H
+0003 7401              MOV     A,#01H
+0005 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 210
+0006 90030C            MOV     DPTR,#030CH
+0009 7405              MOV     A,#05H
+000B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 211
+000C 900308            MOV     DPTR,#0308H
+000F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 212
+0010         check_Txdone1:
+                                           ; SOURCE LINE # 214
+0010 900300            MOV     DPTR,#0300H
+0013 E0                MOVX    A,@DPTR
+0014 900000      R     MOV     DPTR,#c
+0017 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 216
+0018 70F6              JNZ     check_Txdone1
+                                           ; SOURCE LINE # 217
+001A         ?C0016:
+                                           ; SOURCE LINE # 220
+001A 120000      R     LCALL   L?0088
+                                           ; SOURCE LINE # 222
+001D         check_Rxdone:
+                                           ; SOURCE LINE # 225
+001D 900300            MOV     DPTR,#0300H
+0020 E0                MOVX    A,@DPTR
+0021 900000      R     MOV     DPTR,#c
+0024 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 226
+0025 70F6              JNZ     check_Rxdone
+                                           ; SOURCE LINE # 227
+0027         ?C0018:
+                                           ; SOURCE LINE # 228
+0027 90030C            MOV     DPTR,#030CH
+002A E0                MOVX    A,@DPTR
+002B 5401              ANL     A,#01H
+002D 900000      R     MOV     DPTR,#c
+0030 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 232
+0031 6401              XRL     A,#01H
+0033 60CB              JZ      check_st_reg
+                                           ; SOURCE LINE # 233
+0035         ?C0019:
+                                           ; SOURCE LINE # 234
+0035 900308            MOV     DPTR,#0308H
+0038 E4                CLR     A
+0039 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 237
+003A         ?C0020:
+003A 22                RET     
+             ; FUNCTION spiflash_CheckFlashBusy (END)
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 17  
+
+
+             ; FUNCTION _spiflash_EraseBlock (BEGIN)
+                                           ; SOURCE LINE # 259
+0000 8F00        R     MOV     BlockID+03H,R7
+0002 8E00        R     MOV     BlockID+02H,R6
+0004 8D00        R     MOV     BlockID+01H,R5
+0006 8C00        R     MOV     BlockID,R4
+                                           ; SOURCE LINE # 260
+                                           ; SOURCE LINE # 261
+0008 7F01              MOV     R7,#01H
+000A 120000      R     LCALL   _spiflash_wrsr_unlock
+                                           ; SOURCE LINE # 262
+000D 7F01              MOV     R7,#01H
+000F 120000      R     LCALL   _spiflash_wren
+                                           ; SOURCE LINE # 263
+0012 E500        R     MOV     A,block64
+0014 AF00        R     MOV     R7,BlockID+03H
+0016 AE00        R     MOV     R6,BlockID+02H
+0018 AD00        R     MOV     R5,BlockID+01H
+001A AC00        R     MOV     R4,BlockID
+001C B4010A            CJNE    A,#01H,?C0021
+                                           ; SOURCE LINE # 264
+001F 7810              MOV     R0,#010H
+0021 120000      E     LCALL   ?C?LSHL
+0024 EC                MOV     A,R4
+0025 44D8              ORL     A,#0D8H
+0027 8008              SJMP    ?C0062
+0029         ?C0021:
+                                           ; SOURCE LINE # 266
+0029 780F              MOV     R0,#0FH
+002B 120000      E     LCALL   ?C?LSHL
+002E EC                MOV     A,R4
+002F 4452              ORL     A,#052H
+0031         ?C0062:
+0031 8F00        R     MOV     ?_spiFlash_Cmd?BYTE+04H,R7
+0033 8E00        R     MOV     ?_spiFlash_Cmd?BYTE+03H,R6
+0035 8D00        R     MOV     ?_spiFlash_Cmd?BYTE+02H,R5
+0037 F500        R     MOV     ?_spiFlash_Cmd?BYTE+01H,A
+0039 E4                CLR     A
+003A F500        R     MOV     ?_spiFlash_Cmd?BYTE+05H,A
+003C F500        R     MOV     ?_spiFlash_Cmd?BYTE+06H,A
+003E 7F04              MOV     R7,#04H
+0040 120000      R     LCALL   _spiFlash_Cmd
+0043         ?C0022:
+                                           ; SOURCE LINE # 267
+0043 120000      R     LCALL   spiflash_CheckFlashBusy
+                                           ; SOURCE LINE # 269
+0046         ?C0023:
+0046 22                RET     
+             ; FUNCTION _spiflash_EraseBlock (END)
+
+             ; FUNCTION spiflash_eraseLower256k (BEGIN)
+                                           ; SOURCE LINE # 274
+                                           ; SOURCE LINE # 275
+                                           ; SOURCE LINE # 277
+0000 7BFF              MOV     R3,#0FFH
+0002 7A00        R     MOV     R2,#HIGH ?SC_0
+0004 7900        R     MOV     R1,#LOW ?SC_0
+0006 120000      E     LCALL   _printf
+                                           ; SOURCE LINE # 279
+0009 E4                CLR     A
+000A 900000      R     MOV     DPTR,#BlckID
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 18  
+
+000D F0                MOVX    @DPTR,A
+000E         ?C0024:
+                                           ; SOURCE LINE # 280
+000E 7BFF              MOV     R3,#0FFH
+0010 7A00        R     MOV     R2,#HIGH ?SC_27
+0012 7900        R     MOV     R1,#LOW ?SC_27
+0014 120000      E     LCALL   _printf
+                                           ; SOURCE LINE # 281
+0017 900000      R     MOV     DPTR,#BlckID
+001A E0                MOVX    A,@DPTR
+001B FF                MOV     R7,A
+001C E4                CLR     A
+001D FC                MOV     R4,A
+001E FD                MOV     R5,A
+001F FE                MOV     R6,A
+0020 750001      R     MOV     ?_spiflash_EraseBlock?BYTE+04H,#01H
+0023 120000      R     LCALL   _spiflash_EraseBlock
+                                           ; SOURCE LINE # 282
+0026 900000      R     MOV     DPTR,#BlckID
+0029 E0                MOVX    A,@DPTR
+002A 04                INC     A
+002B F0                MOVX    @DPTR,A
+002C E0                MOVX    A,@DPTR
+002D C3                CLR     C
+002E 9404              SUBB    A,#04H
+0030 40DC              JC      ?C0024
+                                           ; SOURCE LINE # 295
+0032         ?C0027:
+0032 22                RET     
+             ; FUNCTION spiflash_eraseLower256k (END)
+
+             ; FUNCTION _spiflash_pageWrite (BEGIN)
+                                           ; SOURCE LINE # 378
+0000 8F00        R     MOV     startAddr+03H,R7
+0002 8E00        R     MOV     startAddr+02H,R6
+0004 8D00        R     MOV     startAddr+01H,R5
+0006 8C00        R     MOV     startAddr,R4
+                                           ; SOURCE LINE # 379
+                                           ; SOURCE LINE # 382
+0008 900000      R     MOV     DPTR,#write_bytes_num_curr_page
+000B 120000      E     LCALL   ?C?LSTKXDATA
+000E 00                DB      00H
+000F 00                DB      00H
+0010 00                DB      00H
+0011 00                DB      00H
+                                           ; SOURCE LINE # 383
+0012 E4                CLR     A
+0013 900000      R     MOV     DPTR,#start_page_offset
+0016 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 385
+0017 A3                INC     DPTR
+0018 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 387
+0019 A3                INC     DPTR
+001A 120000      E     LCALL   ?C?LSTKXDATA
+001D 00                DB      00H
+001E 00                DB      00H
+001F 00                DB      00H
+0020 00                DB      00H
+                                           ; SOURCE LINE # 388
+0021 E4                CLR     A
+0022 900000      R     MOV     DPTR,#c
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 19  
+
+0025 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 389
+0026 A3                INC     DPTR
+0027 120000      E     LCALL   ?C?LSTKXDATA
+002A 00                DB      00H
+002B 00                DB      00H
+002C 00                DB      00H
+002D 00                DB      00H
+                                           ; SOURCE LINE # 390
+002E AF00        R     MOV     R7,startAddr+03H
+0030 AE00        R     MOV     R6,startAddr+02H
+0032 AD00        R     MOV     R5,startAddr+01H
+0034 AC00        R     MOV     R4,startAddr
+0036 900000      R     MOV     DPTR,#flash_address
+0039 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 391
+003C E4                CLR     A
+003D 900000      R     MOV     DPTR,#flash_counter
+0040 F0                MOVX    @DPTR,A
+0041 A3                INC     DPTR
+0042 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 392
+0043 A3                INC     DPTR
+0044 120000      E     LCALL   ?C?LSTKXDATA
+0047 00                DB      00H
+0048 00                DB      00H
+0049 00                DB      00H
+004A 00                DB      00H
+                                           ; SOURCE LINE # 393
+004B 900000      R     MOV     DPTR,#FLASH_PAGE_SIZE
+004E 120000      E     LCALL   ?C?LSTKXDATA
+0051 00                DB      00H
+0052 00                DB      00H
+0053 01                DB      01H
+0054 00                DB      00H
+                                           ; SOURCE LINE # 395
+0055 E500        R     MOV     A,endAddr+03H
+0057 2401              ADD     A,#01H
+0059 FF                MOV     R7,A
+005A E4                CLR     A
+005B 3500        R     ADDC    A,endAddr+02H
+005D FE                MOV     R6,A
+005E E4                CLR     A
+005F 3500        R     ADDC    A,endAddr+01H
+0061 FD                MOV     R5,A
+0062 E4                CLR     A
+0063 3500        R     ADDC    A,endAddr
+0065 900000      R     MOV     DPTR,#flash_address
+0068 120000      R     LCALL   L?0084
+006B 900000      R     MOV     DPTR,#length
+006E 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 397
+0071 900000      R     MOV     DPTR,#FLASH_PAGE_SIZE
+0074 120000      E     LCALL   ?C?LLDXDATA0
+0077 900000      R     MOV     DPTR,#flash_address
+007A 120000      E     LCALL   ?C?LLDXDATA
+007D 120000      E     LCALL   ?C?ULDIV
+0080 900000      R     MOV     DPTR,#start_page_offset
+0083 EB                MOV     A,R3
+0084 F0                MOVX    @DPTR,A
+0085         ?C0028:
+                                           ; SOURCE LINE # 403
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 20  
+
+0085 900000      R     MOV     DPTR,#length
+0088 120000      R     LCALL   L?0079
+008B 5003              JNC     $ + 5H
+008D 020000      R     LJMP    ?C0039
+                                           ; SOURCE LINE # 404
+                                           ; SOURCE LINE # 407
+0090 900000      R     MOV     DPTR,#FLASH_PAGE_SIZE
+0093 120000      E     LCALL   ?C?LLDXDATA
+0096 900000      R     MOV     DPTR,#length
+0099 120000      E     LCALL   ?C?LLDXDATA0
+009C C3                CLR     C
+009D 120000      E     LCALL   ?C?ULCMP
+00A0 900000      R     MOV     DPTR,#start_page_offset
+00A3 E0                MOVX    A,@DPTR
+00A4 FF                MOV     R7,A
+00A5 FB                MOV     R3,A
+00A6 E4                CLR     A
+00A7 FA                MOV     R2,A
+00A8 F9                MOV     R1,A
+00A9 F8                MOV     R0,A
+00AA 5005              JNC     ?C0030
+                                           ; SOURCE LINE # 408
+00AC 900000      R     MOV     DPTR,#length
+                                           ; SOURCE LINE # 411
+00AF 8003              SJMP    ?C0063
+00B1         ?C0030:
+                                           ; SOURCE LINE # 412
+00B1 900000      R     MOV     DPTR,#FLASH_PAGE_SIZE
+00B4         ?C0063:
+00B4 120000      E     LCALL   ?C?LLDXDATA
+00B7 120000      E     LCALL   ?C?LSUB
+00BA 900000      R     MOV     DPTR,#write_bytes_num_curr_page
+00BD 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 414
+00C0         ?C0031:
+                                           ; SOURCE LINE # 417
+00C0 E4                CLR     A
+00C1 900000      R     MOV     DPTR,#start_page_offset
+00C4 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 419
+00C5 7F01              MOV     R7,#01H
+00C7 120000      R     LCALL   _spiflash_wrsr_unlock
+                                           ; SOURCE LINE # 420
+00CA 7F01              MOV     R7,#01H
+00CC 120000      R     LCALL   _spiflash_wren
+                                           ; SOURCE LINE # 422
+00CF 900000      R     MOV     DPTR,#flash_address
+00D2 120000      E     LCALL   ?C?LLDXDATA
+00D5 EC                MOV     A,R4
+00D6 4402              ORL     A,#02H
+00D8 FC                MOV     R4,A
+00D9 120000      E     LCALL   _swUtil_SwapEndian
+00DC 900000      R     MOV     DPTR,#temp
+00DF 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 423
+00E2 900000      R     MOV     DPTR,#temp
+00E5 120000      R     LCALL   L?0082
+                                           ; SOURCE LINE # 424
+00E8 120000      R     LCALL   L?0090
+00EB 120000      R     LCALL   L?0075
+00EE 900307            MOV     DPTR,#0307H
+00F1 F0                MOVX    @DPTR,A
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 21  
+
+                                           ; SOURCE LINE # 425
+00F2 7405              MOV     A,#05H
+                                           ; SOURCE LINE # 427
+00F4 120000      R     LCALL   L?0081
+00F7 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 429
+00F8 8006              SJMP    ?C0064
+00FA         ?C0032:
+                                           ; SOURCE LINE # 430
+00FA 900000      R     MOV     DPTR,#c
+00FD E0                MOVX    A,@DPTR
+00FE 600A              JZ      ?C0033
+                                           ; SOURCE LINE # 431
+                                           ; SOURCE LINE # 432
+0100         ?C0064:
+0100 900300            MOV     DPTR,#0300H
+0103 E0                MOVX    A,@DPTR
+0104 900000      R     MOV     DPTR,#c
+0107 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 433
+0108 80F0              SJMP    ?C0032
+010A         ?C0033:
+                                           ; SOURCE LINE # 434
+010A 120000      R     LCALL   L?0072
+                                           ; SOURCE LINE # 435
+010D 900000      R     MOV     DPTR,#flash_counter
+0110 E4                CLR     A
+0111 F0                MOVX    @DPTR,A
+0112 A3                INC     DPTR
+0113 04                INC     A
+0114 F0                MOVX    @DPTR,A
+0115         ?C0034:
+0115 900000      R     MOV     DPTR,#flash_counter
+0118 120000      R     LCALL   L?0078
+011B 900000      R     MOV     DPTR,#write_bytes_num_curr_page
+011E 120000      R     LCALL   L?0080
+0121 4033              JC      ?C0035
+                                           ; SOURCE LINE # 436
+                                           ; SOURCE LINE # 438
+0123 120000      R     LCALL   L?0090
+0126 120000      R     LCALL   L?0075
+0129 90030C            MOV     DPTR,#030CH
+012C F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 439
+012D 7401              MOV     A,#01H
+                                           ; SOURCE LINE # 441
+012F 120000      R     LCALL   L?0081
+0132 7405              MOV     A,#05H
+0134 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 443
+0135 8006              SJMP    ?C0065
+0137         ?C0037:
+                                           ; SOURCE LINE # 444
+0137 900000      R     MOV     DPTR,#c
+013A E0                MOVX    A,@DPTR
+013B 600A              JZ      ?C0036
+                                           ; SOURCE LINE # 445
+                                           ; SOURCE LINE # 446
+013D         ?C0065:
+013D 900300            MOV     DPTR,#0300H
+0140 E0                MOVX    A,@DPTR
+0141 900000      R     MOV     DPTR,#c
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 22  
+
+0144 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 447
+0145 80F0              SJMP    ?C0037
+                                           ; SOURCE LINE # 448
+0147         ?C0036:
+0147 900000      R     MOV     DPTR,#flash_counter
+014A E4                CLR     A
+014B 75F001            MOV     B,#01H
+014E 120000      E     LCALL   ?C?IILDX
+0151 120000      R     LCALL   L?0072
+0154 80BF              SJMP    ?C0034
+0156         ?C0035:
+                                           ; SOURCE LINE # 449
+0156 7BFF              MOV     R3,#0FFH
+0158 7A00        R     MOV     R2,#HIGH ?SC_27
+015A 7900        R     MOV     R1,#LOW ?SC_27
+015C 120000      E     LCALL   _printf
+                                           ; SOURCE LINE # 450
+015F 900308            MOV     DPTR,#0308H
+0162 E4                CLR     A
+0163 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 451
+0164 120000      R     LCALL   spiflash_CheckFlashBusy
+                                           ; SOURCE LINE # 452
+0167 E4                CLR     A
+0168 FF                MOV     R7,A
+0169 120000      R     LCALL   _spiflash_wrsr_unlock
+                                           ; SOURCE LINE # 454
+016C 900000      R     MOV     DPTR,#flash_address
+016F 120000      E     LCALL   ?C?LLDXDATA0
+0172 900000      R     MOV     DPTR,#flash_counter
+0175 120000      R     LCALL   L?0078
+0178 120000      E     LCALL   ?C?LADD
+017B 900000      R     MOV     DPTR,#flash_address
+017E 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 456
+0181 900000      R     MOV     DPTR,#length
+0184 120000      E     LCALL   ?C?LLDXDATA
+0187 900000      R     MOV     DPTR,#write_bytes_num_curr_page
+018A 120000      R     LCALL   L?0085
+018D 900000      R     MOV     DPTR,#length
+0190 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 457
+0193 020000      R     LJMP    ?C0028
+                                           ; SOURCE LINE # 461
+0196         ?C0039:
+0196 22                RET     
+             ; FUNCTION _spiflash_pageWrite (END)
+
+             ; FUNCTION _spiflash_pageReadVerify (BEGIN)
+                                           ; SOURCE LINE # 464
+0000 8F00        R     MOV     startAddr+03H,R7
+0002 8E00        R     MOV     startAddr+02H,R6
+0004 8D00        R     MOV     startAddr+01H,R5
+0006 8C00        R     MOV     startAddr,R4
+                                           ; SOURCE LINE # 465
+                                           ; SOURCE LINE # 468
+0008 900000      R     MOV     DPTR,#write_bytes_num_curr_page
+000B 120000      E     LCALL   ?C?LSTKXDATA
+000E 00                DB      00H
+000F 00                DB      00H
+0010 00                DB      00H
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 23  
+
+0011 00                DB      00H
+                                           ; SOURCE LINE # 469
+0012 E4                CLR     A
+0013 900000      R     MOV     DPTR,#start_page_offset
+0016 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 471
+0017 A3                INC     DPTR
+0018 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 473
+0019 A3                INC     DPTR
+001A 120000      E     LCALL   ?C?LSTKXDATA
+001D 00                DB      00H
+001E 00                DB      00H
+001F 00                DB      00H
+0020 00                DB      00H
+                                           ; SOURCE LINE # 474
+0021 E4                CLR     A
+0022 900000      R     MOV     DPTR,#c
+0025 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 475
+0026 A3                INC     DPTR
+0027 120000      E     LCALL   ?C?LSTKXDATA
+002A 00                DB      00H
+002B 00                DB      00H
+002C 00                DB      00H
+002D 00                DB      00H
+                                           ; SOURCE LINE # 476
+002E AF00        R     MOV     R7,startAddr+03H
+0030 AE00        R     MOV     R6,startAddr+02H
+0032 AD00        R     MOV     R5,startAddr+01H
+0034 AC00        R     MOV     R4,startAddr
+0036 900000      R     MOV     DPTR,#flash_address
+0039 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 477
+003C E4                CLR     A
+003D 900000      R     MOV     DPTR,#flash_counter
+0040 F0                MOVX    @DPTR,A
+0041 A3                INC     DPTR
+0042 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 478
+0043 A3                INC     DPTR
+0044 120000      E     LCALL   ?C?LSTKXDATA
+0047 00                DB      00H
+0048 00                DB      00H
+0049 00                DB      00H
+004A 00                DB      00H
+                                           ; SOURCE LINE # 479
+004B 900000      R     MOV     DPTR,#FLASH_PAGE_SIZE
+004E 120000      E     LCALL   ?C?LSTKXDATA
+0051 00                DB      00H
+0052 00                DB      00H
+0053 01                DB      01H
+0054 00                DB      00H
+                                           ; SOURCE LINE # 480
+0055 E4                CLR     A
+0056 900000      R     MOV     DPTR,#flash_rd_data
+0059 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 482
+005A E500        R     MOV     A,endAddr+03H
+005C 2401              ADD     A,#01H
+005E FF                MOV     R7,A
+005F E4                CLR     A
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 24  
+
+0060 3500        R     ADDC    A,endAddr+02H
+0062 FE                MOV     R6,A
+0063 E4                CLR     A
+0064 3500        R     ADDC    A,endAddr+01H
+0066 FD                MOV     R5,A
+0067 E4                CLR     A
+0068 3500        R     ADDC    A,endAddr
+006A 900000      R     MOV     DPTR,#flash_address
+006D 120000      R     LCALL   L?0084
+0070 900000      R     MOV     DPTR,#length
+0073 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 484
+0076 900000      R     MOV     DPTR,#FLASH_PAGE_SIZE
+0079 120000      E     LCALL   ?C?LLDXDATA0
+007C 120000      R     LCALL   L?0091
+007F 120000      E     LCALL   ?C?ULDIV
+0082 900000      R     MOV     DPTR,#start_page_offset
+0085 EB                MOV     A,R3
+0086 F0                MOVX    @DPTR,A
+0087         ?C0040:
+                                           ; SOURCE LINE # 490
+0087 900000      R     MOV     DPTR,#length
+008A 120000      R     LCALL   L?0079
+008D 5003              JNC     $ + 5H
+008F 020000      R     LJMP    ?C0041
+                                           ; SOURCE LINE # 491
+                                           ; SOURCE LINE # 494
+0092 900000      R     MOV     DPTR,#FLASH_PAGE_SIZE
+0095 120000      E     LCALL   ?C?LLDXDATA
+0098 900000      R     MOV     DPTR,#length
+009B 120000      E     LCALL   ?C?LLDXDATA0
+009E C3                CLR     C
+009F 120000      E     LCALL   ?C?ULCMP
+00A2 900000      R     MOV     DPTR,#start_page_offset
+00A5 E0                MOVX    A,@DPTR
+00A6 FF                MOV     R7,A
+00A7 FB                MOV     R3,A
+00A8 E4                CLR     A
+00A9 FA                MOV     R2,A
+00AA F9                MOV     R1,A
+00AB F8                MOV     R0,A
+00AC 5005              JNC     ?C0042
+                                           ; SOURCE LINE # 495
+00AE 900000      R     MOV     DPTR,#length
+                                           ; SOURCE LINE # 498
+00B1 8003              SJMP    ?C0066
+00B3         ?C0042:
+                                           ; SOURCE LINE # 499
+00B3 900000      R     MOV     DPTR,#FLASH_PAGE_SIZE
+00B6         ?C0066:
+00B6 120000      E     LCALL   ?C?LLDXDATA
+00B9 120000      E     LCALL   ?C?LSUB
+00BC 900000      R     MOV     DPTR,#write_bytes_num_curr_page
+00BF 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 501
+00C2         ?C0043:
+                                           ; SOURCE LINE # 504
+00C2 E4                CLR     A
+00C3 900000      R     MOV     DPTR,#start_page_offset
+00C6 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 507
+00C7 120000      R     LCALL   L?0091
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 25  
+
+00CA EC                MOV     A,R4
+00CB 4403              ORL     A,#03H
+00CD FC                MOV     R4,A
+00CE 120000      E     LCALL   _swUtil_SwapEndian
+00D1 900000      R     MOV     DPTR,#temp
+00D4 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 508
+00D7 900000      R     MOV     DPTR,#temp
+00DA 120000      R     LCALL   L?0083
+                                           ; SOURCE LINE # 509
+00DD 900307            MOV     DPTR,#0307H
+00E0 E4                CLR     A
+00E1 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 510
+00E2 900306            MOV     DPTR,#0306H
+00E5 7404              MOV     A,#04H
+00E7 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 512
+00E8 900308            MOV     DPTR,#0308H
+00EB 04                INC     A
+00EC F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 514
+00ED 8006              SJMP    ?C0067
+00EF         ?C0044:
+                                           ; SOURCE LINE # 515
+00EF 900000      R     MOV     DPTR,#c
+00F2 E0                MOVX    A,@DPTR
+00F3 6005              JZ      ?C0045
+                                           ; SOURCE LINE # 516
+                                           ; SOURCE LINE # 517
+00F5         ?C0067:
+00F5 120000      R     LCALL   L?0086
+                                           ; SOURCE LINE # 518
+00F8 80F5              SJMP    ?C0044
+00FA         ?C0045:
+                                           ; SOURCE LINE # 519
+00FA 120000      R     LCALL   L?0089
+                                           ; SOURCE LINE # 520
+00FD 8006              SJMP    ?C0068
+00FF         ?C0046:
+                                           ; SOURCE LINE # 521
+00FF 900000      R     MOV     DPTR,#c
+0102 E0                MOVX    A,@DPTR
+0103 6005              JZ      ?C0047
+                                           ; SOURCE LINE # 522
+                                           ; SOURCE LINE # 523
+0105         ?C0068:
+0105 120000      R     LCALL   L?0086
+                                           ; SOURCE LINE # 524
+0108 80F5              SJMP    ?C0046
+010A         ?C0047:
+                                           ; SOURCE LINE # 525
+                                           ; SOURCE LINE # 526
+010A 120000      R     LCALL   L?0074
+010D FF                MOV     R7,A
+010E EB                MOV     A,R3
+010F 6F                XRL     A,R7
+0110 6014              JZ      ?C0050
+                                           ; SOURCE LINE # 527
+                                           ; SOURCE LINE # 529
+0112 7BFF              MOV     R3,#0FFH
+0114 7A00        R     MOV     R2,#HIGH ?SC_29
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 26  
+
+0116 7900        R     MOV     R1,#LOW ?SC_29
+0118 120000      R     LCALL   L?0092
+011B 8F00        E     MOV     ?_printf?BYTE+06H,R7
+011D 8E00        E     MOV     ?_printf?BYTE+05H,R6
+011F 8D00        E     MOV     ?_printf?BYTE+04H,R5
+0121 8C00        E     MOV     ?_printf?BYTE+03H,R4
+                                           ; SOURCE LINE # 530
+0123 020000      R     LJMP    ?C0069
+                                           ; SOURCE LINE # 531
+                                           ; SOURCE LINE # 532
+                                           ; SOURCE LINE # 534
+0126         ?C0050:
+                                           ; SOURCE LINE # 535
+0126 900000      R     MOV     DPTR,#address_counter
+0129 120000      E     LCALL   ?C?LLDXDATA
+012C 900000      R     MOV     DPTR,#address_counter
+012F 120000      R     LCALL   L?0073
+                                           ; SOURCE LINE # 536
+0132 900000      R     MOV     DPTR,#flash_counter
+0135 E4                CLR     A
+0136 F0                MOVX    @DPTR,A
+0137 A3                INC     DPTR
+0138 04                INC     A
+0139 F0                MOVX    @DPTR,A
+013A         ?C0051:
+013A 120000      R     LCALL   L?0076
+013D 900000      R     MOV     DPTR,#write_bytes_num_curr_page
+0140 120000      R     LCALL   L?0080
+0143 4064              JC      ?C0052
+                                           ; SOURCE LINE # 537
+                                           ; SOURCE LINE # 540
+0145 900306            MOV     DPTR,#0306H
+0148 7401              MOV     A,#01H
+014A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 542
+014B 120000      R     LCALL   L?0089
+                                           ; SOURCE LINE # 544
+014E 8006              SJMP    ?C0070
+0150         ?C0054:
+                                           ; SOURCE LINE # 545
+0150 900000      R     MOV     DPTR,#c
+0153 E0                MOVX    A,@DPTR
+0154 6005              JZ      ?C0055
+                                           ; SOURCE LINE # 546
+                                           ; SOURCE LINE # 547
+0156         ?C0070:
+0156 120000      R     LCALL   L?0087
+                                           ; SOURCE LINE # 548
+0159 80F5              SJMP    ?C0054
+015B         ?C0055:
+                                           ; SOURCE LINE # 549
+                                           ; SOURCE LINE # 550
+015B 120000      R     LCALL   L?0074
+015E FF                MOV     R7,A
+015F EB                MOV     A,R3
+0160 6F                XRL     A,R7
+0161 6020              JZ      ?C0053
+                                           ; SOURCE LINE # 551
+                                           ; SOURCE LINE # 553
+0163 120000      R     LCALL   L?0076
+0166 900000      R     MOV     DPTR,#flash_address
+0169 120000      E     LCALL   ?C?LLDXDATA0
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 27  
+
+016C 120000      E     LCALL   ?C?LADD
+016F 8F00        E     MOV     ?_printf?BYTE+06H,R7
+0171 8E00        E     MOV     ?_printf?BYTE+05H,R6
+0173 8D00        E     MOV     ?_printf?BYTE+04H,R5
+0175 8C00        E     MOV     ?_printf?BYTE+03H,R4
+0177 7BFF              MOV     R3,#0FFH
+0179 7A00        R     MOV     R2,#HIGH ?SC_29
+017B 7900        R     MOV     R1,#LOW ?SC_29
+017D         ?C0069:
+017D 120000      E     LCALL   _printf
+                                           ; SOURCE LINE # 554
+0180 7F00              MOV     R7,#00H
+0182 22                RET     
+                                           ; SOURCE LINE # 555
+                                           ; SOURCE LINE # 556
+                                           ; SOURCE LINE # 558
+                                           ; SOURCE LINE # 559
+0183         ?C0053:
+0183 900000      R     MOV     DPTR,#flash_counter
+0186 E4                CLR     A
+0187 75F001            MOV     B,#01H
+018A 120000      E     LCALL   ?C?IILDX
+018D 900000      R     MOV     DPTR,#address_counter
+0190 120000      E     LCALL   ?C?LLDXDATA
+0193 EF                MOV     A,R7
+0194 2401              ADD     A,#01H
+0196 FF                MOV     R7,A
+0197 E4                CLR     A
+0198 3E                ADDC    A,R6
+0199 FE                MOV     R6,A
+019A E4                CLR     A
+019B 3D                ADDC    A,R5
+019C FD                MOV     R5,A
+019D E4                CLR     A
+019E 3C                ADDC    A,R4
+019F FC                MOV     R4,A
+01A0 900000      R     MOV     DPTR,#address_counter
+01A3 120000      E     LCALL   ?C?LSTXDATA
+01A6 020000      R     LJMP    ?C0051
+01A9         ?C0052:
+                                           ; SOURCE LINE # 560
+01A9 7BFF              MOV     R3,#0FFH
+01AB 7A00        R     MOV     R2,#HIGH ?SC_83
+01AD 7900        R     MOV     R1,#LOW ?SC_83
+01AF 120000      E     LCALL   _printf
+                                           ; SOURCE LINE # 561
+01B2 900308            MOV     DPTR,#0308H
+01B5 E4                CLR     A
+01B6 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 562
+01B7 120000      R     LCALL   spiflash_CheckFlashBusy
+                                           ; SOURCE LINE # 565
+01BA 900000      R     MOV     DPTR,#flash_address
+01BD 120000      E     LCALL   ?C?LLDXDATA0
+01C0 120000      R     LCALL   L?0077
+01C3 120000      E     LCALL   ?C?LADD
+01C6 900000      R     MOV     DPTR,#flash_address
+01C9 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 567
+01CC 900000      R     MOV     DPTR,#length
+01CF 120000      E     LCALL   ?C?LLDXDATA
+01D2 900000      R     MOV     DPTR,#write_bytes_num_curr_page
+C51 COMPILER V9.54   SPIFLASH_DRV                                                          08/17/2016 01:08:45 PAGE 28  
+
+01D5 120000      R     LCALL   L?0085
+01D8 900000      R     MOV     DPTR,#length
+01DB 120000      E     LCALL   ?C?LSTXDATA
+                                           ; SOURCE LINE # 568
+01DE 020000      R     LJMP    ?C0040
+01E1         ?C0041:
+                                           ; SOURCE LINE # 571
+01E1 7F01              MOV     R7,#01H
+                                           ; SOURCE LINE # 572
+01E3         ?C0049:
+01E3 22                RET     
+             ; FUNCTION _spiflash_pageReadVerify (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1379    ----
+   CONSTANT SIZE    =     85    ----
+   XDATA SIZE       =   ----      66
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      33
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

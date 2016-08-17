@@ -1,0 +1,1358 @@
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE     1
+
+
+MACRO ASSEMBLER AX51 V3.13.0.0
+OBJECT MODULE PLACED IN .\spiflash_drv.OBJ
+ASSEMBLER INVOKED BY: C:\Keil_v5\C51\BIN\AX51.EXE .\spiflash_drv.src PR(.\spiflash_drv.ls1) EP DEBUG
+
+LOC    OBJ             LINE     SOURCE
+
+                          1     ; .\spiflash_drv.SRC generated from: ..\src\spiflash_drv.c
+                          2     ; COMPILER INVOKED BY:
+                          3     ;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\spiflash_drv.c OMF2 OPTIMIZE(8,SIZE) BROWSE I
+                               NCDIR(..\src;C:\Keil\C51\INC;..\src) DEBUG CODE PRINT(.\spiflash_drv.lst) TABS(2) PREPRIN
+                               T(.\spiflash_drv.i) SRC(.\spiflash_drv.SRC)
+                          4     
+                          5     $nomod51 
+                          6     
+                          7     NAME    SPIFLASH_DRV
+                          8     
+ 0080                     9     P0      DATA    080H
+ 0090                    10     P1      DATA    090H
+ 00A0                    11     P2      DATA    0A0H
+ 009F                    12     BANKSEL DATA    09FH
+ 00B0                    13     P3      DATA    0B0H
+ 00B0.4                  14     T0      BIT     0B0H.4
+ 00D0.6                  15     AC      BIT     0D0H.6
+ 00B0.5                  16     T1      BIT     0B0H.5
+ 00A8.7                  17     EA      BIT     0A8H.7
+ 00A8                    18     IE      DATA    0A8H
+ 00B0.7                  19     RD      BIT     0B0H.7
+ 00F8                    20     MEMCTRL DATA    0F8H
+ 00A8.4                  21     ES      BIT     0A8H.4
+ 00B8                    22     IP      DATA    0B8H
+ 0098.0                  23     RI      BIT     098H.0
+ 00B0.2                  24     INT0    BIT     0B0H.2
+ 00D0.7                  25     CY      BIT     0D0H.7
+ 0098.1                  26     TI      BIT     098H.1
+ 00B0.3                  27     INT1    BIT     0B0H.3
+ 00B8.4                  28     PS      BIT     0B8H.4
+ 0081                    29     SP      DATA    081H
+ 00D0.2                  30     OV      BIT     0D0H.2
+ 00B0.6                  31     WR      BIT     0B0H.6
+ 0099                    32     SBUF    DATA    099H
+ 0087                    33     PCON    DATA    087H
+ 0098                    34     SCON    DATA    098H
+ 0089                    35     TMOD    DATA    089H
+ 0088                    36     TCON    DATA    088H
+ 0088.1                  37     IE0     BIT     088H.1
+ 0088.3                  38     IE1     BIT     088H.3
+ 00F0                    39     B       DATA    0F0H
+ 00E0                    40     ACC     DATA    0E0H
+ 00A8.1                  41     ET0     BIT     0A8H.1
+ 00A8.3                  42     ET1     BIT     0A8H.3
+ 0088.5                  43     TF0     BIT     088H.5
+ 0088.7                  44     TF1     BIT     088H.7
+ 00F4                    45     CRLA_H  DATA    0F4H
+ 0098.2                  46     RB8     BIT     098H.2
+ 008C                    47     TH0     DATA    08CH
+ 00A8.0                  48     EX0     BIT     0A8H.0
+ 0088.0                  49     IT0     BIT     088H.0
+ 008D                    50     TH1     DATA    08DH
+ 0098.3                  51     TB8     BIT     098H.3
+ 00A8.2                  52     EX1     BIT     0A8H.2
+ 0088.2                  53     IT1     BIT     088H.2
+ 00D0.0                  54     P       BIT     0D0H.0
+ 00F3                    55     CRLA_L  DATA    0F3H
+ 0098.7                  56     SM0     BIT     098H.7
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE     2
+
+ 008A                    57     TL0     DATA    08AH
+ 0098.6                  58     SM1     BIT     098H.6
+ 008B                    59     TL1     DATA    08BH
+ 0098.5                  60     SM2     BIT     098H.5
+ 00F2                    61     CRSA_H  DATA    0F2H
+ 00B8.1                  62     PT0     BIT     0B8H.1
+ 00B8.3                  63     PT1     BIT     0B8H.3
+ 00D0.3                  64     RS0     BIT     0D0H.3
+ 0088.4                  65     TR0     BIT     088H.4
+ 00D0.4                  66     RS1     BIT     0D0H.4
+ 00F1                    67     CRSA_L  DATA    0F1H
+ 0088.6                  68     TR1     BIT     088H.6
+ 00B8.0                  69     PX0     BIT     0B8H.0
+ 00B8.2                  70     PX1     BIT     0B8H.2
+ 0083                    71     DPH     DATA    083H
+ 0082                    72     DPL     DATA    082H
+ 0098.4                  73     REN     BIT     098H.4
+ 00B0.0                  74     RXD     BIT     0B0H.0
+ 00B0.1                  75     TXD     BIT     0B0H.1
+ 00D0.5                  76     F0      BIT     0D0H.5
+ 00D0                    77     PSW     DATA    0D0H
+------                   78     ?PR?_spiFlash_Cmd?SPIFLASH_DRV           SEGMENT CODE 
+------                   79     ?DT?_spiFlash_Cmd?SPIFLASH_DRV           SEGMENT DATA OVERLAYABLE
+------                   80     ?PR?_spiflash_wren?SPIFLASH_DRV          SEGMENT CODE 
+------                   81     ?PR?_spiflash_wrsr_unlock?SPIFLASH_DRV   SEGMENT CODE 
+------                   82     ?DT?_spiflash_wrsr_unlock?SPIFLASH_DRV   SEGMENT DATA OVERLAYABLE
+------                   83     ?PR?spiflash_CheckFlashBusy?SPIFLASH_DRV SEGMENT CODE 
+------                   84     ?PR?_spiflash_EraseBlock?SPIFLASH_DRV    SEGMENT CODE 
+------                   85     ?DT?_spiflash_EraseBlock?SPIFLASH_DRV    SEGMENT DATA OVERLAYABLE
+------                   86     ?PR?spiflash_eraseLower256k?SPIFLASH_DRV SEGMENT CODE 
+------                   87     ?PR?spiflash_eraseBackup256k?SPIFLASH_DRV SEGMENT CODE 
+------                   88     ?PR?_spiflash_WriteByte?SPIFLASH_DRV     SEGMENT CODE 
+------                   89     ?DT?_spiflash_WriteByte?SPIFLASH_DRV     SEGMENT DATA OVERLAYABLE
+------                   90     ?PR?_spiflash_ReadByte?SPIFLASH_DRV      SEGMENT CODE 
+------                   91     ?DT?_spiflash_ReadByte?SPIFLASH_DRV      SEGMENT DATA OVERLAYABLE
+------                   92     ?PR?_spiflash_eraseSector?SPIFLASH_DRV   SEGMENT CODE 
+------                   93     ?DT?_spiflash_eraseSector?SPIFLASH_DRV   SEGMENT DATA OVERLAYABLE
+------                   94     ?CO?SPIFLASH_DRV     SEGMENT CODE 
+------                   95     ?ID?_spiFlash_Cmd?SPIFLASH_DRV           SEGMENT IDATA OVERLAYABLE
+------                   96     ?ID?spiflash_CheckFlashBusy?SPIFLASH_DRV SEGMENT IDATA OVERLAYABLE
+------                   97     ?ID?spiflash_eraseLower256k?SPIFLASH_DRV SEGMENT IDATA OVERLAYABLE
+------                   98     ?ID?spiflash_eraseBackup256k?SPIFLASH_DRV SEGMENT IDATA OVERLAYABLE
+                         99             EXTRN   CODE (_printf)
+                        100             EXTRN   DATA (?_printf?BYTE)
+                        101             EXTRN   CODE (_swUtil_SwapEndian)
+                        102             EXTRN   CODE (?C?LSTIDATA)
+                        103             EXTRN   CODE (?C?LLDIDATA)
+                        104             EXTRN   CODE (?C?LSTXDATA)
+                        105             EXTRN   CODE (?C?LSHL)
+                        106             PUBLIC  _spiflash_eraseSector
+                        107             PUBLIC  _spiflash_ReadByte
+                        108             PUBLIC  ?_spiflash_WriteByte?BYTE
+                        109             PUBLIC  _spiflash_WriteByte
+                        110             PUBLIC  spiflash_eraseBackup256k
+                        111             PUBLIC  spiflash_eraseLower256k
+                        112             PUBLIC  ?_spiflash_EraseBlock?BYTE
+                        113             PUBLIC  _spiflash_EraseBlock
+                        114             PUBLIC  spiflash_CheckFlashBusy
+                        115             PUBLIC  _spiflash_wrsr_unlock
+                        116             PUBLIC  _spiflash_wren
+                        117             PUBLIC  ?_spiFlash_Cmd?BYTE
+                        118             PUBLIC  _spiFlash_Cmd
+                        119     
+------                  120             RSEG  ?DT?_spiflash_wrsr_unlock?SPIFLASH_DRV
+000000                  121     ?_spiflash_wrsr_unlock?BYTE:
+000000                  122          unlock?247:   DS   1
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE     3
+
+                        123     
+------                  124             RSEG  ?DT?_spiflash_EraseBlock?SPIFLASH_DRV
+000000                  125     ?_spiflash_EraseBlock?BYTE:
+000000                  126         BlockID?449:   DS   4
+000004                  127             ORG  4
+000004                  128         block64?450:   DS   1
+                        129     
+------                  130             RSEG  ?DT?_spiFlash_Cmd?SPIFLASH_DRV
+000000                  131     ?_spiFlash_Cmd?BYTE:
+000000                  132     NumOfByteCmd?040:   DS   1
+000001                  133             ORG  1
+000001                  134         CmdData?041:   DS   4
+000005                  135             ORG  5
+000005                  136     SpiWriteData?042:   DS   1
+000006                  137             ORG  6
+000006                  138            RdWr?043:   DS   1
+                        139     
+------                  140             RSEG  ?DT?_spiflash_eraseSector?SPIFLASH_DRV
+000000                  141     ?_spiflash_eraseSector?BYTE:
+000000                  142          Sector?956:   DS   4
+                        143     
+------                  144             RSEG  ?DT?_spiflash_ReadByte?SPIFLASH_DRV
+000000                  145     ?_spiflash_ReadByte?BYTE:
+000000                  146            Addr?855:   DS   4
+                        147     
+------                  148             RSEG  ?DT?_spiflash_WriteByte?SPIFLASH_DRV
+000000                  149     ?_spiflash_WriteByte?BYTE:
+000000                  150            Addr?753:   DS   4
+000004                  151             ORG  4
+000004                  152           IData?754:   DS   1
+                        153     
+------                  154             RSEG  ?ID?_spiFlash_Cmd?SPIFLASH_DRV
+000000                  155               c?044:   DS   1
+                        156     
+------                  157             RSEG  ?ID?_spiFlash_Cmd?SPIFLASH_DRV
+000001                  158            temp?045:   DS   4
+                        159     
+------                  160             RSEG  ?ID?spiflash_CheckFlashBusy?SPIFLASH_DRV
+000000                  161               c?348:   DS   1
+                        162     
+------                  163             RSEG  ?ID?spiflash_eraseLower256k?SPIFLASH_DRV
+000000                  164          BlckID?551:   DS   1
+                        165     
+------                  166             RSEG  ?ID?spiflash_eraseBackup256k?SPIFLASH_DRV
+000000                  167          BlckID?652:   DS   1
+                        168     
+------                  169             RSEG  ?CO?SPIFLASH_DRV
+000000                  170     ?SC_0:
+000000 0A202D2D         171             DB  00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'D' ,'e' ,'l' ,'e' 
+000004 3E204465                 
+000008 6C65                     
+00000A 74696E67         172             DB  't' ,'i' ,'n' ,'g' ,' ' ,'c' ,'o' ,'d' ,'e' ,' ' 
+00000E 20636F64                 
+000012 6520                     
+000014 696D6167         173             DB  'i' ,'m' ,'a' ,'g' ,'e' ,' ' ,000H
+000018 652000                   
+                        174     
+00001B                  175     ?SC_27:
+00001B 2E00             176             DB  '.' ,000H
+                        177     
+00001D                  178     ?SC_29:
+00001D 0A202D2D         179             DB  00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'D' ,'e' ,'l' ,'e' 
+000021 3E204465                 
+000025 6C65                     
+000027 74696E67         180             DB  't' ,'i' ,'n' ,'g' ,' ' ,'b' ,'a' ,'c' ,'k' ,'u' 
+00002B 20626163                 
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE     4
+
+00002F 6B75                     
+000031 7020636F         181             DB  'p' ,' ' ,'c' ,'o' ,'d' ,'e' ,' ' ,'i' ,'m' ,'a' 
+000035 64652069                 
+000039 6D61                     
+00003B 67652000         182             DB  'g' ,'e' ,' ' ,000H
+                        183     
+                        184     
+------                  185             RSEG ?DT?_spiflash_eraseSector?SPIFLASH_DRV
+                        186     ; /*
+                        187     ; * Description : 8051 bootloader spiflash driver functions
+                        188     ; *
+                        189     ; * Copyright (c) 2011-2012 Greenvity Communications, Inc.
+                        190     ; * All rights reserved.
+                        191     ; *
+                        192     ; * Author      : Peter Nguyen
+                        193     ; * Release Date: 04/27/2013
+                        194     ; * Purpose :
+                        195     ; *     spiflash driver functions for the bootloader
+                        196     ; *
+                        197     ; * File: spiflash_drv.c
+                        198     ; */
+                        199     ; #include "test.h"
+                        200     ; 
+                        201     ; #include <typedef.h>
+                        202     ; #include <stdio.h>
+                        203     ; #include <reg51.h>
+                        204     ; #include <macro_def.h>
+                        205     ; #include "spiflash.h"
+                        206     ; 
+                        207     ; #define SPIFL_TXSTAT          0x0300
+                        208     ; #define SPIFL_CFG             0x0304
+                        209     ; #define SPIFL_MSBDATABIT_FIRST 0x0305
+                        210     ; #define SPIFL_NOBYTE2TX 0x0306
+                        211     ; #define SPIFL_TXCTRL          0x0308
+                        212     ; #define SPIFL_WRDATA          0x030C
+                        213     ; #define SPIFL_RDDATA  0x030C
+                        214     ; #define SPIFL_WRDATA0         0x030F  //Command/opcode        - Sent first. 
+                        215     ; #define SPIFL_WRDATA1         0x030E  //Address MS byte
+                        216     ; #define SPIFL_WRDATA2         0x030D  //Address 2nd byte
+                        217     ; #define SPIFL_WRDATA3         0x030C  //Address LS byte  - Compiler is big endian, so 
+                               if sent more than 2 bytes, sw has to swap byte orders before write 
+                        218     ; #define SPIFL_WRDATA4         0x0307  //Data written to sflash        - Sent last
+                        219     ; 
+                        220     ; #define SPIFL_RD         0x03  //Read 1 byte
+                        221     ; #define SPIFL_SECERASE         0x20000000  //Sector erase
+                        222     ; #define SPIFL_BLKERASE   0x52000000
+                        223     ; #define SPIFL_BLK64ERASE 0xD8000000
+                        224     ; #ifdef ONEBYTE_COMMAND_ERASE
+                        225     ; #define SPIFL_CHIPERASE  0x60000000 //Chip erase
+                        226     ; #define SPIFL_CHIPERASE1 0xC7000000
+                        227     ; #else
+                        228     ; #define SPIFL_CHIPERASE  0x60     //Chip erase
+                        229     ; #define SPIFL_CHIPERASE1 0xC7
+                        230     ; #endif
+                        231     ; #define SPIFL_BYTEPRGRM  0x02000000 //Program 1 byte
+                        232     ; #define SPIFL_BYTEREAD         0x03000000 //Read 1 bytes
+                        233     ; #define SPIFL_AAI        0xAF //Auto address increment 
+                        234     ; #define SPIFL_RDSR       0x05 //Read status register
+                        235     ; #define SPIFL_EWSR_B     0x50 //Enable write status register
+                        236     ; #define SPIFL_EWSR       0x50000000 //Enable write status register
+                        237     ; #define SPIFL_WRSR_B   0x01 //Write status register
+                        238     ; #define SPIFL_WRSR       0x00010000 //Write status register
+                        239     ; #define SPIFL_WREN_B           0x06 //Enable write data byte - this is mainly enable t
+                               o latch the address, so any command with the address needs to have this command execute before.
+                        240     ; #define SPIFL_WREN       0x06000000 //Enable to write data to spiflash
+                        241     ; #define SPIFL_WRDI_B   0x04 //Disable write byte.
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE     5
+
+                        242     ; #define SPIFL_WRDI       0x04000000 //Write disable
+                        243     ; #define SPIFL_RDID       0x90 //Read ID
+                        244     ; 
+                        245     ; u8 spiflash_ReadStatusReg(void);
+                        246     ; void spiflash_CheckFlashBusy();
+                        247     ; void spiFlash_Cmd(u8, u32, u8, u8);
+                        248     ; void spiflash_wren(u8);
+                        249     ; void spiflash_eraseConfigMem();
+                        250     ; void spiflash_eraseSector(u32);
+                        251     ; void spiflash_wrsr_unlock(u8);
+                        252     ; void test_spiflash(void);
+                        253     ; void spiflash_chiperase(void);
+                        254     ; void spiflash_eraseLower256k();
+                        255     ; void spiflash_CheckFlashBusy();
+                        256     ; u8 spiflash_ReadStatusReg(void);
+                        257     ; void spiflash_WriteByte(u32, u8);
+                        258     ; u8 spiflash_ReadByte(u32);
+                        259     ; u8 spiflash_BackupCodeImage();
+                        260     ; 
+                        261     ; 
+                        262     ; 
+                        263     ; //***************************************************************
+                        264     ; // void spiFlash_Cmd(u8 NumOfByteCmd, u32 CmdData) is to send a command to the spiflas
+                               h
+                        265     ; // An spiflash command may be from 1 to 4 bytes in length
+                        266     ; // Input:
+                        267     ; //            NumOfByteCmd: The length of command in number of bytes sent to sflash.
+                        268     ; //            CmdData: Command data from 1 byte to 4 bytes
+                        269     ; //            SpiWriteData: 5th byte to transmit to spi flash in case 5-byte command
+                        270     ; //***************************************************************
+                        271     ; void spiFlash_Cmd(u8 const NumOfByteCmd, u32 const CmdData, u8 const SpiWriteData, u8 
+                               const RdWr)
+                        272     
+------                  273             RSEG  ?PR?_spiFlash_Cmd?SPIFLASH_DRV
+000000                  274     L?0050:
+                        275             USING   0
+000000 8F00       F     276             MOV     ?_spiFlash_Cmd?BYTE+04H,R7
+000002 8E00       F     277             MOV     ?_spiFlash_Cmd?BYTE+03H,R6
+000004 8D00       F     278             MOV     ?_spiFlash_Cmd?BYTE+02H,R5
+000006 F500       F     279             MOV     ?_spiFlash_Cmd?BYTE+01H,A
+000008 E4               280             CLR     A
+000009 F500       F     281             MOV     ?_spiFlash_Cmd?BYTE+05H,A
+00000B F500       F     282             MOV     ?_spiFlash_Cmd?BYTE+06H,A
+00000D 7F04             283             MOV     R7,#04H
+00000F                  284     _spiFlash_Cmd:
+                        285             USING   0
+                        286                             ; SOURCE LINE # 86
+00000F 8F00       F     287             MOV     NumOfByteCmd?040,R7
+                        288     ; {
+                        289                             ; SOURCE LINE # 87
+                        290     ;       u8 idata c;
+                        291     ;       u32 idata temp;
+                        292     ;       temp = swUtil_SwapEndian(CmdData);
+                        293                             ; SOURCE LINE # 90
+000011 AF00       F     294             MOV     R7,CmdData?041+03H
+000013 AE00       F     295             MOV     R6,CmdData?041+02H
+000015 AD00       F     296             MOV     R5,CmdData?041+01H
+000017 AC00       F     297             MOV     R4,CmdData?041
+000019 120000     E     298             LCALL   _swUtil_SwapEndian
+00001C 7800       F     299             MOV     R0,#LOW (temp?045)
+00001E 120000     E     300             LCALL   ?C?LSTIDATA
+                        301     ;       *(u32 xdata *)SPIFL_WRDATA = (u32)(temp);
+                        302                             ; SOURCE LINE # 91
+000021 7800       F     303             MOV     R0,#LOW (temp?045)
+000023 120000     E     304             LCALL   ?C?LLDIDATA
+000026 90030C           305             MOV     DPTR,#030CH
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE     6
+
+000029 120000     E     306             LCALL   ?C?LSTXDATA
+                        307     ;       *(u8 xdata *)SPIFL_WRDATA4 = (u8)(SpiWriteData);
+                        308                             ; SOURCE LINE # 92
+00002C 900307           309             MOV     DPTR,#0307H
+00002F E500       F     310             MOV     A,SpiWriteData?042
+000031 F0               311             MOVX    @DPTR,A
+                        312     ;       *(u8 xdata *)SPIFL_NOBYTE2TX = NumOfByteCmd;
+                        313                             ; SOURCE LINE # 93
+000032 900306           314             MOV     DPTR,#0306H
+000035 E500       F     315             MOV     A,NumOfByteCmd?040
+000037 F0               316             MOVX    @DPTR,A
+                        317     ;       if (RdWr){              
+                        318                             ; SOURCE LINE # 94
+000038 E500       F     319             MOV     A,RdWr?043
+00003A 6021             320             JZ      ?C0001
+                        321     ;               *(u8 xdata *)SPIFL_TXCTRL    = 0x5; 
+                        322                             ; SOURCE LINE # 95
+00003C 900308           323             MOV     DPTR,#0308H
+00003F 7405             324             MOV     A,#05H
+000041 F0               325             MOVX    @DPTR,A
+                        326     ;               c = *(u8 xdata *)SPIFL_TXSTAT;
+                        327                             ; SOURCE LINE # 96
+000042 900300           328             MOV     DPTR,#0300H
+000045 E0               329             MOVX    A,@DPTR
+000046 7800       F     330             MOV     R0,#LOW (c?044)
+000048 F6               331             MOV     @R0,A
+000049                  332     ?C0002:
+                        333     ;               while (c!=0)
+                        334                             ; SOURCE LINE # 97
+000049 7800       F     335             MOV     R0,#LOW (c?044)
+00004B E6               336             MOV     A,@R0
+00004C 6007             337             JZ      ?C0003
+                        338     ;               {
+                        339                             ; SOURCE LINE # 98
+                        340     ;                       c = *(u8 xdata *)SPIFL_TXSTAT;
+                        341                             ; SOURCE LINE # 99
+00004E 900300           342             MOV     DPTR,#0300H
+000051 E0               343             MOVX    A,@DPTR
+000052 F6               344             MOV     @R0,A
+                        345     ;               }
+                        346                             ; SOURCE LINE # 100
+000053 80F4             347             SJMP    ?C0002
+000055                  348     ?C0003:
+                        349     ;               *(u8 xdata *)SPIFL_TXCTRL    = 0x3; 
+                        350                             ; SOURCE LINE # 101
+000055 900308           351             MOV     DPTR,#0308H
+000058 7403             352             MOV     A,#03H
+00005A F0               353             MOVX    @DPTR,A
+                        354     ;       } else {
+                        355                             ; SOURCE LINE # 102
+00005B 8006             356             SJMP    ?C0004
+00005D                  357     ?C0001:
+                        358     ;               *(u8 xdata *)SPIFL_TXCTRL    = 0x5; 
+                        359                             ; SOURCE LINE # 103
+00005D 900308           360             MOV     DPTR,#0308H
+000060 7405             361             MOV     A,#05H
+000062 F0               362             MOVX    @DPTR,A
+                        363     ;       }
+                        364                             ; SOURCE LINE # 104
+000063                  365     ?C0004:
+                        366     ;       c = *(u8 xdata *)SPIFL_TXSTAT;
+                        367                             ; SOURCE LINE # 105
+000063 900300           368             MOV     DPTR,#0300H
+000066 E0               369             MOVX    A,@DPTR
+000067 7800       F     370             MOV     R0,#LOW (c?044)
+000069 F6               371             MOV     @R0,A
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE     7
+
+00006A                  372     ?C0005:
+                        373     ;       while (c!=0)
+                        374                             ; SOURCE LINE # 106
+00006A 7800       F     375             MOV     R0,#LOW (c?044)
+00006C E6               376             MOV     A,@R0
+00006D 6007             377             JZ      ?C0006
+                        378     ;       {
+                        379                             ; SOURCE LINE # 107
+                        380     ;               c = *(u8 xdata *)SPIFL_TXSTAT;
+                        381                             ; SOURCE LINE # 108
+00006F 900300           382             MOV     DPTR,#0300H
+000072 E0               383             MOVX    A,@DPTR
+000073 F6               384             MOV     @R0,A
+                        385     ;       }
+                        386                             ; SOURCE LINE # 109
+000074 80F4             387             SJMP    ?C0005
+000076                  388     ?C0006:
+                        389     ;       *(u8 xdata *)SPIFL_TXCTRL  = 0x0; 
+                        390                             ; SOURCE LINE # 110
+000076 900308           391             MOV     DPTR,#0308H
+000079 E4               392             CLR     A
+00007A F0               393             MOVX    @DPTR,A
+                        394     ;       return;
+                        395     ; }
+                        396                             ; SOURCE LINE # 112
+00007B                  397     ?C0007:
+00007B 22               398             RET     
+                        399     ; END OF _spiFlash_Cmd
+                        400     
+                        401     ; //***************************************************************
+                        402     ; // void spiflash_wren(u8 wren) to enable or disable sflash write enable
+                        403     ; // Input:
+                        404     ; //            wren = 1: Enable write mode
+                        405     ; //            wren = 0: Disable write mode
+                        406     ; //            the write enable mode will be disable automatically after every write co
+                               mmand
+                        407     ; //***************************************************************
+                        408     ; 
+                        409     ; void spiflash_wren(u8 const wren)
+                        410     
+------                  411             RSEG  ?PR?_spiflash_wren?SPIFLASH_DRV
+000000                  412     _spiflash_wren:
+                        413             USING   0
+                        414                             ; SOURCE LINE # 121
+                        415     ;---- Variable 'wren?146' assigned to Register 'R7' ----
+                        416     ; {
+                        417                             ; SOURCE LINE # 122
+                        418     ;       if (wren==1)
+                        419                             ; SOURCE LINE # 123
+000000 BF0106           420             CJNE    R7,#01H,?C0008
+                        421     ;               spiFlash_Cmd(1,SPIFL_WREN_B,0,0);
+                        422                             ; SOURCE LINE # 124
+000003 E4               423             CLR     A
+000004 750006     F     424             MOV     ?_spiFlash_Cmd?BYTE+04H,#06H
+000007 8004             425             SJMP    ?C0047
+000009                  426     ?C0008:
+                        427     ;       else
+                        428     ;               spiFlash_Cmd(1,SPIFL_WRDI_B,0,0);
+                        429                             ; SOURCE LINE # 126
+000009 E4               430             CLR     A
+00000A 750004     F     431             MOV     ?_spiFlash_Cmd?BYTE+04H,#04H
+00000D                  432     ?C0047:
+00000D F500       F     433             MOV     ?_spiFlash_Cmd?BYTE+03H,A
+00000F F500       F     434             MOV     ?_spiFlash_Cmd?BYTE+02H,A
+000011 F500       F     435             MOV     ?_spiFlash_Cmd?BYTE+01H,A
+000013 F500       F     436             MOV     ?_spiFlash_Cmd?BYTE+05H,A
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE     8
+
+000015 F500       F     437             MOV     ?_spiFlash_Cmd?BYTE+06H,A
+000017 7F01             438             MOV     R7,#01H
+000019 120000     F     439             LCALL   _spiFlash_Cmd
+                        440     ;       return;
+                        441     ; }
+                        442                             ; SOURCE LINE # 128
+00001C                  443     ?C0010:
+00001C 22               444             RET     
+                        445     ; END OF _spiflash_wren
+                        446     
+                        447     ; //***************************************************************
+                        448     ; // void spiflash_wrsr_unlock(u8 unlock) is to unlock or lock the spiflash
+                        449     ; // Input
+                        450     ; //            unlock = 1: is to unlock the chip
+                        451     ; //            unlock = 0: is to lock the chip
+                        452     ; //***************************************************************
+                        453     ; 
+                        454     ; void spiflash_wrsr_unlock(u8 const unlock)
+                        455     
+------                  456             RSEG  ?PR?_spiflash_wrsr_unlock?SPIFLASH_DRV
+000000                  457     _spiflash_wrsr_unlock:
+                        458             USING   0
+                        459                             ; SOURCE LINE # 136
+000000 8F00       F     460             MOV     unlock?247,R7
+                        461     ; {     
+                        462                             ; SOURCE LINE # 137
+                        463     ;       spiflash_wren(1);
+                        464                             ; SOURCE LINE # 138
+000002 7F01             465             MOV     R7,#01H
+000004 120000     F     466             LCALL   _spiflash_wren
+                        467     ;       if (unlock==1)
+                        468                             ; SOURCE LINE # 139
+000007 E500       F     469             MOV     A,unlock?247
+000009 B40105           470             CJNE    A,#01H,?C0011
+                        471     ;               spiFlash_Cmd(2,(u32)(SFLASH_PROTECT_NONE|(SPIFL_WRSR_B<<8)),0,0);
+                        472                             ; SOURCE LINE # 140
+00000C E4               473             CLR     A
+00000D F500       F     474             MOV     ?_spiFlash_Cmd?BYTE+04H,A
+00000F 8004             475             SJMP    ?C0048
+000011                  476     ?C0011:
+                        477     ;       else 
+                        478     ;               spiFlash_Cmd(2,(u32)(SFLASH_PROTECT_ALL|(SPIFL_WRSR_B<<8)),0,0);
+                        479                             ; SOURCE LINE # 142
+000011 E4               480             CLR     A
+000012 7500BC     F     481             MOV     ?_spiFlash_Cmd?BYTE+04H,#0BCH
+000015                  482     ?C0048:
+000015 750001     F     483             MOV     ?_spiFlash_Cmd?BYTE+03H,#01H
+000018 F500       F     484             MOV     ?_spiFlash_Cmd?BYTE+02H,A
+00001A F500       F     485             MOV     ?_spiFlash_Cmd?BYTE+01H,A
+00001C F500       F     486             MOV     ?_spiFlash_Cmd?BYTE+05H,A
+00001E F500       F     487             MOV     ?_spiFlash_Cmd?BYTE+06H,A
+000020 7F02             488             MOV     R7,#02H
+000022 120000     F     489             LCALL   _spiFlash_Cmd
+000025                  490     ?C0012:
+                        491     ;       spiflash_CheckFlashBusy();
+                        492                             ; SOURCE LINE # 143
+000025 120000     F     493             LCALL   spiflash_CheckFlashBusy
+                        494     ;       return;
+                        495     ; }
+                        496                             ; SOURCE LINE # 145
+000028                  497     ?C0013:
+000028 22               498             RET     
+                        499     ; END OF _spiflash_wrsr_unlock
+                        500     
+                        501     ; #ifdef FEATURE_CHIPERASE
+                        502     ; //***************************************************************
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE     9
+
+                        503     ; //spiflash_chiperase(): erase the whole chip
+                        504     ; //***************************************************************
+                        505     ; #ifdef ONEBYTE_COMMAND_ERASE
+                        506     ; void spiflash_chiperase()
+                        507     ; {
+                        508     ;       u8 c;
+                        509     ;       spiflash_wrsr_unlock(1);
+                        510     ;       spiflash_wren(1);
+                        511     ;       *(u8 xdata *)SPIFL_NOBYTE2TX = 0x1;  
+                        512     ;       *(u32 xdata *)SPIFL_WRDATA   = (u32)SPIFL_CHIPERASE;
+                        513     ;       *(u8 xdata *)SPIFL_TXCTRL    = 0x5;
+                        514     ;       c = *(u8 xdata *)SPIFL_TXSTAT;
+                        515     ;       while (c!=0)
+                        516     ;       {
+                        517     ;               c = *(u8 xdata *)SPIFL_TXSTAT;
+                        518     ;       }
+                        519     ;       *(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+                        520     ; 
+                        521     ;       spiflash_wrsr_unlock(1);
+                        522     ;       spiflash_wren(1);
+                        523     ;       *(u8 xdata *)SPIFL_NOBYTE2TX = 0x1;  
+                        524     ;       *(u32 xdata *)SPIFL_WRDATA       = (u32)SPIFL_CHIPERASE1;
+                        525     ;       *(u8 xdata *)SPIFL_TXCTRL        = 0x5; 
+                        526     ;       c = *(u8 xdata *)SPIFL_TXSTAT;
+                        527     ;       while (c!=0)
+                        528     ;       {
+                        529     ;               c = *(u8 xdata *)SPIFL_TXSTAT;
+                        530     ;       }
+                        531     ;       *(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+                        532     ;       return;
+                        533     ; }
+                        534     ; #else
+                        535     ; void spiflash_chiperase()
+                        536     ; {
+                        537     ;       spiflash_wrsr_unlock(1);
+                        538     ;       spiflash_wren(1);
+                        539     ;       spiFlash_Cmd((u8)1,(u32)SPIFL_CHIPERASE, 0,0);
+                        540     ;       spiflash_wren(1);
+                        541     ;       spiFlash_Cmd((u8)1,(u32)SPIFL_CHIPERASE1, 0,0); 
+                        542     ;       return;
+                        543     ; }
+                        544     ; #endif
+                        545     ; #endif
+                        546     ; //***************************************************************
+                        547     ; //void spiflash_CheckFlashBusy(void)
+                        548     ; //Read status register untill bit busy == 0
+                        549     ; //***************************************************************
+                        550     ; void spiflash_CheckFlashBusy()
+                        551     
+------                  552             RSEG  ?PR?spiflash_CheckFlashBusy?SPIFLASH_DRV
+000000                  553     spiflash_CheckFlashBusy:
+                        554             USING   0
+                        555                             ; SOURCE LINE # 195
+                        556     ; {
+                        557                             ; SOURCE LINE # 196
+                        558     ;       u8 idata c;
+                        559     ; check_st_reg:
+                        560                             ; SOURCE LINE # 198
+000000                  561     ?spiflash_CheckFlashBusy?check_st_reg:
+                        562     ;       *(u8 xdata *)SPIFL_NOBYTE2TX = 1;
+                        563                             ; SOURCE LINE # 199
+000000 900306           564             MOV     DPTR,#0306H
+000003 7401             565             MOV     A,#01H
+000005 F0               566             MOVX    @DPTR,A
+                        567     ;       *(u8 xdata *)SPIFL_WRDATA        = (u8)(SPIFL_RDSR);
+                        568                             ; SOURCE LINE # 200
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    10
+
+000006 90030C           569             MOV     DPTR,#030CH
+000009 7405             570             MOV     A,#05H
+00000B F0               571             MOVX    @DPTR,A
+                        572     ;       *(u8 xdata *)SPIFL_TXCTRL        = 0x5;
+                        573                             ; SOURCE LINE # 201
+00000C 900308           574             MOV     DPTR,#0308H
+00000F F0               575             MOVX    @DPTR,A
+                        576     ; check_Txdone1:
+                        577                             ; SOURCE LINE # 202
+000010                  578     ?spiflash_CheckFlashBusy?check_Txdone1:
+                        579     ;       c = *(u8 xdata *)SPIFL_TXSTAT;
+                        580                             ; SOURCE LINE # 203
+000010 900300           581             MOV     DPTR,#0300H
+000013 E0               582             MOVX    A,@DPTR
+000014 7800       F     583             MOV     R0,#LOW (c?348)
+000016 F6               584             MOV     @R0,A
+                        585     ;       if (c!=0)
+                        586                             ; SOURCE LINE # 204
+000017 70F7             587             JNZ     ?spiflash_CheckFlashBusy?check_Txdone1
+                        588     ;               goto check_Txdone1;
+                        589                             ; SOURCE LINE # 205
+000019                  590     ?C0016:
+                        591     ;       *(u8 xdata *)SPIFL_TXCTRL  = 0x3;
+                        592                             ; SOURCE LINE # 206
+000019 900308           593             MOV     DPTR,#0308H
+00001C 7403             594             MOV     A,#03H
+00001E F0               595             MOVX    @DPTR,A
+                        596     ; check_Rxdone:
+                        597                             ; SOURCE LINE # 207
+00001F                  598     ?spiflash_CheckFlashBusy?check_Rxdone:
+                        599     ;       c = *(u8 xdata *)SPIFL_TXSTAT;
+                        600                             ; SOURCE LINE # 208
+00001F 900300           601             MOV     DPTR,#0300H
+000022 E0               602             MOVX    A,@DPTR
+000023 7800       F     603             MOV     R0,#LOW (c?348)
+000025 F6               604             MOV     @R0,A
+                        605     ;       if (c!=0)
+                        606                             ; SOURCE LINE # 209
+000026 70F7             607             JNZ     ?spiflash_CheckFlashBusy?check_Rxdone
+                        608     ;               goto check_Rxdone;
+                        609                             ; SOURCE LINE # 210
+000028                  610     ?C0018:
+                        611     ;       c = (*(u8 xdata *)SPIFL_RDDATA)&0x1;
+                        612                             ; SOURCE LINE # 211
+000028 90030C           613             MOV     DPTR,#030CH
+00002B E0               614             MOVX    A,@DPTR
+00002C 5401             615             ANL     A,#01H
+00002E 7800       F     616             MOV     R0,#LOW (c?348)
+000030 F6               617             MOV     @R0,A
+                        618     ; #ifdef        TEST_ON_BOARD
+                        619     ;       printf("\nBusy = %x",(u16)(0xFF&c));
+                        620     ; #endif
+                        621     ;       if (c==0x1)
+                        622                             ; SOURCE LINE # 215
+000031 6401             623             XRL     A,#01H
+000033 60CB             624             JZ      ?spiflash_CheckFlashBusy?check_st_reg
+                        625     ;               goto check_st_reg;
+                        626                             ; SOURCE LINE # 216
+000035                  627     ?C0019:
+                        628     ;       *(u8 xdata *)SPIFL_TXCTRL  = 0x0;
+                        629                             ; SOURCE LINE # 217
+000035 900308           630             MOV     DPTR,#0308H
+000038 E4               631             CLR     A
+000039 F0               632             MOVX    @DPTR,A
+                        633     ;       return;
+                        634     ; }
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    11
+
+                        635                             ; SOURCE LINE # 219
+00003A                  636     ?C0020:
+00003A 22               637             RET     
+                        638     ; END OF spiflash_CheckFlashBusy
+                        639     
+                        640     ; #if 0
+                        641     ; //***************************************************************
+                        642     ; //spiflash_32KBlkErase(u8 BlockID): a block of 32Kbytes
+                        643     ; //Input: 
+                        644     ; //    BlockID: The block ID of each 32K (0,1,2,3..)
+                        645     ; //***************************************************************
+                        646     ; void spiflash_32KBlkErase(u32 BlockID)
+                        647     ; {
+                        648     ;       spiflash_wrsr_unlock((u8)1);
+                        649     ;       spiflash_wren((u8)1);
+                        650     ;       spiFlash_Cmd((u8)4,(u32)(SPIFL_BLKERASE | (BlockID<<15)), 0,0);
+                        651     ;       spiflash_CheckFlashBusy();
+                        652     ; }
+                        653     ; #endif
+                        654     ; //***************************************************************
+                        655     ; //spiflash_64KBlkErase(u8 BlockID, u8 block64): a block of 64Kbytes
+                        656     ; //Input: 
+                        657     ; //    BlockID: The block ID of each 32 or 64K (0,1,2,3..)
+                        658     ; //   block64: 1 - erase block 64K, 0 - erase block 32K
+                        659     ; //***************************************************************
+                        660     ; 
+                        661     ; void spiflash_EraseBlock(u32 BlockID, u8 block64)
+                        662     
+------                  663             RSEG  ?PR?_spiflash_EraseBlock?SPIFLASH_DRV
+000000                  664     L?0051:
+                        665             USING   0
+000000 E6               666             MOV     A,@R0
+000001 FF               667             MOV     R7,A
+000002 E4               668             CLR     A
+000003 FC               669             MOV     R4,A
+000004 FD               670             MOV     R5,A
+000005 FE               671             MOV     R6,A
+000006 750001     F     672             MOV     ?_spiflash_EraseBlock?BYTE+04H,#01H
+000009                  673     _spiflash_EraseBlock:
+                        674             USING   0
+                        675                             ; SOURCE LINE # 241
+000009 8F00       F     676             MOV     BlockID?449+03H,R7
+00000B 8E00       F     677             MOV     BlockID?449+02H,R6
+00000D 8D00       F     678             MOV     BlockID?449+01H,R5
+00000F 8C00       F     679             MOV     BlockID?449,R4
+                        680     ; {
+                        681                             ; SOURCE LINE # 242
+                        682     ;       spiflash_wrsr_unlock((u8)1);
+                        683                             ; SOURCE LINE # 243
+000011 7F01             684             MOV     R7,#01H
+000013 120000     F     685             LCALL   _spiflash_wrsr_unlock
+                        686     ;       spiflash_wren((u8)1);
+                        687                             ; SOURCE LINE # 244
+000016 7F01             688             MOV     R7,#01H
+000018 120000     F     689             LCALL   _spiflash_wren
+                        690     ;       if (block64==1)
+                        691                             ; SOURCE LINE # 245
+00001B E500       F     692             MOV     A,block64?450
+00001D AF00       F     693             MOV     R7,BlockID?449+03H
+00001F AE00       F     694             MOV     R6,BlockID?449+02H
+000021 AD00       F     695             MOV     R5,BlockID?449+01H
+000023 AC00       F     696             MOV     R4,BlockID?449
+000025 B4010A           697             CJNE    A,#01H,?C0021
+                        698     ;               spiFlash_Cmd((u8)4,(u32)(SPIFL_BLK64ERASE | (BlockID<<16)), 0,0);
+                        699                             ; SOURCE LINE # 246
+000028 7810             700             MOV     R0,#010H
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    12
+
+00002A 120000     E     701             LCALL   ?C?LSHL
+00002D EC               702             MOV     A,R4
+00002E 44D8             703             ORL     A,#0D8H
+000030 8008             704             SJMP    ?C0049
+000032                  705     ?C0021:
+                        706     ;       else 
+                        707     ;               spiFlash_Cmd((u8)4,(u32)(SPIFL_BLKERASE | (BlockID<<15)), 0,0);         
+                        708                             ; SOURCE LINE # 248
+000032 780F             709             MOV     R0,#0FH
+000034 120000     E     710             LCALL   ?C?LSHL
+000037 EC               711             MOV     A,R4
+000038 4452             712             ORL     A,#052H
+00003A                  713     ?C0049:
+00003A 120000     F     714             LCALL   L?0050
+00003D                  715     ?C0022:
+                        716     ;       spiflash_CheckFlashBusy();
+                        717                             ; SOURCE LINE # 249
+00003D 120000     F     718             LCALL   spiflash_CheckFlashBusy
+                        719     ;       return;
+                        720     ; }
+                        721                             ; SOURCE LINE # 251
+000040                  722     ?C0023:
+000040 22               723             RET     
+                        724     ; END OF _spiflash_EraseBlock
+                        725     
+                        726     ; 
+                        727     ; //***************************************************************
+                        728     ; //void spiflash_erase256k() erase 0-256K bytes of code area in the spi flash
+                        729     ; //***************************************************************
+                        730     ; void spiflash_eraseLower256k()
+                        731     
+------                  732             RSEG  ?PR?spiflash_eraseLower256k?SPIFLASH_DRV
+000000                  733     spiflash_eraseLower256k:
+                        734             USING   0
+                        735                             ; SOURCE LINE # 256
+                        736     ; {
+                        737                             ; SOURCE LINE # 257
+                        738     ;       u8 idata BlckID;
+                        739     ;       printf("\n --> Deleting code image ");
+                        740                             ; SOURCE LINE # 259
+000000 7BFF             741             MOV     R3,#0FFH
+000002 7A00       F     742             MOV     R2,#HIGH (?SC_0)
+000004 7900       F     743             MOV     R1,#LOW (?SC_0)
+000006 120000     E     744             LCALL   _printf
+                        745     ;       for (BlckID=0;BlckID<4;BlckID++){
+                        746                             ; SOURCE LINE # 260
+000009 E4               747             CLR     A
+00000A 7800       F     748             MOV     R0,#LOW (BlckID?551)
+00000C F6               749             MOV     @R0,A
+00000D                  750     ?C0024:
+                        751     ;               printf(".");
+                        752                             ; SOURCE LINE # 261
+00000D 7BFF             753             MOV     R3,#0FFH
+00000F 7A00       F     754             MOV     R2,#HIGH (?SC_27)
+000011 7900       F     755             MOV     R1,#LOW (?SC_27)
+000013 120000     E     756             LCALL   _printf
+                        757     ;               spiflash_EraseBlock(BlckID, 1);
+                        758                             ; SOURCE LINE # 262
+000016 7800       F     759             MOV     R0,#LOW (BlckID?551)
+000018 120000     F     760             LCALL   L?0051
+                        761     ;       }
+                        762                             ; SOURCE LINE # 263
+00001B 7800       F     763             MOV     R0,#LOW (BlckID?551)
+00001D 06               764             INC     @R0
+00001E E6               765             MOV     A,@R0
+00001F C3               766             CLR     C
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    13
+
+000020 9404             767             SUBB    A,#04H
+000022 40E9             768             JC      ?C0024
+000024                  769     ?C0025:
+                        770     ;       for (BlckID=0;BlckID<8;BlckID++){
+                        771                             ; SOURCE LINE # 264
+000024 E4               772             CLR     A
+000025 7800       F     773             MOV     R0,#LOW (BlckID?551)
+000027 F6               774             MOV     @R0,A
+000028                  775     ?C0027:
+                        776     ;               printf(".");
+                        777                             ; SOURCE LINE # 265
+000028 7BFF             778             MOV     R3,#0FFH
+00002A 7A00       F     779             MOV     R2,#HIGH (?SC_27)
+00002C 7900       F     780             MOV     R1,#LOW (?SC_27)
+00002E 120000     E     781             LCALL   _printf
+                        782     ;               spiflash_EraseBlock(BlckID, 0);
+                        783                             ; SOURCE LINE # 266
+000031 7800       F     784             MOV     R0,#LOW (BlckID?551)
+000033 E6               785             MOV     A,@R0
+000034 FF               786             MOV     R7,A
+000035 E4               787             CLR     A
+000036 FC               788             MOV     R4,A
+000037 FD               789             MOV     R5,A
+000038 FE               790             MOV     R6,A
+000039 F500       F     791             MOV     ?_spiflash_EraseBlock?BYTE+04H,A
+00003B 120000     F     792             LCALL   _spiflash_EraseBlock
+                        793     ;       }
+                        794                             ; SOURCE LINE # 267
+00003E 7800       F     795             MOV     R0,#LOW (BlckID?551)
+000040 06               796             INC     @R0
+000041 E6               797             MOV     A,@R0
+000042 C3               798             CLR     C
+000043 9408             799             SUBB    A,#08H
+000045 40E1             800             JC      ?C0027
+000047                  801     ?C0028:
+                        802     ;       for (BlckID=0;BlckID<64;BlckID++){
+                        803                             ; SOURCE LINE # 268
+000047 E4               804             CLR     A
+000048 7800       F     805             MOV     R0,#LOW (BlckID?551)
+00004A F6               806             MOV     @R0,A
+00004B                  807     ?C0030:
+00004B 7800       F     808             MOV     R0,#LOW (BlckID?551)
+00004D E6               809             MOV     A,@R0
+00004E FF               810             MOV     R7,A
+00004F C3               811             CLR     C
+000050 9440             812             SUBB    A,#040H
+000052 5015             813             JNC     ?C0033
+                        814     ;               spiflash_eraseSector(BlckID);
+                        815                             ; SOURCE LINE # 269
+000054 E4               816             CLR     A
+000055 FC               817             MOV     R4,A
+000056 FD               818             MOV     R5,A
+000057 FE               819             MOV     R6,A
+000058 120000     F     820             LCALL   _spiflash_eraseSector
+                        821     ;               printf(".");            
+                        822                             ; SOURCE LINE # 270
+00005B 7BFF             823             MOV     R3,#0FFH
+00005D 7A00       F     824             MOV     R2,#HIGH (?SC_27)
+00005F 7900       F     825             MOV     R1,#LOW (?SC_27)
+000061 120000     E     826             LCALL   _printf
+                        827     ;       }
+                        828                             ; SOURCE LINE # 271
+000064 7800       F     829             MOV     R0,#LOW (BlckID?551)
+000066 06               830             INC     @R0
+000067 80E2             831             SJMP    ?C0030
+                        832     ;       return;
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    14
+
+                        833     ; }
+                        834                             ; SOURCE LINE # 273
+000069                  835     ?C0033:
+000069 22               836             RET     
+                        837     ; END OF spiflash_eraseLower256k
+                        838     
+                        839     ; //***************************************************************
+                        840     ; //void spiflash_eraseBackup256k() 
+                        841     ; //This function is to erase 256k-512K bytes of backup code area in the spi flash
+                        842     ; //***************************************************************
+                        843     ; void spiflash_eraseBackup256k()
+                        844     
+------                  845             RSEG  ?PR?spiflash_eraseBackup256k?SPIFLASH_DRV
+000000                  846     spiflash_eraseBackup256k:
+                        847             USING   0
+                        848                             ; SOURCE LINE # 278
+                        849     ; {
+                        850                             ; SOURCE LINE # 279
+                        851     ;       u8 idata BlckID;
+                        852     ;       printf("\n --> Deleting backup code image ");
+                        853                             ; SOURCE LINE # 281
+000000 7BFF             854             MOV     R3,#0FFH
+000002 7A00       F     855             MOV     R2,#HIGH (?SC_29)
+000004 7900       F     856             MOV     R1,#LOW (?SC_29)
+000006 120000     E     857             LCALL   _printf
+                        858     ;       for (BlckID=4;BlckID<8;BlckID++){
+                        859                             ; SOURCE LINE # 282
+000009 7800       F     860             MOV     R0,#LOW (BlckID?652)
+00000B 7604             861             MOV     @R0,#04H
+00000D                  862     ?C0034:
+                        863     ;               printf(".");
+                        864                             ; SOURCE LINE # 283
+00000D 7BFF             865             MOV     R3,#0FFH
+00000F 7A00       F     866             MOV     R2,#HIGH (?SC_27)
+000011 7900       F     867             MOV     R1,#LOW (?SC_27)
+000013 120000     E     868             LCALL   _printf
+                        869     ;               spiflash_EraseBlock(BlckID, 1);
+                        870                             ; SOURCE LINE # 284
+000016 7800       F     871             MOV     R0,#LOW (BlckID?652)
+000018 120000     F     872             LCALL   L?0051
+                        873     ;       }
+                        874                             ; SOURCE LINE # 285
+00001B 7800       F     875             MOV     R0,#LOW (BlckID?652)
+00001D 06               876             INC     @R0
+00001E E6               877             MOV     A,@R0
+00001F C3               878             CLR     C
+000020 9408             879             SUBB    A,#08H
+000022 40E9             880             JC      ?C0034
+000024                  881     ?C0035:
+                        882     ;       for (BlckID=8;BlckID<16;BlckID++){
+                        883                             ; SOURCE LINE # 286
+000024 7800       F     884             MOV     R0,#LOW (BlckID?652)
+000026 7608             885             MOV     @R0,#08H
+000028                  886     ?C0037:
+                        887     ;               printf(".");
+                        888                             ; SOURCE LINE # 287
+000028 7BFF             889             MOV     R3,#0FFH
+00002A 7A00       F     890             MOV     R2,#HIGH (?SC_27)
+00002C 7900       F     891             MOV     R1,#LOW (?SC_27)
+00002E 120000     E     892             LCALL   _printf
+                        893     ;               spiflash_EraseBlock(BlckID, 0);
+                        894                             ; SOURCE LINE # 288
+000031 7800       F     895             MOV     R0,#LOW (BlckID?652)
+000033 E6               896             MOV     A,@R0
+000034 FF               897             MOV     R7,A
+000035 E4               898             CLR     A
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    15
+
+000036 FC               899             MOV     R4,A
+000037 FD               900             MOV     R5,A
+000038 FE               901             MOV     R6,A
+000039 F500       F     902             MOV     ?_spiflash_EraseBlock?BYTE+04H,A
+00003B 120000     F     903             LCALL   _spiflash_EraseBlock
+                        904     ;       }
+                        905                             ; SOURCE LINE # 289
+00003E 7800       F     906             MOV     R0,#LOW (BlckID?652)
+000040 06               907             INC     @R0
+000041 E6               908             MOV     A,@R0
+000042 C3               909             CLR     C
+000043 9410             910             SUBB    A,#010H
+000045 40E1             911             JC      ?C0037
+000047                  912     ?C0038:
+                        913     ;       for (BlckID=64;BlckID<128;BlckID++){
+                        914                             ; SOURCE LINE # 290
+000047 7800       F     915             MOV     R0,#LOW (BlckID?652)
+000049 7640             916             MOV     @R0,#040H
+00004B                  917     ?C0040:
+00004B 7800       F     918             MOV     R0,#LOW (BlckID?652)
+00004D E6               919             MOV     A,@R0
+00004E FF               920             MOV     R7,A
+00004F C3               921             CLR     C
+000050 9480             922             SUBB    A,#080H
+000052 5015             923             JNC     ?C0043
+                        924     ;               spiflash_eraseSector(BlckID);
+                        925                             ; SOURCE LINE # 291
+000054 E4               926             CLR     A
+000055 FC               927             MOV     R4,A
+000056 FD               928             MOV     R5,A
+000057 FE               929             MOV     R6,A
+000058 120000     F     930             LCALL   _spiflash_eraseSector
+                        931     ;               printf(".");            
+                        932                             ; SOURCE LINE # 292
+00005B 7BFF             933             MOV     R3,#0FFH
+00005D 7A00       F     934             MOV     R2,#HIGH (?SC_27)
+00005F 7900       F     935             MOV     R1,#LOW (?SC_27)
+000061 120000     E     936             LCALL   _printf
+                        937     ;       }
+                        938                             ; SOURCE LINE # 293
+000064 7800       F     939             MOV     R0,#LOW (BlckID?652)
+000066 06               940             INC     @R0
+000067 80E2             941             SJMP    ?C0040
+                        942     ;       return;
+                        943     ; }
+                        944                             ; SOURCE LINE # 295
+000069                  945     ?C0043:
+000069 22               946             RET     
+                        947     ; END OF spiflash_eraseBackup256k
+                        948     
+                        949     ; #ifdef PROGRAM_CONFIGURATION
+                        950     ; //***************************************************************
+                        951     ; //spiflash_eraseConfigMem() erase 32k bytes of configuration data in the spi flash
+                        952     ; //Configuration data is located at address 0x00100000 - 0x0x001000FF; 
+                        953     ; //Sector 256, beyond 1Mbyte
+                        954     ; //***************************************************************
+                        955     ; 
+                        956     ; void spiflash_eraseConfigMem()
+                        957     ; {
+                        958     ;       printf("\n --> Delete configuration memory ...");
+                        959     ;       spiflash_eraseSector(GVTY_CONFIG_DATA_SECTOR);
+                        960     ;       spiflash_EraseBlock(32, 0);
+                        961     ;       spiflash_EraseBlock(16, 1);
+                        962     ;       spiflash_wrsr_unlock((u8)0);
+                        963     ;       printf("\n");
+                        964     ;       return;
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    16
+
+                        965     ; }
+                        966     ; #endif
+                        967     ; 
+                        968     ; 
+                        969     ; //***************************************************************
+                        970     ; //void spiflash_WriteByte(u32 Addr, u8 IData)
+                        971     ; //***************************************************************
+                        972     ; 
+                        973     ; void spiflash_WriteByte(u32 Addr, u8 IData)
+                        974     
+------                  975             RSEG  ?PR?_spiflash_WriteByte?SPIFLASH_DRV
+000000                  976     _spiflash_WriteByte:
+                        977             USING   0
+                        978                             ; SOURCE LINE # 320
+000000 8F00       F     979             MOV     Addr?753+03H,R7
+000002 8E00       F     980             MOV     Addr?753+02H,R6
+000004 8D00       F     981             MOV     Addr?753+01H,R5
+000006 8C00       F     982             MOV     Addr?753,R4
+                        983     ; {
+                        984                             ; SOURCE LINE # 321
+                        985     ;       spiflash_wren(1);
+                        986                             ; SOURCE LINE # 322
+000008 7F01             987             MOV     R7,#01H
+00000A 120000     F     988             LCALL   _spiflash_wren
+                        989     ;       spiFlash_Cmd(5, (SPIFL_BYTEPRGRM|Addr), IData,0);
+                        990                             ; SOURCE LINE # 323
+00000D E500       F     991             MOV     A,Addr?753+03H
+00000F FF               992             MOV     R7,A
+000010 E500       F     993             MOV     A,Addr?753+02H
+000012 FE               994             MOV     R6,A
+000013 E500       F     995             MOV     A,Addr?753+01H
+000015 FD               996             MOV     R5,A
+000016 E500       F     997             MOV     A,Addr?753
+000018 4402             998             ORL     A,#02H
+00001A 8F00       F     999             MOV     ?_spiFlash_Cmd?BYTE+04H,R7
+00001C 8E00       F    1000             MOV     ?_spiFlash_Cmd?BYTE+03H,R6
+00001E 8D00       F    1001             MOV     ?_spiFlash_Cmd?BYTE+02H,R5
+000020 F500       F    1002             MOV     ?_spiFlash_Cmd?BYTE+01H,A
+000022 850000     F    1003             MOV     ?_spiFlash_Cmd?BYTE+05H,IData?754
+000025 E4              1004             CLR     A
+000026 F500       F    1005             MOV     ?_spiFlash_Cmd?BYTE+06H,A
+000028 7F05            1006             MOV     R7,#05H
+00002A 120000     F    1007             LCALL   _spiFlash_Cmd
+                       1008     ;       spiflash_CheckFlashBusy();
+                       1009                             ; SOURCE LINE # 324
+00002D 120000     F    1010             LCALL   spiflash_CheckFlashBusy
+                       1011     ;       return;
+                       1012     ; }
+                       1013                             ; SOURCE LINE # 326
+000030                 1014     ?C0044:
+000030 22              1015             RET     
+                       1016     ; END OF _spiflash_WriteByte
+                       1017     
+                       1018     ; 
+                       1019     ; //***************************************************************
+                       1020     ; //void spiflash_ReadByte(u32 Addr, u8 IData)
+                       1021     ; //***************************************************************
+                       1022     ; 
+                       1023     ; u8 spiflash_ReadByte(u32 Addr)
+                       1024     
+------                 1025             RSEG  ?PR?_spiflash_ReadByte?SPIFLASH_DRV
+000000                 1026     _spiflash_ReadByte:
+                       1027             USING   0
+                       1028                             ; SOURCE LINE # 332
+000000 8F00       F    1029             MOV     Addr?855+03H,R7
+000002 8E00       F    1030             MOV     Addr?855+02H,R6
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    17
+
+000004 8D00       F    1031             MOV     Addr?855+01H,R5
+000006 8C00       F    1032             MOV     Addr?855,R4
+                       1033     ; {
+                       1034                             ; SOURCE LINE # 333
+                       1035     ;       spiFlash_Cmd((u8)4,(u32)(SPIFL_BYTEREAD|Addr),0,1);
+                       1036                             ; SOURCE LINE # 334
+000008 E500       F    1037             MOV     A,Addr?855
+00000A 4403            1038             ORL     A,#03H
+00000C 8F00       F    1039             MOV     ?_spiFlash_Cmd?BYTE+04H,R7
+00000E 8E00       F    1040             MOV     ?_spiFlash_Cmd?BYTE+03H,R6
+000010 8D00       F    1041             MOV     ?_spiFlash_Cmd?BYTE+02H,R5
+000012 F500       F    1042             MOV     ?_spiFlash_Cmd?BYTE+01H,A
+000014 E4              1043             CLR     A
+000015 F500       F    1044             MOV     ?_spiFlash_Cmd?BYTE+05H,A
+000017 750001     F    1045             MOV     ?_spiFlash_Cmd?BYTE+06H,#01H
+00001A 7F04            1046             MOV     R7,#04H
+00001C 120000     F    1047             LCALL   _spiFlash_Cmd
+                       1048     ;       return (*(u8 xdata *)SPIFL_RDDATA);     
+                       1049                             ; SOURCE LINE # 335
+00001F 90030C          1050             MOV     DPTR,#030CH
+000022 E0              1051             MOVX    A,@DPTR
+000023 FF              1052             MOV     R7,A
+                       1053     ; }
+                       1054                             ; SOURCE LINE # 336
+000024                 1055     ?C0045:
+000024 22              1056             RET     
+                       1057     ; END OF _spiflash_ReadByte
+                       1058     
+                       1059     ; //***************************************************************
+                       1060     ; //void spiflash_eraseSector(u32 Addr)
+                       1061     ; //To erase sectors of 4kbyte
+                       1062     ; //***************************************************************
+                       1063     ; void spiflash_eraseSector(u32 Sector)
+                       1064     
+------                 1065             RSEG  ?PR?_spiflash_eraseSector?SPIFLASH_DRV
+000000                 1066     _spiflash_eraseSector:
+                       1067             USING   0
+                       1068                             ; SOURCE LINE # 341
+000000 8F00       F    1069             MOV     Sector?956+03H,R7
+000002 8E00       F    1070             MOV     Sector?956+02H,R6
+000004 8D00       F    1071             MOV     Sector?956+01H,R5
+000006 8C00       F    1072             MOV     Sector?956,R4
+                       1073     ; {
+                       1074                             ; SOURCE LINE # 342
+                       1075     ;       spiflash_wrsr_unlock((u8)1);
+                       1076                             ; SOURCE LINE # 343
+000008 7F01            1077             MOV     R7,#01H
+00000A 120000     F    1078             LCALL   _spiflash_wrsr_unlock
+                       1079     ;       spiflash_wren((u8)1);
+                       1080                             ; SOURCE LINE # 344
+00000D 7F01            1081             MOV     R7,#01H
+00000F 120000     F    1082             LCALL   _spiflash_wren
+                       1083     ;       spiFlash_Cmd((u8)4,(u32)(SPIFL_SECERASE | (Sector<<12)),0,0);
+                       1084                             ; SOURCE LINE # 345
+000012 AF00       F    1085             MOV     R7,Sector?956+03H
+000014 AE00       F    1086             MOV     R6,Sector?956+02H
+000016 AD00       F    1087             MOV     R5,Sector?956+01H
+000018 AC00       F    1088             MOV     R4,Sector?956
+00001A 780C            1089             MOV     R0,#0CH
+00001C 120000     E    1090             LCALL   ?C?LSHL
+00001F EC              1091             MOV     A,R4
+000020 4420            1092             ORL     A,#020H
+000022 120000     F    1093             LCALL   L?0050
+                       1094     ;       spiflash_CheckFlashBusy();
+                       1095                             ; SOURCE LINE # 346
+000025 120000     F    1096             LCALL   spiflash_CheckFlashBusy
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    18
+
+                       1097     ;       return;
+                       1098     ; }
+                       1099                             ; SOURCE LINE # 348
+000028                 1100     ?C0046:
+000028 22              1101             RET     
+                       1102     ; END OF _spiflash_eraseSector
+                       1103     
+                       1104             END
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    19
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E                                    T Y P E  V A L U E     ATTRIBUTES
+
+?_PRINTF?BYTE . . . . . . . . . . . . .    D  ADDR  -------       EXT
+?_SPIFLASH_CMD?BYTE . . . . . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_CMD?SPIFLASH_DRV
+?_SPIFLASH_ERASEBLOCK?BYTE. . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV
+?_SPIFLASH_ERASESECTOR?BYTE . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_ERASESECTOR?SPIFLASH_DRV
+?_SPIFLASH_READBYTE?BYTE. . . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_READBYTE?SPIFLASH_DRV
+?_SPIFLASH_WRITEBYTE?BYTE . . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_WRITEBYTE?SPIFLASH_DRV
+?_SPIFLASH_WRSR_UNLOCK?BYTE . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_WRSR_UNLOCK?SPIFLASH_DRV
+?C0001. . . . . . . . . . . . . . . . .    C  ADDR  005DH     R   SEG=?PR?_SPIFLASH_CMD?SPIFLASH_DRV
+?C0002. . . . . . . . . . . . . . . . .    C  ADDR  0049H     R   SEG=?PR?_SPIFLASH_CMD?SPIFLASH_DRV
+?C0003. . . . . . . . . . . . . . . . .    C  ADDR  0055H     R   SEG=?PR?_SPIFLASH_CMD?SPIFLASH_DRV
+?C0004. . . . . . . . . . . . . . . . .    C  ADDR  0063H     R   SEG=?PR?_SPIFLASH_CMD?SPIFLASH_DRV
+?C0005. . . . . . . . . . . . . . . . .    C  ADDR  006AH     R   SEG=?PR?_SPIFLASH_CMD?SPIFLASH_DRV
+?C0006. . . . . . . . . . . . . . . . .    C  ADDR  0076H     R   SEG=?PR?_SPIFLASH_CMD?SPIFLASH_DRV
+?C0007. . . . . . . . . . . . . . . . .    C  ADDR  007BH     R   SEG=?PR?_SPIFLASH_CMD?SPIFLASH_DRV
+?C0008. . . . . . . . . . . . . . . . .    C  ADDR  0009H     R   SEG=?PR?_SPIFLASH_WREN?SPIFLASH_DRV
+?C0010. . . . . . . . . . . . . . . . .    C  ADDR  001CH     R   SEG=?PR?_SPIFLASH_WREN?SPIFLASH_DRV
+?C0011. . . . . . . . . . . . . . . . .    C  ADDR  0011H     R   SEG=?PR?_SPIFLASH_WRSR_UNLOCK?SPIFLASH_DRV
+?C0012. . . . . . . . . . . . . . . . .    C  ADDR  0025H     R   SEG=?PR?_SPIFLASH_WRSR_UNLOCK?SPIFLASH_DRV
+?C0013. . . . . . . . . . . . . . . . .    C  ADDR  0028H     R   SEG=?PR?_SPIFLASH_WRSR_UNLOCK?SPIFLASH_DRV
+?C0016. . . . . . . . . . . . . . . . .    C  ADDR  0019H     R   SEG=?PR?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV
+?C0018. . . . . . . . . . . . . . . . .    C  ADDR  0028H     R   SEG=?PR?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV
+?C0019. . . . . . . . . . . . . . . . .    C  ADDR  0035H     R   SEG=?PR?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV
+?C0020. . . . . . . . . . . . . . . . .    C  ADDR  003AH     R   SEG=?PR?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV
+?C0021. . . . . . . . . . . . . . . . .    C  ADDR  0032H     R   SEG=?PR?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV
+?C0022. . . . . . . . . . . . . . . . .    C  ADDR  003DH     R   SEG=?PR?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV
+?C0023. . . . . . . . . . . . . . . . .    C  ADDR  0040H     R   SEG=?PR?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV
+?C0024. . . . . . . . . . . . . . . . .    C  ADDR  000DH     R   SEG=?PR?SPIFLASH_ERASELOWER256K?SPIFLASH_DRV
+?C0025. . . . . . . . . . . . . . . . .    C  ADDR  0024H     R   SEG=?PR?SPIFLASH_ERASELOWER256K?SPIFLASH_DRV
+?C0027. . . . . . . . . . . . . . . . .    C  ADDR  0028H     R   SEG=?PR?SPIFLASH_ERASELOWER256K?SPIFLASH_DRV
+?C0028. . . . . . . . . . . . . . . . .    C  ADDR  0047H     R   SEG=?PR?SPIFLASH_ERASELOWER256K?SPIFLASH_DRV
+?C0030. . . . . . . . . . . . . . . . .    C  ADDR  004BH     R   SEG=?PR?SPIFLASH_ERASELOWER256K?SPIFLASH_DRV
+?C0033. . . . . . . . . . . . . . . . .    C  ADDR  0069H     R   SEG=?PR?SPIFLASH_ERASELOWER256K?SPIFLASH_DRV
+?C0034. . . . . . . . . . . . . . . . .    C  ADDR  000DH     R   SEG=?PR?SPIFLASH_ERASEBACKUP256K?SPIFLASH_DRV
+?C0035. . . . . . . . . . . . . . . . .    C  ADDR  0024H     R   SEG=?PR?SPIFLASH_ERASEBACKUP256K?SPIFLASH_DRV
+?C0037. . . . . . . . . . . . . . . . .    C  ADDR  0028H     R   SEG=?PR?SPIFLASH_ERASEBACKUP256K?SPIFLASH_DRV
+?C0038. . . . . . . . . . . . . . . . .    C  ADDR  0047H     R   SEG=?PR?SPIFLASH_ERASEBACKUP256K?SPIFLASH_DRV
+?C0040. . . . . . . . . . . . . . . . .    C  ADDR  004BH     R   SEG=?PR?SPIFLASH_ERASEBACKUP256K?SPIFLASH_DRV
+?C0043. . . . . . . . . . . . . . . . .    C  ADDR  0069H     R   SEG=?PR?SPIFLASH_ERASEBACKUP256K?SPIFLASH_DRV
+?C0044. . . . . . . . . . . . . . . . .    C  ADDR  0030H     R   SEG=?PR?_SPIFLASH_WRITEBYTE?SPIFLASH_DRV
+?C0045. . . . . . . . . . . . . . . . .    C  ADDR  0024H     R   SEG=?PR?_SPIFLASH_READBYTE?SPIFLASH_DRV
+?C0046. . . . . . . . . . . . . . . . .    C  ADDR  0028H     R   SEG=?PR?_SPIFLASH_ERASESECTOR?SPIFLASH_DRV
+?C0047. . . . . . . . . . . . . . . . .    C  ADDR  000DH     R   SEG=?PR?_SPIFLASH_WREN?SPIFLASH_DRV
+?C0048. . . . . . . . . . . . . . . . .    C  ADDR  0015H     R   SEG=?PR?_SPIFLASH_WRSR_UNLOCK?SPIFLASH_DRV
+?C0049. . . . . . . . . . . . . . . . .    C  ADDR  003AH     R   SEG=?PR?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV
+?C?LLDIDATA . . . . . . . . . . . . . .    C  ADDR  -------       EXT
+?C?LSHL . . . . . . . . . . . . . . . .    C  ADDR  -------       EXT
+?C?LSTIDATA . . . . . . . . . . . . . .    C  ADDR  -------       EXT
+?C?LSTXDATA . . . . . . . . . . . . . .    C  ADDR  -------       EXT
+?CO?SPIFLASH_DRV. . . . . . . . . . . .    C  SEG   00003FH       REL=UNIT, ALN=BYTE
+?DT?_SPIFLASH_CMD?SPIFLASH_DRV. . . . .    D  SEG   000007H       REL=UNIT, ALN=BYTE
+?DT?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV .    D  SEG   000005H       REL=UNIT, ALN=BYTE
+?DT?_SPIFLASH_ERASESECTOR?SPIFLASH_DRV.    D  SEG   000004H       REL=UNIT, ALN=BYTE
+?DT?_SPIFLASH_READBYTE?SPIFLASH_DRV . .    D  SEG   000004H       REL=UNIT, ALN=BYTE
+?DT?_SPIFLASH_WRITEBYTE?SPIFLASH_DRV. .    D  SEG   000005H       REL=UNIT, ALN=BYTE
+?DT?_SPIFLASH_WRSR_UNLOCK?SPIFLASH_DRV.    D  SEG   000001H       REL=UNIT, ALN=BYTE
+?ID?_SPIFLASH_CMD?SPIFLASH_DRV. . . . .    I  SEG   000005H       REL=UNIT, ALN=BYTE
+?ID?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV   I  SEG   000001H       REL=UNIT, ALN=BYTE
+?ID?SPIFLASH_ERASEBACKUP256K?SPIFLASH_DRV  I  SEG   000001H       REL=UNIT, ALN=BYTE
+?ID?SPIFLASH_ERASELOWER256K?SPIFLASH_DRV   I  SEG   000001H       REL=UNIT, ALN=BYTE
+?PR?_SPIFLASH_CMD?SPIFLASH_DRV. . . . .    C  SEG   00007CH       REL=UNIT, ALN=BYTE
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    20
+
+?PR?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV .    C  SEG   000041H       REL=UNIT, ALN=BYTE
+?PR?_SPIFLASH_ERASESECTOR?SPIFLASH_DRV.    C  SEG   000029H       REL=UNIT, ALN=BYTE
+?PR?_SPIFLASH_READBYTE?SPIFLASH_DRV . .    C  SEG   000025H       REL=UNIT, ALN=BYTE
+?PR?_SPIFLASH_WREN?SPIFLASH_DRV . . . .    C  SEG   00001DH       REL=UNIT, ALN=BYTE
+?PR?_SPIFLASH_WRITEBYTE?SPIFLASH_DRV. .    C  SEG   000031H       REL=UNIT, ALN=BYTE
+?PR?_SPIFLASH_WRSR_UNLOCK?SPIFLASH_DRV.    C  SEG   000029H       REL=UNIT, ALN=BYTE
+?PR?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV   C  SEG   00003BH       REL=UNIT, ALN=BYTE
+?PR?SPIFLASH_ERASEBACKUP256K?SPIFLASH_DRV  C  SEG   00006AH       REL=UNIT, ALN=BYTE
+?PR?SPIFLASH_ERASELOWER256K?SPIFLASH_DRV   C  SEG   00006AH       REL=UNIT, ALN=BYTE
+?SC_0 . . . . . . . . . . . . . . . . .    C  ADDR  0000H     R   SEG=?CO?SPIFLASH_DRV
+?SC_27. . . . . . . . . . . . . . . . .    C  ADDR  001BH     R   SEG=?CO?SPIFLASH_DRV
+?SC_29. . . . . . . . . . . . . . . . .    C  ADDR  001DH     R   SEG=?CO?SPIFLASH_DRV
+?SPIFLASH_CHECKFLASHBUSY?CHECK_RXDONE .    C  ADDR  001FH     R   SEG=?PR?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV
+?SPIFLASH_CHECKFLASHBUSY?CHECK_ST_REG .    C  ADDR  0000H     R   SEG=?PR?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV
+?SPIFLASH_CHECKFLASHBUSY?CHECK_TXDONE1.    C  ADDR  0010H     R   SEG=?PR?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV
+_PRINTF . . . . . . . . . . . . . . . .    C  ADDR  -------       EXT
+_SPIFLASH_CMD . . . . . . . . . . . . .    C  ADDR  000FH     R   SEG=?PR?_SPIFLASH_CMD?SPIFLASH_DRV
+_SPIFLASH_ERASEBLOCK. . . . . . . . . .    C  ADDR  0009H     R   SEG=?PR?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV
+_SPIFLASH_ERASESECTOR . . . . . . . . .    C  ADDR  0000H     R   SEG=?PR?_SPIFLASH_ERASESECTOR?SPIFLASH_DRV
+_SPIFLASH_READBYTE. . . . . . . . . . .    C  ADDR  0000H     R   SEG=?PR?_SPIFLASH_READBYTE?SPIFLASH_DRV
+_SPIFLASH_WREN. . . . . . . . . . . . .    C  ADDR  0000H     R   SEG=?PR?_SPIFLASH_WREN?SPIFLASH_DRV
+_SPIFLASH_WRITEBYTE . . . . . . . . . .    C  ADDR  0000H     R   SEG=?PR?_SPIFLASH_WRITEBYTE?SPIFLASH_DRV
+_SPIFLASH_WRSR_UNLOCK . . . . . . . . .    C  ADDR  0000H     R   SEG=?PR?_SPIFLASH_WRSR_UNLOCK?SPIFLASH_DRV
+_SWUTIL_SWAPENDIAN. . . . . . . . . . .    C  ADDR  -------       EXT
+AC. . . . . . . . . . . . . . . . . . .    B  ADDR  00D0H.6   A   
+ACC . . . . . . . . . . . . . . . . . .    D  ADDR  00E0H     A   
+ADDR?753. . . . . . . . . . . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_WRITEBYTE?SPIFLASH_DRV
+ADDR?855. . . . . . . . . . . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_READBYTE?SPIFLASH_DRV
+B . . . . . . . . . . . . . . . . . . .    D  ADDR  00F0H     A   
+BANKSEL . . . . . . . . . . . . . . . .    D  ADDR  009FH     A   
+BLCKID?551. . . . . . . . . . . . . . .    I  ADDR  0000H     R   SEG=?ID?SPIFLASH_ERASELOWER256K?SPIFLASH_DRV
+BLCKID?652. . . . . . . . . . . . . . .    I  ADDR  0000H     R   SEG=?ID?SPIFLASH_ERASEBACKUP256K?SPIFLASH_DRV
+BLOCK64?450 . . . . . . . . . . . . . .    D  ADDR  0004H     R   SEG=?DT?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV
+BLOCKID?449 . . . . . . . . . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV
+C?044 . . . . . . . . . . . . . . . . .    I  ADDR  0000H     R   SEG=?ID?_SPIFLASH_CMD?SPIFLASH_DRV
+C?348 . . . . . . . . . . . . . . . . .    I  ADDR  0000H     R   SEG=?ID?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV
+CMDDATA?041 . . . . . . . . . . . . . .    D  ADDR  0001H     R   SEG=?DT?_SPIFLASH_CMD?SPIFLASH_DRV
+CRLA_H. . . . . . . . . . . . . . . . .    D  ADDR  00F4H     A   
+CRLA_L. . . . . . . . . . . . . . . . .    D  ADDR  00F3H     A   
+CRSA_H. . . . . . . . . . . . . . . . .    D  ADDR  00F2H     A   
+CRSA_L. . . . . . . . . . . . . . . . .    D  ADDR  00F1H     A   
+CY. . . . . . . . . . . . . . . . . . .    B  ADDR  00D0H.7   A   
+DPH . . . . . . . . . . . . . . . . . .    D  ADDR  0083H     A   
+DPL . . . . . . . . . . . . . . . . . .    D  ADDR  0082H     A   
+EA. . . . . . . . . . . . . . . . . . .    B  ADDR  00A8H.7   A   
+ES. . . . . . . . . . . . . . . . . . .    B  ADDR  00A8H.4   A   
+ET0 . . . . . . . . . . . . . . . . . .    B  ADDR  00A8H.1   A   
+ET1 . . . . . . . . . . . . . . . . . .    B  ADDR  00A8H.3   A   
+EX0 . . . . . . . . . . . . . . . . . .    B  ADDR  00A8H.0   A   
+EX1 . . . . . . . . . . . . . . . . . .    B  ADDR  00A8H.2   A   
+F0. . . . . . . . . . . . . . . . . . .    B  ADDR  00D0H.5   A   
+IDATA?754 . . . . . . . . . . . . . . .    D  ADDR  0004H     R   SEG=?DT?_SPIFLASH_WRITEBYTE?SPIFLASH_DRV
+IE. . . . . . . . . . . . . . . . . . .    D  ADDR  00A8H     A   
+IE0 . . . . . . . . . . . . . . . . . .    B  ADDR  0088H.1   A   
+IE1 . . . . . . . . . . . . . . . . . .    B  ADDR  0088H.3   A   
+INT0. . . . . . . . . . . . . . . . . .    B  ADDR  00B0H.2   A   
+INT1. . . . . . . . . . . . . . . . . .    B  ADDR  00B0H.3   A   
+IP. . . . . . . . . . . . . . . . . . .    D  ADDR  00B8H     A   
+IT0 . . . . . . . . . . . . . . . . . .    B  ADDR  0088H.0   A   
+IT1 . . . . . . . . . . . . . . . . . .    B  ADDR  0088H.2   A   
+L?0050. . . . . . . . . . . . . . . . .    C  ADDR  0000H     R   SEG=?PR?_SPIFLASH_CMD?SPIFLASH_DRV
+L?0051. . . . . . . . . . . . . . . . .    C  ADDR  0000H     R   SEG=?PR?_SPIFLASH_ERASEBLOCK?SPIFLASH_DRV
+MEMCTRL . . . . . . . . . . . . . . . .    D  ADDR  00F8H     A   
+NUMOFBYTECMD?040. . . . . . . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_CMD?SPIFLASH_DRV
+OV. . . . . . . . . . . . . . . . . . .    B  ADDR  00D0H.2   A   
+P . . . . . . . . . . . . . . . . . . .    B  ADDR  00D0H.0   A   
+AX51 MACRO ASSEMBLER  SPIFLASH_DRV                                                          08/08/16 13:21:02 PAGE    21
+
+P0. . . . . . . . . . . . . . . . . . .    D  ADDR  0080H     A   
+P1. . . . . . . . . . . . . . . . . . .    D  ADDR  0090H     A   
+P2. . . . . . . . . . . . . . . . . . .    D  ADDR  00A0H     A   
+P3. . . . . . . . . . . . . . . . . . .    D  ADDR  00B0H     A   
+PCON. . . . . . . . . . . . . . . . . .    D  ADDR  0087H     A   
+PS. . . . . . . . . . . . . . . . . . .    B  ADDR  00B8H.4   A   
+PSW . . . . . . . . . . . . . . . . . .    D  ADDR  00D0H     A   
+PT0 . . . . . . . . . . . . . . . . . .    B  ADDR  00B8H.1   A   
+PT1 . . . . . . . . . . . . . . . . . .    B  ADDR  00B8H.3   A   
+PX0 . . . . . . . . . . . . . . . . . .    B  ADDR  00B8H.0   A   
+PX1 . . . . . . . . . . . . . . . . . .    B  ADDR  00B8H.2   A   
+RB8 . . . . . . . . . . . . . . . . . .    B  ADDR  0098H.2   A   
+RD. . . . . . . . . . . . . . . . . . .    B  ADDR  00B0H.7   A   
+RDWR?043. . . . . . . . . . . . . . . .    D  ADDR  0006H     R   SEG=?DT?_SPIFLASH_CMD?SPIFLASH_DRV
+REN . . . . . . . . . . . . . . . . . .    B  ADDR  0098H.4   A   
+RI. . . . . . . . . . . . . . . . . . .    B  ADDR  0098H.0   A   
+RS0 . . . . . . . . . . . . . . . . . .    B  ADDR  00D0H.3   A   
+RS1 . . . . . . . . . . . . . . . . . .    B  ADDR  00D0H.4   A   
+RXD . . . . . . . . . . . . . . . . . .    B  ADDR  00B0H.0   A   
+SBUF. . . . . . . . . . . . . . . . . .    D  ADDR  0099H     A   
+SCON. . . . . . . . . . . . . . . . . .    D  ADDR  0098H     A   
+SECTOR?956. . . . . . . . . . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_ERASESECTOR?SPIFLASH_DRV
+SM0 . . . . . . . . . . . . . . . . . .    B  ADDR  0098H.7   A   
+SM1 . . . . . . . . . . . . . . . . . .    B  ADDR  0098H.6   A   
+SM2 . . . . . . . . . . . . . . . . . .    B  ADDR  0098H.5   A   
+SP. . . . . . . . . . . . . . . . . . .    D  ADDR  0081H     A   
+SPIFLASH_CHECKFLASHBUSY . . . . . . . .    C  ADDR  0000H     R   SEG=?PR?SPIFLASH_CHECKFLASHBUSY?SPIFLASH_DRV
+SPIFLASH_DRV. . . . . . . . . . . . . .    -- ----  -------       
+SPIFLASH_ERASEBACKUP256K. . . . . . . .    C  ADDR  0000H     R   SEG=?PR?SPIFLASH_ERASEBACKUP256K?SPIFLASH_DRV
+SPIFLASH_ERASELOWER256K . . . . . . . .    C  ADDR  0000H     R   SEG=?PR?SPIFLASH_ERASELOWER256K?SPIFLASH_DRV
+SPIWRITEDATA?042. . . . . . . . . . . .    D  ADDR  0005H     R   SEG=?DT?_SPIFLASH_CMD?SPIFLASH_DRV
+T0. . . . . . . . . . . . . . . . . . .    B  ADDR  00B0H.4   A   
+T1. . . . . . . . . . . . . . . . . . .    B  ADDR  00B0H.5   A   
+TB8 . . . . . . . . . . . . . . . . . .    B  ADDR  0098H.3   A   
+TCON. . . . . . . . . . . . . . . . . .    D  ADDR  0088H     A   
+TEMP?045. . . . . . . . . . . . . . . .    I  ADDR  0001H     R   SEG=?ID?_SPIFLASH_CMD?SPIFLASH_DRV
+TF0 . . . . . . . . . . . . . . . . . .    B  ADDR  0088H.5   A   
+TF1 . . . . . . . . . . . . . . . . . .    B  ADDR  0088H.7   A   
+TH0 . . . . . . . . . . . . . . . . . .    D  ADDR  008CH     A   
+TH1 . . . . . . . . . . . . . . . . . .    D  ADDR  008DH     A   
+TI. . . . . . . . . . . . . . . . . . .    B  ADDR  0098H.1   A   
+TL0 . . . . . . . . . . . . . . . . . .    D  ADDR  008AH     A   
+TL1 . . . . . . . . . . . . . . . . . .    D  ADDR  008BH     A   
+TMOD. . . . . . . . . . . . . . . . . .    D  ADDR  0089H     A   
+TR0 . . . . . . . . . . . . . . . . . .    B  ADDR  0088H.4   A   
+TR1 . . . . . . . . . . . . . . . . . .    B  ADDR  0088H.6   A   
+TXD . . . . . . . . . . . . . . . . . .    B  ADDR  00B0H.1   A   
+UNLOCK?247. . . . . . . . . . . . . . .    D  ADDR  0000H     R   SEG=?DT?_SPIFLASH_WRSR_UNLOCK?SPIFLASH_DRV
+WR. . . . . . . . . . . . . . . . . . .    B  ADDR  00B0H.6   A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S).

@@ -14,7 +14,7 @@ Imports System.Runtime.InteropServices
 <Assembly: AssemblyDescription("Flashing Utility")>
 <Assembly: AssemblyCompany("")>
 <Assembly: AssemblyProduct("Flashing Utility")>
-<Assembly: AssemblyCopyright("Copyright ©  2015")>
+<Assembly: AssemblyCopyright("Copyright ©  2016")>
 <Assembly: AssemblyTrademark("")>
 
 <Assembly: ComVisible(False)>
@@ -33,7 +33,7 @@ Imports System.Runtime.InteropServices
 ' by using the '*' as shown below:
 ' <Assembly: AssemblyVersion("1.0.*")> 
 
-<Assembly: AssemblyVersion("4.0.0.9")>
-<Assembly: AssemblyFileVersion("4.0.0.9")>
+<Assembly: AssemblyVersion("4.0.0.12")>
+<Assembly: AssemblyFileVersion("4.0.0.12")>
 
 <Assembly: NeutralResourcesLanguageAttribute("en")> 

@@ -1,0 +1,11 @@
+".\main.obj",
+".\uart.obj",
+".\STARTUP.obj",
+".\cmem_ctrl.obj",
+".\hex_file_hdl.obj",
+".\spiflash.obj",
+".\spiflash_drv.obj" 
+TO "MON51_BANK" 
+RAMSIZE(256) 
+CODE( 0X0000-0X1FFF )
+XDATA( 0X2000-0X2FFE )

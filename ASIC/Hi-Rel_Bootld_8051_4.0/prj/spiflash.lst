@@ -1,0 +1,911 @@
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE SPIFLASH
+NO OBJECT MODULE REQUESTED
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\src\spiflash.c OPTIMIZE(8,SIZE) BROWSE INCDIR(..\src;C:\Keil\C51\INC;
+                    -..\src) DEFINE(IDATA_OPT,FEATURE_CHIPERASE_) DEBUG OBJECTEXTEND CODE PRINT(.\spiflash.lst) TABS(2) PREPRINT(.\spiflash.i
+                    -) SRC(.\spiflash.SRC)
+
+line level    source
+
+   1          /*
+   2          * Description : 8051 bootloader spiflash utility
+   3          *
+   4          * Copyright (c) 2011-2012 Greenvity Communications, Inc.
+   5          * All rights reserved.
+   6          *
+   7          * Author      : Peter Nguyen
+   8          * Release Date: 04/27/2013
+   9          * Purpose :
+  10          *     spiflash utility functions for bootloader
+  11          *
+  12          * File: spiflash_drv.c
+  13          */
+  14          #include <stdio.h>
+  15          #include <stdlib.h>
+  16          #include <ctype.h>
+  17          #include <REG51.h>
+  18          #include "typedef.h"
+  19          #include "macro_def.h"
+  20          #include "cmem_ctrl.h"
+  21          #include "hex_file_hdl.h"
+  22          #include "Spiflash_drv.h"
+  23          #include "spiflash.h"
+  24          #include "uart.h"
+  25          #include "global_var.h"
+  26          
+  27          #define lo8(value16) (value16 & 0xFF)
+  28          #define hi8(value16) ((value16 >> 8) & 0xFF)
+  29          #if 0
+              u8 lo8(u16 idata value16) 
+              {
+                u8 idata dbyte; 
+                dbyte = value16 & 0xFF;
+                return dbyte;
+              }
+              
+              u8 hi8(u16 idata value16)
+              {
+                u8 idata dbyte;
+                dbyte = (value16 >> 8);
+                dbyte &= 0xFF;
+                return dbyte;
+              
+              }
+              #endif
+  46          u16 crc_ccitt_update (u16 idata crc, u8 data_byte)
+  47          {
+  48   1          data_byte ^= lo8(crc);
+  49   1          data_byte ^= data_byte << 4;
+  50   1      
+  51   1         return ((((u16)data_byte << 8) | hi8(crc)) ^
+  52   1                   (u8)(data_byte >> 4) ^ ((u16)data_byte << 3));
+  53   1      }
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 2   
+
+  54          
+  55          
+  56          #if 0
+              void test_cram()
+              {
+                u8 idata rdata, cmp;
+                u16 idata addr, memcnt, bankn;
+                
+                EnableWrCRam();
+                  printf("\n --> Testing cram\n");
+                BANKSEL = 0;
+                addr = COMMONADDR_L;
+                for (memcnt=0; memcnt<COMMON_LEN; memcnt++) 
+                {
+                  cmp = (u8)addr;
+                  *(u8 xdata *)addr = (u8)cmp;
+                  addr++;
+                }
+                for (bankn=0; bankn<NUM_OF_BANK; bankn++)
+                {
+                  addr = BANKADDR_L;
+                  BANKSEL = bankn;
+                  for (memcnt=0; memcnt<CBANK_LEN; memcnt++)
+                  {
+                    cmp =  (u8)(addr+bankn);
+                    *(u8 xdata *)addr = (u8)cmp;
+                    addr++;
+                  }   
+                }
+                DisableWrCRam ();
+                BANKSEL = 0;
+                addr = COMMONADDR_L;
+                for (memcnt=0; memcnt<COMMON_LEN; memcnt++)
+                {
+                  rdata = *(u8 code *)addr;
+                  cmp = (u8)addr;
+                  if (rdata!=cmp){
+                    printf("\nF:%04X %02X", addr, (u16)rdata);
+                  } else if ((addr & 0x0F)==0){
+                    printf(".");
+                  }
+                  addr++;
+                }
+                for (bankn=0; bankn<NUM_OF_BANK; bankn++)
+                {
+                  addr = BANKADDR_L;
+                  BANKSEL = bankn;
+                  for (memcnt=0; memcnt<CBANK_LEN; memcnt++)
+                  {
+                    rdata = *(u8 code *)addr;
+                    cmp =  (u8)(addr+bankn);
+                    if (rdata!=cmp){
+                      printf("\nFB%x:%04X %02X", bankn, addr, (u16)rdata);
+                    } else if ((addr & 0x0F)==0){
+                      printf(".");
+                    }
+                    addr++;
+                  }   
+                }
+                return;
+              }
+              #endif
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 3   
+
+ 116          //***************************************************************
+ 117          //void dump_code(u8 dflag)
+ 118          //Dump code from CRAM or SFLASH
+ 119          //Input:
+ 120          //    dflag = 0: Dump code from CRAM
+ 121          //       = 1: Dump code from SFLASH
+ 122          //***************************************************************
+ 123          void load_sflash2cram()
+ 124          {
+ 125   1          u8 idata dbyte, banks;            
+ 126   1        u16 idata addr, datcnt, progcnt;      
+ 127   1        u16 idata  calc_crc;
+ 128   1        u8 idata flag_error = 0;
+ 129   1        printf("\n --> System is booting up ");
+ 130   1      
+ 131   1          EnableWrCRam();
+ 132   1        addr = COMMONADDR_L; 
+ 133   1                        
+ 134   1        progcnt = 0;
+ 135   1        BANKSEL = 0;
+ 136   1        calc_crc = (u16)0;
+ 137   1        for (datcnt = 0; datcnt<COM_BANK0_LEN; datcnt++)  
+ 138   1        {
+ 139   2          dbyte = *((u8 code * )addr);
+ 140   2          *((u8 xdata * )addr) = dbyte;
+ 141   2          
+ 142   2          if(datcnt >= (CRAM_START - COMMONADDR_L))
+ 143   2          {
+ 144   3            calc_crc = crc_ccitt_update(calc_crc,dbyte);
+ 145   3          }
+ 146   2          
+ 147   2          addr++;
+ 148   2          progcnt++;
+ 149   2          if (progcnt==5000)
+ 150   2          {
+ 151   3            printf(".");
+ 152   3            progcnt = 0;
+ 153   3          }   
+ 154   2        }
+ 155   1        printf("\nCRC Read");
+ 156   1        addr = COMMONADDR_L;
+ 157   1      
+ 158   1        // loop for crc dump remove after debug 
+ 159   1        for (datcnt = 0; datcnt<17; datcnt++)
+ 160   1        {
+ 161   2          printf("\n %02bx",*((u8 xdata * )addr));
+ 162   2          addr++;
+ 163   2        }
+ 164   1      // test loop end
+ 165   1      
+ 166   1        //if((((u8*)&calc_crc)[0] == *((u8 xdata * )COMMONADDR_L)) && 
+ 167   1        //  (((u8*)&calc_crc)[1] == *((u8 xdata * )(COMMONADDR_L+1))))
+ 168   1        if((lo8(calc_crc) == *((u8 xdata * )COMMONADDR_L)) && (hi8(calc_crc) == *((u8 xdata * )(COMMONADDR_L+1)))
+             -)
+ 169   1        {
+ 170   2          printf("\ncommon crc match %04x\n",calc_crc);
+ 171   2        }
+ 172   1        else
+ 173   1        {
+ 174   2          printf("\ncommon crc fail %04x,lo %02bx,hi %02bx\n",calc_crc,*((u8 xdata * )COMMONADDR_L),*((u8 xdata * 
+             -)(COMMONADDR_L+1)));
+ 175   2          flag_error = 1;
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 4   
+
+ 176   2        }
+ 177   1      
+ 178   1        if(flag_error == 1)
+ 179   1        {
+ 180   2          goto  FLASH_CRC_ERROR_HANDLE;
+ 181   2        }
+ 182   1      
+ 183   1      
+ 184   1        progcnt = 0;
+ 185   1        
+ 186   1        for (banks=1;banks<NUM_OF_BANK;banks++)
+ 187   1        {
+ 188   2          BANKSEL = banks;
+ 189   2          addr = BANKADDR_L;
+ 190   2          calc_crc = (u16)0;
+ 191   2          for (datcnt=0; datcnt<CBANK_LEN; datcnt++)
+ 192   2          {
+ 193   3            dbyte = *((u8 code * )addr);
+ 194   3            *((u8 xdata * )addr) = dbyte;
+ 195   3      #if 0     
+                    if(banks==1)
+                    {
+                      if ((addr&0x0007)==0)
+                        printf ("\n0x%04X:", addr);
+              
+                      printf (" %02X", (u16)dbyte);
+              
+                    }
+              #endif      
+ 205   3            calc_crc = crc_ccitt_update(calc_crc,dbyte);
+ 206   3            
+ 207   3            addr++;
+ 208   3            progcnt++;
+ 209   3            if (progcnt==5000)
+ 210   3            {
+ 211   4              printf(".");
+ 212   4              progcnt = 0;
+ 213   4            }   
+ 214   3          }
+ 215   2          //printf("\nCRC = %04x\n",calc_crc);
+ 216   2          if((lo8(calc_crc) == *((u8 xdata * )(COMMONADDR_L + banks*2))) && 
+ 217   2            (hi8(calc_crc) == *((u8 xdata * )(COMMONADDR_L + (banks*2)+1))))
+ 218   2          //if((((u8*)&calc_crc)[0] == *((u8 xdata * )(COMMONADDR_L + banks*2))) && 
+ 219   2          //  (((u8*)&calc_crc)[1] == *((u8 xdata * )(COMMONADDR_L + (banks*2)+1))))
+ 220   2          {
+ 221   3            printf("\Bank %bu crc match %04x\n",banks,calc_crc);
+ 222   3          }
+ 223   2          else
+ 224   2          {
+ 225   3            printf("\nBank %bu crc fail %04x,lo %02bx,hi %02bx\n",banks,calc_crc,*((u8 xdata * )(COMMONADDR_L + ban
+             -ks*2)),
+ 226   3                                            *((u8 xdata * )(COMMONADDR_L + (banks*2)+1)));
+ 227   3      
+ 228   3            flag_error = 1;
+ 229   3            break;
+ 230   3          }
+ 231   2          if(flag_error == 1)
+ 232   2          {
+ 233   3            break;
+ 234   3          }
+ 235   2        }
+ 236   1        DisableWrCRam ();
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 5   
+
+ 237   1      
+ 238   1        if(flag_error == 1)
+ 239   1        {
+ 240   2          goto  FLASH_CRC_ERROR_HANDLE;
+ 241   2        }
+ 242   1        printf("\n --> Running firmware\n\n");
+ 243   1        #pragma asm
+ 244   1          MOV SP, #06FH
+ 245   1          LJMP  CRAM_START;
+ 246   1        #pragma endasm
+ 247   1      
+ 248   1      
+ 249   1      FLASH_CRC_ERROR_HANDLE:
+ 250   1        //add code for backup integrity check
+ 251   1        DisableWrCRam ();
+ 252   1        (void)spiflash_RestoreCodeImage(1);
+ 253   1        *((u8 xdata * )(0x34)) = 1; // wb 34 1 system reset
+ 254   1        return;
+ 255   1      }
+ 256          
+ 257          //***************************************************************
+ 258          //void dump_code(u8 dflag)
+ 259          //Dump code from CRAM or SFLASH
+ 260          //Input:
+ 261          //    dflag = 0: Dump code from CRAM
+ 262          //       = 1: Dump code from SFLASH
+ 263          //***************************************************************
+ 264          
+ 265          void dump_code(u8 dflag)
+ 266          {
+ 267   1        u16 idata addr, i;
+ 268   1        u8 idata dbyte, banks;
+ 269   1        //u32 idata flash_address = (u32)0;
+ 270   1      #if 0 
+                if (dflag==0)
+                {
+                  printf("\n --> Dump code RAM");
+                  DisableWrCRam ();
+                }
+                else 
+              #endif  
+ 278   1        if (dflag==1)
+ 279   1        {
+ 280   2          EnableWrCRam();
+ 281   2          printf("\n --> Dump sflash");
+ 282   2        } 
+ 283   1      #if 0 
+                else if (dflag==2)
+                {
+                  printf("\n --> Dump 64K eram");
+                  goto dump_eram;
+              
+                }
+              #endif
+ 291   1        
+ 292   1        addr = COMMONADDR_L; 
+ 293   1        for (i=0; i<COM_BANK0_LEN; i++)
+ 294   1        {
+ 295   2          if ((addr&0x0007)==0)
+ 296   2            printf ("\n0x%04X:", addr);
+ 297   2      
+ 298   2          dbyte = *(u8 code *)addr;
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 6   
+
+ 299   2          addr++;
+ 300   2          //flash_address++;
+ 301   2          printf (" %02X", (u16)dbyte);
+ 302   2        }
+ 303   1        for (banks=1; banks<8;banks++)
+ 304   1        {
+ 305   2          printf("\n\n --> Bank %02X\n", (u16)banks);
+ 306   2          BANKSEL = banks;
+ 307   2          addr = BANKADDR_L;
+ 308   2          for (i=0; i<CBANK_LEN; i++)
+ 309   2          {
+ 310   3            if ((addr&0x0007)==0)
+ 311   3              printf ("\n0x%04X:", addr);
+ 312   3      
+ 313   3            dbyte = *(u8 code *)addr;
+ 314   3            addr++;
+ 315   3            //flash_address++;
+ 316   3            printf (" %02X", (u16)dbyte);
+ 317   3          }
+ 318   2        }
+ 319   1      //  printf("Flash end addr: %lx", flash_address);
+ 320   1        DisableWrCRam ();
+ 321   1        return;
+ 322   1        
+ 323   1      #if 0 
+              dump_eram:
+                addr = COMMONADDR_L;
+              Cont_dump_eram:
+                if ((addr&0x0007)==0){
+                  printf ("\n0x%04X:", addr);
+                }
+                dbyte = *(u8 xdata *)addr;
+                printf (" %02X", (u16)dbyte);
+                if (addr!=0xFFFF)
+                {
+                  addr++;
+                  goto Cont_dump_eram;
+                } 
+              #endif
+ 338   1        
+ 339   1        return;
+ 340   1      }
+ 341          
+ 342          #if 1
+ 343          //***************************************************************
+ 344          //void dump_BackupImage()
+ 345          //Dump code from backup image
+ 346          //***************************************************************
+ 347          
+ 348          void dump_BackupCode()
+ 349          {
+ 350   1        u16 idata addr, i;
+ 351   1        u8 idata dbyte, banks;
+ 352   1        SflashAddr = 0x50000;
+ 353   1        printf("\n --> Dump backup code");
+ 354   1        for (i=0; i<COM_BANK0_LEN; i++)
+ 355   1        {
+ 356   2          if ((i&0x0007)==0){
+ 357   3            printf ("\n0x%04X:",(u16)(i+0x2000));
+ 358   3          }
+ 359   2          dbyte = spiflash_ReadByte(SflashAddr);
+ 360   2          SflashAddr++;
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 7   
+
+ 361   2          printf (" %02X", (u16)dbyte);
+ 362   2        }
+ 363   1        for (banks=1; banks<8;banks++)
+ 364   1        {
+ 365   2          printf("\n\n --> Bank %02X\n", (u16)banks);
+ 366   2          addr = BANKADDR_L;
+ 367   2          for (i=0; i<CBANK_LEN; i++)
+ 368   2          {
+ 369   3            if ((addr&0x0007)==0)
+ 370   3              printf ("\n0x%04X:", addr);
+ 371   3      
+ 372   3            addr++;
+ 373   3            dbyte = spiflash_ReadByte(SflashAddr);
+ 374   3            SflashAddr++;
+ 375   3            printf (" %02X", (u16)dbyte);
+ 376   3          }
+ 377   2        }
+ 378   1        return;
+ 379   1      }
+ 380          #endif
+ 381          #ifdef PROGRAM_CONFIGURATION
+              //***************************************************************
+              // Program_Config_Data() is to program configuration data into spi flash at the address
+              // 0x00100000
+              //***************************************************************
+              void Program_Config_Data()
+              {
+                char idata c;
+                u32 idata ConfigAddr;
+                u8 idata HexVal;
+                u8 idata FirstChar = 0;
+                DisableWrCRam ();
+                printf("\n **** PROGRAM CONFIGURATION DATA ****\n");
+                printf("\n --> Erase configuration data Y/N?: ");
+                c = _get1char();
+                TI = 0;
+                SBUF = c;
+                while (TI==0);
+                if (c!='Y')
+                {
+                  c = '1';
+                  goto AbortPrgConfigData;
+                }
+                spiflash_eraseConfigMem();
+                spiflash_wrsr_unlock((u8)1);
+                printf("\n --> Waiting for configuration data (equal or less than 512 bytes, ended by $): "); 
+                ConfigAddr = GVTY_CONFIG_DATA_ADDR;
+              Read_Config_data:
+                c = _get1char();
+                switch (c)
+                { 
+                case 27:
+                  goto AbortPrgConfigData;
+                  break;
+                case '$':
+                  goto EndPrgConfigData;
+                  break;
+                default:
+                  if (isxdigit(c))
+                  {
+                    if (FirstChar++==0)
+                    {
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 8   
+
+                      HexVal = (u8)((Asc2Hex((u8*)&c))<<4);
+                    }
+                    else 
+                    {
+                      HexVal |= Asc2Hex((u8*)&c);
+                      spiflash_WriteByte(ConfigAddr++,HexVal);
+                      if ((ConfigAddr&0x7)==0)
+                        printf(".");
+                      FirstChar=0;
+                    }
+                  }
+                  break;
+                } 
+                if (ConfigAddr==(GVTY_CONFIG_END_ADDR+1))
+                {
+                  goto EndPrgConfigData;
+                } else {
+                  goto Read_Config_data;
+                }
+              AbortPrgConfigData:
+                printf ("\n\n --> Abort programming configuration data\n");
+                goto CloseConfigProgramming;
+              EndPrgConfigData:
+                printf ("\n\n --> Finish programming configuration data\n");
+              CloseConfigProgramming:
+                spiflash_wrsr_unlock(0);
+                return;
+              }
+              //***************************************************************
+              //Load_Config_Data();
+              //Load configuration data into the data ram @ 0xE000
+              //Input:
+              //  LoadConfig = 1: Load configuration data to data ram
+              //         = 0: Dump configuration data onto screen
+              //***************************************************************
+              void Load_Config_Data(u8 LoadConfig)
+              {
+                u32 idata Temp;
+                u8 idata c, d, e;
+                if (LoadConfig==0)
+                  printf("\n --> Dump configuration data\n");
+                else
+                  printf("\n --> Loading configuration data ");
+                for (Temp=0;Temp<512;Temp++)
+                {
+                  c = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR+Temp));
+                  d = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR+Temp+1));
+                  e = spiflash_ReadByte((u32)(GVTY_CONFIG_DATA_ADDR+Temp+2));
+                  if (c==0xFF && d==0xFF & e==0xFF) 
+                    break;
+                  if (LoadConfig==0)
+                  {     
+                    printf("\n@0x%03X: 0x%02X",(u16)(0xFFFF&Temp), (u16)(0xFF&c));
+                  }
+                  else
+                  {
+                    *(u8 xdata *)((u16)(0xFFFF&(GVTY_CONFIG_DRAM_ADDR + Temp))) = c;
+                    if (Temp&0x7==0)
+                      printf(".");
+                  }
+                }
+                printf("\n");
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 9   
+
+                return;
+              }
+              #endif
+ 488          //***************************************************************
+ 489          // salutil_Big2LittleEndian(u32)
+ 490          // Sofware Abstraction Utility to convert a 32 bit big endian to 32 bit little endian or vs
+ 491          //***************************************************************
+ 492          u32 swUtil_SwapEndian(u32 var32)
+ 493          {
+ 494   1        return ((var32&0x000000FF)<<24 |
+ 495   1            (var32&0x0000FF00)<<8 |
+ 496   1            (var32&0x00FF0000)>>8 |
+ 497   1            (var32&0xFF000000)>>24);
+ 498   1      }   
+ 499          //---------------------------------------------------------------------------
+ 500          // void memUtil_ClearEram(u8 SetData)
+ 501          // Description: to clear ERAM from 2100 to 0xFFFF
+ 502          //---------------------------------------------------------------------------
+ 503          void memUtil_ClearEram(u8 SetData)
+ 504          {
+ 505   1        Uart2EramAddr=0x2100;
+ 506   1      Erase_Ram:
+ 507   1        *(u8 xdata *)Uart2EramAddr = SetData;
+ 508   1        if (Uart2EramAddr<0xFFFF){
+ 509   2          Uart2EramAddr = Uart2EramAddr+1;
+ 510   2          goto Erase_Ram;
+ 511   2        }
+ 512   1        return;
+ 513   1      }
+ 514          
+ 515          //---------------------------------------------------------------------------
+ 516          //void Download_Uart2Sflash()
+ 517          //Handle the task to download code from UART to Sflash
+ 518          //---------------------------------------------------------------------------
+ 519          #if 1
+ 520          void Download_Uart2Sflash(u8 auto_backup)
+ 521          {
+ 522   1        u8 idata c;
+ 523   1        u16 idata mem_crc16 = 0;
+ 524   1        u16 idata addr_count = 0;
+ 525   1        u16 idata max_addr_count;
+ 526   1        u8 idata temp_data;
+ 527   1        u8 idata flash_verify_error = 0;
+ 528   1        //u16 idata eram_addr;
+ 529   1        //u8 idata dByte;
+ 530   1        printf("\n --> Program SFLASH Y/N? :");
+ 531   1        c = _get1char(); 
+ 532   1        if (c!='Y')
+ 533   1        {
+ 534   2          c = '1';
+ 535   2          return;
+ 536   2        }
+ 537   1        c = 0;
+ 538   1        printf("\n --> Delete current code Y/N? :");
+ 539   1        c = _get1char(); 
+ 540   1        if (c!='Y')
+ 541   1        {
+ 542   2          c = '1';
+ 543   2          return;
+ 544   2        }
+ 545   1        spiflash_wrsr_unlock(1);
+ 546   1        spiflash_eraseLower256k();
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 10  
+
+ 547   1        EnableWrCRam();
+ 548   1        
+ 549   1        c = 0;
+ 550   1      Program_Next_bank:
+ 551   1        {
+ 552   2          
+ 553   2          printf("\n\n ##### Download code for - BANK-%02X #####\n", (u16)c);
+ 554   2          BANKSEL = c;
+ 555   2          memUtil_ClearEram(SetDataFF);
+ 556   2          Uart2EramAddr = 0;
+ 557   2          
+ 558   2      #ifndef IDATA_OPT   
+                  ParseHexRecord(&ErrCnt[0], &ProgCnt[0]);
+              
+              #else
+ 562   2          ParseHexRecord(&ErrCnt[0]);
+ 563   2      #endif
+ 564   2          if (c==0){
+ 565   3            SflashAddr = (u32)(CRAM_START - SFLASH_CRAM_OFFSET);
+ 566   3            Eram2SflashAddr = (u16)CRAM_START;
+ 567   3            //eram_addr = (u16)CRAM_START;
+ 568   3          } else {
+ 569   3            SflashAddr = (u32)(((c-1)*6)+0x10-0x02);
+ 570   3            SflashAddr = SflashAddr<<12;
+ 571   3            Eram2SflashAddr = BANKADDR_L;
+ 572   3            //eram_addr = BANKADDR_L;
+ 573   3          }
+ 574   2          if (ErrCnt[4]==0){
+ 575   3            //printf("\n Calc CRC"); // 0xdf00 = (COM_BANK0_LEN - (CRAM_START - SFLASH_CRAM_OFFSET)) +1
+ 576   3            if(c==0)
+ 577   3              max_addr_count = 0xDF00;
+ 578   3            else
+ 579   3              max_addr_count = CBANK_LEN;
+ 580   3      
+ 581   3            mem_crc16 = (u16)0;
+ 582   3            for(addr_count = 0;addr_count <  max_addr_count ;addr_count++)
+ 583   3            {
+ 584   4      #if 0     
+                      dByte = *(u8 xdata *)(Eram2SflashAddr + addr_count);
+                      if(c==1)
+                      {
+                        if ((eram_addr&0x0007)==0)
+                          printf ("\n0x%04X:", eram_addr);
+              
+                        printf (" %02bX", dByte);
+                        eram_addr++;
+                      }
+                      mem_crc16 = crc_ccitt_update(mem_crc16,dByte);
+              #endif
+ 596   4              mem_crc16 = crc_ccitt_update(mem_crc16,*(u8 xdata *)(Eram2SflashAddr + addr_count));
+ 597   4            }
+ 598   3            
+ 599   3            printf("\n --> Writing to sflash ");
+ 600   3      Cont_ProgSflash:
+ 601   3            spiflash_WriteByte(SflashAddr, *(u8 xdata *)Eram2SflashAddr);
+ 602   3            temp_data = spiflash_ReadByte(SflashAddr);
+ 603   3            if (temp_data != *(u8 xdata *)Eram2SflashAddr){
+ 604   4              printf("\n\n *** SFLASH programming error @ 0x%08lX - try again\n\n",SflashAddr);
+ 605   4              flash_verify_error = 1;
+ 606   4              goto End_sflash_programming;
+ 607   4            }
+ 608   3            if ((Eram2SflashAddr & 0xFF)==0){
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 11  
+
+ 609   4              printf(".");
+ 610   4            }
+ 611   3            if (Eram2SflashAddr<Uart2EramAddr){
+ 612   4              SflashAddr++;
+ 613   4              Eram2SflashAddr++;
+ 614   4              goto Cont_ProgSflash;
+ 615   4            } else {
+ 616   4              goto Check_next_bank;
+ 617   4            }
+ 618   3          } else {
+ 619   3            printf("\n *** ERROR downloading from UART to RAM");
+ 620   3            flash_verify_error = 1;
+ 621   3            goto End_sflash_programming;
+ 622   3          }
+ 623   2        }
+ 624   1      Check_next_bank:
+ 625   1        //spiflash_WriteByte(c*2,((u8*)&mem_crc16)[0]);// for loop can be used to optimize code size to do
+ 626   1        //if(spiflash_ReadByte(c*2) != ((u8*)&mem_crc16)[0])
+ 627   1        spiflash_WriteByte(c*2,lo8(mem_crc16));// for loop can be used to optimize code size to do
+ 628   1        if(spiflash_ReadByte(c*2) != lo8(mem_crc16))
+ 629   1        {
+ 630   2          flash_verify_error = 1;
+ 631   2          goto End_sflash_programming;
+ 632   2        }
+ 633   1        spiflash_WriteByte((c*2) + 1,hi8(mem_crc16));
+ 634   1        if(spiflash_ReadByte((c*2)+1) != hi8(mem_crc16))
+ 635   1        //spiflash_WriteByte((c*2) + 1,((u8*)&mem_crc16)[1]);
+ 636   1        //if(spiflash_ReadByte((c*2)+1) != ((u8*)&mem_crc16)[1])
+ 637   1        {
+ 638   2          flash_verify_error = 1;
+ 639   2          goto End_sflash_programming;
+ 640   2        }
+ 641   1        //printf("\nCRC Bank %bu = %x,fl = %bu,fh = %bu",c,mem_crc16,c*2,(c*2)+1);
+ 642   1        printf("\nCRC Bank %bu = %x",c,mem_crc16);
+ 643   1        c++;
+ 644   1        if (c!=8){
+ 645   2          goto Program_Next_bank;
+ 646   2        } else {
+ 647   2          //spiflash_WriteByte(16,c-1);// no of flashed banks
+ 648   2          //printf("\n Flashed banks %bu",c-1);
+ 649   2          printf("\n *** Programming sflash done!\n");
+ 650   2        }
+ 651   1      End_sflash_programming:
+ 652   1        
+ 653   1        DisableWrCRam();
+ 654   1        spiflash_wrsr_unlock(0);
+ 655   1      
+ 656   1        if(auto_backup == 1)
+ 657   1        {
+ 658   2          if(flash_verify_error == 0)//take backup only if flash is good
+ 659   2            (void)spiflash_BackupCodeImage(1);
+ 660   2        }
+ 661   1        
+ 662   1        return;
+ 663   1      }
+ 664          #endif
+ 665          //***************************************************************
+ 666          //void spiflash_BackupCodeImage() 
+ 667          //This function is to copy 0-256k of code in the sflash to the backup area 256k-512k
+ 668          //***************************************************************
+ 669          u8 spiflash_BackupCodeImage(u8 auto_cnf)
+ 670          {
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 12  
+
+ 671   1        u8 idata Dat1;
+ 672   1        //SflashAddr  = 0x100;
+ 673   1        //Addr32_1  = GVTY_BACKUP_START_ADDR + 0x100;
+ 674   1        SflashAddr  = 0;
+ 675   1        Addr32_1  = GVTY_BACKUP_START_ADDR;
+ 676   1      
+ 677   1        if(auto_cnf == 0)
+ 678   1        {
+ 679   2          printf("\n --> Backup code image Y/N?:");
+ 680   2          Dat1 = _get1char();
+ 681   2          TI = 0;
+ 682   2          SBUF = Dat1;
+ 683   2          if (Dat1!='Y')
+ 684   2            return 0;
+ 685   2          printf("\n --> Delete old backup image Y/N?:");
+ 686   2          Dat1 = _get1char();
+ 687   2          TI = 0;
+ 688   2          SBUF = Dat1;
+ 689   2          if (Dat1!='Y')
+ 690   2            return 0;
+ 691   2        }
+ 692   1        spiflash_wrsr_unlock(1);
+ 693   1        spiflash_eraseBackup256k();
+ 694   1        printf("\n\n --> Backing up code image ");
+ 695   1      
+ 696   1        
+ 697   1      Cont_BkpSflash:
+ 698   1        Dat1 = spiflash_ReadByte(SflashAddr);
+ 699   1        spiflash_WriteByte(Addr32_1,Dat1);
+ 700   1        if (spiflash_ReadByte(Addr32_1)!=Dat1){
+ 701   2          //printf("\n *** Backup error @ 0x%04X%04X\n\n",(u16)(0xFFFF&(Addr32_1>>16)),(u16)(0xFFFF&Addr32_1));
+ 702   2          printf("\n *** Code restoring error @ 0x%08lX\n\n",SflashAddr);
+ 703   2          spiflash_wrsr_unlock(0);
+ 704   2          return 1;
+ 705   2        }
+ 706   1        if (Addr32_1<GVTY_BACKUP_END_ADDR){
+ 707   2          SflashAddr++;
+ 708   2          Addr32_1++;
+ 709   2          if ((Addr32_1&0x1FF)==0)
+ 710   2            printf(".");
+ 711   2          goto Cont_BkpSflash;
+ 712   2        }
+ 713   1      
+ 714   1        printf("\n --> Backup code done!");
+ 715   1        spiflash_wrsr_unlock(0);
+ 716   1        return 0;
+ 717   1      }
+ 718          //***************************************************************
+ 719          //void spiflash_RestroreCodeImage() 
+ 720          //This function is to copy 0-256k of code in the sflash to the backup area 256k-512k
+ 721          //***************************************************************
+ 722          u8 spiflash_RestoreCodeImage(u8 auto_cnf)
+ 723          {
+ 724   1        u8 idata Dat1;
+ 725   1        u16 idata calc_crc = 0;
+ 726   1        u32 idata addr_count = (u32)0;
+ 727   1        u32 idata base_addr_offset;
+ 728   1        u8 idata bank_id = 0;
+ 729   1        u8 idata flash_verify_error = 0;
+ 730   1        u32 idata max_bank_size;// dont optimize to u16. multiplication result is get truncated
+ 731   1        
+ 732   1        //SflashAddr  = 0x100; // 0x2100 - 0x2000
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 13  
+
+ 733   1        //Addr32_1  = GVTY_BACKUP_START_ADDR + 0x100;
+ 734   1        
+ 735   1        //Addr32_1  = GVTY_BACKUP_START_ADDR + 0x100;
+ 736   1        printf("\n Checking integrity of Backup ...");
+ 737   1        for(bank_id=0;bank_id<8;bank_id++)
+ 738   1        {
+ 739   2          if(bank_id==0)
+ 740   2          {
+ 741   3            max_bank_size = 0xDF00;
+ 742   3            base_addr_offset = GVTY_BACKUP_START_ADDR + 0x100;
+ 743   3          }
+ 744   2          else
+ 745   2          {
+ 746   3            max_bank_size = CBANK_LEN;    
+ 747   3            base_addr_offset = GVTY_BACKUP_START_ADDR + 0xE000 + (max_bank_size * (bank_id-1));
+ 748   3          }
+ 749   2          //base_addr_offset = GVTY_BACKUP_START_ADDR + 0x100 + bank_id * ;
+ 750   2          calc_crc = 0;
+ 751   2          for(Addr32_1=0;Addr32_1<max_bank_size;Addr32_1++)
+ 752   2          {
+ 753   3            Dat1 = spiflash_ReadByte(base_addr_offset + Addr32_1);
+ 754   3            calc_crc = crc_ccitt_update(calc_crc,Dat1);
+ 755   3          }
+ 756   2          //printf("\nBank ID %bu,CRC %04X,base addr %08lX",bank_id, calc_crc,base_addr_offset);
+ 757   2          printf("\nBank ID %bu,CRC %04X",bank_id, calc_crc);
+ 758   2          //spiflash_WriteByte(bank_id*2,lo8(calc_crc));// for loop can be used to optimize code size to do
+ 759   2          if(spiflash_ReadByte((GVTY_BACKUP_START_ADDR + (bank_id*2))) != lo8(calc_crc))
+ 760   2          {
+ 761   3            flash_verify_error = 1;
+ 762   3            goto End_sflash_restore;
+ 763   3          }
+ 764   2          //spiflash_WriteByte((bank_id*2) + 1,hi8(calc_crc));
+ 765   2          if(spiflash_ReadByte((GVTY_BACKUP_START_ADDR + (bank_id*2)+1)) != hi8(calc_crc))
+ 766   2          //spiflash_WriteByte((c*2) + 1,((u8*)&mem_crc16)[1]);
+ 767   2          //if(spiflash_ReadByte((c*2)+1) != ((u8*)&mem_crc16)[1])
+ 768   2          {
+ 769   3            flash_verify_error = 1;
+ 770   3            goto End_sflash_restore;
+ 771   3          }
+ 772   2        //printf("\nCRC Bank %bu = %x,fl = %bu,fh = %bu",bank_id,calc_crc,bank_id*2,(bank_id*2)+1);
+ 773   2        }
+ 774   1      
+ 775   1        SflashAddr  = 0; // 0x2100 - 0x2000
+ 776   1        Addr32_1  = GVTY_BACKUP_START_ADDR;
+ 777   1        
+ 778   1        
+ 779   1        if(auto_cnf == 0)
+ 780   1        {
+ 781   2          printf("\n --> Recover code image Y/N?:");
+ 782   2          Dat1 = _get1char();
+ 783   2          TI = 0;
+ 784   2          SBUF = Dat1;
+ 785   2          if (Dat1!='Y')
+ 786   2            return 0;
+ 787   2          printf("\n --> Delete code image Y/N?:");
+ 788   2          Dat1 = _get1char();
+ 789   2          TI = 0;
+ 790   2          SBUF = Dat1;
+ 791   2          if (Dat1!='Y')
+ 792   2            return 0;
+ 793   2        }
+ 794   1        
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 14  
+
+ 795   1        spiflash_eraseLower256k();
+ 796   1        printf("\n --> Restoring code image ");
+ 797   1      Cont_RestoreCodeImage:
+ 798   1        Dat1 = spiflash_ReadByte(Addr32_1);
+ 799   1        spiflash_WriteByte(SflashAddr,Dat1);
+ 800   1        if (spiflash_ReadByte(SflashAddr)!=Dat1){
+ 801   2          printf("\n *** Code restoring error @ 0x%08lX\n\n",SflashAddr);
+ 802   2          spiflash_wrsr_unlock(0);
+ 803   2          return 1;
+ 804   2        }
+ 805   1        if (Addr32_1<GVTY_BACKUP_END_ADDR){
+ 806   2          SflashAddr++;
+ 807   2          Addr32_1++;
+ 808   2          if ((Addr32_1&0x1FF)==0)
+ 809   2            printf(".");
+ 810   2          goto Cont_RestoreCodeImage;
+ 811   2        }
+ 812   1        printf("\n --> Restoring code image done!");
+ 813   1      
+ 814   1      End_sflash_restore:
+ 815   1        spiflash_wrsr_unlock(0);
+ 816   1        if(flash_verify_error == 1)
+ 817   1        {
+ 818   2          printf("\nBackup integrity failed.\n CPU Reset");
+ 819   2          *((u8 xdata * )(0x34)) = 1; // wb 34 1 system reset
+ 820   2        }
+ 821   1        return 0;
+ 822   1      }
+ 823          
+ 824          //-----------------------------------------------------------------------------
+ 825          //void Cmd_Erase_Sflash()
+ 826          //Hanlde the task to erase the whole sflash
+ 827          //-----------------------------------------------------------------------------
+ 828          #if 0
+              void Cmd_Erase_Sflash()
+              {
+                char idata c;
+                printf("\n --> THIS FUNCTION WILL ERASE 2MBYTE OF SPI FLASH Y/N? :");
+                c = _getkey();
+                TI = 0;
+                SBUF = c;
+                if (c!='Y')
+                {
+                  c = '1';
+                  return;
+                }
+                c = 0;
+                printf("\n --> Ready Y/N? :");
+                c = _getkey();
+                TI = 0;
+                SBUF = c;
+                if (c!='Y')
+                {
+                  c = '1';
+                  return;
+                }
+                spiflash_chiperase();
+                printf ("\n --> Erase spi flash done\n"); 
+                return;
+              }
+              #endif
+
+C51 COMPILER V9.54   SPIFLASH                                                              10/14/2016 00:11:19 PAGE 15  
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2915    ----
+   CONSTANT SIZE    =    935    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       6
+   IDATA SIZE       =   ----      50
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

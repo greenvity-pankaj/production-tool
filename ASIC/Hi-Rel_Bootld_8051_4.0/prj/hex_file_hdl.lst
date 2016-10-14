@@ -1,0 +1,653 @@
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE HEX_FILE_HDL
+NO OBJECT MODULE REQUESTED
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\src\hex_file_hdl.c OPTIMIZE(8,SIZE) BROWSE INCDIR(..\src;C:\Keil\C51\
+                    -INC;..\src) DEFINE(IDATA_OPT,FEATURE_CHIPERASE_) DEBUG OBJECTEXTEND CODE PRINT(.\hex_file_hdl.lst) TABS(2) PREPRINT(.\he
+                    -x_file_hdl.i) SRC(.\hex_file_hdl.SRC)
+
+line level    source
+
+   1          /*
+   2          * Description : Hex file handler header implement 
+   3          *
+   4          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+   5          * All rights reserved.
+   6          *
+   7          * Author      : Peter Nguyen
+   8          * Release Date: 04/27/2013
+   9          * Purpose :
+  10          *     Parsing hex file and download from uart to code ram
+  11          *
+  12          * File: hex_file_hdl.c
+  13          */
+  14          
+  15          //#include <stdafx.h>
+  16          #include <stdio.h>
+  17          #include <stdlib.h>
+  18          #include <reg51.h>          
+  19          #include <ctype.h>
+  20          #include <typedef.h>
+  21          #include <hex_file_hdl.h>
+  22          #include <uart.h>
+  23          #include <cmem_ctrl.h>
+  24          #include <macro_def.h>
+  25          #include <spiflash_drv.h>
+  26          #include "global_var.h"
+  27          
+  28          //Error counter index
+  29          #define ErrLineBegin 0
+  30          //#define ErrLBA 1
+  31          #define ErrRecType 1
+  32          #define ErrNonAscDigit 2
+  33          #define ErrWrCRam 3
+  34          #define ErrChkSume 4
+  35          #define ErrSegment 5
+  36          
+  37          //Counter good information
+  38          #define CntLine 0
+  39          #define CntAsciiHex 1
+  40          #define CntWrByte 2
+  41          #define CntNonAscii 3
+  42          #define CntGoodRec 4
+  43          
+  44          //Error return
+  45          #define ExitRet  1
+  46          #define NonAscDigitRet  3
+  47          #define GoodHexByteRet 0
+  48          #define AscDigitRet 0
+  49          #define ExtraRecordRet 2
+  50          #define EnterRet 4
+  51          
+  52          //Record type
+  53          #define RECTYPE_DATA 0
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 2   
+
+  54          #define RECTYPE_EOF  1
+  55          #define RECTYPE_EXT_SEG_ADDR 2
+  56          #define RECTYPE_START_SEG_ADDR 3
+  57          #define RECTYPE_EXT_LIN_ADDR 4
+  58          #define RECTYPE_START_LIN_ADDR 5
+  59          
+  60          //State define
+  61          #define START_REC 0
+  62          #define GET_REC_LEN 1
+  63          #define GET_OFFSET 2
+  64          #define GET_REC_TYPE 3
+  65          #define GET_REC_DATA   4  //      GET_REC_TYPE //+ RECTYPE_DATA
+  66          #define GET_REC_EOF    5    //  GET_REC_TYPE + RECTYPE_EOF
+  67          #define GET_EXT_SEG_ADDR  6  //   GET_REC_TYPE + RECTYPE_EXT_SEG_ADDR
+  68          #define GET_START_SEG_ADDR  7  // GET_REC_TYPE + RECTYPE_START_SEG_ADDR
+  69          #define GET_EXT_LIN_ADDR    8 // GET_REC_TYPE + RECTYPE_EXT_LIN_ADDR
+  70          #define GET_START_LIN_ADDR  9  // GET_REC_TYPE + RECTYPE_START_LIN_ADDR
+  71          
+  72          
+  73          #define GET_CHK_SUME 19
+  74          #define HANDLE_ERROR 20
+  75          #define UNKNOWN_REC 21
+  76          #define END_DOWNLOAD 22
+  77          #define EXIT_DOWNLOAD 23
+  78          
+  79          #define DNLD_INDICATOR 200
+  80          
+  81          //#define KEILDEBUG
+  82          
+  83          //CheckSume = 0xff - (RecLen + Offset + Rectype + infor bytes - 1)
+  84          //Correct record when: CheckSume + (RecLen + Offset + Rectype + infor bytes) = 0 
+  85          u8 idata flash_bank_count = 0;
+  86          
+  87          #ifdef CPLUSSIM
+                static FILE *datafile;
+                static u8  errfile;
+              
+              void open_hex_file()
+              {
+              //  datafile = fopen("..\..\hexfile\test_80251.hex", "r");
+              }
+              #endif
+  96          
+  97          //void ParseHexRecord(u16 idata *ErrCntV, u16 idata *ProgCntV, u8 idata *DldMode)
+  98          #ifndef IDATA_OPT
+              void ParseHexRecord(u16 idata *ErrCntV, u16 idata *ProgCntV) 
+              #else
+ 101          void ParseHexRecord(u16 idata *ErrCntV)
+ 102          
+ 103          #endif
+ 104          {
+ 105   1        u16 idata i, n;  //idata
+ 106   1        u8 idata c;  //idata
+ 107   1        u16 idata temp;
+ 108   1        u8 idata ChkSume; //idata - 
+ 109   1        u8 idata HexVal; //idata
+ 110   1        u8 idata RecLen; //idata - number of data bytes begin right after the record type to the last byte before
+             - the check sume.
+ 111   1        u8 idata RecType; //idata
+ 112   1        u16 idata Err; //idata
+ 113   1        u16 idata state; //idata
+ 114   1        u16 idata CRamAddr;
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 3   
+
+ 115   1      
+ 116   1        CRamAddr = (u16)0x0;
+ 117   1        ChkSume = 0;
+ 118   1        HexVal = 0;
+ 119   1        i = 0;
+ 120   1        c = 0;
+ 121   1        state = START_REC;
+ 122   1      
+ 123   1        for (i=0; i<8; i++)
+ 124   1        {
+ 125   2          ErrCntV[i] = 0;
+ 126   2        }
+ 127   1      #ifndef IDATA_OPT 
+                for (i=0; i<6; i++)
+                {
+                  ProgCntV[i] = 0;
+                }
+              #endif
+ 133   1        printf("\n --> Waiting for Intel-hex file .");
+ 134   1      
+ 135   1      #ifdef CPLUS_READFILE
+                //open_hex_file();
+                datafile = fopen("test_80251_i380.hex", "r"); //test_80251.hex", "r");
+                if (datafile==NULL)
+                {
+                  fclose(datafile);
+                  printf ("==== Hexfile empty ====\n\n");
+                }
+                else
+                  printf ("==== Hexfile openned ===\n\n");
+              #endif
+ 146   1        while (1)
+ 147   1        {
+ 148   2          switch (state)
+ 149   2          {
+ 150   3            case START_REC:
+ 151   3              #ifdef CPLUSDEBUG
+                        printf("\n*** Looking for begining of record\n");
+                      #endif
+ 154   3              c = _get1char();
+ 155   3              if (c == 27)
+ 156   3              {
+ 157   4                state = END_DOWNLOAD;
+ 158   4                break;
+ 159   4              }
+ 160   3              else if (c==':')
+ 161   3              {
+ 162   4                ChkSume = 0;
+ 163   4                state = GET_REC_LEN;
+ 164   4      #ifndef IDATA_OPT         
+                        ProgCntV[CntLine] = ProgCntV[CntLine] + 1;
+              #endif
+ 167   4                #ifdef KEILDEBUG
+                          printf("*** %d: Beginning of Record found\n", state);
+                        #endif
+ 170   4                break;
+ 171   4              }
+ 172   3              else if (!isxdigit(c) && (c!=10))
+ 173   3                ErrCntV[ErrNonAscDigit] = ErrCntV[ErrNonAscDigit] + 1;
+ 174   3      
+ 175   3              break;
+ 176   3      
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 4   
+
+ 177   3            case GET_REC_LEN:
+ 178   3              Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+ 179   3              if (Err==GoodHexByteRet)
+ 180   3              {
+ 181   4                RecLen = HexVal;     //Get record length
+ 182   4                state = GET_OFFSET;
+ 183   4                #ifdef KEILDEBUG
+                          printf("==> %d: Rec length = %d - number of lines: %d\n", (u16)state, (u16)RecLen, (u16)ProgCntV[Cnt
+             -Line]);
+                        #endif
+ 186   4                break;
+ 187   4              }
+ 188   3              else 
+ 189   3                state = HANDLE_ERROR;
+ 190   3              break;
+ 191   3      
+ 192   3            case GET_OFFSET:
+ 193   3              Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);  //Get record length high byte
+ 194   3              temp = HexVal;
+ 195   3              if (Err!=GoodHexByteRet)
+ 196   3              {
+ 197   4                state = HANDLE_ERROR;
+ 198   4                break;
+ 199   4              }
+ 200   3              Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);  //Get record length low byte
+ 201   3              if (Err!=GoodHexByteRet)
+ 202   3              {
+ 203   4                state = HANDLE_ERROR;
+ 204   4                break;
+ 205   4              }
+ 206   3              temp <<= 8;
+ 207   3              temp |= HexVal;
+ 208   3              CRamAddr &= 0xFFFF0000;   //Delete previous record's last address
+ 209   3              CRamAddr |= temp;
+ 210   3              state = GET_REC_TYPE;
+ 211   3              #ifdef KEILDEBUG
+                        printf("==> %d: Off set address = %04X --> CRamAddr = ", (u16)state, temp);
+                        printf("%04X%04X\n", (u16)(CRamAddr>>16), (u16)(CRamAddr));
+                      #endif
+ 215   3              break;
+ 216   3      
+ 217   3            case GET_REC_TYPE: //3
+ 218   3              Err = GetAsc2Hex (&RecType, &ChkSume, ErrCntV);
+ 219   3              if (Err!=GoodHexByteRet)
+ 220   3              {
+ 221   4                state = HANDLE_ERROR;
+ 222   4                break;
+ 223   4              }
+ 224   3              else if (RecType > 5)
+ 225   3              {
+ 226   4                state = UNKNOWN_REC;
+ 227   4                break;
+ 228   4              }
+ 229   3              else
+ 230   3              {
+ 231   4                #ifdef KEILDEBUG
+                          printf("==> %d: RecType = %d\n", (u16)state, (u16)RecType);
+                        #endif
+ 234   4                state = RecType + GET_REC_TYPE + 1; //Set the status for specific record types
+ 235   4                i = 0; //To set the status for the next state
+ 236   4                #ifdef KEILDEBUG
+                          printf("==> %d: Next state\n", state);
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 5   
+
+                        #endif
+ 239   4                break;
+ 240   4              }        
+ 241   3            case GET_REC_DATA:  //4
+ 242   3              Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+ 243   3              RecLen--;
+ 244   3              if (CRamAddr>Uart2EramAddr){
+ 245   4                Uart2EramAddr = CRamAddr;
+ 246   4              }
+ 247   3              Err = Wr2CRam(&HexVal, (volatile u8 xdata *)CRamAddr);
+ 248   3              CRamAddr++;
+ 249   3              if (Err==0)
+ 250   3              {
+ 251   4                if (n >= DNLD_INDICATOR)
+ 252   4                {
+ 253   5                #pragma asm
+ 254   5                    CLR  TI
+ 255   5                  MOV SBUF,#02Eh //'.'
+ 256   5                #pragma endasm
+ 257   5                  n = 0;
+ 258   5                }   
+ 259   4                n++;
+ 260   4      #ifndef IDATA_OPT         
+                        ProgCntV[CntWrByte] = ProgCntV[CntWrByte] + 1;   //Count 1 good byte downloaded
+              #endif          
+ 263   4              }
+ 264   3              else
+ 265   3              {
+ 266   4                printf("f");
+ 267   4                ErrCntV[ErrWrCRam] = ErrCntV[ErrWrCRam] + 1;  //Count 1 byte download fail
+ 268   4              }
+ 269   3              if (RecLen==0)
+ 270   3                state = GET_CHK_SUME;
+ 271   3              break;
+ 272   3            case GET_REC_EOF: //5
+ 273   3              Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV); //Get 0xFF checksume of eof
+ 274   3      #ifndef IDATA_OPT       
+                      if ((Err==0) && (ChkSume==0))
+                        ProgCntV[CntGoodRec] = ProgCntV[CntGoodRec] + 1; 
+              #endif        
+ 278   3              #ifdef CPLUSDEBUG
+                        printf("==> %d: Getting EOF - CheckSume = %d\n", state, (u16)ChkSume);
+                      #endif
+ 281   3              state = END_DOWNLOAD;
+ 282   3              break;
+ 283   3      
+ 284   3            case GET_EXT_SEG_ADDR: //6
+ 285   3              state = UNKNOWN_REC;
+ 286   3              break;
+ 287   3      
+ 288   3            case GET_START_SEG_ADDR: //7
+ 289   3              state = UNKNOWN_REC;
+ 290   3              break;
+ 291   3      
+ 292   3            case GET_EXT_LIN_ADDR: //8
+ 293   3              if (i==0)
+ 294   3              {
+ 295   4                temp = 0;
+ 296   4                Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+ 297   4                RecLen--;
+ 298   4                if (Err==0)
+ 299   4                {
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 6   
+
+ 300   5                  temp = (u32) HexVal;
+ 301   5                  temp <<= 8;
+ 302   5                }
+ 303   4                else
+ 304   4                  state = HANDLE_ERROR;
+ 305   4                i = 1;
+ 306   4              }
+ 307   3              else
+ 308   3              {
+ 309   4                Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+ 310   4                RecLen--;
+ 311   4                if (Err==0)
+ 312   4                {
+ 313   5                  temp = temp | (u32)HexVal;
+ 314   5                  if ((temp >= 0x00fb) && (temp <= 0x00fe))
+ 315   5                    temp = temp - 0x00fa; //map segment to data ram for downloading: fb = 01, fc = 02, fd = 03, fe = 04
+ 316   5                  else
+ 317   5                  {
+ 318   6                    ErrCntV[ErrSegment] = ErrCntV[ErrSegment] + 1;// scope for optimization
+ 319   6                    temp = 0x01; //Map all the wrong segment address to 0xfb <=> 0x01 data ram
+ 320   6                  }
+ 321   5          
+ 322   5                  temp <<= 16;
+ 323   5                  CRamAddr = temp;
+ 324   5      
+ 325   5                #ifdef KEILDEBUG
+                          printf("==> %d: Linear extended segment address = 0x%04X%04X\n", state, (u16)(CRamAddr>>16), (u16)CR
+             -amAddr);
+                        #endif
+ 328   5                  state = GET_CHK_SUME;
+ 329   5                }
+ 330   4                else
+ 331   4                  state = HANDLE_ERROR;         
+ 332   4              }     
+ 333   3              break;
+ 334   3      
+ 335   3            case GET_START_LIN_ADDR: //9
+ 336   3              break;
+ 337   3            
+ 338   3            case GET_CHK_SUME:
+ 339   3              #ifdef KEILDEBUG
+                        printf("\n\n==> %d: Get check sume", state);
+                      #endif
+ 342   3              Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+ 343   3              if ((Err==0) && (ChkSume==0) && (RecLen==0))
+ 344   3              {
+ 345   4      #ifndef IDATA_OPT       
+                        ProgCntV[CntGoodRec] = ProgCntV[CntGoodRec] + 1; 
+              #endif
+ 348   4                state = START_REC;
+ 349   4              #ifdef KEILDEBUG
+                        printf ("\n-- Check sume good\n\n");
+                      #endif
+ 352   4                break;
+ 353   4              }
+ 354   3              else
+ 355   3              {
+ 356   4                ErrCntV[ErrChkSume] = ErrCntV[ErrChkSume] + 1;// scope of optimization
+ 357   4              #ifdef KEILDEBUG
+                        printf ("\n-- Check sume error\n\n");
+                      #endif
+ 360   4              }
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 7   
+
+ 361   3              state = START_REC;
+ 362   3              break;
+ 363   3              
+ 364   3            case HANDLE_ERROR:
+ 365   3              if (Err==ExitRet)
+ 366   3              {
+ 367   4                state = END_DOWNLOAD;
+ 368   4                break;
+ 369   4              }
+ 370   3              else if (Err==NonAscDigitRet)
+ 371   3              {
+ 372   4                state = START_REC;
+ 373   4              }
+ 374   3              else if (Err==ExtraRecordRet)
+ 375   3              {
+ 376   4                ChkSume = 0;
+ 377   4                state = GET_REC_LEN;   //Line found, jump back to the look for RECLEN
+ 378   4              }
+ 379   3              break;
+ 380   3      
+ 381   3            case UNKNOWN_REC:
+ 382   3              #ifdef KEILDEBUG
+                        printf("\n\n==> %d: Unknown Record", state);
+                      #endif
+ 385   3              //Keep read the record to the end or new line
+ 386   3              ErrCntV[ErrRecType] = ErrCntV[ErrRecType] + 1;// scope of optimization
+ 387   3              state = START_REC;
+ 388   3              break;
+ 389   3      
+ 390   3            case END_DOWNLOAD:// code optimization
+ 391   3              //printf("\n --> Code Download Summary\n");
+ 392   3              printf("\n  Bank Code Download Done\n");
+ 393   3              //printf(" .Successfully downloaded byte(s): %u\n", (u16)ProgCntV[CntWrByte]);
+ 394   3              //printf(" .Found line(s): %u\n", (u16)ProgCntV[CntLine]);
+ 395   3              //printf(" .False line(s): %u\n", (u16)ErrCntV[ErrLineBegin]);
+ 396   3              //printf(" .Record type error(s): %u\n", (u16)ErrCntV[ErrRecType]);
+ 397   3              //printf(" .Non ascii digit(s): %u\n", (u16)ErrCntV[ErrNonAscDigit]);
+ 398   3              //printf(" .Error downloaded byte(s): %u\n", (u16)ErrCntV[ErrWrCRam]);
+ 399   3              //printf(" .Failed checksume(s): %u\n", (u16)ErrCntV[ErrChkSume]);
+ 400   3              //printf("- Error segment address(s): %u\n", (u16)ErrCntV[ErrSegment]); 
+ 401   3              flash_bank_count++;
+ 402   3              state = EXIT_DOWNLOAD;
+ 403   3              break;
+ 404   3            default:
+ 405   3              break;
+ 406   3          }
+ 407   2          if (state==EXIT_DOWNLOAD){
+ 408   3            break;
+ 409   3          }
+ 410   2        }
+ 411   1        return;
+ 412   1      }
+ 413          
+ 414          //***************************************************************************
+ 415          //u8 GetAsc2Hex (u8 *HexValV, u8 *ChkSumeV, u16 *ProgCntV, u16 *ErrCntV)
+ 416          //    Return: 
+ 417          //            HexVal of 2 ascii digits
+ 418          //            Check Sume of the record
+ 419          //            Progress log: number of bytes, records.. of the hex file parsing
+ 420          //            Error of the process in ErrCntV
+ 421          //
+ 422          //            Error of the function:
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 8   
+
+ 423          //                    0: good hex value is read
+ 424          //                    1: Escape char read
+ 425          //                    2: Error extra record beginning found
+ 426          //***************************************************************************
+ 427          
+ 428          //u8 GetAsc2Hex (u8 idata *HexValV, u8 idata *ChkSumeV, u16 idata *ErrCntV)
+ 429          u8 GetAsc2Hex (u8 idata *HexValV, u8 idata *ChkSumeV, u16 idata *ErrCntV)
+ 430          
+ 431          {
+ 432   1        u8 idata AsciiHex;
+ 433   1        u8 idata HexTemp;
+ 434   1        u8 idata Error, FirstAscii;
+ 435   1        FirstAscii = 0;
+ 436   1        AsciiHex = 0;
+ 437   1      #ifdef CPLUSDEBUG
+                printf ("\n===== GetAsc2Hex\n");
+              #endif
+ 440   1        while (1)
+ 441   1        {
+ 442   2          Error = GetAscii(&AsciiHex, ErrCntV);
+ 443   2          switch (Error)
+ 444   2          {
+ 445   3          case AscDigitRet:
+ 446   3            if (FirstAscii == 0)
+ 447   3            {
+ 448   4              HexTemp = AsciiHex << 4;
+ 449   4              FirstAscii++;
+ 450   4              break;
+ 451   4            }
+ 452   3            else
+ 453   3            {
+ 454   4              HexTemp |= AsciiHex;
+ 455   4              *HexValV = HexTemp;
+ 456   4              *ChkSumeV += HexTemp;
+ 457   4              #ifdef CPLUSDEBUG
+                        printf ("%02X\n", *HexValV);
+                      #endif
+ 460   4              return Error;  //Exit GetAsc2Hex
+ 461   4            }
+ 462   3          case NonAscDigitRet:
+ 463   3            break;  //Non ascii char received, loop to consum all the junk data 
+ 464   3      
+ 465   3          default: //1: Escape, 2: Error extra record beginning
+ 466   3            return Error; //Exit GetAsc2Hex   
+ 467   3            }
+ 468   2        }
+ 469   1      }
+ 470          //*****************************************************************************
+ 471          //Get an ascii char
+ 472          //Change the argument: Hex value of the asccii digit and Erro counter record
+ 473          //Return error: 
+ 474          //             0 - No error, 2 chars of ascii digit is read (1 byte hex) 
+ 475          //             1 = Escape key is hit
+ 476          //             2 = beginning of line found
+ 477          //             3 = Non ascii digit 
+ 478          //*****************************************************************************
+ 479          
+ 480          u8 GetAscii(u8 idata *AsciiHexV, u16 idata *ErrCntV)
+ 481          {
+ 482   1        u8 idata ErrGetAscii;
+ 483   1        u8 idata c;
+ 484   1        *AsciiHexV = 0;
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 9   
+
+ 485   1        ErrGetAscii = 0;
+ 486   1        c = 0;
+ 487   1        c = _get1char(); //_getkey(); //_getchar();
+ 488   1      #ifdef CPLUSDEBUG
+                printf ("======= GetAscii\n");
+              #endif
+ 491   1        switch (c)
+ 492   1        { 
+ 493   2        case 27:
+ 494   2          ErrGetAscii = ExitRet;  //Exit download SR
+ 495   2          break;
+ 496   2        case ':':
+ 497   2          ErrCntV[ErrLineBegin] = ErrCntV[ErrLineBegin] + 1; // scope for improvement
+ 498   2          ErrGetAscii = ExtraRecordRet;  //Process unexpected line beginning, exit to read another line
+ 499   2          break;
+ 500   2        default:
+ 501   2          if (isxdigit(c))
+ 502   2          {
+ 503   3            *AsciiHexV = Asc2Hex(&c);
+ 504   3            ErrGetAscii = AscDigitRet;   //First correct ascii code - hight nibble
+ 505   3          }
+ 506   2          else if (c==10)
+ 507   2            ErrGetAscii = EnterRet;
+ 508   2          else 
+ 509   2          {
+ 510   3            ErrCntV[ErrNonAscDigit] = ErrCntV[ErrNonAscDigit] + 1;// scope for improvement
+ 511   3            ErrGetAscii = NonAscDigitRet;  //Non ascii value read
+ 512   3          }
+ 513   2          break;
+ 514   2        }
+ 515   1        return ErrGetAscii;
+ 516   1      }
+ 517          
+ 518          //***************************************************************************
+ 519          //_getchar() - for debugging on pc, return a char entered from the keyboard
+ 520          //           - for 80251, return a char received from uart
+ 521          //Check macro: CPLUSSIM
+ 522          //***************************************************************************
+ 523          #if 0
+              #ifdef CPLUSSIM
+              u8 _getchar()
+              {
+              #ifdef CPLUSSIM
+                u8 c;
+              #ifdef KEYBRD_CONSOLE
+                printf ("\n*** _getchar : ");
+                scanf("%c", &c);
+                fflush(stdin); //To flush the enter key still in the key board buffer when the first char already read
+              #else
+                if (!feof(datafile))
+                  fscanf(datafile, "%c", &c);
+                else
+                  fclose(datafile);
+              #endif
+              
+              #else
+                u8 idata c;
+                while (1)
+                {
+                  if (RI == 1)
+                  {
+                    RI = 0;
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 10  
+
+                    c = SBUF;
+                  }
+                }
+              #endif
+              
+                return c;
+              }
+              #endif //CPLUSSIM
+              #endif
+ 556          //***************************************************************
+ 557          //Asc2Hex(u8) 
+ 558          //           Input: an ascii hex digit
+ 559          //           ouput: the hex value of the input
+ 560          //***************************************************************
+ 561          u8 Asc2Hex (u8 idata *AscDigit)
+ 562          {
+ 563   1        u8 idata c;
+ 564   1        c = toupper(*AscDigit);
+ 565   1        if (c <= 57)
+ 566   1          c = c - 48; //ascii hex digit 0-9 
+ 567   1        else
+ 568   1          c = c - 55; //ascii hex digit A-F
+ 569   1        return c;
+ 570   1      }
+ 571          //***************************************************************
+ 572          //Write 1 byte of data into code ram
+ 573          //u8 Wr2CRam(u8 *HexValV, u8 *CRamAddr)
+ 574          //           Input: an ascii hex digit
+ 575          //           Input: code ram address
+ 576          //           output: return value = 1 <=> error
+ 577          //                   return value = 0 <=> good
+ 578          //**************************************************************
+ 579          #ifdef CPLUSSIM
+              u8 Wr2CRam(u8 *HexValV, u8 *CRamAddr)
+              #else
+ 582          u8 Wr2CRam(u8 idata *HexValV, u8 xdata * CRamAddr)
+ 583          #endif
+ 584          {
+ 585   1      #ifdef CPLUSSIM
+              #ifdef CPLUSDEBUG
+                printf("CRamAddr = %08X\n", CRamAddr);
+              #endif
+                u8 temp;
+                u8 CRamAddr_t;
+                CRamAddr_t = *HexValV;
+                temp = CRamAddr_t;
+                printf("%02X",temp);
+                if (temp != *HexValV)
+                  return 1;
+                else
+                  return 0;
+              #else
+ 599   1        *CRamAddr = *HexValV;
+ 600   1        if (*CRamAddr!=*HexValV)
+ 601   1          return 1;
+ 602   1        else
+ 603   1          return 0;
+ 604   1      #endif
+ 605   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+C51 COMPILER V9.54   HEX_FILE_HDL                                                          10/14/2016 00:11:19 PAGE 11  
+
+   CODE SIZE        =   1188    ----
+   CONSTANT SIZE    =     65    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       6
+   IDATA SIZE       =      1      24
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

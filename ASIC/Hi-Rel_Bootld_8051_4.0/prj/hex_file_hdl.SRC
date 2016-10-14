@@ -1,0 +1,1955 @@
+; .\hex_file_hdl.SRC generated from: ..\src\hex_file_hdl.c
+; COMPILER INVOKED BY:
+;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\hex_file_hdl.c OPTIMIZE(8,SIZE) BROWSE INCDIR(..\src;C:\Keil\C51\INC;..\src) DEFINE(IDATA_OPT,FEATURE_CHIPERASE_) DEBUG OBJECTEXTEND CODE PRINT(.\hex_file_hdl.lst) TABS(2) PREPRINT(.\hex_file_hdl.i) SRC(.\hex_file_hdl.SRC)
+
+$NOMOD51
+
+NAME	HEX_FILE_HDL
+
+P0	DATA	080H
+P1	DATA	090H
+P2	DATA	0A0H
+BANKSEL	DATA	09FH
+P3	DATA	0B0H
+T0	BIT	0B0H.4
+AC	BIT	0D0H.6
+T1	BIT	0B0H.5
+EA	BIT	0A8H.7
+IE	DATA	0A8H
+RD	BIT	0B0H.7
+MEMCTRL	DATA	0F8H
+ES	BIT	0A8H.4
+IP	DATA	0B8H
+RI	BIT	098H.0
+INT0	BIT	0B0H.2
+CY	BIT	0D0H.7
+TI	BIT	098H.1
+INT1	BIT	0B0H.3
+PS	BIT	0B8H.4
+SP	DATA	081H
+OV	BIT	0D0H.2
+WR	BIT	0B0H.6
+SBUF	DATA	099H
+PCON	DATA	087H
+SCON	DATA	098H
+TMOD	DATA	089H
+TCON	DATA	088H
+IE0	BIT	088H.1
+IE1	BIT	088H.3
+B	DATA	0F0H
+ACC	DATA	0E0H
+ET0	BIT	0A8H.1
+ET1	BIT	0A8H.3
+TF0	BIT	088H.5
+TF1	BIT	088H.7
+CRLA_H	DATA	0F4H
+RB8	BIT	098H.2
+TH0	DATA	08CH
+EX0	BIT	0A8H.0
+IT0	BIT	088H.0
+TH1	DATA	08DH
+TB8	BIT	098H.3
+EX1	BIT	0A8H.2
+IT1	BIT	088H.2
+P	BIT	0D0H.0
+CRLA_L	DATA	0F3H
+SM0	BIT	098H.7
+TL0	DATA	08AH
+SM1	BIT	098H.6
+TL1	DATA	08BH
+SM2	BIT	098H.5
+CRSA_H	DATA	0F2H
+PT0	BIT	0B8H.1
+PT1	BIT	0B8H.3
+RS0	BIT	0D0H.3
+TR0	BIT	088H.4
+RS1	BIT	0D0H.4
+CRSA_L	DATA	0F1H
+TR1	BIT	088H.6
+PX0	BIT	0B8H.0
+PX1	BIT	0B8H.2
+DPH	DATA	083H
+DPL	DATA	082H
+REN	BIT	098H.4
+RXD	BIT	0B0H.0
+TXD	BIT	0B0H.1
+F0	BIT	0D0H.5
+PSW	DATA	0D0H
+?PR?_ParseHexRecord?HEX_FILE_HDL         SEGMENT CODE 
+?DT?_ParseHexRecord?HEX_FILE_HDL         SEGMENT DATA OVERLAYABLE 
+?PR?_GetAsc2Hex?HEX_FILE_HDL             SEGMENT CODE 
+?DT?_GetAsc2Hex?HEX_FILE_HDL             SEGMENT DATA OVERLAYABLE 
+?PR?_GetAscii?HEX_FILE_HDL               SEGMENT CODE 
+?DT?_GetAscii?HEX_FILE_HDL               SEGMENT DATA OVERLAYABLE 
+?PR?_Asc2Hex?HEX_FILE_HDL                SEGMENT CODE 
+?PR?_Wr2CRam?HEX_FILE_HDL                SEGMENT CODE 
+?CO?HEX_FILE_HDL     SEGMENT CODE 
+?C_INITSEG           SEGMENT CODE 
+?ID?HEX_FILE_HDL     SEGMENT IDATA 
+?ID?_ParseHexRecord?HEX_FILE_HDL         SEGMENT IDATA OVERLAYABLE 
+?ID?_GetAsc2Hex?HEX_FILE_HDL             SEGMENT IDATA OVERLAYABLE 
+?ID?_GetAscii?HEX_FILE_HDL               SEGMENT IDATA OVERLAYABLE 
+?ID?_Asc2Hex?HEX_FILE_HDL                SEGMENT IDATA OVERLAYABLE 
+	EXTRN	CODE (_toupper)
+	EXTRN	CODE (_printf)
+	EXTRN	DATA (?_printf?BYTE)
+	EXTRN	XDATA (Uart2EramAddr)
+	EXTRN	CODE (_isxdigit)
+	EXTRN	CODE (_get1char)
+	EXTRN	CODE (?C?CCASE)
+	EXTRN	CODE (?C?LOR)
+	PUBLIC	flash_bank_count
+	PUBLIC	_Wr2CRam
+	PUBLIC	_Asc2Hex
+	PUBLIC	_GetAscii
+	PUBLIC	_GetAsc2Hex
+	PUBLIC	_ParseHexRecord
+
+	RSEG  ?DT?_ParseHexRecord?HEX_FILE_HDL
+?_ParseHexRecord?BYTE:
+    ErrCntV?040:   DS   1
+
+	RSEG  ?DT?_GetAscii?HEX_FILE_HDL
+?_GetAscii?BYTE:
+  AsciiHexV?259:   DS   1
+	ORG  1
+    ErrCntV?260:   DS   1
+
+	RSEG  ?DT?_GetAsc2Hex?HEX_FILE_HDL
+?_GetAsc2Hex?BYTE:
+    HexValV?152:   DS   1
+	ORG  1
+   ChkSumeV?153:   DS   1
+	ORG  2
+    ErrCntV?154:   DS   1
+
+	RSEG  ?ID?HEX_FILE_HDL
+flash_bank_count:   DS   1
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+          i?041:   DS   2
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+          n?042:   DS   2
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+          c?043:   DS   1
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+       temp?044:   DS   2
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+    ChkSume?045:   DS   1
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+     HexVal?046:   DS   1
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+     RecLen?047:   DS   1
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+    RecType?048:   DS   1
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+        Err?049:   DS   2
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+      state?050:   DS   2
+
+	RSEG  ?ID?_ParseHexRecord?HEX_FILE_HDL
+   CRamAddr?051:   DS   2
+
+	RSEG  ?ID?_GetAsc2Hex?HEX_FILE_HDL
+   AsciiHex?155:   DS   1
+
+	RSEG  ?ID?_GetAsc2Hex?HEX_FILE_HDL
+    HexTemp?156:   DS   1
+
+	RSEG  ?ID?_GetAsc2Hex?HEX_FILE_HDL
+      Error?157:   DS   1
+
+	RSEG  ?ID?_GetAsc2Hex?HEX_FILE_HDL
+ FirstAscii?158:   DS   1
+
+	RSEG  ?ID?_GetAscii?HEX_FILE_HDL
+ErrGetAscii?261:   DS   1
+
+	RSEG  ?ID?_GetAscii?HEX_FILE_HDL
+          c?262:   DS   1
+
+	RSEG  ?ID?_Asc2Hex?HEX_FILE_HDL
+          c?364:   DS   1
+
+	RSEG  ?CO?HEX_FILE_HDL
+?SC_0:
+	DB  00AH,' ' ,'-' ,'-' ,'>' ,' ' ,'W' ,'a' ,'i' ,'t' 
+	DB  'i' ,'n' ,'g' ,' ' ,'f' ,'o' ,'r' ,' ' ,'I' ,'n' 
+	DB  't' ,'e' ,'l' ,'-' ,'h' ,'e' ,'x' ,' ' ,'f' ,'i' 
+	DB  'l' ,'e' ,' ' ,'.' ,000H
+
+?SC_35:
+	DB  'f' ,000H
+
+?SC_37:
+	DB  00AH,' ' ,' ' ,'B' ,'a' ,'n' ,'k' ,' ' ,'C' ,'o' 
+	DB  'd' ,'e' ,' ' ,'D' ,'o' ,'w' ,'n' ,'l' ,'o' ,'a' 
+	DB  'd' ,' ' ,'D' ,'o' ,'n' ,'e' ,00AH,000H
+
+
+	RSEG  ?C_INITSEG
+	DB	001H
+	DB	flash_bank_count
+	DB	000H
+
+; /*
+; * Description : Hex file handler header implement 
+; *
+; * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+; * All rights reserved.
+; *
+; * Author      : Peter Nguyen
+; * Release Date: 04/27/2013
+; * Purpose :
+; *     Parsing hex file and download from uart to code ram
+; *
+; * File: hex_file_hdl.c
+; */
+; 
+; //#include <stdafx.h>
+; #include <stdio.h>
+; #include <stdlib.h>
+; #include <reg51.h>					
+; #include <ctype.h>
+; #include <typedef.h>
+; #include <hex_file_hdl.h>
+; #include <uart.h>
+; #include <cmem_ctrl.h>
+; #include <macro_def.h>
+; #include <spiflash_drv.h>
+; #include "global_var.h"
+; 
+; //Error counter index
+; #define ErrLineBegin 0
+; //#define ErrLBA 1
+; #define ErrRecType 1
+; #define ErrNonAscDigit 2
+; #define ErrWrCRam 3
+; #define ErrChkSume 4
+; #define ErrSegment 5
+; 
+; //Counter good information
+; #define CntLine 0
+; #define CntAsciiHex 1
+; #define CntWrByte 2
+; #define CntNonAscii 3
+; #define CntGoodRec 4
+; 
+; //Error return
+; #define ExitRet  1
+; #define NonAscDigitRet  3
+; #define GoodHexByteRet 0
+; #define AscDigitRet 0
+; #define ExtraRecordRet 2
+; #define EnterRet 4
+; 
+; //Record type
+; #define RECTYPE_DATA 0
+; #define RECTYPE_EOF  1
+; #define RECTYPE_EXT_SEG_ADDR 2
+; #define RECTYPE_START_SEG_ADDR 3
+; #define RECTYPE_EXT_LIN_ADDR 4
+; #define RECTYPE_START_LIN_ADDR 5
+; 
+; //State define
+; #define START_REC 0
+; #define GET_REC_LEN 1
+; #define GET_OFFSET 2
+; #define GET_REC_TYPE 3
+; #define GET_REC_DATA   4  //      GET_REC_TYPE //+ RECTYPE_DATA
+; #define GET_REC_EOF    5    //  GET_REC_TYPE + RECTYPE_EOF
+; #define GET_EXT_SEG_ADDR  6  //   GET_REC_TYPE + RECTYPE_EXT_SEG_ADDR
+; #define GET_START_SEG_ADDR  7  // GET_REC_TYPE + RECTYPE_START_SEG_ADDR
+; #define GET_EXT_LIN_ADDR    8 // GET_REC_TYPE + RECTYPE_EXT_LIN_ADDR
+; #define GET_START_LIN_ADDR  9  // GET_REC_TYPE + RECTYPE_START_LIN_ADDR
+; 
+; 
+; #define GET_CHK_SUME 19
+; #define HANDLE_ERROR 20
+; #define UNKNOWN_REC 21
+; #define END_DOWNLOAD 22
+; #define EXIT_DOWNLOAD 23
+; 
+; #define DNLD_INDICATOR 200
+; 
+; //#define KEILDEBUG
+; 
+; //CheckSume = 0xff - (RecLen + Offset + Rectype + infor bytes - 1)
+; //Correct record when: CheckSume + (RecLen + Offset + Rectype + infor bytes) = 0 
+; u8 idata flash_bank_count = 0;
+; 
+; #ifdef CPLUSSIM
+; 	static FILE *datafile;
+; 	static u8  errfile;
+; 
+; void open_hex_file()
+; {
+; //	datafile = fopen("..\..\hexfile\test_80251.hex", "r");
+; }
+; #endif
+; 
+; //void ParseHexRecord(u16 idata *ErrCntV, u16 idata *ProgCntV, u8 idata *DldMode)
+; #ifndef IDATA_OPT
+; void ParseHexRecord(u16 idata *ErrCntV, u16 idata *ProgCntV) 
+; #else
+; void ParseHexRecord(u16 idata *ErrCntV)
+
+	RSEG  ?PR?_ParseHexRecord?HEX_FILE_HDL
+_ParseHexRecord:
+	USING	0
+			; SOURCE LINE # 101
+	MOV  	ErrCntV?040,R7
+; 
+; #endif
+; {
+			; SOURCE LINE # 104
+; 	u16 idata i, n;  //idata
+; 	u8 idata c;  //idata
+; 	u16 idata temp;
+; 	u8 idata ChkSume; //idata - 
+; 	u8 idata HexVal; //idata
+; 	u8 idata RecLen; //idata - number of data bytes begin right after the record type to the last byte before the check sume.
+; 	u8 idata RecType; //idata
+; 	u16 idata Err; //idata
+; 	u16 idata state; //idata
+; 	u16 idata CRamAddr;
+; 
+; 	CRamAddr = (u16)0x0;
+			; SOURCE LINE # 116
+	CLR  	A
+	MOV  	R0,#LOW (CRamAddr?051)
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	@R0,A
+; 	ChkSume = 0;
+			; SOURCE LINE # 117
+	MOV  	R0,#LOW (ChkSume?045)
+	MOV  	@R0,A
+; 	HexVal = 0;
+			; SOURCE LINE # 118
+	INC  	R0
+	MOV  	@R0,A
+; 	i = 0;
+			; SOURCE LINE # 119
+	MOV  	R0,#LOW (i?041)
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	@R0,A
+; 	c = 0;
+			; SOURCE LINE # 120
+	MOV  	R0,#LOW (c?043)
+	MOV  	@R0,A
+; 	state = START_REC;
+			; SOURCE LINE # 121
+	MOV  	R0,#LOW (state?050)
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	@R0,A
+; 
+; 	for (i=0; i<8; i++)
+			; SOURCE LINE # 123
+	MOV  	R0,#LOW (i?041)
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	@R0,A
+?C0001:
+	MOV  	R0,#LOW (i?041)
+	MOV  	A,@R0
+	MOV  	R6,A
+	INC  	R0
+	MOV  	A,@R0
+	MOV  	R7,A
+	CLR  	C
+	SUBB 	A,#08H
+	MOV  	A,R6
+	SUBB 	A,#00H
+	JNC  	?C0002
+; 	{
+			; SOURCE LINE # 124
+; 		ErrCntV[i] = 0;
+			; SOURCE LINE # 125
+	MOV  	R0,ErrCntV?040
+	MOV  	A,R7
+	ADD  	A,ACC
+	ADD  	A,R0
+	MOV  	R0,A
+	CLR  	A
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	@R0,A
+; 	}
+			; SOURCE LINE # 126
+	MOV  	R0,#LOW (i?041+01H)
+	INC  	@R0
+	MOV  	A,@R0
+	DEC  	R0
+	JNZ  	?C0001
+	INC  	@R0
+?C0081:
+	SJMP 	?C0001
+?C0002:
+; #ifndef IDATA_OPT	
+; 	for (i=0; i<6; i++)
+; 	{
+; 		ProgCntV[i] = 0;
+; 	}
+; #endif
+; 	printf("\n --> Waiting for Intel-hex file .");
+			; SOURCE LINE # 133
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_0)
+	MOV  	R1,#LOW (?SC_0)
+	LCALL	_printf
+?C0004:
+; 
+; #ifdef CPLUS_READFILE
+; 	//open_hex_file();
+; 	datafile = fopen("test_80251_i380.hex", "r"); //test_80251.hex", "r");
+; 	if (datafile==NULL)
+; 	{
+; 		fclose(datafile);
+; 		printf ("==== Hexfile empty ====\n\n");
+; 	}
+; 	else
+; 		printf ("==== Hexfile openned ===\n\n");
+; #endif
+; 	while (1)
+			; SOURCE LINE # 146
+; 	{
+			; SOURCE LINE # 147
+; 		switch (state)
+			; SOURCE LINE # 148
+	MOV  	R0,#LOW (state?050)
+	MOV  	A,@R0
+	MOV  	R6,A
+	INC  	R0
+	MOV  	A,@R0
+	MOV  	R7,A
+	MOV  	A,R6
+	JZ   	$ + 5H
+	LJMP 	?C0006
+	MOV  	A,R7
+	LCALL	?C?CCASE
+	DW   	?C0007
+	DB   	00H
+	DW   	?C0013
+	DB   	01H
+	DW   	?C0016
+	DB   	02H
+	DW   	?C0019
+	DB   	03H
+	DW   	?C0024
+	DB   	04H
+	DW   	?C0030
+	DB   	05H
+	DW   	?C0031
+	DB   	06H
+	DW   	?C0032
+	DB   	07H
+	DW   	?C0033
+	DB   	08H
+	DW   	?C0043
+	DB   	013H
+	DW   	?C0046
+	DB   	014H
+	DW   	?C0052
+	DB   	015H
+	DW   	?C0053
+	DB   	016H
+	DW   	00H
+	DW   	?C0006
+; 		{
+			; SOURCE LINE # 149
+; 			case START_REC:
+			; SOURCE LINE # 150
+?C0007:
+; 				#ifdef CPLUSDEBUG
+; 					printf("\n*** Looking for begining of record\n");
+; 				#endif
+; 				c = _get1char();
+			; SOURCE LINE # 154
+	LCALL	_get1char
+	MOV  	R0,#LOW (c?043)
+	MOV  	A,R7
+	MOV  	@R0,A
+; 				if (c == 27)
+			; SOURCE LINE # 155
+	CJNE 	R7,#01BH,?C0008
+; 				{
+			; SOURCE LINE # 156
+; 					state = END_DOWNLOAD;
+			; SOURCE LINE # 157
+	MOV  	R0,#LOW (state?050)
+; 					break;
+			; SOURCE LINE # 158
+	LJMP 	?C0086
+; 				}
+			; SOURCE LINE # 159
+?C0008:
+; 				else if (c==':')
+			; SOURCE LINE # 160
+	MOV  	R0,#LOW (c?043)
+	MOV  	A,@R0
+	MOV  	R7,A
+	CJNE 	A,#03AH,?C0010
+; 				{
+			; SOURCE LINE # 161
+; 					ChkSume = 0;
+			; SOURCE LINE # 162
+	CLR  	A
+; 					state = GET_REC_LEN;
+			; SOURCE LINE # 163
+; #ifndef IDATA_OPT					
+; 					ProgCntV[CntLine] = ProgCntV[CntLine] + 1;
+; #endif
+; 					#ifdef KEILDEBUG
+; 						printf("*** %d: Beginning of Record found\n", state);
+; 					#endif
+; 					break;
+			; SOURCE LINE # 170
+	LJMP 	?C0087
+; 				}
+			; SOURCE LINE # 171
+?C0010:
+; 				else if (!isxdigit(c) && (c!=10))
+			; SOURCE LINE # 172
+	LCALL	_isxdigit
+	JNC  	$ + 5H
+	LJMP 	?C0006
+	MOV  	R0,#LOW (c?043)
+	MOV  	A,@R0
+	XRL  	A,#0AH
+	JNZ  	$ + 5H
+	LJMP 	?C0006
+; 					ErrCntV[ErrNonAscDigit] = ErrCntV[ErrNonAscDigit] + 1;
+			; SOURCE LINE # 173
+	MOV  	A,ErrCntV?040
+	ADD  	A,#05H
+	MOV  	R0,A
+	MOV  	A,@R0
+	ADD  	A,#01H
+	MOV  	R7,A
+	DEC  	R0
+	CLR  	A
+	ADDC 	A,@R0
+	MOV  	R6,A
+	MOV  	A,ErrCntV?040
+	ADD  	A,#04H
+	MOV  	R0,A
+	MOV  	@R0,AR6
+	INC  	R0
+	MOV  	@R0,AR7
+; 
+; 				break;
+			; SOURCE LINE # 175
+	LJMP 	?C0006
+; 
+; 			case GET_REC_LEN:
+			; SOURCE LINE # 177
+?C0013:
+; 				Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+			; SOURCE LINE # 178
+	LCALL	L?0102
+	MOV  	R6,#00H
+	MOV  	R0,#LOW (Err?049)
+	MOV  	A,R6
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 				if (Err==GoodHexByteRet)
+			; SOURCE LINE # 179
+	JNZ  	?C0088
+; 				{
+			; SOURCE LINE # 180
+; 					RecLen = HexVal;     //Get record length
+			; SOURCE LINE # 181
+	MOV  	R0,#LOW (HexVal?046)
+	MOV  	A,@R0
+	INC  	R0
+	MOV  	@R0,A
+; 					state = GET_OFFSET;
+			; SOURCE LINE # 182
+	MOV  	R0,#LOW (state?050)
+	MOV  	@R0,#00H
+	INC  	R0
+	MOV  	@R0,#02H
+; 					#ifdef KEILDEBUG
+; 						printf("==> %d: Rec length = %d - number of lines: %d\n", (u16)state, (u16)RecLen, (u16)ProgCntV[CntLine]);
+; 					#endif
+; 					break;
+			; SOURCE LINE # 186
+	LJMP 	?C0006
+; 				}
+			; SOURCE LINE # 187
+; 				else 
+; 					state = HANDLE_ERROR;
+; 				break;
+; 
+; 			case GET_OFFSET:
+			; SOURCE LINE # 192
+?C0016:
+; 				Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);  //Get record length high byte
+			; SOURCE LINE # 193
+	LCALL	L?0102
+	MOV  	R6,#00H
+	MOV  	R0,#LOW (Err?049)
+	MOV  	A,R6
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 				temp = HexVal;
+			; SOURCE LINE # 194
+	MOV  	R0,#LOW (HexVal?046)
+	MOV  	A,@R0
+	MOV  	R5,A
+	MOV  	R0,#LOW (temp?044)
+	MOV  	@R0,#00H
+	INC  	R0
+	MOV  	@R0,AR5
+; 				if (Err!=GoodHexByteRet)
+			; SOURCE LINE # 195
+	MOV  	A,R7
+	JZ   	?C0017
+; 				{
+			; SOURCE LINE # 196
+; 					state = HANDLE_ERROR;
+			; SOURCE LINE # 197
+?C0088:
+; 					break;
+			; SOURCE LINE # 198
+	LJMP 	?C0089
+; 				}
+			; SOURCE LINE # 199
+?C0017:
+; 				Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);  //Get record length low byte
+			; SOURCE LINE # 200
+	LCALL	L?0103
+	MOV  	R6,#00H
+	MOV  	R0,#LOW (Err?049)
+	MOV  	A,R6
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 				if (Err!=GoodHexByteRet)
+			; SOURCE LINE # 201
+	JZ   	?C0018
+; 				{
+			; SOURCE LINE # 202
+; 					state = HANDLE_ERROR;
+			; SOURCE LINE # 203
+; 					break;
+			; SOURCE LINE # 204
+	SJMP 	?C0090
+; 				}
+			; SOURCE LINE # 205
+?C0018:
+; 				temp <<= 8;
+			; SOURCE LINE # 206
+	MOV  	R0,#LOW (temp?044+01H)
+	MOV  	A,@R0
+	MOV  	R7,#00H
+	DEC  	R0
+	MOV  	@R0,A
+	MOV  	R6,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 				temp |= HexVal;
+			; SOURCE LINE # 207
+	MOV  	R0,#LOW (HexVal?046)
+	MOV  	A,@R0
+	MOV  	R5,A
+	MOV  	A,R5
+	MOV  	R7,A
+	MOV  	R0,#LOW (temp?044)
+	MOV  	A,R6
+	MOV  	@R0,A
+	MOV  	R6,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+	MOV  	R7,A
+; 				CRamAddr &= 0xFFFF0000;   //Delete previous record's last address
+			; SOURCE LINE # 208
+	MOV  	R4,#00H
+	MOV  	R0,#LOW (CRamAddr?051+01H)
+	DEC  	R0
+	MOV  	A,R4
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	@R0,A
+; 				CRamAddr |= temp;
+			; SOURCE LINE # 209
+	MOV  	A,R6
+	DEC  	R0
+	MOV  	@R0,A
+	MOV  	A,R7
+	INC  	R0
+	MOV  	@R0,A
+; 				state = GET_REC_TYPE;
+			; SOURCE LINE # 210
+	MOV  	R0,#LOW (state?050)
+	MOV  	@R0,#00H
+	INC  	R0
+	MOV  	@R0,#03H
+; 				#ifdef KEILDEBUG
+; 					printf("==> %d: Off set address = %04X --> CRamAddr = ", (u16)state, temp);
+; 					printf("%04X%04X\n", (u16)(CRamAddr>>16), (u16)(CRamAddr));
+; 				#endif
+; 				break;
+			; SOURCE LINE # 215
+	LJMP 	?C0006
+; 
+; 			case GET_REC_TYPE: //3
+			; SOURCE LINE # 217
+?C0019:
+; 				Err = GetAsc2Hex (&RecType, &ChkSume, ErrCntV);
+			; SOURCE LINE # 218
+	MOV  	R7,#LOW (RecType?048)
+	LCALL	L?0104
+	MOV  	R6,#00H
+	MOV  	R0,#LOW (Err?049)
+	MOV  	A,R6
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 				if (Err!=GoodHexByteRet)
+			; SOURCE LINE # 219
+	JZ   	?C0020
+; 				{
+			; SOURCE LINE # 220
+; 					state = HANDLE_ERROR;
+			; SOURCE LINE # 221
+?C0090:
+	INC  	R0
+; 					break;
+			; SOURCE LINE # 222
+	LJMP 	?C0091
+; 				}
+			; SOURCE LINE # 223
+?C0020:
+; 				else if (RecType > 5)
+			; SOURCE LINE # 224
+	MOV  	R0,#LOW (RecType?048)
+	MOV  	A,@R0
+	MOV  	R7,A
+	SETB 	C
+	SUBB 	A,#05H
+	JC   	?C0022
+; 				{
+			; SOURCE LINE # 225
+; 					state = UNKNOWN_REC;
+			; SOURCE LINE # 226
+; 					break;
+			; SOURCE LINE # 227
+	LJMP 	?C0096
+; 				}
+			; SOURCE LINE # 228
+?C0022:
+; 				else
+; 				{
+			; SOURCE LINE # 230
+; 					#ifdef KEILDEBUG
+; 						printf("==> %d: RecType = %d\n", (u16)state, (u16)RecType);
+; 					#endif
+; 					state = RecType + GET_REC_TYPE + 1; //Set the status for specific record types
+			; SOURCE LINE # 234
+	MOV  	A,R7
+	ADD  	A,#04H
+	MOV  	R0,#LOW (state?050+01H)
+	MOV  	@R0,A
+	CLR  	A
+	RLC  	A
+	DEC  	R0
+	MOV  	@R0,A
+; 					i = 0; //To set the status for the next state
+			; SOURCE LINE # 235
+	CLR  	A
+	MOV  	R0,#LOW (i?041)
+; 					#ifdef KEILDEBUG
+; 						printf("==> %d: Next state\n", state);
+; 					#endif
+; 					break;
+			; SOURCE LINE # 239
+	LJMP 	?C0100
+; 				}				 
+			; SOURCE LINE # 240
+; 			case GET_REC_DATA:  //4
+			; SOURCE LINE # 241
+?C0024:
+; 				Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+			; SOURCE LINE # 242
+	LCALL	L?0103
+	MOV  	R0,#LOW (Err?049)
+	MOV  	@R0,#00H
+	INC  	R0
+	MOV  	@R0,AR7
+; 				RecLen--;
+			; SOURCE LINE # 243
+	MOV  	R0,#LOW (RecLen?047)
+	DEC  	@R0
+; 				if (CRamAddr>Uart2EramAddr){
+			; SOURCE LINE # 244
+	MOV  	R0,#LOW (CRamAddr?051)
+	MOV  	A,@R0
+	MOV  	R4,A
+	INC  	R0
+	MOV  	A,@R0
+	MOV  	R5,A
+	CLR  	C
+	MOV  	DPTR,#Uart2EramAddr+01H
+	MOVX 	A,@DPTR
+	SUBB 	A,R5
+	MOV  	DPTR,#Uart2EramAddr
+	MOVX 	A,@DPTR
+	SUBB 	A,R4
+	JNC  	?C0025
+; 					Uart2EramAddr = CRamAddr;
+			; SOURCE LINE # 245
+	MOV  	A,R4
+	MOVX 	@DPTR,A
+	INC  	DPTR
+	MOV  	A,R5
+	MOVX 	@DPTR,A
+; 				}
+			; SOURCE LINE # 246
+?C0025:
+; 				Err = Wr2CRam(&HexVal, (volatile u8 xdata *)CRamAddr);
+			; SOURCE LINE # 247
+	MOV  	R7,#LOW (HexVal?046)
+	LCALL	_Wr2CRam
+	MOV  	R6,#00H
+	MOV  	R0,#LOW (Err?049)
+	MOV  	A,R6
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 				CRamAddr++;
+			; SOURCE LINE # 248
+	MOV  	R0,#LOW (CRamAddr?051+01H)
+	INC  	@R0
+	MOV  	A,@R0
+	DEC  	R0
+	JNZ  	?C0082
+	INC  	@R0
+?C0082:
+; 				if (Err==0)
+			; SOURCE LINE # 249
+	MOV  	A,R7
+	ORL  	A,R6
+	JNZ  	?C0026
+; 				{
+			; SOURCE LINE # 250
+; 					if (n >= DNLD_INDICATOR)
+			; SOURCE LINE # 251
+	CLR  	C
+	MOV  	R0,#LOW (n?042+01H)
+	MOV  	A,@R0
+	SUBB 	A,#0C8H
+	DEC  	R0
+	MOV  	A,@R0
+	SUBB 	A,#00H
+	JC   	?C0027
+; 					{
+			; SOURCE LINE # 252
+; 					#pragma asm
+; 					    CLR  TI
+	  CLR  TI
+; 						MOV SBUF,#02Eh //'.'
+	  MOV SBUF,#02Eh  
+; 					#pragma endasm
+; 						n = 0;
+			; SOURCE LINE # 257
+	CLR  	A
+	MOV  	R0,#LOW (n?042)
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	@R0,A
+; 					}		
+			; SOURCE LINE # 258
+?C0027:
+; 					n++;
+			; SOURCE LINE # 259
+	MOV  	R0,#LOW (n?042+01H)
+	INC  	@R0
+	MOV  	A,@R0
+	DEC  	R0
+	JNZ  	?C0028
+	INC  	@R0
+?C0083:
+; #ifndef IDATA_OPT					
+; 					ProgCntV[CntWrByte] = ProgCntV[CntWrByte] + 1;   //Count 1 good byte downloaded
+; #endif					
+; 				}
+			; SOURCE LINE # 263
+	SJMP 	?C0028
+?C0026:
+; 				else
+; 				{
+			; SOURCE LINE # 265
+; 					printf("f");
+			; SOURCE LINE # 266
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_35)
+	MOV  	R1,#LOW (?SC_35)
+	LCALL	_printf
+; 					ErrCntV[ErrWrCRam] = ErrCntV[ErrWrCRam] + 1;  //Count 1 byte download fail
+			; SOURCE LINE # 267
+	MOV  	A,ErrCntV?040
+	ADD  	A,#07H
+	MOV  	R0,A
+	MOV  	A,@R0
+	ADD  	A,#01H
+	MOV  	R7,A
+	DEC  	R0
+	CLR  	A
+	ADDC 	A,@R0
+	MOV  	R6,A
+	MOV  	A,ErrCntV?040
+	ADD  	A,#06H
+	MOV  	R0,A
+	MOV  	@R0,AR6
+	INC  	R0
+	MOV  	@R0,AR7
+; 				}
+			; SOURCE LINE # 268
+?C0028:
+; 				if (RecLen==0)
+			; SOURCE LINE # 269
+	MOV  	R0,#LOW (RecLen?047)
+	MOV  	A,@R0
+	JZ   	$ + 5H
+	LJMP 	?C0006
+; 					state = GET_CHK_SUME;
+			; SOURCE LINE # 270
+	MOV  	R0,#LOW (state?050)
+	MOV  	@R0,A
+; 				break;
+			; SOURCE LINE # 271
+	LJMP 	?C0094
+; 			case GET_REC_EOF: //5
+			; SOURCE LINE # 272
+?C0030:
+; 				Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV); //Get 0xFF checksume of eof
+			; SOURCE LINE # 273
+	LCALL	L?0103
+	MOV  	R0,#LOW (Err?049)
+	MOV  	@R0,#00H
+	INC  	R0
+	MOV  	@R0,AR7
+; #ifndef IDATA_OPT				
+; 				if ((Err==0) && (ChkSume==0))
+; 					ProgCntV[CntGoodRec] = ProgCntV[CntGoodRec] + 1; 
+; #endif				
+; 				#ifdef CPLUSDEBUG
+; 					printf("==> %d: Getting EOF - CheckSume = %d\n", state, (u16)ChkSume);
+; 				#endif
+; 				state = END_DOWNLOAD;
+			; SOURCE LINE # 281
+	INC  	R0
+?C0086:
+	MOV  	@R0,#00H
+; 				break;
+			; SOURCE LINE # 282
+	LJMP 	?C0095
+; 
+; 			case GET_EXT_SEG_ADDR: //6
+			; SOURCE LINE # 284
+?C0031:
+; 				state = UNKNOWN_REC;
+			; SOURCE LINE # 285
+?C0092:
+; 				break;
+			; SOURCE LINE # 286
+	SJMP 	?C0096
+; 
+; 			case GET_START_SEG_ADDR: //7
+			; SOURCE LINE # 288
+?C0032:
+; 				state = UNKNOWN_REC;
+			; SOURCE LINE # 289
+?C0096:
+	MOV  	R0,#LOW (state?050)
+	MOV  	@R0,#00H
+	INC  	R0
+	MOV  	@R0,#015H
+; 				break;
+			; SOURCE LINE # 290
+	LJMP 	?C0006
+; 
+; 			case GET_EXT_LIN_ADDR: //8
+			; SOURCE LINE # 292
+?C0033:
+; 				if (i==0)
+			; SOURCE LINE # 293
+	MOV  	R0,#LOW (i?041+01H)
+	MOV  	A,@R0
+	DEC  	R0
+	ORL  	A,@R0
+	JNZ  	?C0034
+; 				{
+			; SOURCE LINE # 294
+; 					temp = 0;
+			; SOURCE LINE # 295
+	MOV  	R0,#LOW (temp?044)
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	@R0,A
+; 					Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+			; SOURCE LINE # 296
+	LCALL	L?0103
+	MOV  	R6,#00H
+	MOV  	R0,#LOW (Err?049)
+	MOV  	A,R6
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 					RecLen--;
+			; SOURCE LINE # 297
+	MOV  	R0,#LOW (RecLen?047)
+	DEC  	@R0
+; 					if (Err==0)
+			; SOURCE LINE # 298
+	JNZ  	?C0035
+; 					{
+			; SOURCE LINE # 299
+; 						temp = (u32) HexVal;
+			; SOURCE LINE # 300
+	DEC  	R0
+	MOV  	A,@R0
+	MOV  	R7,A
+	CLR  	A
+	MOV  	R0,#LOW (temp?044)
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	@R0,AR7
+; 						temp <<= 8;
+			; SOURCE LINE # 301
+	MOV  	A,@R0
+	MOV  	R0,A
+	CLR  	A
+	MOV  	R1,#LOW (temp?044+01H)
+	MOV  	@R1,A
+	MOV  	A,R0
+	DEC  	R1
+	MOV  	@R1,A
+; 					}
+			; SOURCE LINE # 302
+	SJMP 	?C0036
+?C0035:
+; 					else
+; 						state = HANDLE_ERROR;
+			; SOURCE LINE # 304
+	MOV  	R0,#LOW (state?050)
+	MOV  	@R0,#00H
+	INC  	R0
+	MOV  	@R0,#014H
+?C0036:
+; 					i = 1;
+			; SOURCE LINE # 305
+	MOV  	R0,#LOW (i?041)
+	MOV  	@R0,#00H
+; 				}
+			; SOURCE LINE # 306
+	LJMP 	?C0097
+?C0034:
+; 				else
+; 				{
+			; SOURCE LINE # 308
+; 					Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+			; SOURCE LINE # 309
+	LCALL	L?0103
+	MOV  	R6,#00H
+	MOV  	R0,#LOW (Err?049)
+	MOV  	A,R6
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 					RecLen--;
+			; SOURCE LINE # 310
+	MOV  	R0,#LOW (RecLen?047)
+	DEC  	@R0
+; 					if (Err==0)
+			; SOURCE LINE # 311
+	JZ   	$ + 5H
+	LJMP 	?C0038
+; 					{
+			; SOURCE LINE # 312
+; 						temp = temp | (u32)HexVal;
+			; SOURCE LINE # 313
+	DEC  	R0
+	MOV  	A,@R0
+	MOV  	R7,A
+	CLR  	A
+	MOV  	R4,A
+	MOV  	R5,A
+	PUSH 	AR4
+	MOV  	R1,AR5
+	MOV  	R2,AR6
+	MOV  	R3,AR7
+	MOV  	R0,#LOW (temp?044)
+	MOV  	A,@R0
+	MOV  	R6,A
+	INC  	R0
+	MOV  	A,@R0
+	MOV  	R7,A
+	CLR  	A
+	POP  	AR0
+	LCALL	?C?LOR
+	MOV  	R0,#LOW (temp?044)
+	MOV  	A,R6
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 						if ((temp >= 0x00fb) && (temp <= 0x00fe))
+			; SOURCE LINE # 314
+	CLR  	C
+	SUBB 	A,#0FBH
+	MOV  	A,R6
+	SUBB 	A,#00H
+	JC   	?C0039
+	SETB 	C
+	MOV  	A,@R0
+	SUBB 	A,#0FEH
+	DEC  	R0
+	MOV  	A,@R0
+	SUBB 	A,#00H
+	JNC  	?C0039
+; 							temp = temp - 0x00fa; //map segment to data ram for downloading: fb = 01, fc = 02, fd = 03, fe = 04
+			; SOURCE LINE # 315
+	INC  	R0
+	MOV  	A,#06H
+	ADD  	A,@R0
+	MOV  	@R0,A
+	DEC  	R0
+	MOV  	A,#0FFH
+	ADDC 	A,@R0
+	MOV  	@R0,A
+	SJMP 	?C0040
+?C0039:
+; 						else
+; 						{
+			; SOURCE LINE # 317
+; 							ErrCntV[ErrSegment] = ErrCntV[ErrSegment] + 1;// scope for optimization
+			; SOURCE LINE # 318
+	MOV  	A,ErrCntV?040
+	ADD  	A,#0BH
+	MOV  	R0,A
+	MOV  	A,@R0
+	ADD  	A,#01H
+	MOV  	R7,A
+	DEC  	R0
+	CLR  	A
+	ADDC 	A,@R0
+	MOV  	R6,A
+	MOV  	A,ErrCntV?040
+	ADD  	A,#0AH
+	MOV  	R0,A
+	MOV  	@R0,AR6
+	INC  	R0
+	MOV  	@R0,AR7
+; 							temp = 0x01; //Map all the wrong segment address to 0xfb <=> 0x01 data ram
+			; SOURCE LINE # 319
+	MOV  	R0,#LOW (temp?044)
+	MOV  	@R0,#00H
+	INC  	R0
+	MOV  	@R0,#01H
+; 						}
+			; SOURCE LINE # 320
+?C0040:
+; 		
+; 						temp <<= 16;
+			; SOURCE LINE # 322
+	MOV  	R0,#LOW (temp?044)
+	MOV  	A,@R0
+	MOV  	R6,A
+	INC  	R0
+	MOV  	A,@R0
+	MOV  	R0,#010H
+?C0084:
+	CLR  	C
+	RLC  	A
+	XCH  	A,R6
+	RLC  	A
+	XCH  	A,R6
+	DJNZ 	R0,?C0084
+	MOV  	R7,A
+	MOV  	R0,#LOW (temp?044)
+	MOV  	A,R6
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 						CRamAddr = temp;
+			; SOURCE LINE # 323
+	MOV  	R0,#LOW (CRamAddr?051)
+	MOV  	@R0,AR6
+	INC  	R0
+	MOV  	@R0,A
+; 
+; 					#ifdef KEILDEBUG
+; 						printf("==> %d: Linear extended segment address = 0x%04X%04X\n", state, (u16)(CRamAddr>>16), (u16)CRamAddr);
+; 					#endif
+; 						state = GET_CHK_SUME;
+			; SOURCE LINE # 328
+	MOV  	R0,#LOW (state?050)
+	MOV  	@R0,#00H
+?C0094:
+	INC  	R0
+	MOV  	@R0,#013H
+; 					}
+			; SOURCE LINE # 329
+	LJMP 	?C0006
+?C0038:
+; 					else
+; 						state = HANDLE_ERROR;					
+			; SOURCE LINE # 331
+?C0089:
+	MOV  	R0,#LOW (state?050)
+?C0091:
+	MOV  	@R0,#00H
+	INC  	R0
+	MOV  	@R0,#014H
+; 				}			
+			; SOURCE LINE # 332
+; 				break;
+			; SOURCE LINE # 333
+	LJMP 	?C0006
+; 
+; 			case GET_START_LIN_ADDR: //9
+			; SOURCE LINE # 335
+; 				break;
+			; SOURCE LINE # 336
+; 			
+; 			case GET_CHK_SUME:
+			; SOURCE LINE # 338
+?C0043:
+; 				#ifdef KEILDEBUG
+; 					printf("\n\n==> %d: Get check sume", state);
+; 				#endif
+; 				Err = GetAsc2Hex (&HexVal, &ChkSume, ErrCntV);
+			; SOURCE LINE # 342
+	LCALL	L?0103
+	MOV  	R6,#00H
+	MOV  	R0,#LOW (Err?049)
+	MOV  	A,R6
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	A,R7
+	MOV  	@R0,A
+; 				if ((Err==0) && (ChkSume==0) && (RecLen==0))
+			; SOURCE LINE # 343
+	JNZ  	?C0044
+	MOV  	R0,#LOW (ChkSume?045)
+	MOV  	A,@R0
+	JNZ  	?C0044
+	MOV  	R0,#LOW (RecLen?047)
+	MOV  	A,@R0
+	JNZ  	?C0044
+; 				{
+			; SOURCE LINE # 344
+; #ifndef IDATA_OPT				
+; 					ProgCntV[CntGoodRec] = ProgCntV[CntGoodRec] + 1; 
+; #endif
+; 					state = START_REC;
+			; SOURCE LINE # 348
+	MOV  	R0,#LOW (state?050)
+?C0093:
+; 				#ifdef KEILDEBUG
+; 					printf ("\n-- Check sume good\n\n");
+; 				#endif
+; 					break;
+			; SOURCE LINE # 352
+	SJMP 	?C0100
+; 				}
+			; SOURCE LINE # 353
+?C0044:
+; 				else
+; 				{
+			; SOURCE LINE # 355
+; 					ErrCntV[ErrChkSume] = ErrCntV[ErrChkSume] + 1;// scope of optimization
+			; SOURCE LINE # 356
+	MOV  	A,ErrCntV?040
+	ADD  	A,#09H
+	MOV  	R0,A
+	MOV  	A,@R0
+	ADD  	A,#01H
+	MOV  	R7,A
+	DEC  	R0
+	CLR  	A
+	ADDC 	A,@R0
+	MOV  	R6,A
+	MOV  	A,ErrCntV?040
+	ADD  	A,#08H
+	MOV  	R0,A
+	MOV  	@R0,AR6
+	INC  	R0
+	MOV  	@R0,AR7
+; 				#ifdef KEILDEBUG
+; 					printf ("\n-- Check sume error\n\n");
+; 				#endif
+; 				}
+			; SOURCE LINE # 360
+?C0045:
+; 				state = START_REC;
+			; SOURCE LINE # 361
+	CLR  	A
+	MOV  	R0,#LOW (state?050)
+?C0098:
+; 				break;
+			; SOURCE LINE # 362
+	SJMP 	?C0100
+; 				
+; 			case HANDLE_ERROR:
+			; SOURCE LINE # 364
+?C0046:
+; 				if (Err==ExitRet)
+			; SOURCE LINE # 365
+	MOV  	R0,#LOW (Err?049)
+	MOV  	A,@R0
+	MOV  	R6,A
+	INC  	R0
+	MOV  	A,@R0
+	MOV  	R7,A
+	XRL  	A,#01H
+	ORL  	A,R6
+	JNZ  	?C0047
+; 				{
+			; SOURCE LINE # 366
+; 					state = END_DOWNLOAD;
+			; SOURCE LINE # 367
+	INC  	R0
+	MOV  	@R0,A
+?C0095:
+	INC  	R0
+	MOV  	@R0,#016H
+; 					break;
+			; SOURCE LINE # 368
+	SJMP 	?C0006
+; 				}
+			; SOURCE LINE # 369
+?C0047:
+; 				else if (Err==NonAscDigitRet)
+			; SOURCE LINE # 370
+	MOV  	A,R7
+	XRL  	A,#03H
+	ORL  	A,R6
+	JNZ  	?C0049
+; 				{
+			; SOURCE LINE # 371
+; 					state = START_REC;
+			; SOURCE LINE # 372
+	MOV  	R0,#LOW (state?050)
+?C0099:
+; 				}
+			; SOURCE LINE # 373
+	SJMP 	?C0100
+?C0049:
+; 				else if (Err==ExtraRecordRet)
+			; SOURCE LINE # 374
+	MOV  	A,R7
+	XRL  	A,#02H
+	ORL  	A,R6
+	JNZ  	?C0006
+; 				{
+			; SOURCE LINE # 375
+; 					ChkSume = 0;
+			; SOURCE LINE # 376
+?C0087:
+	MOV  	R0,#LOW (ChkSume?045)
+	MOV  	@R0,A
+; 					state = GET_REC_LEN;   //Line found, jump back to the look for RECLEN
+			; SOURCE LINE # 377
+	MOV  	R0,#LOW (state?050)
+	MOV  	@R0,A
+?C0097:
+	INC  	R0
+	MOV  	@R0,#01H
+; 				}
+			; SOURCE LINE # 378
+; 				break;
+			; SOURCE LINE # 379
+	SJMP 	?C0006
+; 
+; 			case UNKNOWN_REC:
+			; SOURCE LINE # 381
+?C0052:
+; 				#ifdef KEILDEBUG
+; 					printf("\n\n==> %d: Unknown Record", state);
+; 				#endif
+; 				//Keep read the record to the end or new line
+; 				ErrCntV[ErrRecType] = ErrCntV[ErrRecType] + 1;// scope of optimization
+			; SOURCE LINE # 386
+	MOV  	A,ErrCntV?040
+	ADD  	A,#03H
+	MOV  	R0,A
+	MOV  	A,@R0
+	ADD  	A,#01H
+	MOV  	R7,A
+	DEC  	R0
+	CLR  	A
+	ADDC 	A,@R0
+	MOV  	R6,A
+	MOV  	A,ErrCntV?040
+	ADD  	A,#02H
+	MOV  	R0,A
+	MOV  	@R0,AR6
+	INC  	R0
+	MOV  	@R0,AR7
+; 				state = START_REC;
+			; SOURCE LINE # 387
+	CLR  	A
+	MOV  	R0,#LOW (state?050)
+?C0100:
+	MOV  	@R0,A
+	INC  	R0
+	MOV  	@R0,A
+; 				break;
+			; SOURCE LINE # 388
+	SJMP 	?C0006
+; 
+; 			case END_DOWNLOAD:// code optimization
+			; SOURCE LINE # 390
+?C0053:
+; 				//printf("\n --> Code Download Summary\n");
+; 				printf("\n  Bank Code Download Done\n");
+			; SOURCE LINE # 392
+	MOV  	R3,#0FFH
+	MOV  	R2,#HIGH (?SC_37)
+	MOV  	R1,#LOW (?SC_37)
+	LCALL	_printf
+; 				//printf(" .Successfully downloaded byte(s): %u\n", (u16)ProgCntV[CntWrByte]);
+; 				//printf(" .Found line(s): %u\n", (u16)ProgCntV[CntLine]);
+; 				//printf(" .False line(s): %u\n", (u16)ErrCntV[ErrLineBegin]);
+; 				//printf(" .Record type error(s): %u\n", (u16)ErrCntV[ErrRecType]);
+; 				//printf(" .Non ascii digit(s): %u\n", (u16)ErrCntV[ErrNonAscDigit]);
+; 				//printf(" .Error downloaded byte(s): %u\n", (u16)ErrCntV[ErrWrCRam]);
+; 				//printf(" .Failed checksume(s): %u\n", (u16)ErrCntV[ErrChkSume]);
+; 				//printf("- Error segment address(s): %u\n", (u16)ErrCntV[ErrSegment]); 
+; 				flash_bank_count++;
+			; SOURCE LINE # 401
+	MOV  	R0,#LOW (flash_bank_count)
+	INC  	@R0
+; 				state = EXIT_DOWNLOAD;
+			; SOURCE LINE # 402
+	MOV  	R0,#LOW (state?050)
+	MOV  	@R0,#00H
+	INC  	R0
+	MOV  	@R0,#017H
+; 				break;
+			; SOURCE LINE # 403
+; 			default:
+			; SOURCE LINE # 404
+; 				break;
+			; SOURCE LINE # 405
+; 		}
+			; SOURCE LINE # 406
+?C0006:
+; 		if (state==EXIT_DOWNLOAD){
+			; SOURCE LINE # 407
+	MOV  	R0,#LOW (state?050+01H)
+	MOV  	A,@R0
+	XRL  	A,#017H
+	DEC  	R0
+	ORL  	A,@R0
+	JZ   	$ + 5H
+	LJMP 	?C0004
+; 			break;
+			; SOURCE LINE # 408
+	RET  	
+; END OF _ParseHexRecord
+
+; 		}
+; 	}
+; 	return;
+; }
+; 
+; //***************************************************************************
+; //u8 GetAsc2Hex (u8 *HexValV, u8 *ChkSumeV, u16 *ProgCntV, u16 *ErrCntV)
+; //    Return: 
+; //            HexVal of 2 ascii digits
+; //            Check Sume of the record
+; //            Progress log: number of bytes, records.. of the hex file parsing
+; //            Error of the process in ErrCntV
+; //
+; //            Error of the function:
+; //                    0: good hex value is read
+; //                    1: Escape char read
+; //                    2: Error extra record beginning found
+; //***************************************************************************
+; 
+; //u8 GetAsc2Hex (u8 idata *HexValV, u8 idata *ChkSumeV, u16 idata *ErrCntV)
+; u8 GetAsc2Hex (u8 idata *HexValV, u8 idata *ChkSumeV, u16 idata *ErrCntV)
+
+	RSEG  ?PR?_GetAsc2Hex?HEX_FILE_HDL
+L?0102:
+	USING	0
+L?0103:
+	MOV  	R7,#LOW (HexVal?046)
+L?0104:
+	MOV  	R5,#LOW (ChkSume?045)
+	MOV  	R3,ErrCntV?040
+_GetAsc2Hex:
+	USING	0
+			; SOURCE LINE # 429
+	MOV  	HexValV?152,R7
+	MOV  	ChkSumeV?153,R5
+	MOV  	ErrCntV?154,R3
+; 
+; {
+			; SOURCE LINE # 431
+; 	u8 idata AsciiHex;
+; 	u8 idata HexTemp;
+; 	u8 idata Error, FirstAscii;
+; 	FirstAscii = 0;
+			; SOURCE LINE # 435
+	CLR  	A
+	MOV  	R0,#LOW (FirstAscii?158)
+	MOV  	@R0,A
+; 	AsciiHex = 0;
+			; SOURCE LINE # 436
+	MOV  	R0,#LOW (AsciiHex?155)
+	MOV  	@R0,A
+?C0057:
+; #ifdef CPLUSDEBUG
+; 	printf ("\n===== GetAsc2Hex\n");
+; #endif
+; 	while (1)
+			; SOURCE LINE # 440
+; 	{
+			; SOURCE LINE # 441
+; 		Error = GetAscii(&AsciiHex, ErrCntV);
+			; SOURCE LINE # 442
+	MOV  	R7,#LOW (AsciiHex?155)
+	MOV  	R5,ErrCntV?154
+	LCALL	_GetAscii
+	MOV  	R0,#LOW (Error?157)
+	MOV  	A,R7
+	MOV  	@R0,A
+; 		switch (Error)
+			; SOURCE LINE # 443
+	ADD  	A,#0FDH
+	JZ   	?C0057
+	ADD  	A,#03H
+	JNZ  	?C0065
+; 		{
+			; SOURCE LINE # 444
+; 		case AscDigitRet:
+			; SOURCE LINE # 445
+?C0060:
+; 			if (FirstAscii == 0)
+			; SOURCE LINE # 446
+	MOV  	R0,#LOW (FirstAscii?158)
+	MOV  	A,@R0
+	JNZ  	?C0061
+; 			{
+			; SOURCE LINE # 447
+; 				HexTemp = AsciiHex << 4;
+			; SOURCE LINE # 448
+	MOV  	R0,#LOW (AsciiHex?155)
+	MOV  	A,@R0
+	SWAP 	A
+	ANL  	A,#0F0H
+	INC  	R0
+	MOV  	@R0,A
+; 				FirstAscii++;
+			; SOURCE LINE # 449
+	MOV  	R0,#LOW (FirstAscii?158)
+	INC  	@R0
+; 				break;
+			; SOURCE LINE # 450
+	SJMP 	?C0057
+; 			}
+			; SOURCE LINE # 451
+?C0061:
+; 			else
+; 			{
+			; SOURCE LINE # 453
+; 				HexTemp |= AsciiHex;
+			; SOURCE LINE # 454
+	MOV  	R0,#LOW (HexTemp?156)
+	MOV  	A,@R0
+	MOV  	R1,#LOW (AsciiHex?155)
+	ORL  	A,@R1
+	MOV  	@R0,A
+; 				*HexValV = HexTemp;
+			; SOURCE LINE # 455
+	MOV  	A,@R0
+	MOV  	R7,A
+	MOV  	R0,HexValV?152
+	MOV  	@R0,A
+; 				*ChkSumeV += HexTemp;
+			; SOURCE LINE # 456
+	MOV  	R0,ChkSumeV?153
+	MOV  	A,R7
+	ADD  	A,@R0
+	MOV  	@R0,A
+; 				#ifdef CPLUSDEBUG
+; 					printf ("%02X\n", *HexValV);
+; 				#endif
+; 				return Error;  //Exit GetAsc2Hex
+			; SOURCE LINE # 460
+	SJMP 	?C0101
+; 			}
+			; SOURCE LINE # 461
+; 		case NonAscDigitRet:
+			; SOURCE LINE # 462
+; 			break;  //Non ascii char received, loop to consum all the junk data 
+			; SOURCE LINE # 463
+; 
+; 		default: //1: Escape, 2: Error extra record beginning
+			; SOURCE LINE # 465
+?C0065:
+; 			return Error; //Exit GetAsc2Hex		
+			; SOURCE LINE # 466
+?C0101:
+	MOV  	R0,#LOW (Error?157)
+	MOV  	A,@R0
+	MOV  	R7,A
+; 		  }
+			; SOURCE LINE # 467
+; 	}
+			; SOURCE LINE # 468
+; }
+			; SOURCE LINE # 469
+?C0063:
+	RET  	
+; END OF _GetAsc2Hex
+
+; //*****************************************************************************
+; //Get an ascii char
+; //Change the argument: Hex value of the asccii digit and Erro counter record
+; //Return error: 
+; //             0 - No error, 2 chars of ascii digit is read (1 byte hex) 
+; //             1 = Escape key is hit
+; //             2 = beginning of line found
+; //             3 = Non ascii digit 
+; //*****************************************************************************
+; 
+; u8 GetAscii(u8 idata *AsciiHexV, u16 idata *ErrCntV)
+
+	RSEG  ?PR?_GetAscii?HEX_FILE_HDL
+_GetAscii:
+	USING	0
+			; SOURCE LINE # 480
+	MOV  	AsciiHexV?259,R7
+	MOV  	ErrCntV?260,R5
+; {
+			; SOURCE LINE # 481
+; 	u8 idata ErrGetAscii;
+; 	u8 idata c;
+; 	*AsciiHexV = 0;
+			; SOURCE LINE # 484
+	MOV  	R0,AR7
+	CLR  	A
+	MOV  	@R0,A
+; 	ErrGetAscii = 0;
+			; SOURCE LINE # 485
+	MOV  	R0,#LOW (ErrGetAscii?261)
+	MOV  	@R0,A
+; 	c = 0;
+			; SOURCE LINE # 486
+	INC  	R0
+	MOV  	@R0,A
+; 	c = _get1char(); //_getkey(); //_getchar();
+			; SOURCE LINE # 487
+	LCALL	_get1char
+	MOV  	R0,#LOW (c?262)
+	MOV  	@R0,AR7
+; #ifdef CPLUSDEBUG
+; 	printf ("======= GetAscii\n");
+; #endif
+; 	switch (c)
+			; SOURCE LINE # 491
+	MOV  	A,@R0
+	MOV  	R7,A
+	ADD  	A,#0C6H
+	JZ   	?C0068
+	ADD  	A,#01FH
+	JNZ  	?C0069
+; 	{	
+			; SOURCE LINE # 492
+; 	case 27:
+			; SOURCE LINE # 493
+?C0067:
+; 		ErrGetAscii = ExitRet;	//Exit download SR
+			; SOURCE LINE # 494
+	MOV  	R0,#LOW (ErrGetAscii?261)
+	MOV  	@R0,#01H
+; 		break;
+			; SOURCE LINE # 495
+	SJMP 	?C0066
+; 	case ':':
+			; SOURCE LINE # 496
+?C0068:
+; 		ErrCntV[ErrLineBegin] = ErrCntV[ErrLineBegin] + 1; // scope for improvement
+			; SOURCE LINE # 497
+	MOV  	R0,ErrCntV?260
+	INC  	R0
+	INC  	@R0
+	MOV  	A,@R0
+	DEC  	R0
+	JNZ  	?C0085
+	INC  	@R0
+?C0085:
+; 		ErrGetAscii = ExtraRecordRet;  //Process unexpected line beginning, exit to read another line
+			; SOURCE LINE # 498
+	MOV  	R0,#LOW (ErrGetAscii?261)
+	MOV  	@R0,#02H
+; 		break;
+			; SOURCE LINE # 499
+	SJMP 	?C0066
+; 	default:
+			; SOURCE LINE # 500
+?C0069:
+; 		if (isxdigit(c))
+			; SOURCE LINE # 501
+	LCALL	_isxdigit
+	JNC  	?C0070
+; 		{
+			; SOURCE LINE # 502
+; 			*AsciiHexV = Asc2Hex(&c);
+			; SOURCE LINE # 503
+	MOV  	R7,#LOW (c?262)
+	LCALL	_Asc2Hex
+	MOV  	R0,AsciiHexV?259
+	MOV  	@R0,AR7
+; 			ErrGetAscii = AscDigitRet;   //First correct ascii code - hight nibble
+			; SOURCE LINE # 504
+	CLR  	A
+	MOV  	R0,#LOW (ErrGetAscii?261)
+	MOV  	@R0,A
+; 		}
+			; SOURCE LINE # 505
+	SJMP 	?C0066
+?C0070:
+; 		else if (c==10)
+			; SOURCE LINE # 506
+	MOV  	R0,#LOW (c?262)
+	MOV  	A,@R0
+	CJNE 	A,#0AH,?C0072
+; 			ErrGetAscii = EnterRet;
+			; SOURCE LINE # 507
+	DEC  	R0
+	MOV  	@R0,#04H
+	SJMP 	?C0066
+?C0072:
+; 		else 
+; 		{
+			; SOURCE LINE # 509
+; 			ErrCntV[ErrNonAscDigit] = ErrCntV[ErrNonAscDigit] + 1;// scope for improvement
+			; SOURCE LINE # 510
+	MOV  	A,ErrCntV?260
+	ADD  	A,#05H
+	MOV  	R0,A
+	MOV  	A,@R0
+	ADD  	A,#01H
+	MOV  	R7,A
+	DEC  	R0
+	CLR  	A
+	ADDC 	A,@R0
+	MOV  	R6,A
+	MOV  	A,ErrCntV?260
+	ADD  	A,#04H
+	MOV  	R0,A
+	MOV  	@R0,AR6
+	INC  	R0
+	MOV  	@R0,AR7
+; 			ErrGetAscii = NonAscDigitRet;  //Non ascii value read
+			; SOURCE LINE # 511
+	MOV  	R0,#LOW (ErrGetAscii?261)
+	MOV  	@R0,#03H
+; 		}
+			; SOURCE LINE # 512
+; 		break;
+			; SOURCE LINE # 513
+; 	}
+			; SOURCE LINE # 514
+?C0066:
+; 	return ErrGetAscii;
+			; SOURCE LINE # 515
+	MOV  	R0,#LOW (ErrGetAscii?261)
+	MOV  	A,@R0
+	MOV  	R7,A
+; }
+			; SOURCE LINE # 516
+?C0074:
+	RET  	
+; END OF _GetAscii
+
+; 
+; //***************************************************************************
+; //_getchar() - for debugging on pc, return a char entered from the keyboard
+; //           - for 80251, return a char received from uart
+; //Check macro: CPLUSSIM
+; //***************************************************************************
+; #if 0
+; #ifdef CPLUSSIM
+; u8 _getchar()
+; {
+; #ifdef CPLUSSIM
+; 	u8 c;
+; #ifdef KEYBRD_CONSOLE
+; 	printf ("\n*** _getchar : ");
+; 	scanf("%c", &c);
+; 	fflush(stdin); //To flush the enter key still in the key board buffer when the first char already read
+; #else
+; 	if (!feof(datafile))
+; 		fscanf(datafile, "%c", &c);
+; 	else
+; 		fclose(datafile);
+; #endif
+; 
+; #else
+; 	u8 idata c;
+; 	while (1)
+; 	{
+; 		if (RI == 1)
+; 		{
+; 			RI = 0;
+; 			c = SBUF;
+; 		}
+; 	}
+; #endif
+; 
+; 	return c;
+; }
+; #endif //CPLUSSIM
+; #endif
+; //***************************************************************
+; //Asc2Hex(u8) 
+; //           Input: an ascii hex digit
+; //           ouput: the hex value of the input
+; //***************************************************************
+; u8 Asc2Hex (u8 idata *AscDigit)
+
+	RSEG  ?PR?_Asc2Hex?HEX_FILE_HDL
+_Asc2Hex:
+	USING	0
+			; SOURCE LINE # 561
+;---- Variable 'AscDigit?363' assigned to Register 'R0' ----
+	MOV  	R0,AR7
+; {
+			; SOURCE LINE # 562
+; 	u8 idata c;
+; 	c = toupper(*AscDigit);
+			; SOURCE LINE # 564
+	MOV  	A,@R0
+	MOV  	R7,A
+	LCALL	_toupper
+	MOV  	R0,#LOW (c?364)
+	MOV  	A,R7
+	MOV  	@R0,A
+; 	if (c <= 57)
+			; SOURCE LINE # 565
+	SETB 	C
+	SUBB 	A,#039H
+	JNC  	?C0075
+; 		c = c - 48; //ascii hex digit 0-9 
+			; SOURCE LINE # 566
+	MOV  	A,#0D0H
+	ADD  	A,@R0
+	MOV  	@R0,A
+	SJMP 	?C0076
+?C0075:
+; 	else
+; 		c = c - 55; //ascii hex digit A-F
+			; SOURCE LINE # 568
+	MOV  	R0,#LOW (c?364)
+	MOV  	A,#0C9H
+	ADD  	A,@R0
+	MOV  	@R0,A
+?C0076:
+; 	return c;
+			; SOURCE LINE # 569
+	MOV  	R0,#LOW (c?364)
+	MOV  	A,@R0
+	MOV  	R7,A
+; }
+			; SOURCE LINE # 570
+?C0077:
+	RET  	
+; END OF _Asc2Hex
+
+; //***************************************************************
+; //Write 1 byte of data into code ram
+; //u8 Wr2CRam(u8 *HexValV, u8 *CRamAddr)
+; //           Input: an ascii hex digit
+; //           Input: code ram address
+; //           output: return value = 1 <=> error
+; //                   return value = 0 <=> good
+; //**************************************************************
+; #ifdef CPLUSSIM
+; u8 Wr2CRam(u8 *HexValV, u8 *CRamAddr)
+; #else
+; u8 Wr2CRam(u8 idata *HexValV, u8 xdata * CRamAddr)
+
+	RSEG  ?PR?_Wr2CRam?HEX_FILE_HDL
+_Wr2CRam:
+	USING	0
+			; SOURCE LINE # 582
+;---- Variable 'CRamAddr?466' assigned to Register 'DPTR' ----
+	MOV  	DPL,R5
+	MOV  	DPH,R4
+;---- Variable 'HexValV?465' assigned to Register 'R7' ----
+; #endif
+; {
+			; SOURCE LINE # 584
+; #ifdef CPLUSSIM
+; #ifdef CPLUSDEBUG
+; 	printf("CRamAddr = %08X\n", CRamAddr);
+; #endif
+; 	u8 temp;
+; 	u8 CRamAddr_t;
+; 	CRamAddr_t = *HexValV;
+; 	temp = CRamAddr_t;
+; 	printf("%02X",temp);
+; 	if (temp != *HexValV)
+; 		return 1;
+; 	else
+; 		return 0;
+; #else
+; 	*CRamAddr = *HexValV;
+			; SOURCE LINE # 599
+	MOV  	R0,AR7
+	MOV  	A,@R0
+	MOVX 	@DPTR,A
+; 	if (*CRamAddr!=*HexValV)
+			; SOURCE LINE # 600
+	MOVX 	A,@DPTR
+	XRL  	A,@R0
+	JZ   	?C0078
+; 		return 1;
+			; SOURCE LINE # 601
+	MOV  	R7,#01H
+	RET  	
+?C0078:
+; 	else
+; 		return 0;
+			; SOURCE LINE # 603
+	MOV  	R7,#00H
+; #endif
+; }
+			; SOURCE LINE # 605
+?C0079:
+	RET  	
+; END OF _Wr2CRam
+
+	END

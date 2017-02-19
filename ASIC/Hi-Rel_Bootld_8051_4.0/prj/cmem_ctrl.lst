@@ -1,0 +1,97 @@
+C51 COMPILER V9.54   CMEM_CTRL                                                             10/14/2016 00:11:18 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE CMEM_CTRL
+NO OBJECT MODULE REQUESTED
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\src\cmem_ctrl.c OPTIMIZE(8,SIZE) BROWSE INCDIR(..\src;C:\Keil\C51\INC
+                    -;..\src) DEFINE(IDATA_OPT,FEATURE_CHIPERASE_) DEBUG OBJECTEXTEND CODE PRINT(.\cmem_ctrl.lst) TABS(2) PREPRINT(.\cmem_ctr
+                    -l.i) SRC(.\cmem_ctrl.SRC)
+
+line level    source
+
+   1          /*
+   2          * Description : Functions to control Palmchip's code and data memory
+   3          *
+   4          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+   5          * All rights reserved.
+   6          *
+   7          * Author      : Peter Nguyen
+   8          *
+   9          * Purpose :
+  10          *     Control PalmChip's memory mode 
+  11          *
+  12          * File: cmem_ctrl.c
+  13          */
+  14          
+  15          void EnableWrCRam ()
+  16          {
+  17   1      #pragma asm
+  18   1      /*#ifdef 8051_V5
+  19   1          MOV       0f3h,    #0ffh  
+  20   1          MOV       0f4h,    #0ffh  
+  21   1          MOV       0F8H,    #0h    
+  22   1      #else  //8051 v7
+  23   1      */
+  24   1        MOV     09FH,    #0  
+  25   1        MOV       0f1h,    #00h  
+  26   1        MOV       0f2h,    #20h  
+  27   1          MOV       0f3h,    #0ffh 
+  28   1          MOV       0f4h,    #0ffh 
+  29   1          MOV       0F8H,    #0h    
+  30   1      //#endif
+  31   1      #pragma endasm
+  32   1      }
+  33          
+  34          void DisableWrCRam ()
+  35          {
+  36   1      #pragma asm
+  37   1      /*
+  38   1      #ifdef 8051_V5
+  39   1          //Download size
+  40   1          MOV       0f3h,    #0FFh
+  41   1          MOV       0f4h,    #0FFh
+  42   1          MOV       0F8H,    #01h
+  43   1      #else
+  44   1      */
+  45   1        MOV     09FH,    #0   
+  46   1        MOV       0f1h,    #00h   
+  47   1        MOV       0f2h,    #20h   
+  48   1          MOV       0f3h,    #0ffh  
+  49   1          MOV       0f4h,    #0ffh  
+  50   1          MOV       0F8H,    #1h  
+  51   1      //#endif
+  52   1      #if 0
+                mov   r0,#0;
+C51 COMPILER V9.54   CMEM_CTRL                                                             10/14/2016 00:11:18 PAGE 2   
+
+                mov   a,#0;
+              test_mem_lp1:
+                mov   @r0,a;
+                inc   r0;
+                inc   a;
+                cjne  a,#0,test_mem_lp1;
+                mov   r0,#0;
+                mov   a,#0; 
+              test_mem_lp2:
+                mov   a,@r0;
+                mov   p1,a;
+                inc   a;
+                inc   r0;
+                cjne  a,#0,test_mem_lp2;
+              #endif
+  69   1      #pragma endasm
+  70   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    137    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

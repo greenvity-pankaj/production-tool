@@ -131,7 +131,7 @@ Public Class Form1
 #ElseIf FEATURE = "PROD" Then
     Const PRODUCT_TITLE As String = "Load on RAM Utility "
 #ElseIf FEATURE = "DEVELOPER" Then
-    Const PRODUCT_TITLE As String = "Flashing Utility GV701xB2-CRLC "
+    Const PRODUCT_TITLE As String = "Flashing Utility GV701xB2-LB "
 
 #Else
     Const PRODUCT_TITLE As String = "Flashing Utility "
@@ -485,6 +485,13 @@ Public Class Form1
         Else
             save_path()
         End If
+
+        If IO.File.Exists(xml_filepath & "\" & "gv_macro.xml") = True Then
+            load_macro_from_file()
+        Else
+            save_macro_to_file()
+        End If
+
         For Each sp As String In My.Computer.Ports.SerialPortNames
             combobx_portNo.Items.Add(sp)
         Next
@@ -1742,6 +1749,65 @@ Public Class Form1
             ' if file is corrupted then overwrite settings.xml file
         End Try
     End Sub
+
+
+    Sub load_macro_from_file()
+        Dim pos As Integer
+        Dim filenamepath As String
+        Dim filepath As String
+
+        filenamepath = Path.GetFullPath(Application.ExecutablePath)
+
+        pos = filenamepath.LastIndexOf("\")
+        filepath = filenamepath.Remove(pos, filenamepath.Length - pos)
+
+        Dim setting_reader As XmlTextReader = New XmlTextReader(filepath & "\" & "gv_macro.xml")
+        Dim field As String = " " ' initialize to avoid null reference
+        Try
+            Do While (setting_reader.Read())
+                Select Case setting_reader.NodeType
+                    Case XmlNodeType.Element
+                        'txtbx_console.AppendText("Element  <" + setting_reader.Name)
+                        field = setting_reader.Name
+
+                        'If setting_reader.HasAttributes Then
+                        '    While setting_reader.MoveToNextAttribute
+                        '        txtbx_console.AppendText("Attribute " & setting_reader.Name & "    " & setting_reader.Value)
+                        '    End While
+                        'End If
+                        'txtbx_console.AppendText(">" & vbCrLf)
+                    Case XmlNodeType.Text
+                        'txtbx_console.AppendText("Text = " & setting_reader.Value & vbCrLf)
+                        If field = "macro0" Then
+                            txtbx_macro0.Text = setting_reader.Value
+                        ElseIf field = "macro1" Then
+                            txtbx_macro1.Text = setting_reader.Value
+                        ElseIf field = "macro2" Then
+                            txtbx_macro2.Text = setting_reader.Value
+                        ElseIf field = "macro3" Then
+                            txtbx_macro3.Text = setting_reader.Value
+                        ElseIf field = "macro4" Then
+                            txtbx_macro4.Text = setting_reader.Value
+                        ElseIf field = "macro5" Then
+                            txtbx_macro5.Text = setting_reader.Value
+                        ElseIf field = "macro6" Then
+                            txtbx_macro6.Text = setting_reader.Value
+                        ElseIf field = "macro7" Then
+                            txtbx_macro7.Text = setting_reader.Value
+                        ElseIf field = "macro8" Then
+                            txtbx_macro8.Text = setting_reader.Value
+                        ElseIf field = "macro9" Then
+                            txtbx_macro9.Text = setting_reader.Value
+                        End If
+                    Case XmlNodeType.EndElement
+                        'txtbx_console.AppendText("</" & setting_reader.Name & ">" & vbCrLf)
+                End Select
+            Loop
+        Catch ex As Exception
+            MsgBox("Manually delete gv_macro.xml", MsgBoxStyle.Critical)
+            ' if file is corrupted then overwrite settings.xml file
+        End Try
+    End Sub
     Sub save_path()
         'Dim strPath As String = System.IO.Path.GetDirectoryName( _
         '		System.Reflection.Assembly.GetExecutingAssembly().CodeBase) ' This gives extra details like file:\ at start of string
@@ -1796,6 +1862,101 @@ Public Class Form1
                     txtbx_fileName.Text = "gchpgp"
                 End If
                 .WriteEndElement()
+                .WriteEndElement()
+                .WriteEndDocument()
+                .Close()
+            End With
+        End If
+    End Sub
+
+    Sub save_macro_to_file()
+        'Dim strPath As String = System.IO.Path.GetDirectoryName( _
+        '		System.Reflection.Assembly.GetExecutingAssembly().CodeBase) ' This gives extra details like file:\ at start of string
+        'msgbox(strPath)	
+        Dim pos As Integer
+        Dim filenamepath As String
+        Dim filepath As String
+
+        filenamepath = Path.GetFullPath(Application.ExecutablePath)
+
+        pos = filenamepath.LastIndexOf("\")
+        filepath = filenamepath.Remove(pos, filenamepath.Length - pos)
+        If IO.File.Exists(filepath & "\" & "gv_macro.xml") = True Then
+            Dim setting_xml As New XmlDocument
+            Try
+                setting_xml.Load(filepath & "\" & "gv_macro.xml")
+            Catch ex As Exception
+                MsgBox("Manually delete gv_macro.xml", MsgBoxStyle.Critical)
+                Exit Sub
+            End Try
+            Dim settingsnode As XmlNode = setting_xml.SelectSingleNode("/macrodetails")
+            If settingsnode IsNot Nothing Then
+                settingsnode.ChildNodes(0).InnerText = txtbx_macro0.Text
+                settingsnode.ChildNodes(1).InnerText = txtbx_macro1.Text
+                settingsnode.ChildNodes(2).InnerText = txtbx_macro2.Text
+                settingsnode.ChildNodes(3).InnerText = txtbx_macro3.Text
+                settingsnode.ChildNodes(4).InnerText = txtbx_macro4.Text
+                settingsnode.ChildNodes(5).InnerText = txtbx_macro5.Text
+                settingsnode.ChildNodes(6).InnerText = txtbx_macro6.Text
+                settingsnode.ChildNodes(7).InnerText = txtbx_macro7.Text
+                settingsnode.ChildNodes(8).InnerText = txtbx_macro8.Text
+                settingsnode.ChildNodes(9).InnerText = txtbx_macro9.Text
+                Try
+                    setting_xml.Save(filepath & "\" & "gv_macro.xml")
+                Catch ex As Exception
+
+                End Try
+            End If
+        Else
+            Dim settings_xml As New XmlWriterSettings
+            settings_xml.Indent = True
+            Dim xmlwrt As XmlWriter = XmlWriter.Create(filepath & "\" & "gv_macro.xml", settings_xml)
+            With xmlwrt
+                .WriteStartDocument()
+                .WriteStartElement("macrodetails")
+
+                .WriteStartElement("macro0")
+                .WriteString(txtbx_macro0.Text)
+                .WriteEndElement()
+
+                .WriteStartElement("macro1")
+                .WriteString(txtbx_macro1.Text)
+                .WriteEndElement()
+
+                .WriteStartElement("macro2")
+                .WriteString(txtbx_macro2.Text)
+                .WriteEndElement()
+
+                .WriteStartElement("macro3")
+                .WriteString(txtbx_macro3.Text)
+                .WriteEndElement()
+
+                .WriteStartElement("macro4")
+                .WriteString(txtbx_macro4.Text)
+                .WriteEndElement()
+
+                .WriteStartElement("macro5")
+                .WriteString(txtbx_macro5.Text)
+                .WriteEndElement()
+
+                .WriteStartElement("macro6")
+                .WriteString(txtbx_macro6.Text)
+                .WriteEndElement()
+
+                .WriteStartElement("macro7")
+                .WriteString(txtbx_macro7.Text)
+                .WriteEndElement()
+
+
+                .WriteStartElement("macro8")
+                .WriteString(txtbx_macro8.Text)
+                .WriteEndElement()
+
+                .WriteStartElement("macro9")
+                .WriteString(txtbx_macro9.Text)
+                .WriteEndElement()
+
+
                 .WriteEndElement()
                 .WriteEndDocument()
                 .Close()
@@ -2191,6 +2352,14 @@ Public Class Form1
         ' handles ctrl + alt + key - for tool control commands
         If e.Control And e.Alt And e.KeyCode = Keys.F Then
             nonNumberEntered = True
+            flash_state_cr = LOAD_BOOT
+            Try
+                With SerialPort1
+                    .BaudRate = combobx_baudRate1.Text
+                End With
+            Catch ex As Exception
+
+            End Try
             autoflash_sub()
             e.Handled = True
         ElseIf e.Control And e.Alt And e.KeyCode = Keys.A Then
@@ -2245,6 +2414,144 @@ Public Class Form1
             xmitString("p nogvmsg")
 
             e.Handled = True
+
+        ElseIf e.Control And e.Shift AndAlso e.KeyCode = Keys.E Then
+            nonNumberEntered = True
+            xmitString("p eflash")
+
+            e.Handled = True
+
+        ElseIf e.Control And e.Shift AndAlso e.KeyCode = Keys.R Then
+            nonNumberEntered = True
+            xmitString("p hwr")
+
+            e.Handled = True
+
+        ElseIf e.Control And e.Shift AndAlso e.KeyCode = Keys.W Then
+            nonNumberEntered = True
+            xmitString("wb 34 1")
+
+            e.Handled = True
+
+        ElseIf e.Control And e.Shift AndAlso (e.KeyCode >= Keys.D0 And e.KeyCode <= Keys.D9) Then
+            nonNumberEntered = True
+            'xmitString("p nogvmsg")
+            Dim diag_result As DialogResult
+
+            Select Case e.KeyCode
+                Case Keys.D0
+                    If (txtbx_macro0.TextLength = 0) Then
+                        MsgBox("Macro 0 is not defined")
+                    Else
+                        diag_result = MessageBox.Show("Do you want to transmit " & txtbx_macro0.Text, "Macro Tx Confirm", MessageBoxButtons.YesNo)
+                        If diag_result = DialogResult.Yes Then
+                            xmitString(txtbx_macro0.Text)
+                        End If
+                    End If
+                   ' End If
+                Case Keys.D1
+                    'MsgBox("Key 1 pressed")
+                    If (txtbx_macro1.TextLength = 0) Then
+                        MsgBox("Macro 1 is not defined")
+                    Else
+                        diag_result = MessageBox.Show("Do you want to transmit " & txtbx_macro1.Text, "Macro Tx Confirm", MessageBoxButtons.YesNo)
+                        If diag_result = DialogResult.Yes Then
+                            xmitString(txtbx_macro1.Text)
+                        End If
+                    End If
+                Case Keys.D2
+                    ' MsgBox("Key 2 pressed")
+                    If (txtbx_macro2.TextLength = 0) Then
+                        MsgBox("Macro 2 is not defined")
+                    Else
+                        diag_result = MessageBox.Show("Do you want to transmit " & txtbx_macro2.Text, "Macro Tx Confirm", MessageBoxButtons.YesNo)
+                        If diag_result = DialogResult.Yes Then
+                            xmitString(txtbx_macro2.Text)
+                        End If
+                    End If
+                Case Keys.D3
+                    'MsgBox("Key 3 pressed")
+                    If (txtbx_macro3.TextLength = 0) Then
+                        MsgBox("Macro 3 is not defined")
+                    Else
+                        diag_result = MessageBox.Show("Do you want to transmit " & txtbx_macro3.Text, "Macro Tx Confirm", MessageBoxButtons.YesNo)
+                        If diag_result = DialogResult.Yes Then
+                            xmitString(txtbx_macro3.Text)
+                        End If
+                    End If
+                Case Keys.D4
+                    'MsgBox("Key 4 pressed")
+                    If (txtbx_macro4.TextLength = 0) Then
+                        MsgBox("Macro 4 is not defined")
+                    Else
+                        diag_result = MessageBox.Show("Do you want to transmit " & txtbx_macro4.Text, "Macro Tx Confirm", MessageBoxButtons.YesNo)
+                        If diag_result = DialogResult.Yes Then
+                            xmitString(txtbx_macro4.Text)
+                        End If
+                    End If
+
+                Case Keys.D5
+                    'MsgBox("Key 5 pressed")
+                    If (txtbx_macro5.TextLength = 0) Then
+                        MsgBox("Macro 5 is not defined")
+                    Else
+                        diag_result = MessageBox.Show("Do you want to transmit " & txtbx_macro5.Text, "Macro Tx Confirm", MessageBoxButtons.YesNo)
+                        If diag_result = DialogResult.Yes Then
+                            xmitString(txtbx_macro5.Text)
+                        End If
+                    End If
+                Case Keys.D6
+                    'MsgBox("Key 6 pressed")
+                    If (txtbx_macro6.TextLength = 0) Then
+                        MsgBox("Macro 6 is not defined")
+                    Else
+                        diag_result = MessageBox.Show("Do you want to transmit " & txtbx_macro6.Text, "Macro Tx Confirm", MessageBoxButtons.YesNo)
+                        If diag_result = DialogResult.Yes Then
+                            xmitString(txtbx_macro6.Text)
+                        End If
+                    End If
+                Case Keys.D7
+                    'MsgBox("Key 7 pressed")
+                    If (txtbx_macro7.TextLength = 0) Then
+                        MsgBox("Macro 7 is not defined")
+                    Else
+                        diag_result = MessageBox.Show("Do you want to transmit " & txtbx_macro7.Text, "Macro Tx Confirm", MessageBoxButtons.YesNo)
+                        If diag_result = DialogResult.Yes Then
+                            xmitString(txtbx_macro7.Text)
+                        End If
+                    End If
+                Case Keys.D8
+                    'MsgBox("Key 8 pressed")
+                    If (txtbx_macro8.TextLength = 0) Then
+                        MsgBox("Macro 8 is not defined")
+                    Else
+                        diag_result = MessageBox.Show("Do you want to transmit " & txtbx_macro8.Text, "Macro Tx Confirm", MessageBoxButtons.YesNo)
+                        If diag_result = DialogResult.Yes Then
+                            xmitString(txtbx_macro8.Text)
+                        End If
+                    End If
+                Case Keys.D9
+                    'MsgBox("Key 9 pressed")
+                    If (txtbx_macro9.TextLength = 0) Then
+                        MsgBox("Macro 9 is not defined")
+                    Else
+                        diag_result = MessageBox.Show("Do you want to transmit " & txtbx_macro9.Text, "Macro Tx Confirm", MessageBoxButtons.YesNo)
+                        If diag_result = DialogResult.Yes Then
+                            xmitString(txtbx_macro9.Text)
+                        End If
+                    End If
+            End Select
+
+            e.Handled = True
+
+        ElseIf e.Control And e.Shift AndAlso e.KeyCode = Keys.NumPad1 Then
+            nonNumberEntered = True
+            'xmitString("p nogvmsg")
+            MsgBox("Key 1 pressed")
+            e.Handled = True
+
+            '  Else
+            '     MsgBox(e.KeyCode.ToString)
         End If
         ' e.Handled = True
     End Sub
@@ -2283,8 +2590,16 @@ Public Class Form1
                "To Watch System Stats   - CTRL  +   SHIFT   +   S" & vbCrLf &
                "To Watch UART Stats     - CTRL  +   SHIFT   +   U" & vbCrLf &
                "To Enable Debug Messages    - CTRL  +   SHIFT   +   G" & vbCrLf &
-               "To Disable Debug Messages   - CTRL  +   SHIFT   +   N",
-               "Shortcut Key Rerefernce"
+               "To Disable Debug Messages   - CTRL  +   SHIFT   +   N" & vbCrLf &
+               "To Erase Flash Profile   - CTRL  +   SHIFT   +   E" & vbCrLf &
+               "To GPIO HW Reset   - CTRL  +   SHIFT   +   R" & vbCrLf &
+               "To GPIO SW Reset   - CTRL  +   SHIFT   +   W" & vbCrLf &
+               "To transmit user defined macro - CTRL   +   SHIFT   +   1-9",
+               "Flash Tool Shortcut Key Reference"
                )
+    End Sub
+
+    Private Sub btn_save_macro_Click(sender As Object, e As EventArgs) Handles btn_save_macro.Click
+        save_macro_to_file()
     End Sub
 End Class

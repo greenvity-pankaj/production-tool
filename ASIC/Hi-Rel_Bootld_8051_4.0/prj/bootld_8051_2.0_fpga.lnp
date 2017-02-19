@@ -1,0 +1,11 @@
+".\main.obj",
+".\uart.obj",
+".\STARTUP.obj",
+".\cmem_ctrl.obj",
+".\hex_file_hdl.obj",
+".\spiflash.obj",
+".\spiflash_drv.obj" 
+TO "bootld_8051_2.0_fpga.hex" 
+RAMSIZE(256) 
+CODE( 0X0000-0X1FFF )
+XDATA( 0X2100-0X30FE )

@@ -1,0 +1,181 @@
+A51 MACRO ASSEMBLER  CMEM_CTRL                                                            10/14/2016 00:11:19 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.02c
+OBJECT MODULE PLACED IN .\cmem_ctrl.OBJ
+ASSEMBLER INVOKED BY: C:\Keil_v5\C51\BIN\A51.EXE .\cmem_ctrl.src PR(.\cmem_ctrl.ls1) EP DEBUG
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     ; .\cmem_ctrl.SRC generated from: ..\src\cmem_ctrl.c
+                       2     ; COMPILER INVOKED BY:
+                       3     ;        C:\Keil_v5\C51\BIN\C51.EXE ..\src\cmem_ctrl.c OPTIMIZE(8,SIZE) BROWSE INCDIR(..\sr
+                             c;C:\Keil\C51\INC;..\src) DEFINE(IDATA_OPT,FEATURE_CHIPERASE_) DEBUG OBJECTEXTEND CODE PRIN
+                             T(.\cmem_ctrl.lst) TABS(2) PREPRINT(.\cmem_ctrl.i) SRC(.\cmem_ctrl.SRC)
+                       4     
+                       5     
+                       6     NAME    CMEM_CTRL
+                       7     
+                       8     ?PR?EnableWrCRam?CMEM_CTRL               SEGMENT CODE 
+                       9     ?PR?DisableWrCRam?CMEM_CTRL              SEGMENT CODE 
+                      10             PUBLIC  DisableWrCRam
+                      11             PUBLIC  EnableWrCRam
+                      12     ; /*
+                      13     ; * Description : Functions to control Palmchip's code and data memory
+                      14     ; *
+                      15     ; * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+                      16     ; * All rights reserved.
+                      17     ; *
+                      18     ; * Author      : Peter Nguyen
+                      19     ; *
+                      20     ; * Purpose :
+                      21     ; *     Control PalmChip's memory mode 
+                      22     ; *
+                      23     ; * File: cmem_ctrl.c
+                      24     ; */
+                      25     ; 
+                      26     ; void EnableWrCRam ()
+                      27     
+----                  28             RSEG  ?PR?EnableWrCRam?CMEM_CTRL
+0000                  29     EnableWrCRam:
+                      30             USING   0
+                      31                             ; SOURCE LINE # 15
+                      32     ; {
+                      33                             ; SOURCE LINE # 16
+                      34     ; #pragma asm
+                      35     ; /*#ifdef 8051_V5
+                      36              
+                      37     ;     MOV       0f3h,    #0ffh  
+                      38              
+                      39     ;     MOV       0f4h,    #0ffh  
+                      40              
+                      41     ;     MOV       0F8H,    #0h      
+                      42              
+                      43     ; #else  //8051 v7
+                      44              
+                      45     ; */
+                      46               
+                      47     ;       MOV               09FH,    #0    
+0000 759F00           48               MOV             09FH,    #0    
+                      49     ;       MOV       0f1h,    #00h  
+0003 75F100           50               MOV       0f1h,    #00h  
+                      51     ;       MOV       0f2h,    #20h  
+0006 75F220           52               MOV       0f2h,    #20h  
+                      53     ;     MOV       0f3h,    #0ffh 
+0009 75F3FF           54               MOV       0f3h,    #0ffh 
+                      55     ;     MOV       0f4h,    #0ffh 
+000C 75F4FF           56               MOV       0f4h,    #0ffh 
+A51 MACRO ASSEMBLER  CMEM_CTRL                                                            10/14/2016 00:11:19 PAGE     2
+
+                      57     ;     MOV       0F8H,    #0h      
+000F 75F800           58               MOV       0F8H,    #0h          
+                      59     ; //#endif
+                      60               
+                      61     ; #pragma endasm
+                      62     ; }
+                      63                             ; SOURCE LINE # 32
+0012 22               64             RET     
+                      65     ; END OF EnableWrCRam
+                      66     
+                      67     ; 
+                      68     ; void DisableWrCRam ()
+                      69     
+----                  70             RSEG  ?PR?DisableWrCRam?CMEM_CTRL
+0000                  71     DisableWrCRam:
+                      72             USING   0
+                      73                             ; SOURCE LINE # 34
+                      74     ; {
+                      75                             ; SOURCE LINE # 35
+                      76     ; #pragma asm
+                      77     ; /*
+                      78              
+                      79     ; #ifdef 8051_V5
+                      80              
+                      81     ;     //Download size
+                      82              
+                      83     ;     MOV       0f3h,    #0FFh
+                      84              
+                      85     ;     MOV       0f4h,    #0FFh
+                      86              
+                      87     ;     MOV       0F8H,    #01h
+                      88              
+                      89     ; #else
+                      90              
+                      91     ; */
+                      92               
+                      93     ;       MOV               09FH,    #0     
+0000 759F00           94               MOV             09FH,    #0     
+                      95     ;       MOV       0f1h,    #00h   
+0003 75F100           96               MOV       0f1h,    #00h   
+                      97     ;       MOV       0f2h,    #20h   
+0006 75F220           98               MOV       0f2h,    #20h   
+                      99     ;     MOV       0f3h,    #0ffh  
+0009 75F3FF          100               MOV       0f3h,    #0ffh  
+                     101     ;     MOV       0f4h,    #0ffh  
+000C 75F4FF          102               MOV       0f4h,    #0ffh  
+                     103     ;     MOV       0F8H,    #1h    
+000F 75F801          104               MOV       0F8H,    #1h        
+                     105     ; //#endif
+                     106               
+                     107     ; #if 0
+                     108               
+                     109     ;       mov             r0,#0;
+                     110               
+                     111     ;       mov             a,#0;
+                     112               
+                     113     ; test_mem_lp1:
+                     114               
+                     115     ;       mov     @r0,a;
+                     116               
+                     117     ;       inc             r0;
+                     118               
+                     119     ;       inc             a;
+                     120               
+                     121     ;       cjne    a,#0,test_mem_lp1;
+                     122               
+A51 MACRO ASSEMBLER  CMEM_CTRL                                                            10/14/2016 00:11:19 PAGE     3
+
+                     123     ;       mov             r0,#0;
+                     124               
+                     125     ;       mov             a,#0;   
+                     126               
+                     127     ; test_mem_lp2:
+                     128               
+                     129     ;       mov             a,@r0;
+                     130               
+                     131     ;       mov             p1,a;
+                     132               
+                     133     ;       inc             a;
+                     134               
+                     135     ;       inc             r0;
+                     136               
+                     137     ;       cjne    a,#0,test_mem_lp2;
+                     138               
+                     139     ; #endif
+                     140               
+                     141     ; #pragma endasm
+                     142     ; }
+                     143                             ; SOURCE LINE # 70
+0012 22              144             RET     
+                     145     ; END OF DisableWrCRam
+                     146     
+                     147             END
+A51 MACRO ASSEMBLER  CMEM_CTRL                                                            10/14/2016 00:11:19 PAGE     4
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E                      T Y P E  V A L U E   ATTRIBUTES
+
+?PR?DISABLEWRCRAM?CMEM_CTRL  C SEG    0013H       REL=UNIT
+?PR?ENABLEWRCRAM?CMEM_CTRL.  C SEG    0013H       REL=UNIT
+CMEM_CTRL . . . . . . . . .  N NUMB   -----       
+DISABLEWRCRAM . . . . . . .  C ADDR   0000H   R   SEG=?PR?DISABLEWRCRAM?CMEM_CTRL
+ENABLEWRCRAM. . . . . . . .  C ADDR   0000H   R   SEG=?PR?ENABLEWRCRAM?CMEM_CTRL
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

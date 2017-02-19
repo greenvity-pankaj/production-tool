@@ -1,0 +1,243 @@
+C51 COMPILER V9.54   MAIN                                                                  10/14/2016 00:11:18 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+NO OBJECT MODULE REQUESTED
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\src\main.c OPTIMIZE(8,SIZE) BROWSE INCDIR(..\src;C:\Keil\C51\INC;..\s
+                    -rc) DEFINE(IDATA_OPT,FEATURE_CHIPERASE_) DEBUG OBJECTEXTEND CODE PRINT(.\main.lst) TABS(2) PREPRINT(.\main.i) SRC(.\main
+                    -.SRC)
+
+line level    source
+
+   1          /*
+   2          * Description : 8051 bootloader main function
+   3          *
+   4          * Copyright (c) 2010-2011 Greenvity Communications, Inc.
+   5          * All rights reserved.
+   6          *
+   7          * Author      : Peter Nguyen
+   8          * Release Date: 04/27/2013
+   9          * Purpose :
+  10          *     function main of bootloader project
+  11          *
+  12          * File: bootld_80251.c
+  13          */
+  14          
+  15          //#include <stdafx.h>
+  16          #include "test.h"
+  17          #include <reg51.h>                  /* Include 251SB header file */ 
+  18          #include <stdio.h>
+  19          #include <stdarg.h>
+  20          #include <string.h>
+  21          #include "typedef.h"
+  22          #include "uart.h"
+  23          #include "hex_file_hdl.h"
+  24          #include "spiflash.h"
+  25          #include "macro_def.h"
+  26          #include "cmem_ctrl.h"
+  27          #include "spiflash_drv.h"
+  28          #include "static_var.h"
+  29          
+  30          void main(void)
+  31          {
+  32   1        u32 xdata Temp;
+  33   1        char idata c;
+  34   1        BANKSEL = 0;
+  35   1        DisableWrCRam();
+  36   1      
+  37   1        ComInit();
+  38   1      
+  39   1        EA = 0;
+  40   1        c = 0;
+  41   1        Temp = 0;
+  42   1        printf("\n*********************************************");
+  43   1        printf("\n**     GREENVITY COMMUNICATIONS INC        **");
+  44   1        //printf("\n**          Boot loader V2.0               **");
+  45   1        printf("\n**       HI - REL Boot loader V4.0         **"); 
+  46   1        //printf("\n*********************************************\n\n");
+  47   1        
+  48   1        while(1)
+  49   1        {
+  50   2          switch(c)
+  51   2          {
+  52   3          case ('s'):
+  53   3          case ('S'):
+C51 COMPILER V9.54   MAIN                                                                  10/14/2016 00:11:18 PAGE 2   
+
+  54   3            goto Bootup;
+  55   3            break;
+  56   3          case ('u'):
+  57   3          case ('U'):
+  58   3            EnableWrCRam ();
+  59   3            for (c=0;c<NUM_OF_BANK;c++)
+  60   3            {
+  61   4              printf("\n\n ##### Download code from UART to CRAM - BANK-%02X #####\n", (U16)c);
+  62   4              BANKSEL = c;
+  63   4      #ifndef IDATA_OPT     
+                      ParseHexRecord(&ErrCnt[0], &ProgCnt[0]);
+              #else
+  66   4              ParseHexRecord(&ErrCnt[0]);
+  67   4      #endif
+  68   4            }
+  69   3            DisableWrCRam ();
+  70   3            #pragma asm
+  71   3              MOV   SP,#06FH
+  72   3              LJMP  CRAM_START;
+  73   3            #pragma endasm
+  74   3            break;
+  75   3          case ('f'):
+  76   3            Download_Uart2Sflash(1);
+  77   3            c = '1';
+  78   3          break;
+  79   3          case ('F'):
+  80   3            Download_Uart2Sflash(0);
+  81   3            c = '1';
+  82   3          break;
+  83   3      #if 0   
+                  case ('t'):
+                  case ('T'):
+                    test_cram();
+                    printf("\n --> Finished testing CRAM");
+                    c = '1';
+                    break;
+              #endif    
+  91   3          case ('j'):
+  92   3          case ('J'):
+  93   3            #pragma asm
+  94   3              MOV  SP,#06FH;
+  95   3              LJMP CRAM_START;
+  96   3            #pragma endasm
+  97   3      #if 0     
+                  case ('d'):
+                  case ('D'):
+                    dump_code(0);
+                    printf("\n --> Finished dumping CRAM");
+                    c='1';
+                    break;
+              #endif    
+ 105   3          case ('p'):
+ 106   3          case ('P'):
+ 107   3            dump_code(1); 
+ 108   3            printf("\n --> Finished dumping SFLASH");
+ 109   3            c = '1';
+ 110   3            break;
+ 111   3      #if 0   
+                  case 'r':
+                  case 'R':
+                    dump_code(2);
+                    printf("\n --> Finished dumping erams");
+C51 COMPILER V9.54   MAIN                                                                  10/14/2016 00:11:18 PAGE 3   
+
+                    c = '1';
+                    break;
+              #endif    
+ 119   3          case 'E':
+ 120   3            spiflash_eraseBackup256k();
+ 121   3            c='1';
+ 122   3            break;
+ 123   3            
+ 124   3          case 'e':
+ 125   3            dump_BackupCode();
+ 126   3            c = '1';
+ 127   3            break;
+ 128   3          case ('1'):
+ 129   3            printf("\n\n --> Press reset or hit 's' to reboot the system");
+ 130   3            Temp = 0;
+ 131   3            c = 1;
+ 132   3            break;
+ 133   3      #ifdef PROGRAM_CONFIGURATION
+                  case ('c'):
+                  case ('C'):
+                    Program_Config_Data();
+                    c = '1';
+                    break;
+                  case ('g'):
+                  case ('G'):
+                    Load_Config_Data(1);
+                    c = '1';
+                    break;
+                  case ('l'):
+                  case ('L'):
+                    Load_Config_Data(0);
+                    c = '1';
+                    break;
+              #endif
+ 150   3          case 'b':
+ 151   3          case 'B':
+ 152   3            (void)spiflash_BackupCodeImage(0);
+ 153   3            c = '1';
+ 154   3            break;
+ 155   3          case 'z':
+ 156   3          case 'Z':
+ 157   3            (void)spiflash_RestoreCodeImage(0);
+ 158   3            c = '1';
+ 159   3            break;
+ 160   3      #ifdef FEATURE_CHIPERASE
+                  case ('x'):
+                  case ('X'):
+                    printf("\n   *** THIS FUNCTION WILL ERASE 2MB OF SPI FLASH Y/N? :");
+                    c = _get1char();
+                    TI = 0;
+                    SBUF = c;
+                    if (c!='Y')
+                    {
+                      c = '1';
+                      break;
+                    }
+                    c = 0;
+                    printf("\n   *** Ready Y/N? :");
+                      c = _get1char();
+                    TI = 0;
+                    SBUF = c;
+                    if (c!='Y')
+C51 COMPILER V9.54   MAIN                                                                  10/14/2016 00:11:18 PAGE 4   
+
+                    {
+                      c = '1';
+                      break;
+                    }
+                    spiflash_chiperase();
+                    printf ("\n  --> Erase spi flash done\n"); 
+                    c = '1';
+                    break;
+              #endif
+ 187   3          case 1:
+ 188   3            if (RI){
+ 189   4              c = SBUF;
+ 190   4              RI = 0;
+ 191   4            } else {
+ 192   4              c = 1;
+ 193   4            }
+ 194   3            break;
+ 195   3          default:
+ 196   3            if (RI==1){
+ 197   4              c = SBUF;
+ 198   4              RI = 0;
+ 199   4            }
+ 200   3            Temp++;
+ 201   3            if (Temp>=GVTY_STARTING_TIMEOUT)
+ 202   3      Bootup:
+ 203   3            {
+ 204   4      #ifdef PROGRAM_CONFIGURATION
+                      Load_Config_Data(1);
+              #endif
+ 207   4              load_sflash2cram();     
+ 208   4            }
+ 209   3            break;
+ 210   3          }
+ 211   2        }
+ 212   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    345    ----
+   CONSTANT SIZE    =    282    ----
+   XDATA SIZE       =     14       4
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =     12       1
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

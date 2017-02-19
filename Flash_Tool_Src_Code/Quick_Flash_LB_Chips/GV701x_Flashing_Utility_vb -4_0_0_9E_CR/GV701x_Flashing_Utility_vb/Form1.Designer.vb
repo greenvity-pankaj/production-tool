@@ -106,6 +106,29 @@ Partial Class Form1
         Me.OpenFileDialog1 = New System.Windows.Forms.OpenFileDialog()
         Me.SaveFileDialog1 = New System.Windows.Forms.SaveFileDialog()
         Me.FileSystemWatcher1 = New System.IO.FileSystemWatcher()
+        Me.TabPage2 = New System.Windows.Forms.TabPage()
+        Me.Label9 = New System.Windows.Forms.Label()
+        Me.Label11 = New System.Windows.Forms.Label()
+        Me.txtbx_macro0 = New System.Windows.Forms.TextBox()
+        Me.txtbx_macro1 = New System.Windows.Forms.TextBox()
+        Me.Label12 = New System.Windows.Forms.Label()
+        Me.txtbx_macro2 = New System.Windows.Forms.TextBox()
+        Me.Label13 = New System.Windows.Forms.Label()
+        Me.txtbx_macro3 = New System.Windows.Forms.TextBox()
+        Me.Label14 = New System.Windows.Forms.Label()
+        Me.txtbx_macro4 = New System.Windows.Forms.TextBox()
+        Me.Label15 = New System.Windows.Forms.Label()
+        Me.txtbx_macro9 = New System.Windows.Forms.TextBox()
+        Me.Label16 = New System.Windows.Forms.Label()
+        Me.txtbx_macro8 = New System.Windows.Forms.TextBox()
+        Me.Label17 = New System.Windows.Forms.Label()
+        Me.txtbx_macro7 = New System.Windows.Forms.TextBox()
+        Me.Label18 = New System.Windows.Forms.Label()
+        Me.txtbx_macro6 = New System.Windows.Forms.TextBox()
+        Me.Label19 = New System.Windows.Forms.Label()
+        Me.txtbx_macro5 = New System.Windows.Forms.TextBox()
+        Me.Label20 = New System.Windows.Forms.Label()
+        Me.btn_save_macro = New System.Windows.Forms.Button()
         Me.grbx_serial_settings.SuspendLayout()
         Me.tab_ctrl_flashmode.SuspendLayout()
         Me.tabPage1.SuspendLayout()
@@ -225,6 +248,7 @@ Partial Class Form1
         '
         Me.tab_ctrl_flashmode.Controls.Add(Me.tabPage1)
         Me.tab_ctrl_flashmode.Controls.Add(Me.tab_config)
+        Me.tab_ctrl_flashmode.Controls.Add(Me.TabPage2)
         Me.tab_ctrl_flashmode.Location = New System.Drawing.Point(12, 100)
         Me.tab_ctrl_flashmode.Name = "tab_ctrl_flashmode"
         Me.tab_ctrl_flashmode.SelectedIndex = 0
@@ -570,7 +594,7 @@ Partial Class Form1
         '
         Me.txtbx_device_type.Font = New System.Drawing.Font("Microsoft Sans Serif", 9.0!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.txtbx_device_type.Location = New System.Drawing.Point(245, 124)
-        Me.txtbx_device_type.MaxLength = 32
+        Me.txtbx_device_type.MaxLength = 100
         Me.txtbx_device_type.Name = "txtbx_device_type"
         Me.txtbx_device_type.Size = New System.Drawing.Size(277, 21)
         Me.txtbx_device_type.TabIndex = 12
@@ -848,6 +872,240 @@ Partial Class Form1
         Me.FileSystemWatcher1.EnableRaisingEvents = True
         Me.FileSystemWatcher1.SynchronizingObject = Me
         '
+        'TabPage2
+        '
+        Me.TabPage2.Controls.Add(Me.btn_save_macro)
+        Me.TabPage2.Controls.Add(Me.txtbx_macro9)
+        Me.TabPage2.Controls.Add(Me.Label16)
+        Me.TabPage2.Controls.Add(Me.txtbx_macro8)
+        Me.TabPage2.Controls.Add(Me.Label17)
+        Me.TabPage2.Controls.Add(Me.txtbx_macro7)
+        Me.TabPage2.Controls.Add(Me.Label18)
+        Me.TabPage2.Controls.Add(Me.txtbx_macro6)
+        Me.TabPage2.Controls.Add(Me.Label19)
+        Me.TabPage2.Controls.Add(Me.txtbx_macro5)
+        Me.TabPage2.Controls.Add(Me.Label20)
+        Me.TabPage2.Controls.Add(Me.txtbx_macro4)
+        Me.TabPage2.Controls.Add(Me.Label15)
+        Me.TabPage2.Controls.Add(Me.txtbx_macro3)
+        Me.TabPage2.Controls.Add(Me.Label14)
+        Me.TabPage2.Controls.Add(Me.txtbx_macro2)
+        Me.TabPage2.Controls.Add(Me.Label13)
+        Me.TabPage2.Controls.Add(Me.txtbx_macro1)
+        Me.TabPage2.Controls.Add(Me.Label12)
+        Me.TabPage2.Controls.Add(Me.txtbx_macro0)
+        Me.TabPage2.Controls.Add(Me.Label11)
+        Me.TabPage2.Controls.Add(Me.Label9)
+        Me.TabPage2.Location = New System.Drawing.Point(4, 22)
+        Me.TabPage2.Name = "TabPage2"
+        Me.TabPage2.Padding = New System.Windows.Forms.Padding(3)
+        Me.TabPage2.Size = New System.Drawing.Size(799, 459)
+        Me.TabPage2.TabIndex = 2
+        Me.TabPage2.Text = "Macro"
+        Me.TabPage2.UseVisualStyleBackColor = True
+        '
+        'Label9
+        '
+        Me.Label9.AutoSize = True
+        Me.Label9.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label9.Location = New System.Drawing.Point(39, 22)
+        Me.Label9.Name = "Label9"
+        Me.Label9.Size = New System.Drawing.Size(447, 13)
+        Me.Label9.TabIndex = 0
+        Me.Label9.Text = "Press CTRL + SHIFT + 1-9 to transmit specific user defined macro to firmware"
+        '
+        'Label11
+        '
+        Me.Label11.AutoSize = True
+        Me.Label11.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label11.Location = New System.Drawing.Point(42, 66)
+        Me.Label11.Name = "Label11"
+        Me.Label11.Size = New System.Drawing.Size(14, 13)
+        Me.Label11.TabIndex = 1
+        Me.Label11.Text = "0"
+        Me.Label11.Visible = False
+        '
+        'txtbx_macro0
+        '
+        Me.txtbx_macro0.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.txtbx_macro0.Location = New System.Drawing.Point(74, 63)
+        Me.txtbx_macro0.Name = "txtbx_macro0"
+        Me.txtbx_macro0.Size = New System.Drawing.Size(418, 20)
+        Me.txtbx_macro0.TabIndex = 1
+        Me.txtbx_macro0.Visible = False
+        '
+        'txtbx_macro1
+        '
+        Me.txtbx_macro1.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.txtbx_macro1.Location = New System.Drawing.Point(74, 92)
+        Me.txtbx_macro1.Name = "txtbx_macro1"
+        Me.txtbx_macro1.Size = New System.Drawing.Size(418, 20)
+        Me.txtbx_macro1.TabIndex = 2
+        '
+        'Label12
+        '
+        Me.Label12.AutoSize = True
+        Me.Label12.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label12.Location = New System.Drawing.Point(42, 95)
+        Me.Label12.Name = "Label12"
+        Me.Label12.Size = New System.Drawing.Size(14, 13)
+        Me.Label12.TabIndex = 3
+        Me.Label12.Text = "1"
+        '
+        'txtbx_macro2
+        '
+        Me.txtbx_macro2.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.txtbx_macro2.Location = New System.Drawing.Point(74, 122)
+        Me.txtbx_macro2.Name = "txtbx_macro2"
+        Me.txtbx_macro2.Size = New System.Drawing.Size(418, 20)
+        Me.txtbx_macro2.TabIndex = 3
+        '
+        'Label13
+        '
+        Me.Label13.AutoSize = True
+        Me.Label13.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label13.Location = New System.Drawing.Point(42, 125)
+        Me.Label13.Name = "Label13"
+        Me.Label13.Size = New System.Drawing.Size(14, 13)
+        Me.Label13.TabIndex = 5
+        Me.Label13.Text = "2"
+        '
+        'txtbx_macro3
+        '
+        Me.txtbx_macro3.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.txtbx_macro3.Location = New System.Drawing.Point(74, 152)
+        Me.txtbx_macro3.Name = "txtbx_macro3"
+        Me.txtbx_macro3.Size = New System.Drawing.Size(418, 20)
+        Me.txtbx_macro3.TabIndex = 4
+        '
+        'Label14
+        '
+        Me.Label14.AutoSize = True
+        Me.Label14.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label14.Location = New System.Drawing.Point(42, 155)
+        Me.Label14.Name = "Label14"
+        Me.Label14.Size = New System.Drawing.Size(14, 13)
+        Me.Label14.TabIndex = 7
+        Me.Label14.Text = "3"
+        '
+        'txtbx_macro4
+        '
+        Me.txtbx_macro4.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.txtbx_macro4.Location = New System.Drawing.Point(74, 182)
+        Me.txtbx_macro4.Name = "txtbx_macro4"
+        Me.txtbx_macro4.Size = New System.Drawing.Size(418, 20)
+        Me.txtbx_macro4.TabIndex = 5
+        '
+        'Label15
+        '
+        Me.Label15.AutoSize = True
+        Me.Label15.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label15.Location = New System.Drawing.Point(42, 185)
+        Me.Label15.Name = "Label15"
+        Me.Label15.Size = New System.Drawing.Size(14, 13)
+        Me.Label15.TabIndex = 9
+        Me.Label15.Text = "4"
+        '
+        'txtbx_macro9
+        '
+        Me.txtbx_macro9.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.txtbx_macro9.Location = New System.Drawing.Point(74, 331)
+        Me.txtbx_macro9.Name = "txtbx_macro9"
+        Me.txtbx_macro9.Size = New System.Drawing.Size(418, 20)
+        Me.txtbx_macro9.TabIndex = 10
+        '
+        'Label16
+        '
+        Me.Label16.AutoSize = True
+        Me.Label16.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label16.Location = New System.Drawing.Point(42, 334)
+        Me.Label16.Name = "Label16"
+        Me.Label16.Size = New System.Drawing.Size(14, 13)
+        Me.Label16.TabIndex = 19
+        Me.Label16.Text = "9"
+        '
+        'txtbx_macro8
+        '
+        Me.txtbx_macro8.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.txtbx_macro8.Location = New System.Drawing.Point(74, 301)
+        Me.txtbx_macro8.Name = "txtbx_macro8"
+        Me.txtbx_macro8.Size = New System.Drawing.Size(418, 20)
+        Me.txtbx_macro8.TabIndex = 9
+        '
+        'Label17
+        '
+        Me.Label17.AutoSize = True
+        Me.Label17.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label17.Location = New System.Drawing.Point(42, 304)
+        Me.Label17.Name = "Label17"
+        Me.Label17.Size = New System.Drawing.Size(14, 13)
+        Me.Label17.TabIndex = 17
+        Me.Label17.Text = "8"
+        '
+        'txtbx_macro7
+        '
+        Me.txtbx_macro7.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.txtbx_macro7.Location = New System.Drawing.Point(74, 271)
+        Me.txtbx_macro7.Name = "txtbx_macro7"
+        Me.txtbx_macro7.Size = New System.Drawing.Size(418, 20)
+        Me.txtbx_macro7.TabIndex = 8
+        '
+        'Label18
+        '
+        Me.Label18.AutoSize = True
+        Me.Label18.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label18.Location = New System.Drawing.Point(42, 274)
+        Me.Label18.Name = "Label18"
+        Me.Label18.Size = New System.Drawing.Size(14, 13)
+        Me.Label18.TabIndex = 15
+        Me.Label18.Text = "7"
+        '
+        'txtbx_macro6
+        '
+        Me.txtbx_macro6.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.txtbx_macro6.Location = New System.Drawing.Point(74, 241)
+        Me.txtbx_macro6.Name = "txtbx_macro6"
+        Me.txtbx_macro6.Size = New System.Drawing.Size(418, 20)
+        Me.txtbx_macro6.TabIndex = 7
+        '
+        'Label19
+        '
+        Me.Label19.AutoSize = True
+        Me.Label19.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label19.Location = New System.Drawing.Point(42, 244)
+        Me.Label19.Name = "Label19"
+        Me.Label19.Size = New System.Drawing.Size(14, 13)
+        Me.Label19.TabIndex = 13
+        Me.Label19.Text = "6"
+        '
+        'txtbx_macro5
+        '
+        Me.txtbx_macro5.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.txtbx_macro5.Location = New System.Drawing.Point(74, 212)
+        Me.txtbx_macro5.Name = "txtbx_macro5"
+        Me.txtbx_macro5.Size = New System.Drawing.Size(418, 20)
+        Me.txtbx_macro5.TabIndex = 6
+        '
+        'Label20
+        '
+        Me.Label20.AutoSize = True
+        Me.Label20.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.Label20.Location = New System.Drawing.Point(42, 215)
+        Me.Label20.Name = "Label20"
+        Me.Label20.Size = New System.Drawing.Size(14, 13)
+        Me.Label20.TabIndex = 11
+        Me.Label20.Text = "5"
+        '
+        'btn_save_macro
+        '
+        Me.btn_save_macro.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.btn_save_macro.Location = New System.Drawing.Point(601, 144)
+        Me.btn_save_macro.Name = "btn_save_macro"
+        Me.btn_save_macro.Size = New System.Drawing.Size(122, 100)
+        Me.btn_save_macro.TabIndex = 20
+        Me.btn_save_macro.Text = "Save Macro"
+        Me.btn_save_macro.UseVisualStyleBackColor = True
+        '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
@@ -878,6 +1136,8 @@ Partial Class Form1
         Me.MenuStrip1.ResumeLayout(False)
         Me.MenuStrip1.PerformLayout()
         CType(Me.FileSystemWatcher1, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.TabPage2.ResumeLayout(False)
+        Me.TabPage2.PerformLayout()
         Me.ResumeLayout(False)
         Me.PerformLayout()
 
@@ -963,5 +1223,28 @@ Partial Class Form1
     Friend WithEvents Label8 As Label
     Friend WithEvents HelpToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ShortcutKeysReferenceToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents TabPage2 As TabPage
+    Friend WithEvents Label9 As Label
+    Friend WithEvents txtbx_macro9 As TextBox
+    Friend WithEvents Label16 As Label
+    Friend WithEvents txtbx_macro8 As TextBox
+    Friend WithEvents Label17 As Label
+    Friend WithEvents txtbx_macro7 As TextBox
+    Friend WithEvents Label18 As Label
+    Friend WithEvents txtbx_macro6 As TextBox
+    Friend WithEvents Label19 As Label
+    Friend WithEvents txtbx_macro5 As TextBox
+    Friend WithEvents Label20 As Label
+    Friend WithEvents txtbx_macro4 As TextBox
+    Friend WithEvents Label15 As Label
+    Friend WithEvents txtbx_macro3 As TextBox
+    Friend WithEvents Label14 As Label
     Private WithEvents combobx_baudRate2 As ComboBox
+    Friend WithEvents txtbx_macro2 As TextBox
+    Friend WithEvents Label13 As Label
+    Friend WithEvents txtbx_macro1 As TextBox
+    Friend WithEvents Label12 As Label
+    Friend WithEvents txtbx_macro0 As TextBox
+    Friend WithEvents Label11 As Label
+    Friend WithEvents btn_save_macro As Button
 End Class

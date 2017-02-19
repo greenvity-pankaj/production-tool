@@ -121,6 +121,7 @@ Public Class HomeScreen
     Public Shared userPLCTXPramasSet As New Boolean
     Public Shared userPLCRXPramasSet As New Boolean
     Private sweepTestRunning As New Boolean
+    Public Shared calStatus As Boolean = True
 
     '   Delegates
     Private Delegate Sub _initUIDelegate()
@@ -425,7 +426,8 @@ Public Class HomeScreen
         Dim clIP As String() = client.RemoteEndPoint.ToString.Split(":"c)
 
         Dim ip As String = clIP.First
-        lvClients.SelectedIndex = lvClients.FindString(ip)
+        lvClients.SelectedIndex = lvClients.FindStringExact(ip)
+
         If lvClients.SelectedIndex <> -1 Then
             lvClients.Items.RemoveAt(lvClients.SelectedIndex)
         End If
@@ -968,27 +970,42 @@ Public Class HomeScreen
                                     status.state = RunTest.states.STATE_PREPARE_REFERENCE
 
                                 End If
+
                                 executeTests(status)
 
-                            End If
-
-                            If resp.rsp = response.FAILED Then
+                                '  End If
+                            ElseIf resp.rsp = response.FAILED Then
                                 If c.calStatus = RFCalibStatus.RF_CALIBRATION_FAILED Then
-                                    MsgBox("DUT Manual RF Calibration Required", MsgBoxStyle.Critical)
-                                    enableUI()
-                                    clearBar()
-                                    setStatusvarNull()
-                                    btn_ShowResults.Enabled = False
+                                    calStatus = False
+                                    'MsgBox("DUT Manual RF Calibration Required", MsgBoxStyle.Critical)
+                                    dumpMsg("-------------------------")
+                                    dumpMsg("DUT Manual RF Calibration Required")
+                                    dumpMsg("RF Tests Removed")
+                                    dumpMsg("-------------------------" & vbCrLf)
 
-                                    start_time = Nothing
-                                    stop_time = Nothing
-                                    elapsed_time = Nothing
-                                    testRunning = False
+                                    disableRFRXSweep()
+                                    disableRFTXSweep()
+                                    If qExecStatus.Count = 0 Then
+                                        setStatusvarNull()
+                                        Exit Select
+                                    End If
 
-                                    ' clear test parameter queues
-                                    sweepParamList.Clear()
-                                    RFChannelParamList.Clear()
+                                    updateBar()
+                                    If qExecStatus.First = tests.TEST_ID_PLC_TX Or qExecStatus.First = tests.TEST_ID_PLC_TX_SWEEP Then
+
+                                        status.test = tests.TEST_ID_PLC_TX
+                                        status.state = RunTest.states.STATE_START_TEST_DUT
+
+                                    ElseIf qExecStatus.First = tests.TEST_ID_PLC_RX Or qExecStatus.First = tests.TEST_ID_PLC_RX_SWEEP Then
+
+                                        status.test = tests.TEST_ID_PLC_RX
+                                        status.state = RunTest.states.STATE_PREPARE_DUT
+                                    End If
+                                    executeTests(status)
+                                    'RFChannelParamList.Clear()
+
                                 End If
+
                             End If
                             Exit Select
 
@@ -1868,20 +1885,31 @@ Public Class HomeScreen
 
     End Sub
     Private Sub display_test_color()
-        If ((plc_test_color = True) And (rf_test_color = True)) Then
-            pbox_test_result_visual.BackColor = Color.ForestGreen
-            lbl_test_result.Text = "All Test Passed"
-        ElseIf plc_test_color = False And rf_test_color = True Then
-            pbox_test_result_visual.BackColor = Color.Blue
-            lbl_test_result.Text = "PLC Test Failed"
-        ElseIf plc_test_color = True And rf_test_color = False Then
-            pbox_test_result_visual.BackColor = Color.Orange
-            lbl_test_result.Text = "RF Test Failed"
-        ElseIf plc_test_color = False And rf_test_color = False Then
-            pbox_test_result_visual.BackColor = Color.DarkRed
-            lbl_test_result.Text = "All Test Failed"
-        End If
 
+        If calStatus = False Then
+            If plc_test_color = True Then
+                pbox_test_result_visual.BackColor = Color.Black
+                lbl_test_result.Text = "Cal. failed & PLC passed"
+            Else
+                pbox_test_result_visual.BackColor = Color.DarkRed
+                lbl_test_result.Text = "Cal. failed & PLC failed"
+            End If
+        Else
+
+            If ((plc_test_color = True) And (rf_test_color = True)) Then
+                pbox_test_result_visual.BackColor = Color.ForestGreen
+                lbl_test_result.Text = "All Test Passed"
+            ElseIf plc_test_color = False And rf_test_color = True Then
+                pbox_test_result_visual.BackColor = Color.Blue
+                lbl_test_result.Text = "PLC Test Failed"
+            ElseIf plc_test_color = True And rf_test_color = False Then
+                pbox_test_result_visual.BackColor = Color.Orange
+                lbl_test_result.Text = "RF Test Failed"
+            ElseIf plc_test_color = False And rf_test_color = False Then
+                pbox_test_result_visual.BackColor = Color.DarkRed
+                lbl_test_result.Text = "All Test Failed"
+            End If
+        End If
         lbl_test_result.Enabled = True
     End Sub
     Private Sub flashParams()
@@ -2330,8 +2358,8 @@ Public Class HomeScreen
         pbox_test_status.Image = Nothing
         pbox_test_result_visual.BackColor = Control.DefaultBackColor
         lbl_flashDone.Text = ""
-        lbl_test_result.text = ""
-
+        lbl_test_result.Text = ""
+        calStatus = True
         disableUI()
 
         ' Tests to be executed

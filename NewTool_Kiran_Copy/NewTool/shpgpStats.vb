@@ -244,6 +244,10 @@ Public Class shpgpStats
 
         Using sw
             '   Append Metadata
+            If HomeScreen.calStatus = False Then
+                sw.WriteLine("******************* RF Calibration Status *******************")
+                sw.WriteLine("RF Calibration Failed. Unable to start RF Tests" & vbCrLf)
+            End If
             If m.newTestRun = True Then
                 sw.WriteLine("******************* Test Run " & m.runCount & " *******************")
             End If

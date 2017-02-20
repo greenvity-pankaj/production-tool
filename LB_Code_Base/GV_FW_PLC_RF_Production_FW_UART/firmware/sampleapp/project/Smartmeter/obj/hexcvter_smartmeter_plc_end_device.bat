@@ -1,0 +1,8 @@
+c:\Keil\C51\BIN\Ohx51.exe smartmeter_plcendevice RANGE(B0:0 - B0:0xFFFF) HEXFILE (smartmeter_plcendevice.H00)
+c:\Keil\C51\BIN\Ohx51.exe smartmeter_plcendevice RANGE(B1:0 - B1:0xFFFF) HEXFILE (smartmeter_plcendevice.H01) OFFSET (-0x10000)
+c:\Keil\C51\BIN\Ohx51.exe smartmeter_plcendevice RANGE(B2:0 - B2:0xFFFF) HEXFILE (smartmeter_plcendevice.H02) OFFSET (-0x20000)
+c:\Keil\C51\BIN\Ohx51.exe smartmeter_plcendevice RANGE(B3:0 - B3:0xFFFF) HEXFILE (smartmeter_plcendevice.H03) OFFSET (-0x30000)
+c:\Keil\C51\BIN\Ohx51.exe smartmeter_plcendevice RANGE(B4:0 - B4:0xFFFF) HEXFILE (smartmeter_plcendevice.H04) OFFSET (-0x40000)
+c:\Keil\C51\BIN\Ohx51.exe smartmeter_plcendevice RANGE(B5:0 - B5:0xFFFF) HEXFILE (smartmeter_plcendevice.H05) OFFSET (-0x50000)
+c:\Keil\C51\BIN\Ohx51.exe smartmeter_plcendevice RANGE(B6:0 - B6:0xFFFF) HEXFILE (smartmeter_plcendevice.H06) OFFSET (-0x60000)
+c:\Keil\C51\BIN\Ohx51.exe smartmeter_plcendevice RANGE(B7:0 - B7:0xFFFF) HEXFILE (smartmeter_plcendevice.H07) OFFSET (-0x70000)
